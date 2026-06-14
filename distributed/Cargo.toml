@@ -1,0 +1,22 @@
+[package]
+name = "attentiondb-distributed"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+rand = { workspace = true }
+parking_lot = { workspace = true }
+reqwest = { version = "0.12", features = ["json"] }
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "distributed_bench"
+harness = false

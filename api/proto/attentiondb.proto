@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package attentiondb;
+
+service AttentionDB {
+    rpc Attend (AttendRequest) returns (AttendResponse);
+    rpc Insert (InsertRequest) returns (InsertResponse);
+    rpc Delete (DeleteRequest) returns (DeleteResponse);
+    rpc HealthCheck (HealthRequest) returns (HealthResponse);
+}
+
+message AttendRequest {
+    string collection = 1;
+    string query = 2;
+    repeated string heads = 3;
+    uint32 top_k = 4;
+    float min_weight = 5;
+    optional float temporal_decay = 6;
+}
+
+message AttendResponse {
+    repeated Result results = 1;
+    double latency_ms = 2;
+    float effective_sample_size = 3;
+}
+
+message Result {
+    string id = 1;
+    float score = 2;
+    map<string, string> fields = 3;
+}
+
+message InsertRequest {
+    string collection = 1;
+    map<string, string> fields = 2;
+}
+
+message InsertResponse {
+    string id = 1;
+    bool success = 2;
+}
+
+message DeleteRequest {
+    string collection = 1;
+    string id = 2;
+}
+
+message DeleteResponse {
+    bool success = 1;
+}
+
+message HealthRequest {}
+message HealthResponse {
+    string status = 1;
+    string version = 2;
+}

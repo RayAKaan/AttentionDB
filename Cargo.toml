@@ -1,0 +1,31 @@
+[workspace]
+members = [
+    "storage",
+    "hnsw",
+    "query",
+    "multihead",
+    "api",
+    "learned",
+    "distributed",
+]
+
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Rayyan Kaan"]
+license = "MIT"
+repository = "https://github.com/RayAKaan/AttentionDB"
+
+[workspace.dependencies]
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
+uuid = { version = "1.7", features = ["v4", "serde"] }
+rand = "0.8"
+tokio = { version = "1.37", features = ["full"] }
+rayon = "1.10"
+parking_lot = "0.12"
+criterion = { version = "0.5", features = ["html_reports"] }
+tempfile = "3.10"
+serde_json = "1.0"

@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: attentiondb
+spec:
+  serviceName: attentiondb
+  replicas: 3
+  selector:
+    matchLabels:
+      app: attentiondb
+  template:
+    metadata:
+      labels:
+        app: attentiondb
+    spec:
+      containers:
+      - name: attentiondb
+        image: attentiondb:latest
+        ports:
+        - containerPort: 7400
+          name: grpc
+        - containerPort: 8080
+          name: rest
+        env:
+        - name: NODE_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: RAFT_PEERS
+          value: "attentiondb-0.attentiondb:7400,attentiondb-1.attentiondb:7400,attentiondb-2.attentiondb:7400"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: attentiondb
+spec:
+  clusterIP: None
+  selector:
+    app: attentiondb
+  ports:
+  - port: 7400
+    name: grpc
+  - port: 8080
+    name: rest

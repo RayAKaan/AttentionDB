@@ -1,0 +1,27 @@
+[package]
+name = "attentiondb-learned"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+ndarray = "0.15"
+ndarray-rand = "0.14"
+rand = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+rayon = { workspace = true }
+tch = { version = "0.15", optional = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "training_bench"
+harness = false
+
+[features]
+default = []
+pytorch = ["tch"]

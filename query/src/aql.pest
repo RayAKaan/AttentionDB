@@ -1,0 +1,17 @@
+// AQL Grammar for AttentionDB Phase 3
+
+WHITESPACE = _{ " " | "\t" | "\n" | "\r" }
+
+query = { "ATTEND" ~ "TO" ~ identifier ~ "WHERE" ~ "QUERY" ~ query_text ~ ("HEADS" ~ heads)? ~ ("TOP_K" ~ top_k)? ~ ("MIN_WEIGHT" ~ min_weight)? ~ ("TEMPORAL_DECAY" ~ temporal_decay)? ~ EOI }
+
+identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+
+query_text = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
+
+heads = { "[" ~ (identifier ~ ("," ~ identifier)*)? ~ "]" }
+
+number = @{ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
+
+top_k = { number }
+min_weight = { number }
+temporal_decay = { number }
