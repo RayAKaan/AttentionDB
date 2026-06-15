@@ -17,3 +17,5 @@ Thumbs.db
 *.log
 hnsw_graphs/
 results*.json
+hnsw/data/
+hnsw/recall_results.json

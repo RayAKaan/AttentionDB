@@ -22,6 +22,7 @@ cudarc = { version = "0.12", optional = true, default-features = false }
 tempfile = { workspace = true }
 criterion = { workspace = true }
 approx = "0.5"
+clap = { version = "4", features = ["derive"] }
 
 [[bench]]
 name = "hnsw_bench"
