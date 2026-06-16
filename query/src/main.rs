@@ -96,7 +96,7 @@ fn main() {
     }
 
     // Execute ALTER via the executor
-    let alter_result = execute_statement(&alter_parsed, None).unwrap();
+    let alter_result = execute_statement(&alter_parsed, None, None).unwrap();
     println!("\n→ Executor result: {}", match &alter_result {
         ExecuteResult::DdlResult { message, .. } => message,
         _ => "unknown",

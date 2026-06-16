@@ -118,7 +118,7 @@ fn test_alter_collection_ddl() {
 fn test_alter_collection_executor() {
     let aql = r#"ALTER COLLECTION metrics SET (ef_search = 128, exact_rerank = false)"#;
     let parsed = parse_aql(aql).unwrap();
-    let result = execute_statement(&parsed, None).unwrap();
+    let result = execute_statement(&parsed, None, None).unwrap();
     match result {
         ExecuteResult::DdlResult { collection, message } => {
             assert_eq!(collection, "metrics");
