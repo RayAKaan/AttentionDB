@@ -2,6 +2,7 @@ use hnsw_rs::hnsw::{Hnsw, Neighbour};
 use hnsw_rs::prelude::*;
 use std::path::Path;
 use std::collections::HashMap;
+use std::sync::Arc;
 use serde::{Serialize, Deserialize};
 use crate::error::HNSWError;
 use crate::gpu::{GpuBackend, CpuBackend};
@@ -62,6 +63,18 @@ impl HNSWConfig {
     }
 }
 
+impl From<CollectionSettings> for HNSWConfig {
+    fn from(settings: CollectionSettings) -> Self {
+        HNSWConfig {
+            max_nb_connection: settings.max_nb_connection,
+            ef_construction: settings.ef_construction,
+            ef_search: settings.ef_search,
+            store_vectors: true,
+            max_elements: 100_000,
+        }
+    }
+}
+
 pub struct HNSWIndex {
     pub head_name: String,
     pub dim: usize,
@@ -71,7 +84,11 @@ pub struct HNSWIndex {
     pub is_built: bool,
     pub(crate) vectors: Vec<(u64, Vec<f32>)>,
     id_to_idx: HashMap<u64, usize>,
-    _pins: Vec<Box<[f32]>>,
+    /// Arc references keep vector data alive for the lifetime of the index.
+    /// When `insert` is called, the vector is cloned into a `Vec<f32>` that
+    /// is stored both in `vectors` and in `_arc_refs`. The `Arc` ensures the
+    /// backing memory is not freed while `hnsw_rs` holds a raw reference.
+    _arc_refs: Vec<Arc<Vec<f32>>>,
     gpu_backend: Box<dyn GpuBackend>,
 }
 
@@ -94,12 +111,11 @@ impl HNSWIndex {
             is_built: false,
             vectors: Vec::new(),
             id_to_idx: HashMap::new(),
-            _pins: Vec::new(),
+            _arc_refs: Vec::new(),
             gpu_backend: Box::new(CpuBackend),
         }
     }
 
-    /// Create with custom CollectionSettings (validated)
     pub fn with_settings(
         head_name: &str,
         dim: usize,
@@ -112,7 +128,6 @@ impl HNSWIndex {
         Ok(index)
     }
 
-    /// Update collection settings at runtime
     pub fn update_settings(&mut self, settings: CollectionSettings) -> Result<(), HNSWError> {
         settings.validate().map_err(|e| HNSWError::InvalidConfig(e))?;
         self.settings = settings;
@@ -130,10 +145,14 @@ impl HNSWIndex {
             return Err(HNSWError::DimensionMismatch { expected: self.dim, got: vector.len() });
         }
 
-        let boxed: Box<[f32]> = vector.to_vec().into_boxed_slice();
-        let reference: &'static [f32] = unsafe { &*(&*boxed as *const [f32]) };
-        self._pins.push(boxed);
-        self.inner.insert((reference, id as usize));
+        let arc_vec = Arc::new(vector.to_vec());
+        let reference: &[f32] = &arc_vec;
+        // SAFETY: hnsw_rs stores a 'static reference, but we keep the Arc alive
+        // in _arc_refs for the entire lifetime of the index, so the reference
+        // remains valid.
+        let static_ref: &'static [f32] = unsafe { &*(reference as *const [f32]) };
+        self.inner.insert((static_ref, id as usize));
+        self._arc_refs.push(arc_vec);
         self.is_built = true;
 
         if self.config.store_vectors {
@@ -223,22 +242,18 @@ impl HNSWIndex {
         self.config.ef_search = ef;
     }
 
-    /// Save to a directory (metadata.json + vectors.bin).
-    /// Rebuilds the graph from vectors on load.
     pub fn save(&self, dir: &Path) -> Result<(), HNSWError> {
         crate::persistence::save_index(self, dir)
             .map_err(|e| HNSWError::Persistence(e.to_string()))?;
         Ok(())
     }
 
-    /// Load from a directory previously saved with `save()`.
     pub fn load(dir: &Path) -> Result<Self, HNSWError> {
         let index = crate::persistence::load_index(dir)
             .map_err(|e| HNSWError::Persistence(e.to_string()))?;
         Ok(index)
     }
 
-    /// Load from a directory with progress reporting.
     pub fn load_with_progress<F>(
         dir: &Path,
         progress_callback: F,
@@ -251,7 +266,6 @@ impl HNSWIndex {
         Ok(index)
     }
 
-    /// Append new vectors to this index and persist them (incremental update)
     pub fn append_vectors(
         &mut self,
         dir: &Path,

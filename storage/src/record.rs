@@ -1,5 +1,3 @@
-//! Record definition and serialization for AttentionDB Phase 1
-
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use std::collections::HashMap;
@@ -10,7 +8,7 @@ pub struct Record {
     pub version: u64,
     pub timestamp: i64,
     pub fields: HashMap<String, serde_json::Value>,
-    pub k_vecs: Vec<Vec<f32>>,
+    pub k_vecs: HashMap<String, Vec<f32>>,
     pub v_vecs: Vec<Vec<f32>>,
     pub t_embed: Vec<f32>,
     pub schema_id: Option<u32>,
@@ -24,7 +22,7 @@ impl Record {
             version: 1,
             timestamp: chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0),
             fields,
-            k_vecs: vec![],
+            k_vecs: HashMap::new(),
             v_vecs: vec![],
             t_embed: vec![0.0; 64],
             schema_id: None,

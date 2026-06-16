@@ -55,7 +55,7 @@ fn test_search_with_rerank() {
 
 #[test]
 fn test_multi_head_fusion() {
-    let mut manager = HeadIndexManager::new(8);
+    let manager = HeadIndexManager::new(8);
     manager.add_head("a");
     manager.add_head("b");
 
@@ -73,7 +73,7 @@ fn test_multi_head_fusion() {
 
 #[test]
 fn test_multi_head_weighted() {
-    let mut manager = HeadIndexManager::new(8);
+    let manager = HeadIndexManager::new(8);
     manager.add_head("a");
     manager.add_head("b");
 
@@ -140,7 +140,7 @@ fn test_get_vector() {
 
 #[test]
 fn test_list_and_count_heads() {
-    let mut manager = HeadIndexManager::new(8);
+    let manager = HeadIndexManager::new(8);
     assert_eq!(manager.head_count(), 0);
 
     manager.add_head("a");
@@ -153,7 +153,7 @@ fn test_list_and_count_heads() {
 
 #[test]
 fn test_remove_head() {
-    let mut manager = HeadIndexManager::new(8);
+    let manager = HeadIndexManager::new(8);
     manager.add_head("a");
     manager.add_head("b");
     manager.remove_head("a").unwrap();

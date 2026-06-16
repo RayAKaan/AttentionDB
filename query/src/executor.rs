@@ -20,52 +20,8 @@ pub enum ExecuteResult {
 pub struct QueryExecutor;
 
 impl QueryExecutor {
-    /// Execute a physical plan against a query vector.
-    /// In production this calls into Phase 2 HNSW indexes.
-    pub fn execute(plan: &PhysicalPlan, query_vector: &[f32]) -> Result<QueryResult, QueryError> {
-        let start = std::time::Instant::now();
-
-        if query_vector.is_empty() {
-            return Err(QueryError::Execution("Empty query vector".into()));
-        }
-
-        let head_count = plan.hnsw_search.heads.len();
-        if head_count == 0 {
-            return Err(QueryError::Execution("No heads specified in plan".into()));
-        }
-
-        let candidate_count = plan.hnsw_search.k * head_count;
-        let ids: Vec<u64> = (0..candidate_count as u64).collect();
-        let scores: Vec<f32> = (0..candidate_count)
-            .map(|i| 1.0 - (i as f32 / candidate_count as f32) * 0.5)
-            .collect();
-
-        let mut filtered: Vec<(u64, f32)> = ids.into_iter()
-            .zip(scores.into_iter())
-            .filter(|(_, s)| *s >= plan.min_weight)
-            .take(plan.top_k)
-            .collect();
-
-        if let Some(ref _rerank) = plan.exact_rerank {
-            filtered.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-            filtered.truncate(plan.top_k);
-        }
-
-        let latency = start.elapsed().as_secs_f64() * 1000.0;
-
-        let (final_ids, final_scores): (Vec<_>, Vec<_>) = filtered.into_iter().unzip();
-
-        Ok(QueryResult {
-            ids: final_ids,
-            scores: final_scores,
-            latency_ms: latency,
-            plan: format!("HNSW(ef={},k={}) + Filter(min={}) + Rerank",
-                         plan.hnsw_search.ef, plan.hnsw_search.k, plan.min_weight),
-        })
-    }
-
     /// Execute a physical plan against a real HNSW index.
-    /// Unlike `execute()`, this calls `index.search()` instead of returning placeholder results.
+    /// This is the only query execution path — no placeholder fallback.
     pub fn execute_on_index(
         plan: &PhysicalPlan,
         index: &attentiondb_hnsw::HNSWIndex,
@@ -90,34 +46,19 @@ impl QueryExecutor {
             plan: format!("RealHNSW(ef={},k={})", plan.hnsw_search.ef, plan.top_k),
         })
     }
-
-    /// Execute a query with a rich result description
-    pub fn execute_with_status(plan: &PhysicalPlan, query_vector: &[f32]) -> Result<(QueryResult, String), QueryError> {
-        let result = Self::execute(plan, query_vector)?;
-        let status = format!(
-            "Executed plan: {} | Heads: {} | Top-K: {} | Results: {} | Latency: {:.3}ms",
-            result.plan,
-            plan.hnsw_search.heads.len(),
-            plan.top_k,
-            result.ids.len(),
-            result.latency_ms,
-        );
-        Ok((result, status))
-    }
 }
 
 /// Execute a parsed AQL statement (query or DDL).
 ///
-/// If `indexes` is provided and the collection exists, the query path will
-/// call `execute_on_index` for real HNSW search instead of placeholder results.
+/// The `indexes` parameter must point to the collection's head index map.
+/// DDL-only callers (CREATE, ALTER) should pass an empty HashMap.
 pub fn execute_statement(
     statement: &AQLStatement,
-    indexes: Option<&HashMap<String, attentiondb_hnsw::HNSWIndex>>,
+    indexes: &HashMap<String, attentiondb_hnsw::HNSWIndex>,
     query_vector: Option<&[f32]>,
 ) -> Result<ExecuteResult, QueryError> {
     match statement {
         AQLStatement::Query(query) => {
-            // Build a plan from the parsed query (simplified — real planner is more complex)
             use crate::planner::*;
             let heads: Vec<(String, f32)> = query.heads.iter().map(|h| (h.clone(), 1.0)).collect();
             let plan = PhysicalPlan {
@@ -133,17 +74,10 @@ pub fn execute_statement(
             };
             let vec = query_vector.ok_or_else(|| QueryError::Execution("Query vector required".into()))?;
 
-            // Use real search if an index is available, otherwise placeholder fallback
-            let result = if let Some(indexes) = indexes {
-                if let Some(index) = indexes.get(&query.collection) {
-                    QueryExecutor::execute_on_index(&plan, index, vec)?
-                } else {
-                    QueryExecutor::execute(&plan, vec)?
-                }
-            } else {
-                QueryExecutor::execute(&plan, vec)?
-            };
+            let index = indexes.get(&query.collection)
+                .ok_or_else(|| QueryError::Execution(format!("Collection '{}' not found", query.collection)))?;
 
+            let result = QueryExecutor::execute_on_index(&plan, index, vec)?;
             Ok(ExecuteResult::QueryResult(result))
         }
         AQLStatement::CreateCollection(coll) => {
@@ -190,59 +124,42 @@ pub fn execute_statement(
 mod tests {
     use super::*;
     use crate::planner::*;
+    use attentiondb_hnsw::HNSWConfig;
 
-    #[test]
-    fn test_execute_empty_vector() {
-        let plan = PhysicalPlan {
-            hnsw_search: HNSWSearchStep { heads: vec![("semantic".into(), 1.0)], ef: 64, k: 30 },
-            exact_rerank: None,
-            filter_steps: vec![],
-            top_k: 10,
-            min_weight: 0.01,
-        };
-        let result = QueryExecutor::execute(&plan, &[]);
-        assert!(result.is_err());
+    fn create_test_index() -> attentiondb_hnsw::HNSWIndex {
+        let mut index = attentiondb_hnsw::HNSWIndex::new("test", 4, HNSWConfig::default());
+        index.insert(1, &[1.0, 0.0, 0.0, 0.0]).unwrap();
+        index.insert(2, &[0.0, 1.0, 0.0, 0.0]).unwrap();
+        index
     }
 
     #[test]
-    fn test_execute_no_heads() {
-        let plan = PhysicalPlan {
-            hnsw_search: HNSWSearchStep { heads: vec![], ef: 64, k: 30 },
-            exact_rerank: None,
-            filter_steps: vec![],
-            top_k: 10,
-            min_weight: 0.01,
-        };
-        let result = QueryExecutor::execute(&plan, &[0.1; 256]);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_execute_basic() {
+    fn test_execute_on_index_basic() {
         let plan = PhysicalPlan {
             hnsw_search: HNSWSearchStep { heads: vec![("semantic".into(), 1.0)], ef: 64, k: 30 },
-            exact_rerank: Some(ExactRerankStep { top_candidates: 30 }),
+            exact_rerank: None,
             filter_steps: vec![],
             top_k: 5,
             min_weight: 0.01,
         };
-        let result = QueryExecutor::execute(&plan, &[0.1; 256]).unwrap();
-        assert_eq!(result.ids.len(), 5);
+        let index = create_test_index();
+        let result = QueryExecutor::execute_on_index(&plan, &index, &[1.0, 0.0, 0.0, 0.0]).unwrap();
+        assert_eq!(result.ids.len(), 2);
         assert!(result.latency_ms >= 0.0);
     }
 
     #[test]
-    fn test_execute_with_status() {
+    fn test_execute_on_index_empty_vector() {
         let plan = PhysicalPlan {
-            hnsw_search: HNSWSearchStep { heads: vec![("a".into(), 1.0), ("b".into(), 0.5)], ef: 64, k: 30 },
+            hnsw_search: HNSWSearchStep { heads: vec![("semantic".into(), 1.0)], ef: 64, k: 30 },
             exact_rerank: None,
             filter_steps: vec![],
             top_k: 10,
-            min_weight: 0.05,
+            min_weight: 0.01,
         };
-        let (_result, status) = QueryExecutor::execute_with_status(&plan, &[0.1; 256]).unwrap();
-        assert!(status.contains("Heads: 2"));
-        assert!(status.contains("Top-K: 10"));
+        let index = create_test_index();
+        let result = QueryExecutor::execute_on_index(&plan, &index, &[]);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -250,7 +167,8 @@ mod tests {
         use crate::parser::parse_aql;
         let aql = r#"CREATE COLLECTION papers (title TEXT) WITH (ef_search = 256, similarity = "cosine")"#;
         let stmt = parse_aql(aql).unwrap();
-        let result = execute_statement(&stmt, None, None).unwrap();
+        let empty_indexes = HashMap::new();
+        let result = execute_statement(&stmt, &empty_indexes, None).unwrap();
         match result {
             ExecuteResult::DdlResult { collection, message } => {
                 assert_eq!(collection, "papers");
@@ -266,12 +184,27 @@ mod tests {
         use crate::parser::parse_aql;
         let aql = r#"ATTEND TO docs WHERE QUERY "test" TOP_K 5"#;
         let stmt = parse_aql(aql).unwrap();
-        let result = execute_statement(&stmt, None, Some(&[0.1; 256])).unwrap();
+
+        let mut indexes = HashMap::new();
+        let index = create_test_index();
+        indexes.insert("docs".to_string(), index);
+
+        let result = execute_statement(&stmt, &indexes, Some(&[1.0, 0.0, 0.0, 0.0])).unwrap();
         match result {
             ExecuteResult::QueryResult(r) => {
-                assert_eq!(r.ids.len(), 5);
+                assert!(!r.ids.is_empty());
             }
             _ => panic!("Expected QueryResult"),
         }
+    }
+
+    #[test]
+    fn test_execute_query_collection_not_found() {
+        use crate::parser::parse_aql;
+        let aql = r#"ATTEND TO nonexistent WHERE QUERY "test" TOP_K 5"#;
+        let stmt = parse_aql(aql).unwrap();
+        let empty_indexes = HashMap::new();
+        let result = execute_statement(&stmt, &empty_indexes, Some(&[1.0, 0.0, 0.0, 0.0]));
+        assert!(result.is_err());
     }
 }

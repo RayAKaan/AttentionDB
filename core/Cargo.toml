@@ -1,0 +1,23 @@
+[package]
+name = "attentiondb-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+attentiondb-hnsw = { path = "../hnsw" }
+attentiondb-query = { path = "../query" }
+attentiondb-multihead = { path = "../multihead" }
+attentiondb-storage = { path = "../storage" }
+attentiondb-distributed = { path = "../distributed" }
+attentiondb-learned = { path = "../learned" }
+thiserror = { workspace = true }
+serde = { workspace = true }
+parking_lot = { workspace = true }
+uuid = { workspace = true }
+rand = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

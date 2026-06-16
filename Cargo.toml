@@ -7,6 +7,7 @@ members = [
     "api",
     "learned",
     "distributed",
+    "core",
 ]
 
 resolver = "2"
@@ -25,7 +26,7 @@ attentiondb-query = { path = "query" }
 attentiondb-multihead = { path = "multihead" }
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Rayyan Kaan"]
 license = "MIT"

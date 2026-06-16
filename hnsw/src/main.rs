@@ -7,7 +7,7 @@ fn main() {
     println!("║     AttentionDB Phase 2 — HNSW Index Layer (Amazing)       ║");
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
-    let mut manager = HeadIndexManager::new(256);
+    let manager = HeadIndexManager::new(256);
 
     let config = HNSWConfig::new()
         .with_ef_search(64)
@@ -37,7 +37,7 @@ fn main() {
     for head in manager.list_heads() {
         if let Ok(index) = manager.get_head(&head) {
             println!("   {:<12}  {:>6} vectors",
-                     head, index.len());
+                     head, index.read().len());
         }
     }
 
@@ -45,7 +45,7 @@ fn main() {
 
     println!("\n→ Raw HNSW Search (semantic):");
     if let Ok(index) = manager.get_head("semantic") {
-        let results = index.search(&query, 5, None).unwrap();
+        let results = index.read().search(&query, 5, None).unwrap();
         for (id, dist) in results {
             println!("   ID: {:>6}  Distance: {:.4}", id, dist);
         }
@@ -53,7 +53,7 @@ fn main() {
 
     println!("\n→ Search + Exact Rerank (semantic):");
     if let Ok(index) = manager.get_head("semantic") {
-        let results = index.search_with_rerank(&query, 5, None).unwrap();
+        let results = index.read().search_with_rerank(&query, 5, None).unwrap();
         for (id, score) in results {
             println!("   ID: {:>6}  Score: {:.4}", id, score);
         }

@@ -1,5 +1,3 @@
-//! Error types for AttentionDB storage layer
-
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -18,4 +16,10 @@ pub enum StorageError {
 
     #[error("Checksum mismatch")]
     ChecksumMismatch,
+
+    #[error("SSTable error: {0}")]
+    Sstable(String),
+
+    #[error("Projection error: {0}")]
+    Projection(String),
 }

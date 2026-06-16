@@ -1,39 +1,40 @@
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Arc;
+use parking_lot::RwLock;
 use crate::hnsw_index::{HNSWIndex, HNSWConfig};
 use crate::error::HNSWError;
 
 pub struct HeadIndexManager {
-    pub heads: HashMap<String, HNSWIndex>,
+    heads: RwLock<HashMap<String, Arc<RwLock<HNSWIndex>>>>,
     pub dim: usize,
 }
 
 impl HeadIndexManager {
     pub fn new(dim: usize) -> Self {
-        Self { heads: HashMap::new(), dim }
+        Self { heads: RwLock::new(HashMap::new()), dim }
     }
 
-    pub fn add_head(&mut self, name: &str) {
+    pub fn add_head(&self, name: &str) {
         let config = HNSWConfig::default();
-        let index = HNSWIndex::new(name, self.dim, config);
-        self.heads.insert(name.to_string(), index);
+        let index = Arc::new(RwLock::new(HNSWIndex::new(name, self.dim, config)));
+        self.heads.write().insert(name.to_string(), index);
     }
 
-    pub fn add_head_with_config(&mut self, name: &str, config: HNSWConfig) {
-        let index = HNSWIndex::new(name, self.dim, config);
-        self.heads.insert(name.to_string(), index);
+    pub fn add_head_with_config(&self, name: &str, config: HNSWConfig) {
+        let index = Arc::new(RwLock::new(HNSWIndex::new(name, self.dim, config)));
+        self.heads.write().insert(name.to_string(), index);
     }
 
-    pub fn get_head(&self, name: &str) -> Result<&HNSWIndex, HNSWError> {
-        self.heads.get(name).ok_or_else(|| HNSWError::HeadNotFound(name.to_string()))
+    pub fn get_head(&self, name: &str) -> Result<Arc<RwLock<HNSWIndex>>, HNSWError> {
+        self.heads.read().get(name).cloned()
+            .ok_or_else(|| HNSWError::HeadNotFound(name.to_string()))
     }
 
-    pub fn get_head_mut(&mut self, name: &str) -> Result<&mut HNSWIndex, HNSWError> {
-        self.heads.get_mut(name).ok_or_else(|| HNSWError::HeadNotFound(name.to_string()))
-    }
-
-    pub fn insert(&mut self, head: &str, id: u64, vector: &[f32]) -> Result<(), HNSWError> {
-        self.get_head_mut(head)?.insert(id, vector)
+    pub fn insert(&self, head: &str, id: u64, vector: &[f32]) -> Result<(), HNSWError> {
+        let idx = self.get_head(head)?;
+        let result = idx.write().insert(id, vector);
+        result
     }
 
     pub fn search_multi(
@@ -45,8 +46,8 @@ impl HeadIndexManager {
     ) -> Result<Vec<(u64, f32)>, HNSWError> {
         let mut all_results: Vec<(u64, f32)> = Vec::new();
         for head_name in heads {
-            if let Ok(index) = self.get_head(head_name) {
-                let results = index.search(query, k * 2, ef)?;
+            if let Ok(idx) = self.get_head(head_name) {
+                let results = idx.read().search(query, k * 2, ef)?;
                 all_results.extend(results);
             }
         }
@@ -64,8 +65,8 @@ impl HeadIndexManager {
     ) -> Result<Vec<(u64, f32)>, HNSWError> {
         let mut all_results: Vec<(u64, f32)> = Vec::new();
         for (head_name, weight) in heads {
-            if let Ok(index) = self.get_head(head_name) {
-                let results = index.search(query, k * 2, ef)?;
+            if let Ok(idx) = self.get_head(head_name) {
+                let results = idx.read().search(query, k * 2, ef)?;
                 for (id, dist) in results {
                     all_results.push((id, dist * weight));
                 }
@@ -76,28 +77,33 @@ impl HeadIndexManager {
         Ok(all_results)
     }
 
-    pub fn remove_head(&mut self, name: &str) -> Result<(), HNSWError> {
-        self.heads.remove(name).ok_or_else(|| HNSWError::HeadNotFound(name.to_string()))?;
+    pub fn remove_head(&self, name: &str) -> Result<(), HNSWError> {
+        self.heads.write().remove(name)
+            .ok_or_else(|| HNSWError::HeadNotFound(name.to_string()))?;
         Ok(())
     }
 
     pub fn save_all(&self, dir: &Path) -> Result<(), HNSWError> {
         std::fs::create_dir_all(dir)?;
-        for (name, index) in &self.heads {
-            index.save(&dir.join(name))?;
+        let heads = self.heads.read();
+        for (name, index) in heads.iter() {
+            let idx = index.read();
+            idx.save(&dir.join(name))?;
         }
         Ok(())
     }
 
     pub fn list_heads(&self) -> Vec<String> {
-        self.heads.keys().cloned().collect()
+        self.heads.read().keys().cloned().collect()
     }
 
     pub fn total_vectors(&self) -> usize {
-        self.heads.values().map(|h| h.len()).sum()
+        self.heads.read().values()
+            .map(|idx| idx.read().len())
+            .sum()
     }
 
     pub fn head_count(&self) -> usize {
-        self.heads.len()
+        self.heads.read().len()
     }
 }

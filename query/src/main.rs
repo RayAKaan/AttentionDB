@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use attentiondb_query::{parse_aql, plan_query, QueryExecutor, AQLStatement, ExecuteResult, execute_statement};
 
 fn main() {
@@ -5,7 +6,6 @@ fn main() {
     println!("║     AttentionDB Phase 3 — Query Engine + AQL Parser       ║");
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
-    // --- ATTEND query demo ---
     let aql = r#"
         ATTEND TO papers
         WHERE QUERY "attention mechanisms in transformers"
@@ -43,10 +43,11 @@ fn main() {
             println!("   Exact rerank:   {}", if plan.exact_rerank.is_some() { "yes" } else { "no" });
 
             println!("\n→ Executing...");
+            let index = attentiondb_hnsw::HNSWIndex::new("papers", 256, attentiondb_hnsw::HNSWConfig::default());
             let query_vector = vec![0.1; 256];
-            let (result, status) = QueryExecutor::execute_with_status(&plan, &query_vector).unwrap();
-
-            println!("   Status: {}", status);
+            let result = QueryExecutor::execute_on_index(&plan, &index, &query_vector).unwrap();
+            println!("   Status: Executed plan: {} | Heads: {} | Top-K: {} | Results: {} | Latency: {:.3}ms",
+                     result.plan, plan.hnsw_search.heads.len(), plan.top_k, result.ids.len(), result.latency_ms);
             println!("\n   Results:");
             for (i, (id, score)) in result.ids.iter().zip(result.scores.iter()).enumerate() {
                 println!("   {:>3}.  ID: {:>6}  Score: {:.4}", i + 1, id, score);
@@ -63,7 +64,6 @@ fn main() {
         }
     }
 
-    // --- CREATE COLLECTION DDL demo ---
     let ddl = r#"CREATE COLLECTION papers (title TEXT, body TEXT, year INT) WITH (ef_search = 256, similarity = "cosine")"#;
 
     println!("\n→ Input AQL (CREATE COLLECTION DDL):");
@@ -79,7 +79,6 @@ fn main() {
         _ => {}
     }
 
-    // --- ALTER COLLECTION DDL demo ---
     let alter = r#"ALTER COLLECTION papers SET (ef_search = 512, max_connections = 64, exact_rerank = false)"#;
 
     println!("\n→ Input AQL (ALTER COLLECTION DDL):");
@@ -95,8 +94,8 @@ fn main() {
         _ => {}
     }
 
-    // Execute ALTER via the executor
-    let alter_result = execute_statement(&alter_parsed, None, None).unwrap();
+    let empty_indexes = HashMap::new();
+    let alter_result = execute_statement(&alter_parsed, &empty_indexes, None).unwrap();
     println!("\n→ Executor result: {}", match &alter_result {
         ExecuteResult::DdlResult { message, .. } => message,
         _ => "unknown",
