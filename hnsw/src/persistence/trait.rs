@@ -33,14 +33,14 @@ impl IndexPersistence for VectorPersistence {
     }
 
     fn load(&self, dir: &Path) -> Result<HNSWIndex, PersistenceError> {
-        index_persistence::load_index(dir)
+        index_persistence::load_index(dir, None::<fn(index_persistence::LoadProgress)>)
     }
 
     fn load_with_progress<F>(&self, dir: &Path, callback: F) -> Result<HNSWIndex, PersistenceError>
     where
         F: FnMut(index_persistence::LoadProgress),
     {
-        index_persistence::load_index_with_progress(dir, callback)
+        index_persistence::load_index(dir, Some(callback))
     }
 
     fn append(&self, dir: &Path, vectors: &[(u64, Vec<f32>)]) -> Result<usize, PersistenceError> {

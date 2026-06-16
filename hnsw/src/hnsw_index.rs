@@ -249,7 +249,7 @@ impl HNSWIndex {
     }
 
     pub fn load(dir: &Path) -> Result<Self, HNSWError> {
-        let index = crate::persistence::load_index(dir)
+        let index = crate::persistence::load_index(dir, None::<fn(crate::persistence::LoadProgress)>)
             .map_err(|e| HNSWError::Persistence(e.to_string()))?;
         Ok(index)
     }
@@ -261,7 +261,7 @@ impl HNSWIndex {
     where
         F: FnMut(crate::persistence::LoadProgress),
     {
-        let index = crate::persistence::load_index_with_progress(dir, progress_callback)
+        let index = crate::persistence::load_index(dir, Some(progress_callback))
             .map_err(|e| HNSWError::Persistence(e.to_string()))?;
         Ok(index)
     }

@@ -154,20 +154,17 @@ fn migrate_metadata(metadata: &mut IndexMetadata) -> Result<(), PersistenceError
     }
 }
 
-/// Load an HNSW index from disk (rebuilds the graph)
-pub fn load_index(dir: &Path) -> Result<HNSWIndex, PersistenceError> {
-    load_index_inner(dir, None::<fn(LoadProgress)>)
-}
-
-/// Load an HNSW index with optional progress reporting
-pub fn load_index_with_progress<F>(
+/// Load an HNSW index from disk (rebuilds the graph).
+///
+/// Optionally accepts a progress callback that is invoked periodically during loading.
+pub fn load_index<F>(
     dir: &Path,
-    progress_callback: F,
+    progress: Option<F>,
 ) -> Result<HNSWIndex, PersistenceError>
 where
     F: FnMut(LoadProgress),
 {
-    load_index_inner(dir, Some(progress_callback))
+    load_index_inner(dir, progress)
 }
 
 fn load_index_inner<F>(

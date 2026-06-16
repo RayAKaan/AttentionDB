@@ -10,7 +10,9 @@
 pub mod error;
 pub mod index_persistence;
 pub mod r#trait;
+pub mod strategy;
 
 pub use error::PersistenceError;
-pub use index_persistence::{save_index, load_index, load_index_with_progress, append_vectors, IndexMetadata, LoadProgress};
+pub use index_persistence::{save_index, load_index, append_vectors, IndexMetadata, LoadProgress};
 pub use r#trait::{IndexPersistence, VectorPersistence};
+pub use strategy::{PersistenceStrategy, VectorRebuildPersistence};
