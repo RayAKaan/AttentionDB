@@ -130,23 +130,63 @@ pub fn append_vectors(dir: &Path, new_vectors: &[(u64, Vec<f32>)]) -> Result<usi
     Ok(existing_vectors.len())
 }
 
+/// Progress information during index loading
+#[derive(Debug, Clone)]
+pub struct LoadProgress {
+    pub total_vectors: usize,
+    pub loaded_vectors: usize,
+}
+
+fn migrate_metadata(metadata: &mut IndexMetadata) -> Result<(), PersistenceError> {
+    match metadata.version {
+        1 => {
+            metadata.version = 2;
+            if metadata.checksum.is_none() {
+                metadata.checksum = Some("legacy".to_string());
+            }
+            Ok(())
+        }
+        2 => Ok(()),
+        _ => Err(PersistenceError::InvalidMetadata(format!(
+            "Unsupported persistence version: {}",
+            metadata.version
+        ))),
+    }
+}
+
 /// Load an HNSW index from disk (rebuilds the graph)
 pub fn load_index(dir: &Path) -> Result<HNSWIndex, PersistenceError> {
+    load_index_inner(dir, None::<fn(LoadProgress)>)
+}
+
+/// Load an HNSW index with optional progress reporting
+pub fn load_index_with_progress<F>(
+    dir: &Path,
+    progress_callback: F,
+) -> Result<HNSWIndex, PersistenceError>
+where
+    F: FnMut(LoadProgress),
+{
+    load_index_inner(dir, Some(progress_callback))
+}
+
+fn load_index_inner<F>(
+    dir: &Path,
+    mut progress_callback: Option<F>,
+) -> Result<HNSWIndex, PersistenceError>
+where
+    F: FnMut(LoadProgress),
+{
     let meta_path = dir.join("metadata.json");
     if !meta_path.exists() {
         return Err(PersistenceError::IndexNotFound(dir.to_string_lossy().to_string()));
     }
 
     let meta_json = std::fs::read_to_string(&meta_path)?;
-    let metadata: IndexMetadata = serde_json::from_str(&meta_json)
+    let mut metadata: IndexMetadata = serde_json::from_str(&meta_json)
         .map_err(|e| PersistenceError::Deserialization(e.to_string()))?;
 
-    if metadata.version != 2 {
-        return Err(PersistenceError::InvalidMetadata(format!(
-            "Unsupported persistence version: {}. Expected version 2.",
-            metadata.version
-        )));
-    }
+    migrate_metadata(&mut metadata)?;
 
     let vectors_path = dir.join("vectors.bin");
     if !vectors_path.exists() {
@@ -160,7 +200,7 @@ pub fn load_index(dir: &Path) -> Result<HNSWIndex, PersistenceError> {
 
     let mut vectors = Vec::with_capacity(vector_count);
 
-    for _ in 0..vector_count {
+    for i in 0..vector_count {
         let mut id_buf = [0u8; 8];
         file.read_exact(&mut id_buf)?;
         let id = u64::from_le_bytes(id_buf);
@@ -184,6 +224,15 @@ pub fn load_index(dir: &Path) -> Result<HNSWIndex, PersistenceError> {
         }
 
         vectors.push((id, vec));
+
+        if let Some(ref mut cb) = progress_callback {
+            if i % 1000 == 0 || i == vector_count - 1 {
+                cb(LoadProgress {
+                    total_vectors: vector_count,
+                    loaded_vectors: i + 1,
+                });
+            }
+        }
     }
 
     if let Some(expected_checksum) = &metadata.checksum {

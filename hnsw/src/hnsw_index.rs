@@ -163,7 +163,7 @@ impl HNSWIndex {
         let ef = ef.unwrap_or(self.settings.ef_search);
         let neighbors: Vec<Neighbour> = self.inner.search(query, k, ef);
         let results: Vec<(u64, f32)> = neighbors.into_iter()
-            .map(|n| (n.d_id as u64, n.distance))
+            .map(|n| (n.d_id as u64, 1.0 - n.distance))
             .collect();
 
         Ok(results)
@@ -234,6 +234,19 @@ impl HNSWIndex {
     /// Load from a directory previously saved with `save()`.
     pub fn load(dir: &Path) -> Result<Self, HNSWError> {
         let index = crate::persistence::load_index(dir)
+            .map_err(|e| HNSWError::Persistence(e.to_string()))?;
+        Ok(index)
+    }
+
+    /// Load from a directory with progress reporting.
+    pub fn load_with_progress<F>(
+        dir: &Path,
+        progress_callback: F,
+    ) -> Result<Self, HNSWError>
+    where
+        F: FnMut(crate::persistence::LoadProgress),
+    {
+        let index = crate::persistence::load_index_with_progress(dir, progress_callback)
             .map_err(|e| HNSWError::Persistence(e.to_string()))?;
         Ok(index)
     }

@@ -11,6 +11,19 @@ members = [
 
 resolver = "2"
 
+[package]
+name = "attentiondb"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+
+[dev-dependencies]
+attentiondb-hnsw = { path = "hnsw" }
+attentiondb-query = { path = "query" }
+attentiondb-multihead = { path = "multihead" }
+
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
