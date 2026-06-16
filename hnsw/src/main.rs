@@ -73,8 +73,8 @@ fn main() {
     manager.save_all(Path::new("hnsw_graphs")).unwrap();
     println!("   Saved all heads to hnsw_graphs/");
 
-    let path = Path::new("hnsw_graphs/semantic.hnsw");
-    let loaded = attentiondb_hnsw::HNSWIndex::load(path, "semantic", 256).unwrap();
+    let path = Path::new("hnsw_graphs/semantic");
+    let loaded = attentiondb_hnsw::HNSWIndex::load(path).unwrap();
     println!("   Loaded semantic head: {} vectors\n", loaded.len());
 
     println!("✅ Phase 2 demo completed successfully!");

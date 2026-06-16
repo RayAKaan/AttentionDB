@@ -1,8 +1,21 @@
-// AQL Grammar for AttentionDB Phase 3
+query = { SOI ~ (attend | create_collection | alter_collection) ~ EOI }
 
-WHITESPACE = _{ " " | "\t" | "\n" | "\r" }
+alter_collection = { "ALTER" ~ "COLLECTION" ~ identifier ~ "SET" ~ "(" ~ setting_pair ~ ("," ~ setting_pair)* ~ ")" }
 
-query = { "ATTEND" ~ "TO" ~ identifier ~ "WHERE" ~ "QUERY" ~ query_text ~ ("HEADS" ~ heads)? ~ ("TOP_K" ~ top_k)? ~ ("MIN_WEIGHT" ~ min_weight)? ~ ("TEMPORAL_DECAY" ~ temporal_decay)? ~ EOI }
+attend = { "ATTEND" ~ "TO" ~ identifier ~ "WHERE" ~ "QUERY" ~ query_text ~ ("HEADS" ~ heads)? ~ ("TOP_K" ~ top_k_value)? ~ ("MIN_WEIGHT" ~ min_weight_value)? ~ ("TEMPORAL_DECAY" ~ temporal_decay_value)? }
+
+top_k_value = { number }
+min_weight_value = { number }
+temporal_decay_value = { number }
+
+create_collection = { "CREATE" ~ "COLLECTION" ~ identifier ~ "(" ~ field_list ~ ")" ~ ("WITH" ~ "(" ~ setting_pair ~ ("," ~ setting_pair)* ~ ")")? }
+
+field_list = { (field_def ~ ("," ~ field_def)*)? }
+field_def = { identifier ~ identifier }
+
+setting_pair = { setting_key ~ "=" ~ setting_value }
+setting_value = { string | number | boolean_ }
+setting_key = { identifier ~ ("." ~ identifier)* }
 
 identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
 
@@ -11,7 +24,8 @@ query_text = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 heads = { "[" ~ (identifier ~ ("," ~ identifier)*)? ~ "]" }
 
 number = @{ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
+boolean_ = { "true" | "false" }
 
-top_k = { number }
-min_weight = { number }
-temporal_decay = { number }
+string = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
+
+WHITESPACE = _{ " " | "\t" | "\n" | "\r" }

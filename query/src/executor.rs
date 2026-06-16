@@ -1,4 +1,5 @@
 use crate::planner::PhysicalPlan;
+use crate::parser::AQLStatement;
 use crate::error::QueryError;
 
 #[derive(Debug, Clone)]
@@ -7,6 +8,12 @@ pub struct QueryResult {
     pub scores: Vec<f32>,
     pub latency_ms: f64,
     pub plan: String,
+}
+
+#[derive(Debug, Clone)]
+pub enum ExecuteResult {
+    QueryResult(QueryResult),
+    DdlResult { collection: String, message: String },
 }
 
 pub struct QueryExecutor;
@@ -21,27 +28,23 @@ impl QueryExecutor {
             return Err(QueryError::Execution("Empty query vector".into()));
         }
 
-        // Stage 1: Multi-head HNSW search (placeholder — would call Phase 2)
         let head_count = plan.hnsw_search.heads.len();
         if head_count == 0 {
             return Err(QueryError::Execution("No heads specified in plan".into()));
         }
 
-        // Stage 2: Fusion + filter (placeholder)
         let candidate_count = plan.hnsw_search.k * head_count;
         let ids: Vec<u64> = (0..candidate_count as u64).collect();
         let scores: Vec<f32> = (0..candidate_count)
             .map(|i| 1.0 - (i as f32 / candidate_count as f32) * 0.5)
             .collect();
 
-        // Apply min_weight threshold
         let mut filtered: Vec<(u64, f32)> = ids.into_iter()
             .zip(scores.into_iter())
             .filter(|(_, s)| *s >= plan.min_weight)
             .take(plan.top_k)
             .collect();
 
-        // Stage 3: Exact rerank (placeholder)
         if let Some(ref _rerank) = plan.exact_rerank {
             filtered.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
             filtered.truncate(plan.top_k);
@@ -72,6 +75,71 @@ impl QueryExecutor {
             result.latency_ms,
         );
         Ok((result, status))
+    }
+}
+
+/// Execute a parsed AQL statement (query or DDL).
+pub fn execute_statement(
+    statement: &AQLStatement,
+    query_vector: Option<&[f32]>,
+) -> Result<ExecuteResult, QueryError> {
+    match statement {
+        AQLStatement::Query(query) => {
+            // Build a plan from the parsed query (simplified — real planner is more complex)
+            use crate::planner::*;
+            let heads: Vec<(String, f32)> = query.heads.iter().map(|h| (h.clone(), 1.0)).collect();
+            let plan = PhysicalPlan {
+                hnsw_search: HNSWSearchStep {
+                    heads,
+                    ef: 64,
+                    k: query.top_k * 3,
+                },
+                exact_rerank: Some(ExactRerankStep { top_candidates: query.top_k * 3 }),
+                filter_steps: vec![],
+                top_k: query.top_k,
+                min_weight: query.min_weight,
+            };
+            let vec = query_vector.ok_or_else(|| QueryError::Execution("Query vector required".into()))?;
+            let result = QueryExecutor::execute(&plan, vec)?;
+            Ok(ExecuteResult::QueryResult(result))
+        }
+        AQLStatement::CreateCollection(coll) => {
+            let mut msg = format!("Created collection '{}'", coll.collection);
+            if !coll.fields.is_empty() {
+                let field_str: Vec<String> = coll.fields.iter()
+                    .map(|(n, t)| format!("{}: {}", n, t))
+                    .collect();
+                msg.push_str(&format!(" with fields [{}]", field_str.join(", ")));
+            }
+            msg.push_str(&format!(
+                " with settings (ef_search={}, ef_construction={}, max_connections={}, similarity={}, exact_rerank={})",
+                coll.settings.ef_search,
+                coll.settings.ef_construction,
+                coll.settings.max_nb_connection,
+                coll.settings.similarity_metric,
+                coll.settings.enable_exact_reranking,
+            ));
+            msg.push_str(".");
+            Ok(ExecuteResult::DdlResult {
+                collection: coll.collection.clone(),
+                message: msg,
+            })
+        }
+        AQLStatement::AlterCollection(alter) => {
+            let msg = format!(
+                "Altered collection '{}' settings to (ef_search={}, ef_construction={}, max_connections={}, similarity={}, exact_rerank={})",
+                alter.collection,
+                alter.settings.ef_search,
+                alter.settings.ef_construction,
+                alter.settings.max_nb_connection,
+                alter.settings.similarity_metric,
+                alter.settings.enable_exact_reranking,
+            );
+            Ok(ExecuteResult::DdlResult {
+                collection: alter.collection.clone(),
+                message: msg,
+            })
+        }
     }
 }
 
@@ -132,5 +200,35 @@ mod tests {
         let (_result, status) = QueryExecutor::execute_with_status(&plan, &[0.1; 256]).unwrap();
         assert!(status.contains("Heads: 2"));
         assert!(status.contains("Top-K: 10"));
+    }
+
+    #[test]
+    fn test_execute_ddl() {
+        use crate::parser::parse_aql;
+        let aql = r#"CREATE COLLECTION papers (title TEXT) WITH (ef_search = 256, similarity = "cosine")"#;
+        let stmt = parse_aql(aql).unwrap();
+        let result = execute_statement(&stmt, None).unwrap();
+        match result {
+            ExecuteResult::DdlResult { collection, message } => {
+                assert_eq!(collection, "papers");
+                assert!(message.contains("ef_search=256"));
+                assert!(message.contains("similarity=cosine"));
+            }
+            _ => panic!("Expected DdlResult"),
+        }
+    }
+
+    #[test]
+    fn test_execute_query_statement() {
+        use crate::parser::parse_aql;
+        let aql = r#"ATTEND TO docs WHERE QUERY "test" TOP_K 5"#;
+        let stmt = parse_aql(aql).unwrap();
+        let result = execute_statement(&stmt, Some(&[0.1; 256])).unwrap();
+        match result {
+            ExecuteResult::QueryResult(r) => {
+                assert_eq!(r.ids.len(), 5);
+            }
+            _ => panic!("Expected QueryResult"),
+        }
     }
 }

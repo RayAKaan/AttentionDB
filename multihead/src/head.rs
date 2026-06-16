@@ -17,6 +17,7 @@ pub struct HeadConfig {
     pub dim: usize,
     pub weight: f32,
     pub fields: Vec<String>,
+    pub settings: Option<attentiondb_hnsw::CollectionSettings>,
 }
 
 impl HeadConfig {
@@ -27,6 +28,7 @@ impl HeadConfig {
             dim,
             weight: 1.0,
             fields: vec![],
+            settings: None,
         }
     }
 
@@ -37,6 +39,11 @@ impl HeadConfig {
 
     pub fn with_fields(mut self, fields: Vec<String>) -> Self {
         self.fields = fields;
+        self
+    }
+
+    pub fn with_settings(mut self, settings: attentiondb_hnsw::CollectionSettings) -> Self {
+        self.settings = Some(settings);
         self
     }
 }

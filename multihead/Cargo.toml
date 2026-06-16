@@ -11,6 +11,11 @@ thiserror = { workspace = true }
 rand = { workspace = true }
 ndarray = "0.15"
 rayon = { workspace = true }
+attentiondb-hnsw = { path = "../hnsw" }
+
+[features]
+default = []
+gpu = ["attentiondb-hnsw/cuda"]
 
 [dev-dependencies]
 criterion = { workspace = true }

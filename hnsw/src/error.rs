@@ -25,4 +25,7 @@ pub enum HNSWError {
 
     #[error("GPU error: {0}")]
     Gpu(#[from] crate::gpu::GpuError),
+
+    #[error("Persistence error: {0}")]
+    Persistence(String),
 }

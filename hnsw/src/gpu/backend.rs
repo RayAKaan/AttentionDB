@@ -18,4 +18,19 @@ pub trait GpuBackend: Send + Sync {
         matrix: &[f32],
         vectors: &[Vec<f32>],
     ) -> Result<Vec<Vec<f32>>, GpuError>;
+
+    /// Fuse scores from multiple heads using weighted sum on GPU
+    fn fuse_scores(
+        &self,
+        head_results: &[(String, Vec<(u64, f32)>)],
+        gate_weights: &[f32],
+    ) -> Result<Vec<(u64, f32)>, GpuError>;
+
+    /// Run gating network forward pass (MLP + softmax) on GPU
+    fn run_gating_network(
+        &self,
+        query_embedding: &[f32],
+        weights: &[f32],
+        bias: &[f32],
+    ) -> Result<Vec<f32>, GpuError>;
 }

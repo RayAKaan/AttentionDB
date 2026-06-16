@@ -84,7 +84,7 @@ impl HeadIndexManager {
     pub fn save_all(&self, dir: &Path) -> Result<(), HNSWError> {
         std::fs::create_dir_all(dir)?;
         for (name, index) in &self.heads {
-            index.save(&dir.join(format!("{}.hnsw", name)))?;
+            index.save(&dir.join(name))?;
         }
         Ok(())
     }

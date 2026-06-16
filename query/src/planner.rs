@@ -95,13 +95,17 @@ pub fn plan_query(query: AQLQuery) -> Result<PhysicalPlan, QueryError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::parse_aql;
+    use crate::parser::{parse_aql, AQLStatement};
 
     #[test]
     fn test_basic_planning() {
         let aql = r#"ATTEND TO papers WHERE QUERY "attention" HEADS [semantic] TOP_K 5"#;
         let parsed = parse_aql(aql).unwrap();
-        let plan = plan_query(parsed).unwrap();
+        let query = match parsed {
+            AQLStatement::Query(q) => q,
+            _ => panic!("Expected Query"),
+        };
+        let plan = plan_query(query).unwrap();
         assert_eq!(plan.top_k, 5);
         assert_eq!(plan.hnsw_search.ef, 32);
         assert!(plan.exact_rerank.is_some());
@@ -122,11 +126,17 @@ mod tests {
         assert!(result.is_err());
     }
 
+    fn extract_query(parsed: AQLStatement) -> crate::parser::AQLQuery {
+        match parsed {
+            AQLStatement::Query(q) => q,
+            _ => panic!("Expected Query"),
+        }
+    }
+
     #[test]
     fn test_temporal_decay_weight() {
         let aql = r#"ATTEND TO papers WHERE QUERY "test" HEADS [semantic, temporal] TEMPORAL_DECAY 0.3"#;
-        let parsed = parse_aql(aql).unwrap();
-        let plan = plan_query(parsed).unwrap();
+        let plan = plan_query(extract_query(parse_aql(aql).unwrap())).unwrap();
         let temporal_weight = plan.hnsw_search.heads.iter()
             .find(|(n, _)| n == "temporal")
             .map(|(_, w)| *w);
@@ -139,8 +149,8 @@ mod tests {
         let aql_med = r#"ATTEND TO papers WHERE QUERY "test" TOP_K 15"#;
         let aql_large = r#"ATTEND TO papers WHERE QUERY "test" TOP_K 50"#;
 
-        assert_eq!(plan_query(parse_aql(aql_small).unwrap()).unwrap().hnsw_search.ef, 32);
-        assert_eq!(plan_query(parse_aql(aql_med).unwrap()).unwrap().hnsw_search.ef, 64);
-        assert_eq!(plan_query(parse_aql(aql_large).unwrap()).unwrap().hnsw_search.ef, 128);
+        assert_eq!(plan_query(extract_query(parse_aql(aql_small).unwrap())).unwrap().hnsw_search.ef, 32);
+        assert_eq!(plan_query(extract_query(parse_aql(aql_med).unwrap())).unwrap().hnsw_search.ef, 64);
+        assert_eq!(plan_query(extract_query(parse_aql(aql_large).unwrap())).unwrap().hnsw_search.ef, 128);
     }
 }

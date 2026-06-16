@@ -119,10 +119,10 @@ fn test_save_load() {
         index.insert(i, &vec).unwrap();
     }
 
-    let path = std::env::temp_dir().join("test_hnsw_roundtrip.hnsw");
-    index.save(&path).unwrap();
+    let dir = std::env::temp_dir().join("test_hnsw_roundtrip");
+    index.save(&dir).unwrap();
 
-    let loaded = HNSWIndex::load(&path, "test", 8).unwrap();
+    let loaded = HNSWIndex::load(&dir).unwrap();
     assert_eq!(loaded.len(), 30);
     assert!(loaded.is_built);
 }

@@ -7,6 +7,9 @@ service AttentionDB {
     rpc Insert (InsertRequest) returns (InsertResponse);
     rpc Delete (DeleteRequest) returns (DeleteResponse);
     rpc HealthCheck (HealthRequest) returns (HealthResponse);
+    rpc CreateCollection (CreateCollectionRequest) returns (CreateCollectionResponse);
+    rpc GetCollectionSettings (GetCollectionSettingsRequest) returns (GetCollectionSettingsResponse);
+    rpc AlterCollection (AlterCollectionRequest) returns (AlterCollectionResponse);
 }
 
 message AttendRequest {
@@ -53,4 +56,47 @@ message HealthRequest {}
 message HealthResponse {
     string status = 1;
     string version = 2;
+}
+
+message CollectionSettings {
+    uint32 ef_search = 1;
+    uint32 ef_construction = 2;
+    uint32 max_connections = 3;
+    string similarity = 4;
+    bool exact_rerank = 5;
+    bool enable_gpu_fusion = 6;
+}
+
+message FieldDefinition {
+    string name = 1;
+    string type = 2;
+}
+
+message CreateCollectionRequest {
+    string collection = 1;
+    repeated FieldDefinition fields = 2;
+    optional CollectionSettings settings = 3;
+}
+
+message CreateCollectionResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message GetCollectionSettingsRequest {
+    string collection = 1;
+}
+
+message GetCollectionSettingsResponse {
+    optional CollectionSettings settings = 1;
+}
+
+message AlterCollectionRequest {
+    string collection = 1;
+    CollectionSettings settings = 2;
+}
+
+message AlterCollectionResponse {
+    bool success = 1;
+    string message = 2;
 }

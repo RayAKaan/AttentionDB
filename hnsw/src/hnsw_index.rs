@@ -1,12 +1,11 @@
 use hnsw_rs::hnsw::{Hnsw, Neighbour};
 use hnsw_rs::prelude::*;
 use std::path::Path;
-use std::fs::File;
-use std::io::{Read, Write};
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 use crate::error::HNSWError;
 use crate::gpu::{GpuBackend, CpuBackend};
+use crate::settings::CollectionSettings;
 
 #[cfg(feature = "cuda")]
 use crate::gpu::CudaBackend;
@@ -68,8 +67,9 @@ pub struct HNSWIndex {
     pub dim: usize,
     inner: Hnsw<'static, f32, DistCosine>,
     pub config: HNSWConfig,
+    pub settings: CollectionSettings,
     pub is_built: bool,
-    vectors: Vec<(u64, Vec<f32>)>,
+    pub(crate) vectors: Vec<(u64, Vec<f32>)>,
     id_to_idx: HashMap<u64, usize>,
     _pins: Vec<Box<[f32]>>,
     gpu_backend: Box<dyn GpuBackend>,
@@ -90,12 +90,33 @@ impl HNSWIndex {
             dim,
             inner,
             config,
+            settings: CollectionSettings::default(),
             is_built: false,
             vectors: Vec::new(),
             id_to_idx: HashMap::new(),
             _pins: Vec::new(),
             gpu_backend: Box::new(CpuBackend),
         }
+    }
+
+    /// Create with custom CollectionSettings (validated)
+    pub fn with_settings(
+        head_name: &str,
+        dim: usize,
+        config: HNSWConfig,
+        settings: CollectionSettings,
+    ) -> Result<Self, HNSWError> {
+        settings.validate().map_err(|e| HNSWError::InvalidConfig(e))?;
+        let mut index = Self::new(head_name, dim, config);
+        index.settings = settings;
+        Ok(index)
+    }
+
+    /// Update collection settings at runtime
+    pub fn update_settings(&mut self, settings: CollectionSettings) -> Result<(), HNSWError> {
+        settings.validate().map_err(|e| HNSWError::InvalidConfig(e))?;
+        self.settings = settings;
+        Ok(())
     }
 
     #[cfg(feature = "cuda")]
@@ -139,7 +160,7 @@ impl HNSWIndex {
             return Err(HNSWError::IndexNotBuilt);
         }
 
-        let ef = ef.unwrap_or(self.config.ef_search);
+        let ef = ef.unwrap_or(self.settings.ef_search);
         let neighbors: Vec<Neighbour> = self.inner.search(query, k, ef);
         let results: Vec<(u64, f32)> = neighbors.into_iter()
             .map(|n| (n.d_id as u64, n.distance))
@@ -202,92 +223,31 @@ impl HNSWIndex {
         self.config.ef_search = ef;
     }
 
-    pub fn save(&self, path: &Path) -> Result<(), HNSWError> {
-        let mut file = File::create(path)?;
-        let config_json = serde_json::to_vec(&self.config)
-            .map_err(|e| HNSWError::Serialization(e.to_string()))?;
-        file.write_all(&(config_json.len() as u32).to_le_bytes())?;
-        file.write_all(&config_json)?;
-
-        file.write_all(&(self.vectors.len() as u32).to_le_bytes())?;
-        for (id, vec) in &self.vectors {
-            file.write_all(&id.to_le_bytes())?;
-            file.write_all(&(vec.len() as u32).to_le_bytes())?;
-            for val in vec {
-                file.write_all(&val.to_le_bytes())?;
-            }
-        }
-
+    /// Save to a directory (metadata.json + vectors.bin).
+    /// Rebuilds the graph from vectors on load.
+    pub fn save(&self, dir: &Path) -> Result<(), HNSWError> {
+        crate::persistence::save_index(self, dir)
+            .map_err(|e| HNSWError::Persistence(e.to_string()))?;
         Ok(())
     }
 
-    pub fn load(path: &Path, head_name: &str, dim: usize) -> Result<Self, HNSWError> {
-        let mut file = File::open(path)?;
+    /// Load from a directory previously saved with `save()`.
+    pub fn load(dir: &Path) -> Result<Self, HNSWError> {
+        let index = crate::persistence::load_index(dir)
+            .map_err(|e| HNSWError::Persistence(e.to_string()))?;
+        Ok(index)
+    }
 
-        let config_len = {
-            let mut buf = [0u8; 4];
-            file.read_exact(&mut buf)?;
-            u32::from_le_bytes(buf) as usize
-        };
-
-        let mut config_buf = vec![0u8; config_len];
-        file.read_exact(&mut config_buf)?;
-
-        let config: HNSWConfig = serde_json::from_slice(&config_buf)
-            .map_err(|e| HNSWError::Serialization(e.to_string()))?;
-
-        let inner = Hnsw::<f32, DistCosine>::new(
-            config.max_nb_connection,
-            config.max_elements,
-            16,
-            config.ef_construction,
-            DistCosine {},
-        );
-
-        let vec_count = {
-            let mut buf = [0u8; 4];
-            file.read_exact(&mut buf)?;
-            u32::from_le_bytes(buf) as usize
-        };
-
-        let mut vectors = Vec::with_capacity(vec_count);
-        let mut id_to_idx = HashMap::new();
-        let mut _pins = Vec::with_capacity(vec_count);
-
-        for i in 0..vec_count {
-            let mut id_buf = [0u8; 8];
-            file.read_exact(&mut id_buf)?;
-            let id = u64::from_le_bytes(id_buf);
-
-            let mut len_buf = [0u8; 4];
-            file.read_exact(&mut len_buf)?;
-            let vlen = u32::from_le_bytes(len_buf) as usize;
-
-            let mut vec = vec![0.0; vlen];
-            for v in &mut vec {
-                let mut val_buf = [0u8; 4];
-                file.read_exact(&mut val_buf)?;
-                *v = f32::from_le_bytes(val_buf);
-            }
-
-            let boxed: Box<[f32]> = vec.clone().into_boxed_slice();
-            let reference: &'static [f32] = unsafe { &*(&*boxed as *const [f32]) };
-            _pins.push(boxed);
-            inner.insert((reference, id as usize));
-            vectors.push((id, vec));
-            id_to_idx.insert(id, i);
+    /// Append new vectors to this index and persist them (incremental update)
+    pub fn append_vectors(
+        &mut self,
+        dir: &Path,
+        new_vectors: &[(u64, Vec<f32>)],
+    ) -> Result<usize, HNSWError> {
+        for (id, vec) in new_vectors {
+            let _ = self.insert(*id, vec);
         }
-
-        Ok(Self {
-            head_name: head_name.to_string(),
-            dim,
-            inner,
-            config,
-            is_built: !vectors.is_empty(),
-            vectors,
-            id_to_idx,
-            _pins,
-            gpu_backend: Box::new(CpuBackend),
-        })
+        crate::persistence::append_vectors(dir, new_vectors)
+            .map_err(|e| HNSWError::Persistence(e.to_string()))
     }
 }

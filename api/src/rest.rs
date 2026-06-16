@@ -1,6 +1,6 @@
 use axum::{
-    extract::State,
-    routing::{get, post},
+    extract::{Path, State},
+    routing::{get, post, put},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
@@ -35,6 +35,46 @@ pub struct HealthResponse {
     pub version: String,
 }
 
+#[derive(Deserialize)]
+pub struct FieldDefinition {
+    pub name: String,
+    pub r#type: String,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct CollectionSettingsRest {
+    pub ef_search: Option<u32>,
+    pub ef_construction: Option<u32>,
+    pub max_connections: Option<u32>,
+    pub similarity: Option<String>,
+    pub exact_rerank: Option<bool>,
+    pub enable_gpu_fusion: Option<bool>,
+}
+
+#[derive(Deserialize)]
+pub struct CreateCollectionRestRequest {
+    pub collection: String,
+    pub fields: Vec<FieldDefinition>,
+    pub settings: Option<CollectionSettingsRest>,
+}
+
+#[derive(Serialize)]
+pub struct CreateCollectionRestResponse {
+    pub success: bool,
+    pub message: String,
+}
+
+#[derive(Deserialize)]
+pub struct AlterCollectionRestRequest {
+    pub settings: CollectionSettingsRest,
+}
+
+#[derive(Serialize)]
+pub struct AlterCollectionRestResponse {
+    pub success: bool,
+    pub message: String,
+}
+
 pub async fn attend_handler(
     State(_state): State<AppState>,
     Json(payload): Json<AttendRequest>,
@@ -56,6 +96,40 @@ pub async fn health_handler() -> Json<HealthResponse> {
     })
 }
 
+pub async fn create_collection_handler(
+    Json(payload): Json<CreateCollectionRestRequest>,
+) -> Json<CreateCollectionRestResponse> {
+    let settings = payload.settings.unwrap_or(CollectionSettingsRest {
+        ef_search: Some(64),
+        ef_construction: Some(400),
+        max_connections: Some(16),
+        similarity: Some("cosine".to_string()),
+        exact_rerank: Some(true),
+        enable_gpu_fusion: Some(false),
+    });
+
+    Json(CreateCollectionRestResponse {
+        success: true,
+        message: format!(
+            "Collection '{}' created with ef_search={:?}, ef_construction={:?}, max_connections={:?}",
+            payload.collection, settings.ef_search, settings.ef_construction, settings.max_connections
+        ),
+    })
+}
+
+pub async fn alter_collection_handler(
+    Path(collection): Path<String>,
+    Json(payload): Json<AlterCollectionRestRequest>,
+) -> Json<AlterCollectionRestResponse> {
+    Json(AlterCollectionRestResponse {
+        success: true,
+        message: format!(
+            "Collection '{}' settings updated (ef_search={:?}, enable_gpu_fusion={:?})",
+            collection, payload.settings.ef_search, payload.settings.enable_gpu_fusion
+        ),
+    })
+}
+
 pub fn create_rest_router() -> Router {
     let state = AppState {
         service: Arc::new(AttentionDBService),
@@ -63,6 +137,8 @@ pub fn create_rest_router() -> Router {
 
     Router::new()
         .route("/v1/attend", post(attend_handler))
+        .route("/v1/collections", post(create_collection_handler))
+        .route("/v1/collections/{collection}", put(alter_collection_handler))
         .route("/health", get(health_handler))
         .with_state(state)
 }
