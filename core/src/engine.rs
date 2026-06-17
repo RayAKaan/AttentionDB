@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::path::Path;
 use parking_lot::RwLock;
@@ -6,6 +8,16 @@ use attentiondb_query::parse_aql;
 use attentiondb_storage::{Wal, OpType, Record};
 use crate::collection::Collection;
 use crate::error::CoreError;
+
+/// Deterministically convert a UUID to a stable u64 hash.
+///
+/// This avoids silently truncating the UUID's high 64 bits and retains a
+/// low probability of collision using a deterministic hash over the full 128 bits.
+fn uuid_to_u64(id: &uuid::Uuid) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    id.hash(&mut hasher);
+    hasher.finish()
+}
 
 pub struct AttentionEngine {
     collections: Arc<RwLock<HashMap<String, Arc<Collection>>>>,
@@ -140,7 +152,7 @@ impl AttentionEngine {
         let collection = self.get_collection(collection_name)?;
 
         let id = record.id.to_string();
-        let numeric_id = record.id.as_u128() as u64;
+        let numeric_id = uuid_to_u64(&record.id);
 
         {
             let mut id_map = self.id_map.write();
@@ -196,6 +208,10 @@ impl AttentionEngine {
     }
 
     pub fn execute_aql(&self, aql: &str) -> Result<String, CoreError> {
+        self.execute_aql_with_vector(aql, None)
+    }
+
+    pub fn execute_aql_with_vector(&self, aql: &str, query_vector: Option<&[f32]>) -> Result<String, CoreError> {
         let statement = parse_aql(aql)?;
 
         match statement {
@@ -206,7 +222,15 @@ impl AttentionEngine {
                 } else {
                     query.heads.clone()
                 };
-                let results = collection.attend(&heads, &[0.0f32; 64], query.top_k)?;
+
+                let vec = query_vector.ok_or_else(|| CoreError::InvalidOperation(
+                    format!(
+                        "ATTEND query requires a pre-computed query vector. query_text='{}' is a semantic label, not a vector. Call execute_aql_with_vector() with the embedded vector.",
+                        query.query_text
+                    )
+                ))?;
+
+                let results = collection.attend(&heads, vec, query.top_k)?;
                 Ok(format!("[{} results] for '{}' on {}", results.len(), query.query_text, query.collection))
             }
             attentiondb_query::AQLStatement::CreateCollection(coll) => {
@@ -237,7 +261,7 @@ impl AttentionEngine {
 
         for mut record in records {
             if record.tags.contains(&format!("collection:{}", target_collection)) {
-                let numeric_id = record.id.as_u128() as u64;
+                let numeric_id = uuid_to_u64(&record.id);
 
                 let mut new_k_vecs = HashMap::new();
                 for (head_name, vec) in &record.k_vecs {

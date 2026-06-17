@@ -103,9 +103,9 @@ fn generate_self_signed() -> Result<RustlsConfig, Box<dyn std::error::Error>> {
         "attentiondb".to_string(),
     ];
 
-    let cert = generate_simple_self_signed(subject_alt_names)?;
-    let cert_pem = cert.serialize_pem()?;
-    let key_pem = cert.serialize_private_key_pem();
+    let rcgen::CertifiedKey { cert, key_pair } = generate_simple_self_signed(subject_alt_names)?;
+    let cert_pem = cert.pem();
+    let key_pem = key_pair.serialize_pem();
 
     let dir = std::env::temp_dir().join("attentiondb_tls");
     std::fs::create_dir_all(&dir)?;

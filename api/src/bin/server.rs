@@ -64,7 +64,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .serve_with_shutdown(grpc_addr, shutdown_signal("gRPC"));
 
     // ── REST Server (HTTP or HTTPS) ──────────────────────────────────────
-    let app = create_rest_router_with_service(rest_svc)
+    let app = create_rest_router_with_service(rest_svc, api_keys.clone())
         .layer(CorsLayer::permissive())
         .layer(RequestBodyLimitLayer::new(
             attentiondb_api::validation::MAX_REQUEST_BODY_BYTES,
@@ -109,23 +109,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("Server shutdown complete");
     Ok(())
-}
-
-async fn metrics_handler(Extension(handle): Extension<Arc<Option<MetricsHandle>>>) -> axum::response::Response {
-    match handle.as_ref() {
-        Some(handle) => {
-            let body = handle.render();
-            axum::response::Response::builder()
-                .status(StatusCode::OK)
-                .header(axum::http::header::CONTENT_TYPE, "text/plain; version=0.0.4")
-                .body(body.into())
-                .unwrap()
-        }
-        None => axum::response::Response::builder()
-            .status(StatusCode::SERVICE_UNAVAILABLE)
-            .body("Metrics unavailable".into())
-            .unwrap(),
-    }
 }
 
 async fn shutdown_signal(name: &str) {

@@ -1,4 +1,4 @@
-use attentiondb_api::{AttentionDBService, create_rest_router_with_service};
+use attentiondb_api::{AttentionDBService, ApiKeyStore, create_rest_router_with_service};
 use attentiondb_api::server::attentiondb::attention_db_server::AttentionDb;
 use attentiondb_api::server::attentiondb::{InsertRequest, AttendRequest, CreateCollectionRequest, CollectionSettings};
 use std::sync::Arc;
@@ -75,7 +75,8 @@ async fn test_grpc_end_to_end_insert_and_attend() {
 #[tokio::test]
 async fn test_rest_end_to_end_insert_and_attend() {
     let svc = Arc::new(AttentionDBService::default());
-    let app = create_rest_router_with_service(svc.clone());
+    let api_keys = Arc::new(ApiKeyStore::disabled());
+    let app = create_rest_router_with_service(svc.clone(), api_keys);
 
     let coll_body = serde_json::json!({
         "collection": "rest_papers",

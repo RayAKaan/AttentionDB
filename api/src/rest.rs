@@ -1,11 +1,13 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Extension, Path, State},
     http::StatusCode,
+    middleware::from_fn,
     routing::{get, post, put},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use crate::auth::{ApiKeyStore, auth_middleware};
 use crate::server::AttentionDBService;
 use crate::observability;
 use crate::validation::{validate_collection_name, validate_fields, validate_heads, validate_top_k};
@@ -13,6 +15,7 @@ use crate::validation::{validate_collection_name, validate_fields, validate_head
 #[derive(Clone)]
 pub struct AppState {
     pub service: Arc<AttentionDBService>,
+    pub api_keys: Arc<ApiKeyStore>,
 }
 
 #[derive(Deserialize)]
@@ -97,19 +100,21 @@ pub async fn attend_handler(
     State(state): State<AppState>,
     Json(payload): Json<AttendRequest>,
 ) -> Result<Json<AttendResponse>, (StatusCode, String)> {
+    let _timer = observability::LatencyTimer::new("rest_attend");
+
     validate_collection_name(&payload.collection)
         .map_err(|e| (StatusCode::BAD_REQUEST, e.message().to_string()))?;
     let top_k = payload.top_k.unwrap_or(10);
     validate_top_k(top_k)
         .map_err(|e| (StatusCode::BAD_REQUEST, e.message().to_string()))?;
 
-    let query_vec = crate::server::parse_float_vector(&payload.query)
-        .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid query vector format".to_string()))?;
-
     if let Some(ref heads_list) = payload.heads {
         validate_heads(heads_list)
             .map_err(|e| (StatusCode::BAD_REQUEST, e.message().to_string()))?;
     }
+
+    let query_vec = crate::server::parse_float_vector(&payload.query)
+        .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid query vector format".to_string()))?;
 
     let heads = payload.heads.unwrap_or_else(|| {
         if let Ok(coll) = state.service.engine.get_collection(&payload.collection) {
@@ -120,8 +125,11 @@ pub async fn attend_handler(
     });
 
     let start = std::time::Instant::now();
-    let raw_results = state.service.engine.attend(&payload.collection, &heads, &query_vec, payload.top_k.unwrap_or(10) as usize)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let raw_results = state.service.engine.attend(&payload.collection, &heads, &query_vec, top_k as usize)
+        .map_err(|e| {
+            observability::record_error("rest_attend", &e.to_string());
+            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        })?;
     let latency = start.elapsed().as_secs_f64() * 1000.0;
 
     let results: Vec<serde_json::Value> = raw_results.into_iter().map(|(numeric_id, score)| {
@@ -146,6 +154,8 @@ pub async fn insert_handler(
     State(state): State<AppState>,
     Json(payload): Json<InsertRestRequest>,
 ) -> Result<Json<InsertRestResponse>, (StatusCode, String)> {
+    let _timer = observability::LatencyTimer::new("rest_insert");
+
     validate_collection_name(&payload.collection)
         .map_err(|e| (StatusCode::BAD_REQUEST, e.message().to_string()))?;
     validate_fields(&payload.fields)
@@ -176,10 +186,15 @@ pub async fn insert_handler(
     let mut record = attentiondb_storage::Record::new(json_fields);
     record.k_vecs = k_vecs;
 
+    let start = std::time::Instant::now();
     let id = state.service.engine.insert_document(&payload.collection, record)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .map_err(|e| {
+            observability::record_error("rest_insert", &e.to_string());
+            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        })?;
+    let latency = start.elapsed().as_secs_f64() * 1000.0;
 
-    observability::record_insert(&payload.collection, &id, num_vectors, 0.0);
+    observability::record_insert(&payload.collection, &id, num_vectors, latency);
 
     Ok(Json(InsertRestResponse {
         id,
@@ -235,16 +250,23 @@ pub async fn create_collection_handler(
     };
     let head_refs: Vec<&str> = heads.iter().map(|s| s.as_str()).collect();
 
-    let success = state.service.engine.create_collection_with_settings(&payload.collection, 64, &head_refs, hnsw_settings.clone()).is_ok();
-
-    if success {
-        observability::record_create_collection(&payload.collection, &head_refs, hnsw_settings.ef_search);
+    let ef_search = hnsw_settings.ef_search;
+    match state.service.engine.create_collection_with_settings(&payload.collection, 64, &head_refs, hnsw_settings.clone()) {
+        Ok(_) => {
+            observability::record_create_collection(&payload.collection, &head_refs, ef_search);
+            Json(CreateCollectionRestResponse {
+                success: true,
+                message: format!("Created collection '{}' with {} heads", payload.collection, heads.len()),
+            })
+        }
+        Err(e) => {
+            observability::record_error("rest_create_collection", &e.to_string());
+            Json(CreateCollectionRestResponse {
+                success: false,
+                message: e.to_string(),
+            })
+        }
     }
-
-    Json(CreateCollectionRestResponse {
-        success,
-        message: format!("Created collection '{}' with {} heads", payload.collection, heads.len()),
-    })
 }
 
 pub async fn alter_collection_handler(
@@ -269,24 +291,37 @@ pub async fn alter_collection_handler(
     hnsw_settings.enable_gpu_fusion = s.enable_gpu_fusion.unwrap_or(false);
     hnsw_settings.enable_gpu_projections = s.enable_gpu_projections.unwrap_or(false);
 
-    let success = state.service.engine.alter_collection_settings(&collection, hnsw_settings).is_ok();
-
-    if !success {
-        observability::record_error("alter_collection", "failed to apply new settings");
+    let ef_search = hnsw_settings.ef_search;
+    match state.service.engine.alter_collection_settings(&collection, hnsw_settings) {
+        Ok(_) => {
+            observability::record_create_collection(&collection, &[], ef_search);
+            Json(AlterCollectionRestResponse {
+                success: true,
+                message: format!("Altered collection '{}'", collection),
+            })
+        }
+        Err(e) => {
+            observability::record_error("rest_alter_collection", &e.to_string());
+            Json(AlterCollectionRestResponse {
+                success: false,
+                message: e.to_string(),
+            })
+        }
     }
-
-    Json(AlterCollectionRestResponse {
-        success,
-        message: format!("Altered collection '{}'", collection),
-    })
 }
 
 pub fn create_rest_router() -> Router {
-    create_rest_router_with_service(Arc::new(AttentionDBService::default()))
+    create_rest_router_with_service(
+        Arc::new(AttentionDBService::default()),
+        Arc::new(ApiKeyStore::disabled()),
+    )
 }
 
-pub fn create_rest_router_with_service(service: Arc<AttentionDBService>) -> Router {
-    let state = AppState { service };
+pub fn create_rest_router_with_service(
+    service: Arc<AttentionDBService>,
+    api_keys: Arc<ApiKeyStore>,
+) -> Router {
+    let state = AppState { service, api_keys: api_keys.clone() };
 
     Router::new()
         .route("/v1/attend", post(attend_handler))
@@ -294,5 +329,7 @@ pub fn create_rest_router_with_service(service: Arc<AttentionDBService>) -> Rout
         .route("/v1/collections", post(create_collection_handler))
         .route("/v1/collections/{collection}", put(alter_collection_handler))
         .route("/health", get(health_handler))
+        .layer(Extension(api_keys))
+        .layer(from_fn(auth_middleware))
         .with_state(state)
 }
