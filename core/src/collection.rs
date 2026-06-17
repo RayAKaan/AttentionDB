@@ -9,6 +9,7 @@ pub struct Collection {
     pub dim: usize,
     pub head_manager: Arc<RwLock<HeadIndexManager>>,
     pub multihead_manager: Arc<RwLock<MultiHeadManager>>,
+    pub settings: RwLock<attentiondb_hnsw::CollectionSettings>,
 }
 
 impl Collection {
@@ -21,6 +22,7 @@ impl Collection {
             dim,
             head_manager,
             multihead_manager,
+            settings: RwLock::new(attentiondb_hnsw::CollectionSettings::default()),
         }
     }
 
@@ -66,6 +68,13 @@ impl Collection {
         id: u64,
         vector: &[f32],
     ) -> Result<(), CoreError> {
+        {
+            let mut mh = self.multihead_manager.write();
+            if mh.get_head(head).is_err() {
+                let head_config = HeadConfig::new(head, HeadType::Semantic, self.dim);
+                mh.add_head(head_config);
+            }
+        }
         let heads = self.head_manager.read();
         heads.insert(head, id, vector)?;
         Ok(())

@@ -16,9 +16,14 @@ tower-http = { version = "0.5", features = ["cors"] }
 thiserror = { workspace = true }
 uuid = { workspace = true }
 attentiondb-hnsw = { path = "../hnsw" }
+attentiondb-core = { path = "../core" }
+attentiondb-storage = { path = "../storage" }
 
 [build-dependencies]
 tonic-build = "0.11"
+
+[dev-dependencies]
+tower = { version = "0.4", features = ["util"] }
 
 [[bin]]
 name = "attentiondb-server"

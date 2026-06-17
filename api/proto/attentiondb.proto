@@ -65,6 +65,7 @@ message CollectionSettings {
     string similarity = 4;
     bool exact_rerank = 5;
     bool enable_gpu_fusion = 6;
+    bool enable_gpu_projections = 7;
 }
 
 message FieldDefinition {

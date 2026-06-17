@@ -1,9 +1,10 @@
 use attentiondb_api::server::AttentionDBService;
-use attentiondb_api::rest::create_rest_router;
+use attentiondb_api::{create_rest_router, create_rest_router_with_service};
 use tonic::transport::Server;
 use std::net::SocketAddr;
 use tower_http::cors::CorsLayer;
 use tokio::net::TcpListener;
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -17,14 +18,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  REST  → {}:{}", rest_addr.ip(), rest_addr.port());
     println!("  Press Ctrl+C to stop.\n");
 
-    let svc = AttentionDBService;
+    let engine = Arc::new(attentiondb_core::engine::AttentionEngine::new());
+    let svc = AttentionDBService::new(engine.clone());
+    let rest_svc = Arc::new(AttentionDBService::new(engine));
 
     let grpc_server = Server::builder()
         .add_service(attentiondb_api::server::attentiondb::attention_db_server::AttentionDbServer::new(svc))
         .serve(grpc_addr);
 
     let listener = TcpListener::bind(&rest_addr).await?;
-    let app = create_rest_router().layer(CorsLayer::permissive());
+    let app = create_rest_router_with_service(rest_svc).layer(CorsLayer::permissive());
     let rest_server = axum::serve(listener, app.into_make_service());
 
     tokio::select! {

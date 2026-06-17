@@ -10,6 +10,8 @@ use crate::error::CoreError;
 pub struct AttentionEngine {
     collections: Arc<RwLock<HashMap<String, Arc<Collection>>>>,
     wal: Arc<parking_lot::Mutex<Option<Wal>>>,
+    pub document_store: Arc<RwLock<attentiondb_storage::DocumentStore>>,
+    id_map: Arc<RwLock<HashMap<u64, uuid::Uuid>>>,
 }
 
 pub struct EngineStats {
@@ -23,14 +25,21 @@ impl AttentionEngine {
         Self {
             collections: Arc::new(RwLock::new(HashMap::new())),
             wal: Arc::new(parking_lot::Mutex::new(None)),
+            document_store: Arc::new(RwLock::new(attentiondb_storage::DocumentStore::new())),
+            id_map: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
     pub fn open(wal_path: &str, durability: attentiondb_storage::Durability) -> Result<Self, CoreError> {
         let wal = Wal::new(Path::new(wal_path))?.with_durability(durability);
+        let dir = Path::new(wal_path).parent().unwrap_or(Path::new(".")).to_path_buf();
+        let document_store = attentiondb_storage::DocumentStore::open(dir)?;
+
         Ok(Self {
             collections: Arc::new(RwLock::new(HashMap::new())),
             wal: Arc::new(parking_lot::Mutex::new(Some(wal))),
+            document_store: Arc::new(RwLock::new(document_store)),
+            id_map: Arc::new(RwLock::new(HashMap::new())),
         })
     }
 
@@ -40,17 +49,38 @@ impl AttentionEngine {
         dim: usize,
         heads: &[&str],
     ) -> Result<(), CoreError> {
+        self.create_collection_with_settings(name, dim, heads, attentiondb_hnsw::CollectionSettings::default())
+    }
+
+    pub fn create_collection_with_settings(
+        &self,
+        name: &str,
+        dim: usize,
+        heads: &[&str],
+        settings: attentiondb_hnsw::CollectionSettings,
+    ) -> Result<(), CoreError> {
         let mut collections = self.collections.write();
         if collections.contains_key(name) {
             return Err(CoreError::CollectionAlreadyExists(name.to_string()));
         }
 
         let collection = Arc::new(Collection::new(name, dim));
+        *collection.settings.write() = settings;
         for head_name in heads {
             collection.add_default_head(head_name)?;
         }
 
         collections.insert(name.to_string(), collection);
+        Ok(())
+    }
+
+    pub fn alter_collection_settings(
+        &self,
+        name: &str,
+        settings: attentiondb_hnsw::CollectionSettings,
+    ) -> Result<(), CoreError> {
+        let collection = self.get_collection(name)?;
+        *collection.settings.write() = settings;
         Ok(())
     }
 
@@ -110,21 +140,59 @@ impl AttentionEngine {
         let collection = self.get_collection(collection_name)?;
 
         let id = record.id.to_string();
-        let record_bytes = record.to_msgpack()?;
+        let numeric_id = record.id.as_u128() as u64;
+
+        {
+            let mut id_map = self.id_map.write();
+            id_map.insert(numeric_id, record.id);
+        }
+
+        {
+            let mut store = self.document_store.write();
+            store.insert(record.clone())?;
+        }
 
         {
             let mut wal_guard = self.wal.lock();
             if let Some(wal) = wal_guard.as_mut() {
+                let record_bytes = record.to_msgpack()?;
                 wal.append(OpType::Insert, collection_name, record.id, record_bytes)?;
             }
         }
 
         for (head_name, vec_data) in &record.k_vecs {
-            let numeric_id = record.id.as_u128() as u64;
             collection.insert_vector(head_name, numeric_id, vec_data)?;
         }
 
         Ok(id)
+    }
+
+    pub fn get_document_fields(&self, numeric_id: u64) -> HashMap<String, String> {
+        let id_map = self.id_map.read();
+        if let Some(uuid) = id_map.get(&numeric_id) {
+            let store = self.document_store.read();
+            if let Some(record) = store.get(uuid) {
+                return record.fields.iter().map(|(k, v)| {
+                    let s = match v {
+                        serde_json::Value::String(str) => str.clone(),
+                        other => other.to_string(),
+                    };
+                    (k.clone(), s)
+                }).collect();
+            }
+        }
+        HashMap::new()
+    }
+
+    pub fn delete_document(&self, collection_name: &str, id_str: &str) -> Result<bool, CoreError> {
+        let _collection = self.get_collection(collection_name)?;
+        if let Ok(uuid) = uuid::Uuid::parse_str(id_str) {
+            let mut store = self.document_store.write();
+            store.delete(&uuid)?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 
     pub fn execute_aql(&self, aql: &str) -> Result<String, CoreError> {
@@ -142,7 +210,12 @@ impl AttentionEngine {
                 Ok(format!("[{} results] for '{}' on {}", results.len(), query.query_text, query.collection))
             }
             attentiondb_query::AQLStatement::CreateCollection(coll) => {
-                self.create_collection(&coll.collection, 64, &["default"])?;
+                let heads: Vec<&str> = if coll.head_settings.is_empty() {
+                    vec!["default"]
+                } else {
+                    coll.head_settings.keys().map(|s| s.as_str()).collect()
+                };
+                self.create_collection(&coll.collection, 64, &heads)?;
                 Ok(format!("Created collection '{}'", coll.collection))
             }
             attentiondb_query::AQLStatement::AlterCollection(alter) => {
