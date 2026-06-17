@@ -197,4 +197,26 @@ impl DocumentStore {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    pub fn list_all_records(&self) -> Vec<Record> {
+        let mut results: HashMap<Uuid, Record> = HashMap::new();
+        for (id, rec) in &self.flushed_records {
+            if !rec.tags.contains(&"__TOMBSTONE__".to_string()) {
+                results.insert(*id, rec.clone());
+            }
+        }
+        for (id, rec) in &self.memtable {
+            if rec.tags.contains(&"__TOMBSTONE__".to_string()) {
+                results.remove(id);
+            } else {
+                results.insert(*id, rec.clone());
+            }
+        }
+        results.into_values().collect()
+    }
+
+    pub fn update_record(&mut self, record: Record) -> Result<(), StorageError> {
+        self.insert(record)?;
+        Ok(())
+    }
 }

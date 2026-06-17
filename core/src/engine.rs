@@ -225,6 +225,40 @@ impl AttentionEngine {
         }
     }
 
+    pub fn execute_reprojection_job(&self, job: &attentiondb_learned::ReprojectionJob) -> Result<(), CoreError> {
+        let target_collection = &job.collection;
+        let collection = self.get_collection(target_collection)?;
+
+        let store = self.document_store.read();
+        let records = store.list_all_records();
+        drop(store);
+
+        let mut updated_records = Vec::new();
+
+        for mut record in records {
+            if record.tags.contains(&format!("collection:{}", target_collection)) {
+                let numeric_id = record.id.as_u128() as u64;
+
+                let mut new_k_vecs = HashMap::new();
+                for (head_name, vec) in &record.k_vecs {
+                    let reprojected = job.new_projection.project_key(vec);
+                    collection.insert_vector(head_name, numeric_id, &reprojected)?;
+                    new_k_vecs.insert(head_name.clone(), reprojected);
+                }
+
+                record.k_vecs = new_k_vecs;
+                updated_records.push(record);
+            }
+        }
+
+        let mut store_write = self.document_store.write();
+        for record in updated_records {
+            store_write.update_record(record)?;
+        }
+
+        Ok(())
+    }
+
     pub fn is_persistent(&self) -> bool {
         self.wal.lock().is_some()
     }
@@ -321,6 +355,26 @@ mod tests {
             .attend("docs", &["semantic".to_string()], &[1.0, 0.0, 0.0, 0.0], 2)
             .unwrap();
         assert!(!results.is_empty());
+    }
+
+    #[test]
+    fn test_execute_reprojection_job() {
+        let engine = AttentionEngine::new();
+        engine.create_collection("papers", 4, &["semantic"]).unwrap();
+
+        let mut fields = HashMap::new();
+        fields.insert("title".to_string(), serde_json::json!("Test"));
+        let mut rec = Record::new(fields);
+        rec.k_vecs.insert("semantic".to_string(), vec![1.0, 0.0, 0.0, 0.0]);
+
+        engine.insert_document("papers", rec).unwrap();
+
+        let config = attentiondb_learned::ProjectionConfig { dim: 4, num_heads: 1, head_dim: 4 };
+        let old = attentiondb_learned::ProjectionMatrix::new(config.clone());
+        let new = attentiondb_learned::ProjectionMatrix::new(config);
+        let job = attentiondb_learned::ReprojectionJob::new("papers", old, new);
+
+        assert!(engine.execute_reprojection_job(&job).is_ok());
     }
 
     #[test]
