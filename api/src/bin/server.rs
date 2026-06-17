@@ -1,119 +1,108 @@
-use attentiondb_api::auth::{grpc_auth_interceptor, ApiKeyStore};
-use attentiondb_api::create_rest_router_with_service;
-use attentiondb_api::observability::{init_logging, init_metrics, MetricsHandle};
 use attentiondb_api::server::AttentionDBService;
-use attentiondb_api::validation::MAX_REQUEST_BODY_BYTES;
-use axum::extract::Extension;
-use axum::middleware::from_fn;
-use axum::routing::get;
-use axum::Router;
-use axum::http::StatusCode;
-use axum_server::Server as AxumServer;
+use attentiondb_api::create_rest_router_with_service;
+use attentiondb_api::auth::ApiKeyStore;
+use attentiondb_api::observability;
+use attentiondb_api::tls;
+use tonic::transport::Server;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::net::TcpListener;
-use tokio::signal;
-use tonic::service::interceptor::InterceptedService;
-use tonic::transport::{Identity, Server, ServerTlsConfig};
 use tower_http::cors::CorsLayer;
 use tower_http::limit::RequestBodyLimitLayer;
-use tracing::{error, info};
+use tokio::signal;
+use tracing::{info, error};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    init_logging();
-    let metrics_handle = Arc::new(init_metrics());
+    // ── Initialize Observability ─────────────────────────────────────────
+    observability::init_logging();
+    observability::init_metrics();
 
+    // ── Configuration ────────────────────────────────────────────────────
     let grpc_port = std::env::var("ATTENTIONDB_GRPC_PORT").unwrap_or_else(|_| "7400".into());
     let rest_port = std::env::var("ATTENTIONDB_REST_PORT").unwrap_or_else(|_| "8080".into());
-    let metrics_port = std::env::var("ATTENTIONDB_METRICS_PORT").unwrap_or_else(|_| "9090".into());
-
     let grpc_addr: SocketAddr = format!("0.0.0.0:{}", grpc_port).parse()?;
     let rest_addr: SocketAddr = format!("0.0.0.0:{}", rest_port).parse()?;
-    let metrics_addr: SocketAddr = format!("0.0.0.0:{}", metrics_port).parse()?;
 
+    // ── Initialize Authentication ────────────────────────────────────────
     let api_keys = Arc::new(ApiKeyStore::from_env());
+
+    // ── Initialize TLS ───────────────────────────────────────────────────
+    let tls_mode = tls::resolve_tls().await;
+
+    // ── Initialize Engine ────────────────────────────────────────────────
     let wal_dir = std::env::var("ATTENTIONDB_DATA_DIR").unwrap_or_else(|_| "/data".into());
     let wal_path = format!("{}/engine.wal", wal_dir);
 
-    let engine = match attentiondb_core::engine::AttentionEngine::open(&wal_path, attentiondb_storage::Durability::GroupCommit) {
+    let engine = match attentiondb_core::AttentionEngine::open(&wal_path, attentiondb_storage::Durability::GroupCommit) {
         Ok(e) => {
             info!(wal_path = %wal_path, "Engine opened with persistent WAL");
             Arc::new(e)
         }
         Err(e) => {
             info!(error = %e, "WAL open failed, starting with in-memory engine");
-            Arc::new(attentiondb_core::engine::AttentionEngine::new())
+            Arc::new(attentiondb_core::AttentionEngine::new())
         }
     };
 
-    info!(grpc = %grpc_addr, rest = %rest_addr, metrics = %metrics_addr, auth = api_keys.enabled, "Server starting");
+    let tls_label = match &tls_mode {
+        tls::TlsMode::Enabled(_) => "HTTPS",
+        tls::TlsMode::Disabled => "HTTP",
+    };
+    info!("╔══════════════════════════════════════════════════════════════╗");
+    info!("║     AttentionDB — Production API Server                    ║");
+    info!("╚══════════════════════════════════════════════════════════════╝");
+    info!(grpc = %grpc_addr, rest = %rest_addr, protocol = tls_label, auth = api_keys.enabled, "Server starting");
 
     let svc = AttentionDBService::new(engine.clone());
     let rest_svc = Arc::new(AttentionDBService::new(engine));
 
-    // Configure optional TLS for gRPC if cert/key env vars are provided
-    let mut server_builder = Server::builder();
-    if let (Ok(cert_path), Ok(key_path)) = (
-        std::env::var("ATTENTIONDB_TLS_CERT"),
-        std::env::var("ATTENTIONDB_TLS_KEY"),
-    ) {
-        match (std::fs::read(&cert_path), std::fs::read(&key_path)) {
-            (Ok(cert), Ok(key)) => {
-                let identity = Identity::from_pem(cert, key);
-                let tls = ServerTlsConfig::new().identity(identity);
-                server_builder = server_builder.tls_config(tls)?;
-                info!(cert = %cert_path, "gRPC TLS enabled");
-            }
-            _ => {
-                info!(cert = %cert_path, key = %key_path, "Failed to read TLS cert/key, continuing without TLS");
-            }
-        }
-    }
-
-    let grpc_server = server_builder
-        .add_service(InterceptedService::new(
-            attentiondb_api::server::attentiondb::attention_db_server::AttentionDbServer::new(svc),
-            grpc_auth_interceptor(api_keys.clone()),
-        ))
+    // ── gRPC Server ──────────────────────────────────────────────────────
+    let grpc_server = Server::builder()
+        .add_service(
+            attentiondb_api::server::attentiondb::attention_db_server::AttentionDbServer::new(svc)
+        )
         .serve_with_shutdown(grpc_addr, shutdown_signal("gRPC"));
 
-    let rest_app = create_rest_router_with_service(rest_svc)
-        .layer(Extension(api_keys.clone()))
-        .layer(from_fn(attentiondb_api::auth::auth_middleware))
+    // ── REST Server (HTTP or HTTPS) ──────────────────────────────────────
+    let app = create_rest_router_with_service(rest_svc)
         .layer(CorsLayer::permissive())
-        .layer(RequestBodyLimitLayer::new(MAX_REQUEST_BODY_BYTES));
-
-    let listener = TcpListener::bind(&rest_addr).await?;
-    let rest_server = axum::serve(listener, rest_app.into_make_service())
-        .with_graceful_shutdown(shutdown_signal("REST"));
-
-    let metrics_app = Router::new()
-        .route("/metrics", get(metrics_handler))
-        .layer(Extension(metrics_handle.clone()));
-
-    let metrics_server = async move {
-        AxumServer::bind(metrics_addr)
-            .serve(metrics_app.into_make_service())
-            .await
-    };
+        .layer(RequestBodyLimitLayer::new(
+            attentiondb_api::validation::MAX_REQUEST_BODY_BYTES,
+        ));
 
     info!("Server ready — press Ctrl+C for graceful shutdown");
 
-    tokio::select! {
-        result = grpc_server => {
-            if let Err(e) = result {
-                error!(error = %e, "gRPC server error");
+    match tls_mode {
+        tls::TlsMode::Enabled(tls_config) => {
+            // HTTPS mode
+            let rest_server = axum_server::bind_rustls(rest_addr, tls_config)
+                .serve(app.into_make_service());
+
+            tokio::select! {
+                result = grpc_server => {
+                    if let Err(e) = result { error!(error = %e, "gRPC server error"); }
+                }
+                result = rest_server => {
+                    if let Err(e) = result { error!(error = %e, "HTTPS REST server error"); }
+                }
+                _ = shutdown_signal("main") => {
+                    info!("Shutdown signal received");
+                }
             }
         }
-        result = rest_server => {
-            if let Err(e) = result {
-                error!(error = %e, "REST server error");
-            }
-        }
-        result = metrics_server => {
-            if let Err(e) = result {
-                error!(error = %e, "Metrics server error");
+        tls::TlsMode::Disabled => {
+            // HTTP mode
+            let listener = tokio::net::TcpListener::bind(&rest_addr).await?;
+            let rest_server = axum::serve(listener, app.into_make_service())
+                .with_graceful_shutdown(shutdown_signal("REST"));
+
+            tokio::select! {
+                result = grpc_server => {
+                    if let Err(e) = result { error!(error = %e, "gRPC server error"); }
+                }
+                result = rest_server => {
+                    if let Err(e) = result { error!(error = %e, "HTTP REST server error"); }
+                }
             }
         }
     }
