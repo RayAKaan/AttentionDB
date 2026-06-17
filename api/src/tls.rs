@@ -25,6 +25,8 @@
 use axum_server::tls_rustls::RustlsConfig;
 use std::path::PathBuf;
 use tracing::{info, warn};
+use tonic::transport::{Identity, ServerTlsConfig};
+use tokio::fs;
 
 /// Result of TLS configuration attempt.
 pub enum TlsMode {
@@ -90,6 +92,65 @@ pub async fn resolve_tls() -> TlsMode {
     // ── Disabled ────────────────────────────────────────────────────────
     info!("TLS disabled (set ATTENTIONDB_TLS_CERT/KEY or ATTENTIONDB_TLS_SELF_SIGNED=true to enable)");
     TlsMode::Disabled
+}
+
+/// Resolve gRPC TLS configuration using the same environment variables as REST TLS.
+pub async fn resolve_grpc_tls() -> Option<ServerTlsConfig> {
+    if let (Ok(cert_path), Ok(key_path)) = (
+        std::env::var("ATTENTIONDB_TLS_CERT"),
+        std::env::var("ATTENTIONDB_TLS_KEY"),
+    ) {
+        let cert = PathBuf::from(&cert_path);
+        let key = PathBuf::from(&key_path);
+
+        if !cert.exists() {
+            warn!(path = %cert_path, "gRPC TLS cert file not found — falling back to plaintext");
+        } else if !key.exists() {
+            warn!(path = %key_path, "gRPC TLS key file not found — falling back to plaintext");
+        } else {
+            let cert_bytes = fs::read(&cert).await;
+            let key_bytes = fs::read(&key).await;
+            if let (Ok(cert_bytes), Ok(key_bytes)) = (cert_bytes, key_bytes) {
+                let identity = Identity::from_pem(cert_bytes, key_bytes);
+                info!(cert = %cert_path, key = %key_path, "gRPC TLS enabled (file-based)");
+                return Some(ServerTlsConfig::new().identity(identity));
+            }
+        }
+    }
+
+    if std::env::var("ATTENTIONDB_TLS_SELF_SIGNED")
+        .map(|v| v == "true" || v == "1")
+        .unwrap_or(false)
+    {
+        match generate_self_signed_identity().await {
+            Ok(identity) => {
+                warn!("gRPC TLS enabled with SELF-SIGNED certificate (development only — do NOT use in production)");
+                return Some(ServerTlsConfig::new().identity(identity));
+            }
+            Err(e) => {
+                warn!(error = %e, "Failed to generate self-signed gRPC cert — falling back to plaintext");
+            }
+        }
+    }
+
+    None
+}
+
+async fn generate_self_signed_identity() -> Result<Identity, Box<dyn std::error::Error>> {
+    use rcgen::generate_simple_self_signed;
+
+    let subject_alt_names = vec![
+        "localhost".to_string(),
+        "127.0.0.1".to_string(),
+        "0.0.0.0".to_string(),
+        "attentiondb".to_string(),
+    ];
+
+    let rcgen::CertifiedKey { cert, key_pair } = generate_simple_self_signed(subject_alt_names)?;
+    let cert_pem = cert.pem();
+    let key_pem = key_pair.serialize_pem();
+
+    Ok(Identity::from_pem(cert_pem.as_bytes(), key_pem.as_bytes()))
 }
 
 /// Generate an ephemeral self-signed certificate using rcgen.

@@ -1,6 +1,6 @@
 use attentiondb_api::server::AttentionDBService;
 use attentiondb_api::create_rest_router_with_service;
-use attentiondb_api::auth::ApiKeyStore;
+use attentiondb_api::auth::{ApiKeyStore, grpc_auth_interceptor};
 use attentiondb_api::observability;
 use attentiondb_api::tls;
 use tonic::transport::Server;
@@ -15,7 +15,7 @@ use tracing::{info, error};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ── Initialize Observability ─────────────────────────────────────────
     observability::init_logging();
-    observability::init_metrics();
+    let metrics_handle = observability::init_metrics().map(Arc::new);
 
     // ── Configuration ────────────────────────────────────────────────────
     let grpc_port = std::env::var("ATTENTIONDB_GRPC_PORT").unwrap_or_else(|_| "7400".into());
@@ -28,6 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ── Initialize TLS ───────────────────────────────────────────────────
     let tls_mode = tls::resolve_tls().await;
+    let grpc_tls_config = tls::resolve_grpc_tls().await;
 
     // ── Initialize Engine ────────────────────────────────────────────────
     let wal_dir = std::env::var("ATTENTIONDB_DATA_DIR").unwrap_or_else(|_| "/data".into());
@@ -57,14 +58,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rest_svc = Arc::new(AttentionDBService::new(engine));
 
     // ── gRPC Server ──────────────────────────────────────────────────────
-    let grpc_server = Server::builder()
-        .add_service(
-            attentiondb_api::server::attentiondb::attention_db_server::AttentionDbServer::new(svc)
-        )
+    let grpc_service = attentiondb_api::server::attentiondb::attention_db_server::AttentionDbServer::with_interceptor(
+        svc,
+        grpc_auth_interceptor(api_keys.clone()),
+    );
+    let mut grpc_builder = Server::builder();
+    if let Some(tls_config) = grpc_tls_config {
+        grpc_builder = grpc_builder.tls_config(tls_config)?;
+    }
+    let grpc_server = grpc_builder
+        .add_service(grpc_service)
         .serve_with_shutdown(grpc_addr, shutdown_signal("gRPC"));
 
     // ── REST Server (HTTP or HTTPS) ──────────────────────────────────────
-    let app = create_rest_router_with_service(rest_svc, api_keys.clone())
+    let app = create_rest_router_with_service(rest_svc, api_keys.clone(), metrics_handle.clone())
         .layer(CorsLayer::permissive())
         .layer(RequestBodyLimitLayer::new(
             attentiondb_api::validation::MAX_REQUEST_BODY_BYTES,

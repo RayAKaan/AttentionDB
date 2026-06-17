@@ -38,6 +38,7 @@ impl AttentionDBClient {
             top_k,
             min_weight: 0.01,
             temporal_decay: None,
+            offset: 0,
         });
 
         let response = self.client.attend(request).await?;

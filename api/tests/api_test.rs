@@ -76,7 +76,7 @@ async fn test_grpc_end_to_end_insert_and_attend() {
 async fn test_rest_end_to_end_insert_and_attend() {
     let svc = Arc::new(AttentionDBService::default());
     let api_keys = Arc::new(ApiKeyStore::disabled());
-    let app = create_rest_router_with_service(svc.clone(), api_keys);
+    let app = create_rest_router_with_service(svc.clone(), api_keys, None);
 
     let coll_body = serde_json::json!({
         "collection": "rest_papers",

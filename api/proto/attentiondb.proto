@@ -19,12 +19,16 @@ message AttendRequest {
     uint32 top_k = 4;
     float min_weight = 5;
     optional float temporal_decay = 6;
+    uint32 offset = 7;
 }
 
 message AttendResponse {
     repeated Result results = 1;
     double latency_ms = 2;
     float effective_sample_size = 3;
+    uint32 total_count = 4;
+    uint32 offset = 5;
+    bool has_more = 6;
 }
 
 message Result {
@@ -78,6 +82,7 @@ message CreateCollectionRequest {
     repeated FieldDefinition fields = 2;
     optional CollectionSettings settings = 3;
     map<string, CollectionSettings> head_settings = 4;
+    uint32 dimension = 5;
 }
 
 message CreateCollectionResponse {

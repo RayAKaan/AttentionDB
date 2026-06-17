@@ -140,6 +140,27 @@ impl DocumentStore {
 
             let reader = SSTableReader::open(&sst_path)?;
             self.sstables.push(reader);
+
+            // Trigger compaction if enough SST files have accumulated.
+            let config = crate::compaction::CompactionConfig::default();
+            if let Ok(Some(result)) = crate::compaction::compact(dir, &config) {
+                let _ = crate::compaction::cleanup_merged_files(&result);
+
+                self.sstables.clear();
+                if let Ok(entries) = std::fs::read_dir(dir) {
+                    let mut paths: Vec<_> = entries
+                        .filter_map(Result::ok)
+                        .map(|e| e.path())
+                        .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("sst"))
+                        .collect();
+                    paths.sort();
+                    for path in paths {
+                        if let Ok(reader) = SSTableReader::open(&path) {
+                            self.sstables.push(reader);
+                        }
+                    }
+                }
+            }
         }
 
         for (id, record) in self.memtable.drain() {

@@ -1,7 +1,8 @@
 use tonic::{Request, Response, Status};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::debug;
+use tracing::{debug, warn};
+use crate::auth::ApiKeyStore;
 use crate::validation;
 use crate::observability;
 
@@ -22,11 +23,16 @@ use attentiondb::{
 #[derive(Clone)]
 pub struct AttentionDBService {
     pub engine: Arc<attentiondb_core::engine::AttentionEngine>,
+    pub api_keys: Arc<ApiKeyStore>,
 }
 
 impl AttentionDBService {
     pub fn new(engine: Arc<attentiondb_core::engine::AttentionEngine>) -> Self {
-        Self { engine }
+        Self { engine, api_keys: Arc::new(ApiKeyStore::disabled()) }
+    }
+
+    pub fn with_auth(engine: Arc<attentiondb_core::engine::AttentionEngine>, api_keys: Arc<ApiKeyStore>) -> Self {
+        Self { engine, api_keys }
     }
 }
 
@@ -58,12 +64,44 @@ pub fn parse_float_vector(s: &str) -> Result<Vec<f32>, ()> {
     Ok(vec)
 }
 
+fn check_grpc_auth(api_keys: &ApiKeyStore, metadata: &tonic::metadata::MetadataMap) -> Result<(), Status> {
+    if !api_keys.enabled {
+        return Ok(());
+    }
+
+    if let Some(val) = metadata.get("authorization") {
+        if let Ok(s) = val.to_str() {
+            if let Some(token) = s.strip_prefix("Bearer ").or_else(|| s.strip_prefix("bearer ")) {
+                if api_keys.validate(token) {
+                    return Ok(());
+                }
+                warn!("gRPC: invalid API key via Authorization header");
+                return Err(Status::unauthenticated("Invalid API key"));
+            }
+        }
+    }
+
+    if let Some(val) = metadata.get("x-api-key") {
+        if let Ok(s) = val.to_str() {
+            if api_keys.validate(s) {
+                return Ok(());
+            }
+            warn!("gRPC: invalid API key via x-api-key header");
+            return Err(Status::unauthenticated("Invalid API key"));
+        }
+    }
+
+    warn!("gRPC: missing API key");
+    Err(Status::unauthenticated("API key required. Set Authorization: Bearer <key> or x-api-key metadata."))
+}
+
 #[tonic::async_trait]
 impl AttentionDb for AttentionDBService {
     async fn attend(
         &self,
         request: Request<AttendRequest>,
     ) -> Result<Response<AttendResponse>, Status> {
+        check_grpc_auth(&self.api_keys, request.metadata())?;
         let req = request.into_inner();
         let _timer = observability::LatencyTimer::new("attend");
 
@@ -75,7 +113,7 @@ impl AttentionDb for AttentionDBService {
             .map_err(|_| Status::invalid_argument(format!("Invalid query vector format: '{}'", req.query)))?;
         validation::validate_vector_dimension(query_vec.len())?;
 
-        debug!(collection = %req.collection, heads = ?req.heads, top_k = req.top_k, "ATTEND request received");
+        debug!(collection = %req.collection, heads = ?req.heads, top_k = req.top_k, offset = req.offset, "ATTEND request received");
 
         let heads = if req.heads.is_empty() || req.heads == ["default"] {
             if let Ok(coll) = self.engine.get_collection(&req.collection) {
@@ -87,12 +125,22 @@ impl AttentionDb for AttentionDBService {
             req.heads.clone()
         };
 
+        let offset = req.offset as usize;
+        let fetch_count = offset + req.top_k as usize;
+
         let start = std::time::Instant::now();
-        let raw_results = self.engine.attend(&req.collection, &heads, &query_vec, req.top_k as usize)
-            .map_err(|e| Status::internal(e.to_string()))?;
+        let raw_results = self.engine.attend(&req.collection, &heads, &query_vec, fetch_count)
+            .map_err(|e| {
+                observability::record_error("attend", &e.to_string());
+                Status::internal(e.to_string())
+            })?;
         let latency = start.elapsed().as_secs_f64() * 1000.0;
 
-        let results: Vec<attentiondb::Result> = raw_results.into_iter().map(|(numeric_id, score)| {
+        let total_count = raw_results.len() as u32;
+        let paged: Vec<(u64, f32)> = raw_results.into_iter().skip(offset).take(req.top_k as usize).collect();
+        let has_more = (offset + paged.len()) < total_count as usize;
+
+        let results: Vec<attentiondb::Result> = paged.into_iter().map(|(numeric_id, score)| {
             let fields = self.engine.get_document_fields(numeric_id);
             attentiondb::Result {
                 id: numeric_id.to_string(),
@@ -107,6 +155,9 @@ impl AttentionDb for AttentionDBService {
             results,
             latency_ms: latency,
             effective_sample_size: 1.0,
+            total_count,
+            offset: req.offset,
+            has_more,
         }))
     }
 
@@ -114,6 +165,7 @@ impl AttentionDb for AttentionDBService {
         &self,
         request: Request<InsertRequest>,
     ) -> Result<Response<InsertResponse>, Status> {
+        check_grpc_auth(&self.api_keys, request.metadata())?;
         let req = request.into_inner();
         let _timer = observability::LatencyTimer::new("insert");
 
@@ -167,6 +219,7 @@ impl AttentionDb for AttentionDBService {
         &self,
         request: Request<DeleteRequest>,
     ) -> Result<Response<DeleteResponse>, Status> {
+        check_grpc_auth(&self.api_keys, request.metadata())?;
         let req = request.into_inner();
         validation::validate_collection_name(&req.collection)?;
 
@@ -221,7 +274,14 @@ impl AttentionDb for AttentionDBService {
         validation::validate_heads(&heads)?;
         let head_refs: Vec<&str> = heads.iter().map(|s| s.as_str()).collect();
 
-        self.engine.create_collection_with_settings(&req.collection, 64, &head_refs, hnsw_settings.clone())
+        let dimension = if req.dimension > 0 {
+            validation::validate_vector_dimension(req.dimension as usize)?;
+            req.dimension as usize
+        } else {
+            64
+        };
+
+        self.engine.create_collection_with_settings(&req.collection, dimension, &head_refs, hnsw_settings.clone())
             .map_err(|e| {
                 observability::record_error("create_collection", &e.to_string());
                 Status::internal(e.to_string())
@@ -259,6 +319,7 @@ impl AttentionDb for AttentionDBService {
         &self,
         request: Request<GetCollectionSettingsRequest>,
     ) -> Result<Response<GetCollectionSettingsResponse>, Status> {
+        check_grpc_auth(&self.api_keys, request.metadata())?;
         let req = request.into_inner();
         validation::validate_collection_name(&req.collection)?;
         let coll = self.engine.get_collection(&req.collection)
@@ -283,6 +344,7 @@ impl AttentionDb for AttentionDBService {
         &self,
         request: Request<AlterCollectionRequest>,
     ) -> Result<Response<AlterCollectionResponse>, Status> {
+        check_grpc_auth(&self.api_keys, request.metadata())?;
         let req = request.into_inner();
         validation::validate_collection_name(&req.collection)?;
 

@@ -2,20 +2,23 @@ use axum::{
     extract::{Extension, Path, State},
     http::StatusCode,
     middleware::from_fn,
+    response::IntoResponse,
     routing::{get, post, put},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
+use metrics_exporter_prometheus::PrometheusHandle;
 use std::sync::Arc;
 use crate::auth::{ApiKeyStore, auth_middleware};
 use crate::server::AttentionDBService;
 use crate::observability;
-use crate::validation::{validate_collection_name, validate_fields, validate_heads, validate_top_k};
+use crate::validation::{validate_collection_name, validate_fields, validate_heads, validate_top_k, validate_vector_dimension};
 
 #[derive(Clone)]
 pub struct AppState {
     pub service: Arc<AttentionDBService>,
     pub api_keys: Arc<ApiKeyStore>,
+    pub metrics: Option<Arc<PrometheusHandle>>,
 }
 
 #[derive(Deserialize)]
@@ -26,6 +29,7 @@ pub struct AttendRequest {
     pub top_k: Option<u32>,
     pub min_weight: Option<f32>,
     pub temporal_decay: Option<f32>,
+    pub offset: Option<u32>,
 }
 
 #[derive(Serialize)]
@@ -33,6 +37,9 @@ pub struct AttendResponse {
     pub results: Vec<serde_json::Value>,
     pub latency_ms: f64,
     pub effective_sample_size: f32,
+    pub total_count: u32,
+    pub offset: u32,
+    pub has_more: bool,
 }
 
 #[derive(Deserialize)]
@@ -76,6 +83,7 @@ pub struct CreateCollectionRestRequest {
     pub fields: Vec<FieldDefinition>,
     pub settings: Option<CollectionSettingsRest>,
     pub head_settings: Option<std::collections::HashMap<String, CollectionSettingsRest>>,
+    pub dimension: Option<u32>,
 }
 
 #[derive(Serialize)]
@@ -107,6 +115,7 @@ pub async fn attend_handler(
     let top_k = payload.top_k.unwrap_or(10);
     validate_top_k(top_k)
         .map_err(|e| (StatusCode::BAD_REQUEST, e.message().to_string()))?;
+    let offset = payload.offset.unwrap_or(0);
 
     if let Some(ref heads_list) = payload.heads {
         validate_heads(heads_list)
@@ -115,6 +124,8 @@ pub async fn attend_handler(
 
     let query_vec = crate::server::parse_float_vector(&payload.query)
         .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid query vector format".to_string()))?;
+    validate_vector_dimension(query_vec.len())
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.message().to_string()))?;
 
     let heads = payload.heads.unwrap_or_else(|| {
         if let Ok(coll) = state.service.engine.get_collection(&payload.collection) {
@@ -124,15 +135,21 @@ pub async fn attend_handler(
         }
     });
 
+    let offset_usize = offset as usize;
+    let fetch_count = offset_usize + top_k as usize;
     let start = std::time::Instant::now();
-    let raw_results = state.service.engine.attend(&payload.collection, &heads, &query_vec, top_k as usize)
+    let raw_results = state.service.engine.attend(&payload.collection, &heads, &query_vec, fetch_count)
         .map_err(|e| {
             observability::record_error("rest_attend", &e.to_string());
             (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
         })?;
     let latency = start.elapsed().as_secs_f64() * 1000.0;
 
-    let results: Vec<serde_json::Value> = raw_results.into_iter().map(|(numeric_id, score)| {
+    let total_count = raw_results.len() as u32;
+    let paged: Vec<(u64, f32)> = raw_results.into_iter().skip(offset_usize).take(top_k as usize).collect();
+    let has_more = (offset_usize + paged.len()) < total_count as usize;
+
+    let results: Vec<serde_json::Value> = paged.into_iter().map(|(numeric_id, score)| {
         let fields = state.service.engine.get_document_fields(numeric_id);
         serde_json::json!({
             "id": numeric_id.to_string(),
@@ -147,6 +164,9 @@ pub async fn attend_handler(
         results,
         latency_ms: latency,
         effective_sample_size: 1.0,
+        total_count,
+        offset,
+        has_more,
     }))
 }
 
@@ -250,8 +270,23 @@ pub async fn create_collection_handler(
     };
     let head_refs: Vec<&str> = heads.iter().map(|s| s.as_str()).collect();
 
+    let dim = if let Some(d) = payload.dimension {
+        if d > 0 {
+            if let Err(e) = validate_vector_dimension(d as usize) {
+                return Json(CreateCollectionRestResponse {
+                    success: false,
+                    message: e.message().to_string(),
+                });
+            }
+            d as usize
+        } else {
+            64
+        }
+    } else {
+        64
+    };
     let ef_search = hnsw_settings.ef_search;
-    match state.service.engine.create_collection_with_settings(&payload.collection, 64, &head_refs, hnsw_settings.clone()) {
+    match state.service.engine.create_collection_with_settings(&payload.collection, dim, &head_refs, hnsw_settings.clone()) {
         Ok(_) => {
             observability::record_create_collection(&payload.collection, &head_refs, ef_search);
             Json(CreateCollectionRestResponse {
@@ -314,14 +349,16 @@ pub fn create_rest_router() -> Router {
     create_rest_router_with_service(
         Arc::new(AttentionDBService::default()),
         Arc::new(ApiKeyStore::disabled()),
+        None,
     )
 }
 
 pub fn create_rest_router_with_service(
     service: Arc<AttentionDBService>,
     api_keys: Arc<ApiKeyStore>,
+    metrics: Option<Arc<PrometheusHandle>>,
 ) -> Router {
-    let state = AppState { service, api_keys: api_keys.clone() };
+    let state = AppState { service, api_keys: api_keys.clone(), metrics };
 
     Router::new()
         .route("/v1/attend", post(attend_handler))
@@ -329,7 +366,17 @@ pub fn create_rest_router_with_service(
         .route("/v1/collections", post(create_collection_handler))
         .route("/v1/collections/{collection}", put(alter_collection_handler))
         .route("/health", get(health_handler))
+        .route("/metrics", get(metrics_handler))
         .layer(Extension(api_keys))
         .layer(from_fn(auth_middleware))
         .with_state(state)
+}
+
+pub async fn metrics_handler(State(state): State<AppState>) -> impl IntoResponse {
+    if let Some(handle) = &state.metrics {
+        let metrics = handle.render();
+        (StatusCode::OK, [("Content-Type", "text/plain; version=0.0.4")], metrics)
+    } else {
+        (StatusCode::SERVICE_UNAVAILABLE, [("Content-Type", "text/plain; charset=utf-8")], "Metrics not available".to_string())
+    }
 }
