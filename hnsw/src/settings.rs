@@ -26,6 +26,9 @@ pub struct CollectionSettings {
 
     /// enable_gpu_fusion: whether to use GPU for multi-head score fusion
     pub enable_gpu_fusion: bool,
+
+    /// enable_gpu_projections: whether to use GPU for W_Q / W_K / W_V projections
+    pub enable_gpu_projections: bool,
 }
 
 impl Default for CollectionSettings {
@@ -37,6 +40,7 @@ impl Default for CollectionSettings {
             similarity_metric: "cosine".to_string(),
             enable_exact_reranking: true,
             enable_gpu_fusion: false,
+            enable_gpu_projections: false,
         }
     }
 }
@@ -63,7 +67,6 @@ impl CollectionSettings {
         Ok(())
     }
 
-    /// Settings optimized for high recall (ef=256, ef_constr=800, max_conn=48)
     pub fn high_recall() -> Self {
         Self {
             ef_search: 256,
@@ -72,10 +75,10 @@ impl CollectionSettings {
             similarity_metric: "cosine".to_string(),
             enable_exact_reranking: true,
             enable_gpu_fusion: true,
+            enable_gpu_projections: true,
         }
     }
 
-    /// Settings optimized for low latency (ef=32, ef_constr=200, max_conn=12)
     pub fn low_latency() -> Self {
         Self {
             ef_search: 32,
@@ -84,6 +87,7 @@ impl CollectionSettings {
             similarity_metric: "cosine".to_string(),
             enable_exact_reranking: false,
             enable_gpu_fusion: false,
+            enable_gpu_projections: false,
         }
     }
 }

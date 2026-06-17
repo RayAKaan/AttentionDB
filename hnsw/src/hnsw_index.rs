@@ -243,6 +243,47 @@ impl HNSWIndex {
         self.config.ef_search = ef;
     }
 
+    // ==================== GPU PROJECTIONS ====================
+
+    /// Enable GPU acceleration for projection operations (requires `cuda` feature)
+    #[cfg(feature = "cuda")]
+    pub fn enable_gpu_projections(&mut self) -> Result<(), HNSWError> {
+        if !self.gpu_backend.is_available() {
+            self.gpu_backend = Box::new(CudaBackend::new()?);
+        }
+        Ok(())
+    }
+
+    /// Perform batched projection using GPU if available, otherwise CPU
+    pub fn project_batch(&self, matrix: &[f32], vectors: &[Vec<f32>]) -> Vec<Vec<f32>> {
+        if self.settings.enable_gpu_fusion && self.gpu_backend.is_available() {
+            match self.gpu_backend.project_batch(matrix, vectors) {
+                Ok(result) => return result,
+                Err(_) => {}
+            }
+        }
+        let dim = if vectors.is_empty() { return vec![]; } else { vectors[0].len() };
+        let mut results = Vec::with_capacity(vectors.len());
+        for vec in vectors {
+            let mut output = vec![0.0; dim];
+            for i in 0..dim {
+                for j in 0..dim {
+                    output[i] += matrix[i * dim + j] * vec[j];
+                }
+            }
+            results.push(output);
+        }
+        results
+    }
+
+    /// Project a single vector (convenience wrapper)
+    pub fn project_vector(&self, matrix: &[f32], vector: &[f32]) -> Vec<f32> {
+        self.project_batch(matrix, &[vector.to_vec()])
+            .into_iter()
+            .next()
+            .unwrap_or_default()
+    }
+
     pub fn save(&self, dir: &Path) -> Result<(), HNSWError> {
         crate::persistence::save_index(self, dir)
             .map_err(|e| HNSWError::Persistence(e.to_string()))?;
