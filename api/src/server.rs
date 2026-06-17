@@ -1,6 +1,9 @@
 use tonic::{Request, Response, Status};
 use std::collections::HashMap;
 use std::sync::Arc;
+use tracing::{info, warn, error, debug};
+use crate::validation;
+use crate::observability;
 
 pub mod attentiondb {
     tonic::include_proto!("attentiondb");
@@ -62,11 +65,17 @@ impl AttentionDb for AttentionDBService {
         request: Request<AttendRequest>,
     ) -> Result<Response<AttendResponse>, Status> {
         let req = request.into_inner();
-        println!("[gRPC] Attend: collection={}, query=\"{}\", heads={:?}, top_k={}",
-                 req.collection, req.query, req.heads, req.top_k);
+        let _timer = observability::LatencyTimer::new("attend");
+
+        validation::validate_collection_name(&req.collection)?;
+        validation::validate_top_k(req.top_k)?;
+        validation::validate_heads(&req.heads)?;
 
         let query_vec = parse_float_vector(&req.query)
             .map_err(|_| Status::invalid_argument(format!("Invalid query vector format: '{}'", req.query)))?;
+        validation::validate_vector_dimension(query_vec.len())?;
+
+        debug!(collection = %req.collection, heads = ?req.heads, top_k = req.top_k, "ATTEND request received");
 
         let heads = if req.heads.is_empty() || req.heads == ["default"] {
             if let Ok(coll) = self.engine.get_collection(&req.collection) {
@@ -83,7 +92,7 @@ impl AttentionDb for AttentionDBService {
             .map_err(|e| Status::internal(e.to_string()))?;
         let latency = start.elapsed().as_secs_f64() * 1000.0;
 
-        let results = raw_results.into_iter().map(|(numeric_id, score)| {
+        let results: Vec<attentiondb::Result> = raw_results.into_iter().map(|(numeric_id, score)| {
             let fields = self.engine.get_document_fields(numeric_id);
             attentiondb::Result {
                 id: numeric_id.to_string(),
@@ -91,6 +100,8 @@ impl AttentionDb for AttentionDBService {
                 fields,
             }
         }).collect();
+
+        observability::record_attend(&req.collection, &heads, req.top_k as usize, results.len(), latency);
 
         Ok(Response::new(AttendResponse {
             results,
@@ -104,6 +115,10 @@ impl AttentionDb for AttentionDBService {
         request: Request<InsertRequest>,
     ) -> Result<Response<InsertResponse>, Status> {
         let req = request.into_inner();
+        let _timer = observability::LatencyTimer::new("insert");
+
+        validation::validate_collection_name(&req.collection)?;
+        validation::validate_fields(&req.fields)?;
 
         let mut json_fields = HashMap::new();
         let mut k_vecs = HashMap::new();
@@ -131,8 +146,16 @@ impl AttentionDb for AttentionDBService {
             ));
         }
 
+        let num_vecs = record.k_vecs.len();
+        let start = std::time::Instant::now();
         let id_str = self.engine.insert_document(&req.collection, record)
-            .map_err(|e| Status::internal(e.to_string()))?;
+            .map_err(|e| {
+                observability::record_error("insert", &e.to_string());
+                Status::internal(e.to_string())
+            })?;
+        let latency = start.elapsed().as_secs_f64() * 1000.0;
+
+        observability::record_insert(&req.collection, &id_str, num_vecs, latency);
 
         Ok(Response::new(InsertResponse {
             id: id_str,
@@ -145,8 +168,15 @@ impl AttentionDb for AttentionDBService {
         request: Request<DeleteRequest>,
     ) -> Result<Response<DeleteResponse>, Status> {
         let req = request.into_inner();
+        validation::validate_collection_name(&req.collection)?;
+
         let success = self.engine.delete_document(&req.collection, &req.id)
-            .map_err(|e| Status::internal(e.to_string()))?;
+            .map_err(|e| {
+                observability::record_error("delete", &e.to_string());
+                Status::internal(e.to_string())
+            })?;
+
+        observability::record_delete(&req.collection, &req.id, success);
         Ok(Response::new(DeleteResponse { success }))
     }
 
@@ -155,9 +185,11 @@ impl AttentionDb for AttentionDBService {
         _request: Request<HealthRequest>,
     ) -> Result<Response<HealthResponse>, Status> {
         let stats = self.engine.stats();
+        observability::record_engine_stats(stats.collection_count, stats.total_heads, stats.total_vectors);
+
         Ok(Response::new(HealthResponse {
             status: format!("healthy (collections: {}, heads: {}, vectors: {})", stats.collection_count, stats.total_heads, stats.total_vectors),
-            version: "0.5.0".to_string(),
+            version: env!("CARGO_PKG_VERSION").to_string(),
         }))
     }
 
@@ -166,7 +198,7 @@ impl AttentionDb for AttentionDBService {
         request: Request<CreateCollectionRequest>,
     ) -> Result<Response<CreateCollectionResponse>, Status> {
         let req = request.into_inner();
-        println!("[gRPC] CreateCollection: collection={}", req.collection);
+        validation::validate_collection_name(&req.collection)?;
 
         let mut hnsw_settings = attentiondb_hnsw::CollectionSettings::default();
         if let Some(ref s) = req.settings {
@@ -186,26 +218,28 @@ impl AttentionDb for AttentionDBService {
         } else {
             req.head_settings.keys().cloned().collect()
         };
+        validation::validate_heads(&heads)?;
         let head_refs: Vec<&str> = heads.iter().map(|s| s.as_str()).collect();
 
         self.engine.create_collection_with_settings(&req.collection, 64, &head_refs, hnsw_settings.clone())
-            .map_err(|e| Status::internal(e.to_string()))?;
+            .map_err(|e| {
+                observability::record_error("create_collection", &e.to_string());
+                Status::internal(e.to_string())
+            })?;
 
-        let field_info: Vec<String> = req.fields.iter()
-            .map(|f| format!("{}:{}", f.name, f.r#type))
-            .collect();
+        observability::record_create_collection(&req.collection, &head_refs, hnsw_settings.ef_search);
 
         let per_head_count = req.head_settings.len();
-
         let mut msg = format!(
-            "Created collection '{}' with fields [{}] and settings (ef_search={}, ef_construction={}, max_connections={}, similarity={}, exact_rerank={})",
+            "Created collection '{}' with settings (ef_search={}, ef_construction={}, max_connections={}, similarity={}, exact_rerank={}, enable_gpu_fusion={}, enable_gpu_projections={})",
             req.collection,
-            field_info.join(", "),
             hnsw_settings.ef_search,
             hnsw_settings.ef_construction,
             hnsw_settings.max_nb_connection,
             hnsw_settings.similarity_metric,
             hnsw_settings.enable_exact_reranking,
+            hnsw_settings.enable_gpu_fusion,
+            hnsw_settings.enable_gpu_projections,
         );
 
         if per_head_count > 0 {
@@ -226,6 +260,7 @@ impl AttentionDb for AttentionDBService {
         request: Request<GetCollectionSettingsRequest>,
     ) -> Result<Response<GetCollectionSettingsResponse>, Status> {
         let req = request.into_inner();
+        validation::validate_collection_name(&req.collection)?;
         let coll = self.engine.get_collection(&req.collection)
             .map_err(|e| Status::not_found(e.to_string()))?;
 
@@ -249,7 +284,7 @@ impl AttentionDb for AttentionDBService {
         request: Request<AlterCollectionRequest>,
     ) -> Result<Response<AlterCollectionResponse>, Status> {
         let req = request.into_inner();
-        println!("[gRPC] AlterCollection: collection={}", req.collection);
+        validation::validate_collection_name(&req.collection)?;
 
         let s = req.settings.unwrap_or_default();
         let hnsw_settings = attentiondb_hnsw::CollectionSettings {
@@ -265,7 +300,10 @@ impl AttentionDb for AttentionDBService {
         hnsw_settings.validate().map_err(|e| Status::invalid_argument(e))?;
 
         self.engine.alter_collection_settings(&req.collection, hnsw_settings.clone())
-            .map_err(|e| Status::internal(e.to_string()))?;
+            .map_err(|e| {
+                observability::record_error("alter_collection", &e.to_string());
+                Status::internal(e.to_string())
+            })?;
 
         let per_head_count = req.head_settings.len();
 

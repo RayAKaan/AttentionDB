@@ -14,7 +14,7 @@ use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::signal;
 use tonic::service::interceptor::InterceptedService;
-use tonic::transport::Server;
+use tonic::transport::{Identity, Server, ServerTlsConfig};
 use tower_http::cors::CorsLayer;
 use tower_http::limit::RequestBodyLimitLayer;
 use tracing::{error, info};
@@ -52,7 +52,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let svc = AttentionDBService::new(engine.clone());
     let rest_svc = Arc::new(AttentionDBService::new(engine));
 
-    let grpc_server = Server::builder()
+    // Configure optional TLS for gRPC if cert/key env vars are provided
+    let mut server_builder = Server::builder();
+    if let (Ok(cert_path), Ok(key_path)) = (
+        std::env::var("ATTENTIONDB_TLS_CERT"),
+        std::env::var("ATTENTIONDB_TLS_KEY"),
+    ) {
+        match (std::fs::read(&cert_path), std::fs::read(&key_path)) {
+            (Ok(cert), Ok(key)) => {
+                let identity = Identity::from_pem(cert, key);
+                let tls = ServerTlsConfig::new().identity(identity);
+                server_builder = server_builder.tls_config(tls)?;
+                info!(cert = %cert_path, "gRPC TLS enabled");
+            }
+            _ => {
+                info!(cert = %cert_path, key = %key_path, "Failed to read TLS cert/key, continuing without TLS");
+            }
+        }
+    }
+
+    let grpc_server = server_builder
         .add_service(InterceptedService::new(
             attentiondb_api::server::attentiondb::attention_db_server::AttentionDbServer::new(svc),
             grpc_auth_interceptor(api_keys.clone()),

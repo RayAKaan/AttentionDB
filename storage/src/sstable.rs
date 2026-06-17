@@ -3,6 +3,9 @@ use std::io::{Write, Read};
 use std::path::Path;
 use serde::{Serialize, Deserialize};
 use crate::error::StorageError;
+use crc32fast::Hasher;
+
+const SSTABLE_MAGIC: u32 = 0xA54D_4244; // 'A' 'M' 'B' 'D'
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SSTableEntry {
@@ -40,10 +43,15 @@ impl SSTableWriter {
     pub fn flush(&mut self) -> Result<(), StorageError> {
         self.entries.sort_by(|a, b| a.key.cmp(&b.key));
 
-        let serialized = bincode::serialize(&self.entries)
+        let payload = bincode::serialize(&self.entries)
             .map_err(|e| StorageError::Sstable(e.to_string()))?;
+        let mut hasher = Hasher::new();
+        hasher.update(&payload);
+        let crc32 = hasher.finalize();
 
-        self.file.write_all(&serialized)?;
+        self.file.write_all(&SSTABLE_MAGIC.to_be_bytes())?;
+        self.file.write_all(&crc32.to_be_bytes())?;
+        self.file.write_all(&payload)?;
         self.file.sync_all()?;
         Ok(())
     }
@@ -62,9 +70,27 @@ impl SSTableReader {
         let mut file = File::open(path)?;
         let mut buf = Vec::new();
         file.read_to_end(&mut buf)?;
-
-        let entries: Vec<SSTableEntry> = bincode::deserialize(&buf)
-            .map_err(|e| StorageError::Sstable(e.to_string()))?;
+        let entries = if buf.len() >= 8 {
+            let magic = u32::from_be_bytes([buf[0], buf[1], buf[2], buf[3]]);
+            let expected_crc = u32::from_be_bytes([buf[4], buf[5], buf[6], buf[7]]);
+            if magic == SSTABLE_MAGIC {
+                let payload = &buf[8..];
+                let mut hasher = Hasher::new();
+                hasher.update(payload);
+                let actual_crc = hasher.finalize();
+                if actual_crc != expected_crc {
+                    return Err(StorageError::Sstable(format!("SSTable checksum mismatch: expected {:08x}, actual {:08x}", expected_crc, actual_crc)));
+                }
+                bincode::deserialize(payload)
+                    .map_err(|e| StorageError::Sstable(e.to_string()))?
+            } else {
+                bincode::deserialize(&buf)
+                    .map_err(|e| StorageError::Sstable(e.to_string()))?
+            }
+        } else {
+            bincode::deserialize(&buf)
+                .map_err(|e| StorageError::Sstable(e.to_string()))?
+        };
 
         Ok(Self { entries })
     }

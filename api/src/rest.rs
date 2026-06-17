@@ -7,6 +7,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use crate::server::AttentionDBService;
+use crate::observability;
 use crate::validation::{validate_collection_name, validate_fields, validate_heads, validate_top_k};
 
 #[derive(Clone)]
@@ -123,7 +124,7 @@ pub async fn attend_handler(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     let latency = start.elapsed().as_secs_f64() * 1000.0;
 
-    let results = raw_results.into_iter().map(|(numeric_id, score)| {
+    let results: Vec<serde_json::Value> = raw_results.into_iter().map(|(numeric_id, score)| {
         let fields = state.service.engine.get_document_fields(numeric_id);
         serde_json::json!({
             "id": numeric_id.to_string(),
@@ -131,6 +132,8 @@ pub async fn attend_handler(
             "fields": fields,
         })
     }).collect();
+
+    observability::record_attend(&payload.collection, &heads, top_k as usize, results.len(), latency);
 
     Ok(Json(AttendResponse {
         results,
@@ -169,11 +172,14 @@ pub async fn insert_handler(
         return Err((StatusCode::BAD_REQUEST, "No vector embeddings found in fields".to_string()));
     }
 
+    let num_vectors = k_vecs.len();
     let mut record = attentiondb_storage::Record::new(json_fields);
     record.k_vecs = k_vecs;
 
     let id = state.service.engine.insert_document(&payload.collection, record)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    observability::record_insert(&payload.collection, &id, num_vectors, 0.0);
 
     Ok(Json(InsertRestResponse {
         id,
@@ -183,9 +189,10 @@ pub async fn insert_handler(
 
 pub async fn health_handler(State(state): State<AppState>) -> Json<HealthResponse> {
     let stats = state.service.engine.stats();
+    observability::record_engine_stats(stats.collection_count, stats.total_heads, stats.total_vectors);
     Json(HealthResponse {
         status: format!("healthy (collections: {}, heads: {}, vectors: {})", stats.collection_count, stats.total_heads, stats.total_vectors),
-        version: "0.5.0".to_string(),
+        version: env!("CARGO_PKG_VERSION").to_string(),
     })
 }
 
@@ -228,7 +235,11 @@ pub async fn create_collection_handler(
     };
     let head_refs: Vec<&str> = heads.iter().map(|s| s.as_str()).collect();
 
-    let success = state.service.engine.create_collection_with_settings(&payload.collection, 64, &head_refs, hnsw_settings).is_ok();
+    let success = state.service.engine.create_collection_with_settings(&payload.collection, 64, &head_refs, hnsw_settings.clone()).is_ok();
+
+    if success {
+        observability::record_create_collection(&payload.collection, &head_refs, hnsw_settings.ef_search);
+    }
 
     Json(CreateCollectionRestResponse {
         success,
@@ -259,6 +270,10 @@ pub async fn alter_collection_handler(
     hnsw_settings.enable_gpu_projections = s.enable_gpu_projections.unwrap_or(false);
 
     let success = state.service.engine.alter_collection_settings(&collection, hnsw_settings).is_ok();
+
+    if !success {
+        observability::record_error("alter_collection", "failed to apply new settings");
+    }
 
     Json(AlterCollectionRestResponse {
         success,

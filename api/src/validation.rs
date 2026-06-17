@@ -10,6 +10,10 @@ pub const MAX_COLLECTION_NAME_LEN: usize = 128;
 pub const MAX_HEADS: usize = 32;
 /// Maximum allowed top_k value.
 pub const MAX_TOP_K: u32 = 10_000;
+/// Maximum allowed pagination page size.
+pub const MAX_PAGE_SIZE: u32 = 1000;
+/// Maximum allowed pagination page number.
+pub const MAX_PAGE_NUMBER: u32 = 1000;
 /// Maximum allowed vector dimension.
 pub const MAX_DIMENSION: usize = 4096;
 /// Maximum allowed fields per document.
@@ -45,6 +49,32 @@ pub fn validate_top_k(top_k: u32) -> Result<(), Status> {
     if top_k > MAX_TOP_K {
         return Err(Status::invalid_argument(
             format!("top_k too large: {} (max {})", top_k, MAX_TOP_K)
+        ));
+    }
+    Ok(())
+}
+
+/// Validate pagination parameters.
+pub fn validate_page(page: u32) -> Result<(), Status> {
+    if page == 0 {
+        return Err(Status::invalid_argument("page must be at least 1"));
+    }
+    if page > MAX_PAGE_NUMBER {
+        return Err(Status::invalid_argument(
+            format!("page number too large: {} (max {})", page, MAX_PAGE_NUMBER)
+        ));
+    }
+    Ok(())
+}
+
+/// Validate pagination page size.
+pub fn validate_page_size(page_size: u32) -> Result<(), Status> {
+    if page_size == 0 {
+        return Err(Status::invalid_argument("page_size must be at least 1"));
+    }
+    if page_size > MAX_PAGE_SIZE {
+        return Err(Status::invalid_argument(
+            format!("page_size too large: {} (max {})", page_size, MAX_PAGE_SIZE)
         ));
     }
     Ok(())
@@ -159,5 +189,20 @@ mod tests {
         assert!(validate_vector_dimension(4096).is_ok());
         assert!(validate_vector_dimension(0).is_err());
         assert!(validate_vector_dimension(5000).is_err());
+    }
+
+    #[test]
+    fn test_pagination_validation() {
+        assert!(validate_page(1).is_ok());
+        assert!(validate_page(100).is_ok());
+        assert!(validate_page(MAX_PAGE_NUMBER).is_ok());
+        assert!(validate_page(0).is_err());
+        assert!(validate_page(MAX_PAGE_NUMBER + 1).is_err());
+
+        assert!(validate_page_size(1).is_ok());
+        assert!(validate_page_size(10).is_ok());
+        assert!(validate_page_size(MAX_PAGE_SIZE).is_ok());
+        assert!(validate_page_size(0).is_err());
+        assert!(validate_page_size(MAX_PAGE_SIZE + 1).is_err());
     }
 }
