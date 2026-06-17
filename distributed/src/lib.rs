@@ -6,7 +6,7 @@ pub mod operator;
 pub mod chaos;
 
 pub use shard::{Shard, HeadPartition, ShardManager};
-pub use raft::{RaftNode, RaftLogEntry};
+pub use raft::{RaftNode, RaftLogEntry, RaftMessage, RaftRole, RaftPayload};
 pub use replica::{ReadReplica, ReplicaManager};
 pub use operator::KubernetesOperator;
 pub use chaos::ChaosTester;
