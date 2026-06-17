@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use attentiondb_query::{parse_aql, plan_query, QueryExecutor, AQLStatement, ExecuteResult, execute_statement};
+use attentiondb_query::{parse_aql, plan_query, QueryExecutor, AQLStatement};
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");
@@ -45,9 +45,9 @@ fn main() {
             println!("\n→ Executing...");
             let index = attentiondb_hnsw::HNSWIndex::new("papers", 256, attentiondb_hnsw::HNSWConfig::default());
             let query_vector = vec![0.1; 256];
-            let result = QueryExecutor::execute_on_index(&plan, &index, &query_vector).unwrap();
-            println!("   Status: Executed plan: {} | Heads: {} | Top-K: {} | Results: {} | Latency: {:.3}ms",
-                     result.plan, plan.hnsw_search.heads.len(), plan.top_k, result.ids.len(), result.latency_ms);
+            let result = QueryExecutor::execute(&plan, &index, &query_vector).unwrap();
+            println!("   Status: Heads: {} | Top-K: {} | Results: {} | Latency: {:.3}ms",
+                     plan.hnsw_search.heads.len(), plan.top_k, result.ids.len(), result.latency_ms);
             println!("\n   Results:");
             for (i, (id, score)) in result.ids.iter().zip(result.scores.iter()).enumerate() {
                 println!("   {:>3}.  ID: {:>6}  Score: {:.4}", i + 1, id, score);
@@ -94,12 +94,10 @@ fn main() {
         _ => {}
     }
 
-    let empty_indexes = HashMap::new();
-    let alter_result = execute_statement(&alter_parsed, &empty_indexes, None).unwrap();
-    println!("\n→ Executor result: {}", match &alter_result {
-        ExecuteResult::DdlResult { message, .. } => message,
-        _ => "unknown",
-    });
+    let mut empty_indexes = HashMap::new();
+    let mut empty_managers = HashMap::new();
+    let alter_result = QueryExecutor::execute_statement(&alter_parsed, &mut empty_indexes, &mut empty_managers, None).unwrap();
+    println!("\n→ Executor result: {}", alter_result.message);
 
     println!("\n✅ Phase 3 demo completed successfully.");
 }

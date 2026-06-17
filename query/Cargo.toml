@@ -12,6 +12,7 @@ serde = { workspace = true }
 thiserror = { workspace = true }
 rayon = { workspace = true }
 attentiondb-hnsw = { path = "../hnsw" }
+attentiondb-multihead = { path = "../multihead" }
 
 [dev-dependencies]
 criterion = { workspace = true }

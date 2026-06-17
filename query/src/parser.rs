@@ -255,6 +255,25 @@ fn parse_alter_collection(pair: pest::iterators::Pair<Rule>) -> Result<AlterColl
     Ok(AlterCollection { collection, settings, head_settings })
 }
 
+/// Extract per-head settings from a parsed AQL statement.
+/// Returns a map of head_name -> CollectionSettings.
+pub fn get_per_head_settings(statement: &AQLStatement) -> HashMap<String, attentiondb_hnsw::CollectionSettings> {
+    match statement {
+        AQLStatement::CreateCollection(c) => c.head_settings.clone(),
+        AQLStatement::AlterCollection(a) => a.head_settings.clone(),
+        _ => HashMap::new(),
+    }
+}
+
+/// Check whether a parsed AQL statement contains any per-head settings.
+pub fn has_per_head_settings(statement: &AQLStatement) -> bool {
+    match statement {
+        AQLStatement::CreateCollection(c) => !c.head_settings.is_empty(),
+        AQLStatement::AlterCollection(a) => !a.head_settings.is_empty(),
+        _ => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

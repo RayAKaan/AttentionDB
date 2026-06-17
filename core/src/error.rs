@@ -22,4 +22,10 @@ pub enum CoreError {
 
     #[error("Invalid configuration: {0}")]
     InvalidConfig(String),
+
+    #[error("Not found: {0}")]
+    NotFound(String),
+
+    #[error("Invalid operation: {0}")]
+    InvalidOperation(String),
 }

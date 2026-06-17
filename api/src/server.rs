@@ -87,7 +87,9 @@ impl AttentionDb for AttentionDBService {
             .map(|f| format!("{}:{}", f.name, f.r#type))
             .collect();
 
-        let msg = format!(
+        let per_head_count = req.head_settings.len();
+
+        let mut msg = format!(
             "Created collection '{}' with fields [{}] and settings (ef_search={}, ef_construction={}, max_connections={}, similarity={}, exact_rerank={})",
             req.collection,
             field_info.join(", "),
@@ -97,6 +99,13 @@ impl AttentionDb for AttentionDBService {
             hnsw_settings.similarity_metric,
             hnsw_settings.enable_exact_reranking,
         );
+
+        if per_head_count > 0 {
+            let head_info: Vec<String> = req.head_settings.iter()
+                .map(|(name, s)| format!("{}: (ef_search={})", name, s.ef_search))
+                .collect();
+            msg.push_str(&format!(". Per-head settings: [{}]", head_info.join(", ")));
+        }
 
         Ok(Response::new(CreateCollectionResponse {
             success: true,
@@ -140,7 +149,9 @@ impl AttentionDb for AttentionDBService {
 
         hnsw_settings.validate().map_err(|e| Status::invalid_argument(e))?;
 
-        let msg = format!(
+        let per_head_count = req.head_settings.len();
+
+        let mut msg = format!(
             "Altered collection '{}' settings to (ef_search={}, ef_construction={}, max_connections={}, similarity={}, exact_rerank={})",
             req.collection,
             hnsw_settings.ef_search,
@@ -149,6 +160,13 @@ impl AttentionDb for AttentionDBService {
             hnsw_settings.similarity_metric,
             hnsw_settings.enable_exact_reranking,
         );
+
+        if per_head_count > 0 {
+            let head_info: Vec<String> = req.head_settings.iter()
+                .map(|(name, s)| format!("{}: (ef_search={})", name, s.ef_search))
+                .collect();
+            msg.push_str(&format!(". Per-head settings: [{}]", head_info.join(", ")));
+        }
 
         Ok(Response::new(AlterCollectionResponse {
             success: true,

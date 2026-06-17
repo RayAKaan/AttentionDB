@@ -56,6 +56,7 @@ pub struct CreateCollectionRestRequest {
     pub collection: String,
     pub fields: Vec<FieldDefinition>,
     pub settings: Option<CollectionSettingsRest>,
+    pub head_settings: Option<std::collections::HashMap<String, CollectionSettingsRest>>,
 }
 
 #[derive(Serialize)]
@@ -67,6 +68,7 @@ pub struct CreateCollectionRestResponse {
 #[derive(Deserialize)]
 pub struct AlterCollectionRestRequest {
     pub settings: CollectionSettingsRest,
+    pub head_settings: Option<std::collections::HashMap<String, CollectionSettingsRest>>,
 }
 
 #[derive(Serialize)]
@@ -108,12 +110,19 @@ pub async fn create_collection_handler(
         enable_gpu_fusion: Some(false),
     });
 
+    let per_head_count = payload.head_settings.as_ref().map_or(0, |m| m.len());
+    let mut msg = format!(
+        "Collection '{}' created with ef_search={:?}, ef_construction={:?}, max_connections={:?}",
+        payload.collection, settings.ef_search, settings.ef_construction, settings.max_connections
+    );
+
+    if per_head_count > 0 {
+        msg.push_str(&format!(". Per-head settings: {} head(s)", per_head_count));
+    }
+
     Json(CreateCollectionRestResponse {
         success: true,
-        message: format!(
-            "Collection '{}' created with ef_search={:?}, ef_construction={:?}, max_connections={:?}",
-            payload.collection, settings.ef_search, settings.ef_construction, settings.max_connections
-        ),
+        message: msg,
     })
 }
 
@@ -121,12 +130,19 @@ pub async fn alter_collection_handler(
     Path(collection): Path<String>,
     Json(payload): Json<AlterCollectionRestRequest>,
 ) -> Json<AlterCollectionRestResponse> {
+    let per_head_count = payload.head_settings.as_ref().map_or(0, |m| m.len());
+    let mut msg = format!(
+        "Collection '{}' settings updated (ef_search={:?})",
+        collection, payload.settings.ef_search
+    );
+
+    if per_head_count > 0 {
+        msg.push_str(&format!(". Per-head settings: {} head(s)", per_head_count));
+    }
+
     Json(AlterCollectionRestResponse {
         success: true,
-        message: format!(
-            "Collection '{}' settings updated (ef_search={:?}, enable_gpu_fusion={:?})",
-            collection, payload.settings.ef_search, payload.settings.enable_gpu_fusion
-        ),
+        message: msg,
     })
 }
 

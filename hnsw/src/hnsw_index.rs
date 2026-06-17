@@ -6,6 +6,7 @@ use std::sync::Arc;
 use serde::{Serialize, Deserialize};
 use crate::error::HNSWError;
 use crate::gpu::{GpuBackend, CpuBackend};
+use crate::persistence::strategy::PersistenceStrategy;
 use crate::settings::CollectionSettings;
 
 #[cfg(feature = "cuda")]
@@ -275,6 +276,20 @@ impl HNSWIndex {
             let _ = self.insert(*id, vec);
         }
         crate::persistence::append_vectors(dir, new_vectors)
+            .map_err(|e| HNSWError::Persistence(e.to_string()))
+    }
+
+    /// Save using graph-aware persistence (preserves insertion order)
+    pub fn save_graph(&self, dir: &Path) -> Result<(), HNSWError> {
+        let strategy = crate::persistence::GraphPersistence;
+        strategy.save(self, dir)
+            .map_err(|e| HNSWError::Persistence(e.to_string()))
+    }
+
+    /// Load using graph-aware persistence
+    pub fn load_graph(dir: &Path) -> Result<Self, HNSWError> {
+        let strategy = crate::persistence::GraphPersistence;
+        strategy.load(dir)
             .map_err(|e| HNSWError::Persistence(e.to_string()))
     }
 }

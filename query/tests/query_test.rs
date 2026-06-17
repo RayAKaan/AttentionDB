@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use attentiondb_query::{parse_aql, plan_query, QueryExecutor, AQLStatement, ExecuteResult, execute_statement};
+use attentiondb_query::{parse_aql, plan_query, QueryExecutor, AQLStatement};
 use attentiondb_hnsw::HNSWConfig;
 
 fn get_query(stmt: AQLStatement) -> attentiondb_query::AQLQuery {
@@ -21,7 +21,7 @@ fn test_full_pipeline() {
     let parsed = parse_aql(aql).unwrap();
     let plan = plan_query(get_query(parsed)).unwrap();
     let index = create_test_index_with_dim(256);
-    let result = QueryExecutor::execute_on_index(&plan, &index, &[0.1; 256]).unwrap();
+    let result = QueryExecutor::execute(&plan, &index, &[0.1; 256]).unwrap();
     assert!(result.latency_ms >= 0.0);
 }
 
@@ -31,7 +31,7 @@ fn test_multi_head_pipeline() {
     let parsed = parse_aql(aql).unwrap();
     let plan = plan_query(get_query(parsed)).unwrap();
     let index = create_test_index_with_dim(256);
-    let result = QueryExecutor::execute_on_index(&plan, &index, &[0.2; 256]).unwrap();
+    let result = QueryExecutor::execute(&plan, &index, &[0.2; 256]).unwrap();
     assert!(result.latency_ms >= 0.0);
 }
 
@@ -41,7 +41,7 @@ fn test_temporal_decay_pipeline() {
     let parsed = parse_aql(aql).unwrap();
     let plan = plan_query(get_query(parsed)).unwrap();
     let index = create_test_index_with_dim(256);
-    let _result = QueryExecutor::execute_on_index(&plan, &index, &[0.3; 256]).unwrap();
+    let _result = QueryExecutor::execute(&plan, &index, &[0.3; 256]).unwrap();
     let temporal_weight = plan.hnsw_search.heads.iter()
         .find(|(n, _)| n == "temporal")
         .map(|(_, w)| *w);
@@ -70,7 +70,7 @@ fn test_min_weight_filtering() {
     let parsed = parse_aql(aql).unwrap();
     let plan = plan_query(get_query(parsed)).unwrap();
     let index = create_test_index_with_dim(256);
-    let result = QueryExecutor::execute_on_index(&plan, &index, &[0.1; 256]).unwrap();
+    let result = QueryExecutor::execute(&plan, &index, &[0.1; 256]).unwrap();
     assert!(result.latency_ms >= 0.0);
 }
 
@@ -113,16 +113,20 @@ fn test_alter_collection_ddl() {
 
 #[test]
 fn test_alter_collection_executor() {
-    let aql = r#"ALTER COLLECTION metrics SET (ef_search = 128, exact_rerank = false)"#;
-    let parsed = parse_aql(aql).unwrap();
-    let empty_indexes = HashMap::new();
-    let result = execute_statement(&parsed, &empty_indexes, None).unwrap();
-    match result {
-        ExecuteResult::DdlResult { collection, message } => {
-            assert_eq!(collection, "metrics");
-            assert!(message.contains("ef_search=128"));
-            assert!(message.contains("exact_rerank=false"));
-        }
-        _ => panic!("Expected DdlResult"),
-    }
+    let create_aql = r#"CREATE COLLECTION metrics (name TEXT) WITH (ef_search = 256, similarity = "cosine")"#;
+    let alter_aql = r#"ALTER COLLECTION metrics SET (ef_search = 128, exact_rerank = false)"#;
+
+    let create_parsed = parse_aql(create_aql).unwrap();
+    let alter_parsed = parse_aql(alter_aql).unwrap();
+
+    let mut indexes = HashMap::new();
+    let mut managers = HashMap::new();
+
+    let _create_result = QueryExecutor::execute_statement(&create_parsed, &mut indexes, &mut managers, None).unwrap();
+    let result = QueryExecutor::execute_statement(&alter_parsed, &mut indexes, &mut managers, None).unwrap();
+
+    assert!(result.success);
+    assert_eq!(result.affected_collection, Some("metrics".to_string()));
+    assert!(result.message.contains("ef_search=128"));
+    assert!(result.message.contains("exact_rerank=false"));
 }

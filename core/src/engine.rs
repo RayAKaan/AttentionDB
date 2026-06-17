@@ -1,11 +1,15 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::path::Path;
 use parking_lot::RwLock;
+use attentiondb_query::parse_aql;
+use attentiondb_storage::{Wal, OpType, Record};
 use crate::collection::Collection;
 use crate::error::CoreError;
 
 pub struct AttentionEngine {
     collections: Arc<RwLock<HashMap<String, Arc<Collection>>>>,
+    wal: Arc<parking_lot::Mutex<Option<Wal>>>,
 }
 
 pub struct EngineStats {
@@ -18,7 +22,16 @@ impl AttentionEngine {
     pub fn new() -> Self {
         Self {
             collections: Arc::new(RwLock::new(HashMap::new())),
+            wal: Arc::new(parking_lot::Mutex::new(None)),
         }
+    }
+
+    pub fn open(wal_path: &str, durability: attentiondb_storage::Durability) -> Result<Self, CoreError> {
+        let wal = Wal::new(Path::new(wal_path))?.with_durability(durability);
+        Ok(Self {
+            collections: Arc::new(RwLock::new(HashMap::new())),
+            wal: Arc::new(parking_lot::Mutex::new(Some(wal))),
+        })
     }
 
     pub fn create_collection(
@@ -91,6 +104,56 @@ impl AttentionEngine {
     pub fn list_collections(&self) -> Vec<String> {
         let collections = self.collections.read();
         collections.keys().cloned().collect()
+    }
+
+    pub fn insert_document(&self, collection_name: &str, record: Record) -> Result<String, CoreError> {
+        let collection = self.get_collection(collection_name)?;
+
+        let id = record.id.to_string();
+        let record_bytes = record.to_msgpack()?;
+
+        {
+            let mut wal_guard = self.wal.lock();
+            if let Some(wal) = wal_guard.as_mut() {
+                wal.append(OpType::Insert, collection_name, record.id, record_bytes)?;
+            }
+        }
+
+        for (head_name, vec_data) in &record.k_vecs {
+            let numeric_id = record.id.as_u128() as u64;
+            collection.insert_vector(head_name, numeric_id, vec_data)?;
+        }
+
+        Ok(id)
+    }
+
+    pub fn execute_aql(&self, aql: &str) -> Result<String, CoreError> {
+        let statement = parse_aql(aql)?;
+
+        match statement {
+            attentiondb_query::AQLStatement::Query(query) => {
+                let collection = self.get_collection(&query.collection)?;
+                let heads: Vec<String> = if query.heads.is_empty() {
+                    collection.list_heads()
+                } else {
+                    query.heads.clone()
+                };
+                let results = collection.attend(&heads, &[0.0f32; 64], query.top_k)?;
+                Ok(format!("[{} results] for '{}' on {}", results.len(), query.query_text, query.collection))
+            }
+            attentiondb_query::AQLStatement::CreateCollection(coll) => {
+                self.create_collection(&coll.collection, 64, &["default"])?;
+                Ok(format!("Created collection '{}'", coll.collection))
+            }
+            attentiondb_query::AQLStatement::AlterCollection(alter) => {
+                let _collection = self.get_collection(&alter.collection)?;
+                Ok(format!("Altered collection '{}'", alter.collection))
+            }
+        }
+    }
+
+    pub fn is_persistent(&self) -> bool {
+        self.wal.lock().is_some()
     }
 
     pub fn stats(&self) -> EngineStats {

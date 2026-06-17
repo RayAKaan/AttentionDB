@@ -76,6 +76,7 @@ message CreateCollectionRequest {
     string collection = 1;
     repeated FieldDefinition fields = 2;
     optional CollectionSettings settings = 3;
+    map<string, CollectionSettings> head_settings = 4;
 }
 
 message CreateCollectionResponse {
@@ -94,6 +95,7 @@ message GetCollectionSettingsResponse {
 message AlterCollectionRequest {
     string collection = 1;
     CollectionSettings settings = 2;
+    map<string, CollectionSettings> head_settings = 3;
 }
 
 message AlterCollectionResponse {

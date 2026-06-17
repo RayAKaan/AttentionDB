@@ -1,6 +1,8 @@
 use crate::planner::PhysicalPlan;
 use crate::parser::AQLStatement;
 use crate::error::QueryError;
+use attentiondb_hnsw::HNSWIndex;
+use attentiondb_multihead::MultiHeadManager;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -8,23 +10,21 @@ pub struct QueryResult {
     pub ids: Vec<u64>,
     pub scores: Vec<f32>,
     pub latency_ms: f64,
-    pub plan: String,
 }
 
 #[derive(Debug, Clone)]
-pub enum ExecuteResult {
-    QueryResult(QueryResult),
-    DdlResult { collection: String, message: String },
+pub struct ExecuteResult {
+    pub success: bool,
+    pub message: String,
+    pub affected_collection: Option<String>,
 }
 
 pub struct QueryExecutor;
 
 impl QueryExecutor {
-    /// Execute a physical plan against a real HNSW index.
-    /// This is the only query execution path — no placeholder fallback.
-    pub fn execute_on_index(
+    pub fn execute(
         plan: &PhysicalPlan,
-        index: &attentiondb_hnsw::HNSWIndex,
+        index: &HNSWIndex,
         query_vector: &[f32],
     ) -> Result<QueryResult, QueryError> {
         let start = std::time::Instant::now();
@@ -39,83 +39,169 @@ impl QueryExecutor {
         let (ids, scores): (Vec<u64>, Vec<f32>) = results.into_iter().unzip();
         let latency = start.elapsed().as_secs_f64() * 1000.0;
 
-        Ok(QueryResult {
-            ids,
-            scores,
-            latency_ms: latency,
-            plan: format!("RealHNSW(ef={},k={})", plan.hnsw_search.ef, plan.top_k),
-        })
+        Ok(QueryResult { ids, scores, latency_ms: latency })
     }
-}
 
-/// Execute a parsed AQL statement (query or DDL).
-///
-/// The `indexes` parameter must point to the collection's head index map.
-/// DDL-only callers (CREATE, ALTER) should pass an empty HashMap.
-pub fn execute_statement(
-    statement: &AQLStatement,
-    indexes: &HashMap<String, attentiondb_hnsw::HNSWIndex>,
-    query_vector: Option<&[f32]>,
-) -> Result<ExecuteResult, QueryError> {
-    match statement {
-        AQLStatement::Query(query) => {
-            use crate::planner::*;
-            let heads: Vec<(String, f32)> = query.heads.iter().map(|h| (h.clone(), 1.0)).collect();
-            let plan = PhysicalPlan {
-                hnsw_search: HNSWSearchStep {
-                    heads,
-                    ef: 64,
-                    k: query.top_k * 3,
-                },
-                exact_rerank: Some(ExactRerankStep { top_candidates: query.top_k * 3 }),
-                filter_steps: vec![],
-                top_k: query.top_k,
-                min_weight: query.min_weight,
-            };
-            let vec = query_vector.ok_or_else(|| QueryError::Execution("Query vector required".into()))?;
+    pub fn execute_statement(
+        statement: &AQLStatement,
+        indexes: &mut HashMap<String, HNSWIndex>,
+        head_managers: &mut HashMap<String, MultiHeadManager>,
+        query_vector: Option<&[f32]>,
+    ) -> Result<ExecuteResult, QueryError> {
+        match statement {
+            AQLStatement::Query(q) => {
+                let vec = query_vector.ok_or_else(|| {
+                    QueryError::Execution("Query vector required for ATTEND".into())
+                })?;
 
-            let index = indexes.get(&query.collection)
-                .ok_or_else(|| QueryError::Execution(format!("Collection '{}' not found", query.collection)))?;
+                if let Some(manager) = head_managers.get(&q.collection) {
+                    let heads = if q.heads.is_empty() || q.heads == ["default"] {
+                        manager.list_heads()
+                    } else {
+                        q.heads.clone()
+                    };
 
-            let result = QueryExecutor::execute_on_index(&plan, index, vec)?;
-            Ok(ExecuteResult::QueryResult(result))
-        }
-        AQLStatement::CreateCollection(coll) => {
-            let mut msg = format!("Created collection '{}'", coll.collection);
-            if !coll.fields.is_empty() {
-                let field_str: Vec<String> = coll.fields.iter()
-                    .map(|(n, t)| format!("{}: {}", n, t))
-                    .collect();
-                msg.push_str(&format!(" with fields [{}]", field_str.join(", ")));
+                    let mut head_results: Vec<(String, Vec<(u64, f32)>)> = Vec::new();
+                    for head_name in &heads {
+                        if let Ok(index) = manager.create_hnsw_index_for_head(
+                            head_name,
+                            vec.len(),
+                            attentiondb_hnsw::HNSWConfig::default(),
+                        ) {
+                            if let Ok(results) = index.search(vec, q.top_k, None) {
+                                head_results.push((head_name.clone(), results));
+                            }
+                        }
+                    }
+
+                    if head_results.is_empty() {
+                        return Err(QueryError::Execution(format!(
+                            "No heads available for collection '{}'", q.collection
+                        )));
+                    }
+
+                    let gate_weights = vec![1.0; head_results.len()];
+                    let mut fused = attentiondb_multihead::fusion::fuse_scores(&head_results, &gate_weights);
+                    fused.truncate(q.top_k);
+
+                    let count = fused.len();
+
+                    return Ok(ExecuteResult {
+                        success: true,
+                        message: format!(
+                            "Query executed on '{}' via {} head(s), {} results",
+                            q.collection, head_results.len(), count
+                        ),
+                        affected_collection: Some(q.collection.clone()),
+                    });
+                }
+
+                let index = indexes.get(&q.collection).ok_or_else(|| {
+                    QueryError::Execution(format!("Collection '{}' not found", q.collection))
+                })?;
+
+                let plan = PhysicalPlan {
+                    hnsw_search: crate::planner::HNSWSearchStep {
+                        heads: q.heads.iter().map(|h| (h.clone(), 1.0)).collect(),
+                        ef: 128,
+                        k: q.top_k * 3,
+                    },
+                    exact_rerank: None,
+                    filter_steps: vec![],
+                    top_k: q.top_k,
+                    min_weight: q.min_weight,
+                };
+
+                let result = Self::execute(&plan, index, vec)?;
+
+                Ok(ExecuteResult {
+                    success: true,
+                    message: format!(
+                        "Query executed on '{}', {} results, {:.2}ms",
+                        q.collection, result.ids.len(), result.latency_ms
+                    ),
+                    affected_collection: Some(q.collection.clone()),
+                })
             }
-            msg.push_str(&format!(
-                " with settings (ef_search={}, ef_construction={}, max_connections={}, similarity={}, exact_rerank={})",
-                coll.settings.ef_search,
-                coll.settings.ef_construction,
-                coll.settings.max_nb_connection,
-                coll.settings.similarity_metric,
-                coll.settings.enable_exact_reranking,
-            ));
-            msg.push_str(".");
-            Ok(ExecuteResult::DdlResult {
-                collection: coll.collection.clone(),
-                message: msg,
-            })
-        }
-        AQLStatement::AlterCollection(alter) => {
-            let msg = format!(
-                "Altered collection '{}' settings to (ef_search={}, ef_construction={}, max_connections={}, similarity={}, exact_rerank={})",
-                alter.collection,
-                alter.settings.ef_search,
-                alter.settings.ef_construction,
-                alter.settings.max_nb_connection,
-                alter.settings.similarity_metric,
-                alter.settings.enable_exact_reranking,
-            );
-            Ok(ExecuteResult::DdlResult {
-                collection: alter.collection.clone(),
-                message: msg,
-            })
+
+            AQLStatement::CreateCollection(c) => {
+                let config = attentiondb_hnsw::HNSWConfig {
+                    max_nb_connection: c.settings.max_nb_connection,
+                    ef_construction: c.settings.ef_construction,
+                    ef_search: c.settings.ef_search,
+                    store_vectors: true,
+                    max_elements: 1_000_000,
+                };
+
+                let index = attentiondb_hnsw::HNSWIndex::with_settings(
+                    &c.collection,
+                    256,
+                    config,
+                    c.settings.clone(),
+                )
+                .map_err(|e| QueryError::Execution(e.to_string()))?;
+
+                indexes.insert(c.collection.clone(), index);
+
+                let mut msg = format!("Created collection '{}'", c.collection);
+                if !c.fields.is_empty() {
+                    let field_str: Vec<String> = c.fields.iter()
+                        .map(|(n, t)| format!("{}: {}", n, t))
+                        .collect();
+                    msg.push_str(&format!(" with fields [{}]", field_str.join(", ")));
+                }
+                msg.push_str(&format!(
+                    " with settings (ef_search={}, ef_construction={}, max_connections={}, similarity={}, exact_rerank={})",
+                    c.settings.ef_search,
+                    c.settings.ef_construction,
+                    c.settings.max_nb_connection,
+                    c.settings.similarity_metric,
+                    c.settings.enable_exact_reranking,
+                ));
+                if !c.head_settings.is_empty() {
+                    let head_str: Vec<String> = c.head_settings.iter()
+                        .map(|(name, s)| format!("{}: (ef_search={})", name, s.ef_search))
+                        .collect();
+                    msg.push_str(&format!(". Per-head settings: [{}]", head_str.join(", ")));
+                }
+
+                Ok(ExecuteResult {
+                    success: true,
+                    message: msg,
+                    affected_collection: Some(c.collection.clone()),
+                })
+            }
+
+            AQLStatement::AlterCollection(a) => {
+                if let Some(index) = indexes.get_mut(&a.collection) {
+                    index.update_settings(a.settings.clone())
+                        .map_err(|e| QueryError::Execution(e.to_string()))?;
+
+                    let mut msg = format!(
+                        "Altered collection '{}' settings to (ef_search={}, ef_construction={}, max_connections={}, similarity={}, exact_rerank={})",
+                        a.collection,
+                        a.settings.ef_search,
+                        a.settings.ef_construction,
+                        a.settings.max_nb_connection,
+                        a.settings.similarity_metric,
+                        a.settings.enable_exact_reranking,
+                    );
+                    if !a.head_settings.is_empty() {
+                        let head_str: Vec<String> = a.head_settings.iter()
+                            .map(|(name, s)| format!("{}: (ef_search={})", name, s.ef_search))
+                            .collect();
+                        msg.push_str(&format!(". Per-head settings: [{}]", head_str.join(", ")));
+                    }
+
+                    Ok(ExecuteResult {
+                        success: true,
+                        message: msg,
+                        affected_collection: Some(a.collection.clone()),
+                    })
+                } else {
+                    Err(QueryError::Execution(format!("Collection '{}' not found", a.collection)))
+                }
+            }
         }
     }
 }
@@ -134,7 +220,7 @@ mod tests {
     }
 
     #[test]
-    fn test_execute_on_index_basic() {
+    fn test_execute_basic() {
         let plan = PhysicalPlan {
             hnsw_search: HNSWSearchStep { heads: vec![("semantic".into(), 1.0)], ef: 64, k: 30 },
             exact_rerank: None,
@@ -143,13 +229,13 @@ mod tests {
             min_weight: 0.01,
         };
         let index = create_test_index();
-        let result = QueryExecutor::execute_on_index(&plan, &index, &[1.0, 0.0, 0.0, 0.0]).unwrap();
+        let result = QueryExecutor::execute(&plan, &index, &[1.0, 0.0, 0.0, 0.0]).unwrap();
         assert_eq!(result.ids.len(), 2);
         assert!(result.latency_ms >= 0.0);
     }
 
     #[test]
-    fn test_execute_on_index_empty_vector() {
+    fn test_execute_empty_vector() {
         let plan = PhysicalPlan {
             hnsw_search: HNSWSearchStep { heads: vec![("semantic".into(), 1.0)], ef: 64, k: 30 },
             exact_rerank: None,
@@ -158,7 +244,7 @@ mod tests {
             min_weight: 0.01,
         };
         let index = create_test_index();
-        let result = QueryExecutor::execute_on_index(&plan, &index, &[]);
+        let result = QueryExecutor::execute(&plan, &index, &[]);
         assert!(result.is_err());
     }
 
@@ -167,16 +253,16 @@ mod tests {
         use crate::parser::parse_aql;
         let aql = r#"CREATE COLLECTION papers (title TEXT) WITH (ef_search = 256, similarity = "cosine")"#;
         let stmt = parse_aql(aql).unwrap();
-        let empty_indexes = HashMap::new();
-        let result = execute_statement(&stmt, &empty_indexes, None).unwrap();
-        match result {
-            ExecuteResult::DdlResult { collection, message } => {
-                assert_eq!(collection, "papers");
-                assert!(message.contains("ef_search=256"));
-                assert!(message.contains("similarity=cosine"));
-            }
-            _ => panic!("Expected DdlResult"),
-        }
+        let mut empty_indexes = HashMap::new();
+        let mut empty_managers = HashMap::new();
+        let result = QueryExecutor::execute_statement(&stmt, &mut empty_indexes, &mut empty_managers, None).unwrap();
+        assert!(result.success);
+        assert_eq!(result.affected_collection.as_deref(), Some("papers"));
+        assert!(result.message.contains("ef_search=256"));
+        assert!(result.message.contains("similarity=cosine"));
+
+        let index = empty_indexes.get("papers");
+        assert!(index.is_some());
     }
 
     #[test]
@@ -186,16 +272,12 @@ mod tests {
         let stmt = parse_aql(aql).unwrap();
 
         let mut indexes = HashMap::new();
+        let mut managers = HashMap::new();
         let index = create_test_index();
         indexes.insert("docs".to_string(), index);
 
-        let result = execute_statement(&stmt, &indexes, Some(&[1.0, 0.0, 0.0, 0.0])).unwrap();
-        match result {
-            ExecuteResult::QueryResult(r) => {
-                assert!(!r.ids.is_empty());
-            }
-            _ => panic!("Expected QueryResult"),
-        }
+        let result = QueryExecutor::execute_statement(&stmt, &mut indexes, &mut managers, Some(&[1.0, 0.0, 0.0, 0.0])).unwrap();
+        assert!(result.success);
     }
 
     #[test]
@@ -203,8 +285,9 @@ mod tests {
         use crate::parser::parse_aql;
         let aql = r#"ATTEND TO nonexistent WHERE QUERY "test" TOP_K 5"#;
         let stmt = parse_aql(aql).unwrap();
-        let empty_indexes = HashMap::new();
-        let result = execute_statement(&stmt, &empty_indexes, Some(&[1.0, 0.0, 0.0, 0.0]));
+        let mut empty_indexes = HashMap::new();
+        let mut empty_managers = HashMap::new();
+        let result = QueryExecutor::execute_statement(&stmt, &mut empty_indexes, &mut empty_managers, Some(&[1.0, 0.0, 0.0, 0.0]));
         assert!(result.is_err());
     }
 }

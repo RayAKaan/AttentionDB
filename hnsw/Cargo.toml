@@ -18,9 +18,12 @@ parking_lot = { workspace = true }
 byteorder = "1.5"
 chrono = { workspace = true }
 cudarc = { version = "0.12", optional = true, default-features = false }
+tokio = { workspace = true }
+reqwest = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+tokio = { workspace = true, features = ["rt", "macros"] }
 criterion = { workspace = true }
 approx = "0.5"
 clap = { version = "4", features = ["derive"] }
