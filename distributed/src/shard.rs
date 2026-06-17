@@ -88,7 +88,13 @@ impl ShardManager {
         let hash = hash_str(routing_key);
         let shard_id = match self.ring.range(hash..).next() {
             Some((_, &s_id)) => s_id,
-            None => *self.ring.values().next().unwrap(),
+            None => {
+                if let Some(&s_id) = self.ring.values().next() {
+                    s_id
+                } else {
+                    return None;
+                }
+            }
         };
         self.get_shard(shard_id)
     }

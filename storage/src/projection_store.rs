@@ -39,9 +39,14 @@ impl ProjectionStore {
         let mut buf = vec![0u8; self.head_dim * 4];
         self.file.read_exact(&mut buf)
             .map_err(|e| StorageError::Projection(e.to_string()))?;
-        let vec: Vec<f32> = buf.chunks_exact(4)
-            .map(|b| f32::from_le_bytes(b.try_into().unwrap()))
-            .collect();
+        let mut vec = Vec::with_capacity(self.head_dim);
+        for chunk in buf.chunks_exact(4) {
+            if let Ok(bytes) = chunk.try_into() {
+                vec.push(f32::from_le_bytes(bytes));
+            } else {
+                return Err(StorageError::Projection("Malformed float vector bytes".to_string()));
+            }
+        }
         Ok(vec)
     }
 

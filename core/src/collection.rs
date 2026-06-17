@@ -68,6 +68,11 @@ impl Collection {
         id: u64,
         vector: &[f32],
     ) -> Result<(), CoreError> {
+        if self.head_manager.read().get_head(head).is_err() {
+            let config = HNSWConfig::default();
+            self.head_manager.read().add_head_with_config(head, config);
+        }
+
         {
             let mut mh = self.multihead_manager.write();
             if mh.get_head(head).is_err() {

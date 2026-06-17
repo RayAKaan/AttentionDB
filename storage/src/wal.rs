@@ -123,7 +123,10 @@ impl Wal {
         while offset < buf.len() {
             match bincode::deserialize::<WalEntry>(&buf[offset..]) {
                 Ok(entry) => {
-                    let entry_size = bincode::serialized_size(&entry).unwrap() as usize;
+                    let entry_size = match bincode::serialized_size(&entry) {
+                        Ok(size) => size as usize,
+                        Err(_) => break,
+                    };
                     if Self::verify_entry(&entry) {
                         entries.push(entry);
                     }

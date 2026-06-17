@@ -65,7 +65,8 @@ impl AttentionDb for AttentionDBService {
         println!("[gRPC] Attend: collection={}, query=\"{}\", heads={:?}, top_k={}",
                  req.collection, req.query, req.heads, req.top_k);
 
-        let query_vec = parse_float_vector(&req.query).unwrap_or_else(|_| vec![0.1; 64]);
+        let query_vec = parse_float_vector(&req.query)
+            .map_err(|_| Status::invalid_argument(format!("Invalid query vector format: '{}'", req.query)))?;
 
         let heads = if req.heads.is_empty() || req.heads == ["default"] {
             if let Ok(coll) = self.engine.get_collection(&req.collection) {
@@ -125,7 +126,9 @@ impl AttentionDb for AttentionDBService {
         record.k_vecs = k_vecs;
 
         if record.k_vecs.is_empty() {
-            record.k_vecs.insert("default".to_string(), vec![0.1; 64]);
+            return Err(Status::invalid_argument(
+                "No vector embeddings found in fields. Provide at least one field parseable as a float vector."
+            ));
         }
 
         let id_str = self.engine.insert_document(&req.collection, record)

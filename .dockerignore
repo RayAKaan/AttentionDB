@@ -1,0 +1,8 @@
+target/
+.git/
+*.log
+stress_tests/
+comparison_bench/
+design/
+hnsw/data/
+hnsw_graphs/

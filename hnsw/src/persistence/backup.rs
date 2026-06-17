@@ -8,7 +8,9 @@ pub fn create_backup(dir: &Path) -> Result<PathBuf, PersistenceError> {
     }
 
     let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S").to_string();
-    let dir_name = dir.file_name().unwrap().to_string_lossy();
+    let dir_name = dir.file_name()
+        .and_then(|n| Some(n.to_string_lossy().to_string()))
+        .unwrap_or_else(|| "attentiondb_backup".to_string());
     let backup_dir = dir.parent()
         .unwrap_or(dir)
         .join(format!("backup_{}_{}", dir_name, timestamp));
@@ -35,7 +37,12 @@ pub fn create_backup(dir: &Path) -> Result<PathBuf, PersistenceError> {
 
 pub fn list_backups(dir: &Path) -> Result<Vec<PathBuf>, PersistenceError> {
     let parent = dir.parent().unwrap_or(dir);
-    let prefix = format!("backup_{}_", dir.file_name().unwrap().to_string_lossy());
+    let prefix = format!(
+        "backup_{}_",
+        dir.file_name()
+            .and_then(|n| Some(n.to_string_lossy().to_string()))
+            .unwrap_or_else(|| "attentiondb_backup".to_string())
+    );
 
     let mut backups = Vec::new();
     if let Ok(entries) = fs::read_dir(parent) {

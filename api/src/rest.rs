@@ -1,11 +1,13 @@
 use axum::{
     extract::{Path, State},
+    http::StatusCode,
     routing::{get, post, put},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use crate::server::AttentionDBService;
+use crate::validation::{validate_collection_name, validate_fields, validate_heads, validate_top_k};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -93,8 +95,20 @@ pub struct AlterCollectionRestResponse {
 pub async fn attend_handler(
     State(state): State<AppState>,
     Json(payload): Json<AttendRequest>,
-) -> Json<AttendResponse> {
-    let query_vec = crate::server::parse_float_vector(&payload.query).unwrap_or_else(|_| vec![0.1; 64]);
+) -> Result<Json<AttendResponse>, (StatusCode, String)> {
+    validate_collection_name(&payload.collection)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.message().to_string()))?;
+    let top_k = payload.top_k.unwrap_or(10);
+    validate_top_k(top_k)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.message().to_string()))?;
+
+    let query_vec = crate::server::parse_float_vector(&payload.query)
+        .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid query vector format".to_string()))?;
+
+    if let Some(ref heads_list) = payload.heads {
+        validate_heads(heads_list)
+            .map_err(|e| (StatusCode::BAD_REQUEST, e.message().to_string()))?;
+    }
 
     let heads = payload.heads.unwrap_or_else(|| {
         if let Ok(coll) = state.service.engine.get_collection(&payload.collection) {
@@ -106,7 +120,7 @@ pub async fn attend_handler(
 
     let start = std::time::Instant::now();
     let raw_results = state.service.engine.attend(&payload.collection, &heads, &query_vec, payload.top_k.unwrap_or(10) as usize)
-        .unwrap_or_default();
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     let latency = start.elapsed().as_secs_f64() * 1000.0;
 
     let results = raw_results.into_iter().map(|(numeric_id, score)| {
@@ -118,17 +132,22 @@ pub async fn attend_handler(
         })
     }).collect();
 
-    Json(AttendResponse {
+    Ok(Json(AttendResponse {
         results,
         latency_ms: latency,
         effective_sample_size: 1.0,
-    })
+    }))
 }
 
 pub async fn insert_handler(
     State(state): State<AppState>,
     Json(payload): Json<InsertRestRequest>,
-) -> Json<InsertRestResponse> {
+) -> Result<Json<InsertRestResponse>, (StatusCode, String)> {
+    validate_collection_name(&payload.collection)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.message().to_string()))?;
+    validate_fields(&payload.fields)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.message().to_string()))?;
+
     let mut json_fields = std::collections::HashMap::new();
     let mut k_vecs = std::collections::HashMap::new();
 
@@ -146,19 +165,20 @@ pub async fn insert_handler(
         json_fields.insert(k.clone(), serde_json::Value::String(v.clone()));
     }
 
-    let mut record = attentiondb_storage::Record::new(json_fields);
-    record.k_vecs = k_vecs;
-    if record.k_vecs.is_empty() {
-        record.k_vecs.insert("default".to_string(), vec![0.1; 64]);
+    if k_vecs.is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "No vector embeddings found in fields".to_string()));
     }
 
-    let id = state.service.engine.insert_document(&payload.collection, record)
-        .unwrap_or_else(|_| uuid::Uuid::new_v4().to_string());
+    let mut record = attentiondb_storage::Record::new(json_fields);
+    record.k_vecs = k_vecs;
 
-    Json(InsertRestResponse {
+    let id = state.service.engine.insert_document(&payload.collection, record)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(Json(InsertRestResponse {
         id,
         success: true,
-    })
+    }))
 }
 
 pub async fn health_handler(State(state): State<AppState>) -> Json<HealthResponse> {
@@ -173,6 +193,12 @@ pub async fn create_collection_handler(
     State(state): State<AppState>,
     Json(payload): Json<CreateCollectionRestRequest>,
 ) -> Json<CreateCollectionRestResponse> {
+    if let Err(e) = validate_collection_name(&payload.collection) {
+        return Json(CreateCollectionRestResponse {
+            success: false,
+            message: e.message().to_string(),
+        });
+    }
     let mut hnsw_settings = attentiondb_hnsw::CollectionSettings::default();
     if let Some(ref s) = payload.settings {
         hnsw_settings.ef_search = s.ef_search.unwrap_or(64) as usize;
@@ -188,7 +214,14 @@ pub async fn create_collection_handler(
         if hm.is_empty() {
             vec!["default".to_string()]
         } else {
-            hm.keys().cloned().collect()
+            let head_names: Vec<String> = hm.keys().cloned().collect();
+            if let Err(e) = validate_heads(&head_names) {
+                return Json(CreateCollectionRestResponse {
+                    success: false,
+                    message: e.message().to_string(),
+                });
+            }
+            head_names
         }
     } else {
         vec!["default".to_string()]
@@ -208,6 +241,13 @@ pub async fn alter_collection_handler(
     Path(collection): Path<String>,
     Json(payload): Json<AlterCollectionRestRequest>,
 ) -> Json<AlterCollectionRestResponse> {
+    if let Err(e) = validate_collection_name(&collection) {
+        return Json(AlterCollectionRestResponse {
+            success: false,
+            message: e.message().to_string(),
+        });
+    }
+
     let mut hnsw_settings = attentiondb_hnsw::CollectionSettings::default();
     let s = &payload.settings;
     hnsw_settings.ef_search = s.ef_search.unwrap_or(64) as usize;
