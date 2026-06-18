@@ -3,6 +3,7 @@ use crate::parser::AQLStatement;
 use crate::error::QueryError;
 use attentiondb_hnsw::HNSWIndex;
 use attentiondb_multihead::MultiHeadManager;
+use attentiondb_distributed::shard::ShardManager;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -37,6 +38,43 @@ impl QueryExecutor {
             .map_err(|e| QueryError::Execution(e.to_string()))?;
 
         let (ids, scores): (Vec<u64>, Vec<f32>) = results.into_iter().unzip();
+        let latency = start.elapsed().as_secs_f64() * 1000.0;
+
+        Ok(QueryResult { ids, scores, latency_ms: latency })
+    }
+
+    pub fn execute_distributed<F>(
+        plan: &PhysicalPlan,
+        shard_manager: &ShardManager,
+        query_vector: &[f32],
+        mut dispatch_to_shard: F,
+    ) -> Result<QueryResult, QueryError>
+    where
+        F: FnMut(u32, &PhysicalPlan, &[f32]) -> Result<Vec<(u64, f32)>, QueryError>,
+    {
+        let start = std::time::Instant::now();
+        if query_vector.is_empty() {
+            return Err(QueryError::Execution("Empty query vector in distributed search".into()));
+        }
+
+        let shard_ids = shard_manager.list_shards();
+        if shard_ids.is_empty() {
+            return Err(QueryError::Execution("Active ShardManager contains no quorum shards".into()));
+        }
+
+        let mut gathered_results: Vec<(String, Vec<(u64, f32)>)> = Vec::with_capacity(shard_ids.len());
+
+        for shard_id in shard_ids {
+            let shard_hits = dispatch_to_shard(shard_id, plan, query_vector)?;
+            let head_key = format!("remote_shard_{}", shard_id);
+            gathered_results.push((head_key, shard_hits));
+        }
+
+        let gate_weights = vec![1.0; gathered_results.len()];
+        let mut global_fused = attentiondb_multihead::fusion::fuse_scores(&gathered_results, &gate_weights);
+
+        global_fused.truncate(plan.top_k);
+        let (ids, scores): (Vec<u64>, Vec<f32>) = global_fused.into_iter().unzip();
         let latency = start.elapsed().as_secs_f64() * 1000.0;
 
         Ok(QueryResult { ids, scores, latency_ms: latency })
@@ -278,6 +316,40 @@ mod tests {
 
         let result = QueryExecutor::execute_statement(&stmt, &mut indexes, &mut managers, Some(&[1.0, 0.0, 0.0, 0.0])).unwrap();
         assert!(result.success);
+    }
+
+    #[test]
+    fn test_execute_distributed_scatter_gather() {
+        let mut sm = ShardManager::with_virtual_nodes(10);
+        sm.add_shard(attentiondb_distributed::shard::Shard::new(1, vec!["semantic".into()], "addr1"));
+        sm.add_shard(attentiondb_distributed::shard::Shard::new(2, vec!["semantic".into()], "addr2"));
+
+        let plan = PhysicalPlan {
+            hnsw_search: HNSWSearchStep { heads: vec![("semantic".into(), 1.0)], ef: 64, k: 10 },
+            exact_rerank: None,
+            filter_steps: vec![],
+            top_k: 5,
+            min_weight: 0.0,
+        };
+
+        let result = QueryExecutor::execute_distributed(
+            &plan,
+            &sm,
+            &[1.0, 0.0, 0.0, 0.0],
+            |shard_id, _, _| {
+                if shard_id == 1 {
+                    Ok(vec![(101, 0.95), (102, 0.80)])
+                } else {
+                    Ok(vec![(201, 0.90), (202, 0.85)])
+                }
+            }
+        ).unwrap();
+
+        assert_eq!(result.ids.len(), 4);
+        assert_eq!(result.ids[0], 101);
+        assert_eq!(result.ids[1], 201);
+        assert_eq!(result.ids[2], 202);
+        assert_eq!(result.ids[3], 102);
     }
 
     #[test]

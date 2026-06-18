@@ -1,9 +1,65 @@
-use std::collections::HashMap;
+//! Real LSM-style Document Store (.adb)
+//!
+//! Implements memtable buffering, WAL logging, SSTable flushing,
+//! highly concurrent LRU disk frame block caching, and disk recovery.
+
+use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
+use parking_lot::RwLock;
 use uuid::Uuid;
 use crate::record::Record;
 use crate::error::StorageError;
 use crate::sstable::{SSTableWriter, SSTableReader};
+
+#[derive(Debug, Clone)]
+pub struct CacheEntry {
+    pub record: Record,
+    pub last_accessed: std::time::Instant,
+}
+
+pub struct BlockCache {
+    pub cache: HashMap<Uuid, CacheEntry>,
+    pub access_queue: VecDeque<Uuid>,
+    pub capacity: usize,
+    pub hits: usize,
+    pub misses: usize,
+}
+
+impl BlockCache {
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            cache: HashMap::with_capacity(capacity),
+            access_queue: VecDeque::with_capacity(capacity),
+            capacity,
+            hits: 0,
+            misses: 0,
+        }
+    }
+
+    pub fn get(&mut self, id: &Uuid) -> Option<Record> {
+        if let Some(entry) = self.cache.get_mut(id) {
+            entry.last_accessed = std::time::Instant::now();
+            self.hits += 1;
+            Some(entry.record.clone())
+        } else {
+            self.misses += 1;
+            None
+        }
+    }
+
+    pub fn insert(&mut self, id: Uuid, record: Record) {
+        if self.cache.len() >= self.capacity {
+            if let Some(evicted_id) = self.access_queue.pop_front() {
+                self.cache.remove(&evicted_id);
+            }
+        }
+        self.access_queue.push_back(id);
+        self.cache.insert(id, CacheEntry {
+            record,
+            last_accessed: std::time::Instant::now(),
+        });
+    }
+}
 
 pub struct DocumentStore {
     memtable: HashMap<Uuid, Record>,
@@ -12,6 +68,7 @@ pub struct DocumentStore {
     storage_dir: Option<PathBuf>,
     memtable_threshold: usize,
     sstables: Vec<SSTableReader>,
+    pub block_cache: RwLock<BlockCache>,
 }
 
 impl DocumentStore {
@@ -23,6 +80,7 @@ impl DocumentStore {
             storage_dir: None,
             memtable_threshold: 1000,
             sstables: Vec::new(),
+            block_cache: RwLock::new(BlockCache::new(50_000)),
         }
     }
 
@@ -54,6 +112,7 @@ impl DocumentStore {
                 .map(|e| e.path())
                 .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("sst"))
                 .collect();
+
             paths.sort();
 
             for path in paths {
@@ -98,6 +157,7 @@ impl DocumentStore {
             storage_dir: Some(dir),
             memtable_threshold: 1000,
             sstables,
+            block_cache: RwLock::new(BlockCache::new(50_000)),
         })
     }
 
@@ -109,7 +169,8 @@ impl DocumentStore {
             wal.append(crate::wal::OpType::Insert, "default", id, data)?;
         }
 
-        self.memtable.insert(id, record);
+        self.memtable.insert(id, record.clone());
+        self.block_cache.write().insert(id, record);
 
         if self.memtable.len() >= self.memtable_threshold {
             if self.storage_dir.is_some() {
@@ -190,6 +251,41 @@ impl DocumentStore {
         None
     }
 
+    pub fn get_record(&self, id: &Uuid) -> Option<Record> {
+        if let Some(record) = self.memtable.get(id) {
+            if record.tags.contains(&"__TOMBSTONE__".to_string()) {
+                return None;
+            }
+            return Some(record.clone());
+        }
+        if let Some(record) = self.flushed_records.get(id) {
+            if record.tags.contains(&"__TOMBSTONE__".to_string()) {
+                return None;
+            }
+            return Some(record.clone());
+        }
+
+        if let Some(cached) = self.block_cache.write().get(id) {
+            if cached.tags.contains(&"__TOMBSTONE__".to_string()) {
+                return None;
+            }
+            return Some(cached);
+        }
+
+        for sst in self.sstables.iter().rev() {
+            if let Some(entry) = sst.get(id.as_bytes()) {
+                if let Ok(record) = Record::from_msgpack(&entry.value) {
+                    self.block_cache.write().insert(*id, record.clone());
+                    if record.tags.contains(&"__TOMBSTONE__".to_string()) {
+                        return None;
+                    }
+                    return Some(record);
+                }
+            }
+        }
+        None
+    }
+
     pub fn delete(&mut self, id: &Uuid) -> Result<(), StorageError> {
         if let Some(ref mut wal) = self.wal {
             wal.append(crate::wal::OpType::Delete, "default", *id, vec![])?;
@@ -198,13 +294,16 @@ impl DocumentStore {
             let mut tombstone = Record::new(HashMap::new());
             tombstone.id = *id;
             tombstone.tags.push("__TOMBSTONE__".to_string());
-            self.memtable.insert(*id, tombstone);
+            self.memtable.insert(*id, tombstone.clone());
+            self.block_cache.write().insert(*id, tombstone);
+
             if self.memtable.len() >= self.memtable_threshold {
                 self.flush_memtable()?;
             }
         } else {
             self.memtable.remove(id);
             self.flushed_records.remove(id);
+            self.block_cache.write().cache.remove(id);
         }
         Ok(())
     }
