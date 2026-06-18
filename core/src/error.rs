@@ -28,4 +28,7 @@ pub enum CoreError {
 
     #[error("Invalid operation: {0}")]
     InvalidOperation(String),
+
+    #[error("Transaction error: {0}")]
+    Transaction(String),
 }

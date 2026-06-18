@@ -2,6 +2,7 @@ use std::sync::Arc;
 use parking_lot::RwLock;
 use attentiondb_hnsw::{HeadIndexManager, HNSWConfig};
 use attentiondb_multihead::{MultiHeadManager, HeadConfig, HeadType};
+use crate::bm25::Bm25Index;
 use crate::error::CoreError;
 
 pub struct Collection {
@@ -10,6 +11,7 @@ pub struct Collection {
     pub head_manager: Arc<RwLock<HeadIndexManager>>,
     pub multihead_manager: Arc<RwLock<MultiHeadManager>>,
     pub settings: RwLock<attentiondb_hnsw::CollectionSettings>,
+    pub bm25: Bm25Index,
 }
 
 impl Collection {
@@ -23,6 +25,7 @@ impl Collection {
             head_manager,
             multihead_manager,
             settings: RwLock::new(attentiondb_hnsw::CollectionSettings::default()),
+            bm25: Bm25Index::default(),
         }
     }
 
@@ -126,6 +129,20 @@ impl Collection {
         let mh = self.multihead_manager.read();
         let fused = mh.fuse_weighted(&head_results, heads);
         Ok(fused)
+    }
+
+    pub fn attend_hybrid(
+        &self,
+        heads: &[String],
+        query_vector: &[f32],
+        query_text: &str,
+        top_k: usize,
+    ) -> Result<Vec<(u64, f32)>, CoreError> {
+        let dense_results = self.attend(heads, query_vector, top_k * 2)?;
+        let sparse_results = self.bm25.search(query_text, top_k * 2);
+
+        let hybrid_fused = crate::bm25::reciprocal_rank_fusion(&dense_results, &sparse_results, top_k);
+        Ok(hybrid_fused)
     }
 
     pub fn list_heads(&self) -> Vec<String> {

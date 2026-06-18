@@ -8,6 +8,7 @@ use attentiondb_query::parse_aql;
 use attentiondb_storage::{Wal, OpType, Record};
 use crate::collection::Collection;
 use crate::error::CoreError;
+use crate::transaction::TransactionManager;
 
 /// Deterministically convert a UUID to a stable u64 hash.
 ///
@@ -24,6 +25,7 @@ pub struct AttentionEngine {
     wal: Arc<parking_lot::Mutex<Option<Wal>>>,
     pub document_store: Arc<RwLock<attentiondb_storage::DocumentStore>>,
     id_map: Arc<RwLock<HashMap<u64, uuid::Uuid>>>,
+    pub txn_manager: TransactionManager,
 }
 
 pub struct EngineStats {
@@ -39,6 +41,7 @@ impl AttentionEngine {
             wal: Arc::new(parking_lot::Mutex::new(None)),
             document_store: Arc::new(RwLock::new(attentiondb_storage::DocumentStore::new())),
             id_map: Arc::new(RwLock::new(HashMap::new())),
+            txn_manager: TransactionManager::new(),
         }
     }
 
@@ -52,6 +55,7 @@ impl AttentionEngine {
             wal: Arc::new(parking_lot::Mutex::new(Some(wal))),
             document_store: Arc::new(RwLock::new(document_store)),
             id_map: Arc::new(RwLock::new(HashMap::new())),
+            txn_manager: TransactionManager::new(),
         })
     }
 
@@ -176,7 +180,59 @@ impl AttentionEngine {
             collection.insert_vector(head_name, numeric_id, vec_data)?;
         }
 
+        let mut full_text = String::new();
+        for value in record.fields.values() {
+            if let serde_json::Value::String(s) = value {
+                full_text.push_str(s);
+                full_text.push(' ');
+            }
+        }
+        collection.bm25.insert(numeric_id, &full_text);
+
         Ok(id)
+    }
+
+    pub fn attend_hybrid(
+        &self,
+        collection_name: &str,
+        heads: &[String],
+        query_vector: &[f32],
+        query_text: &str,
+        top_k: usize,
+    ) -> Result<Vec<(u64, f32)>, CoreError> {
+        let collection = self.get_collection(collection_name)?;
+        collection.attend_hybrid(heads, query_vector, query_text, top_k)
+    }
+
+    pub fn begin_transaction(&self, collection_name: &str) -> u64 {
+        self.txn_manager.begin_transaction(collection_name)
+    }
+
+    pub fn record_transaction_operation(&self, txn_id: u64, op: crate::transaction::TxnOp) -> Result<(), CoreError> {
+        self.txn_manager.record_operation(txn_id, op)
+    }
+
+    pub fn rollback_transaction(&self, txn_id: u64) -> Result<bool, CoreError> {
+        self.txn_manager.rollback_transaction(txn_id)
+    }
+
+    pub fn commit_transaction(&self, txn_id: u64) -> Result<bool, CoreError> {
+        if let Some(txn) = self.txn_manager.get_staged_transaction(txn_id) {
+            let collection_name = &txn.collection_name;
+            for op in txn.operations {
+                match op {
+                    crate::transaction::TxnOp::Insert(rec) => {
+                        self.insert_document(collection_name, rec)?;
+                    }
+                    crate::transaction::TxnOp::Delete(uuid) => {
+                        self.delete_document(collection_name, &uuid.to_string())?;
+                    }
+                }
+            }
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 
     pub fn get_document_fields(&self, numeric_id: u64) -> HashMap<String, String> {
