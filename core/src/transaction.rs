@@ -1,8 +1,8 @@
+use crate::error::CoreError;
+use attentiondb_storage::Record;
+use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
-use parking_lot::Mutex;
-use attentiondb_storage::Record;
-use crate::error::CoreError;
 
 #[derive(Debug)]
 pub enum TxnOp {
@@ -51,7 +51,10 @@ impl TransactionManager {
             txn.operations.push(op);
             Ok(())
         } else {
-            Err(CoreError::InvalidOperation(format!("Transaction {} not found", txn_id)))
+            Err(CoreError::InvalidOperation(format!(
+                "Transaction {} not found",
+                txn_id
+            )))
         }
     }
 

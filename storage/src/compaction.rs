@@ -3,11 +3,11 @@
 //! Compaction reduces the number of files the storage engine must scan on reads
 //! and removes tombstone entries (deleted records) permanently.
 
-use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
 use crate::error::StorageError;
 use crate::record::Record;
 use crate::sstable::{SSTableReader, SSTableWriter};
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 use tracing::{debug, info};
 
 /// Configuration for compaction behavior.
@@ -50,7 +50,10 @@ pub struct CompactionResult {
 /// 2. If count >= min_files_to_compact, merge the oldest N files
 /// 3. Write merged output, deduplicating by key (latest timestamp wins)
 /// 4. Remove tombstone entries from the output
-pub fn compact(dir: &Path, config: &CompactionConfig) -> Result<Option<CompactionResult>, StorageError> {
+pub fn compact(
+    dir: &Path,
+    config: &CompactionConfig,
+) -> Result<Option<CompactionResult>, StorageError> {
     let mut sst_paths: Vec<PathBuf> = Vec::new();
 
     if let Ok(entries) = std::fs::read_dir(dir) {
@@ -65,7 +68,11 @@ pub fn compact(dir: &Path, config: &CompactionConfig) -> Result<Option<Compactio
     sst_paths.sort();
 
     if sst_paths.len() < config.min_files_to_compact {
-        debug!(sst_count = sst_paths.len(), threshold = config.min_files_to_compact, "Not enough SST files for compaction");
+        debug!(
+            sst_count = sst_paths.len(),
+            threshold = config.min_files_to_compact,
+            "Not enough SST files for compaction"
+        );
         return Ok(None);
     }
 
@@ -93,7 +100,10 @@ pub fn compact(dir: &Path, config: &CompactionConfig) -> Result<Option<Compactio
             };
 
             if should_replace {
-                merged.insert(entry.key.clone(), (entry.value.clone(), entry.timestamp, is_tombstone));
+                merged.insert(
+                    entry.key.clone(),
+                    (entry.value.clone(), entry.timestamp, is_tombstone),
+                );
             }
         }
     }

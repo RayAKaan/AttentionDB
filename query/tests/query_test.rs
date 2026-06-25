@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-use attentiondb_query::{parse_aql, plan_query, QueryExecutor, AQLStatement};
 use attentiondb_hnsw::HNSWConfig;
+use attentiondb_query::{parse_aql, plan_query, AQLStatement, QueryExecutor};
+use std::collections::HashMap;
 
 fn get_query(stmt: AQLStatement) -> attentiondb_query::AQLQuery {
     match stmt {
@@ -27,7 +27,8 @@ fn test_full_pipeline() {
 
 #[test]
 fn test_multi_head_pipeline() {
-    let aql = r#"ATTEND TO docs WHERE QUERY "test" HEADS [semantic, temporal, structural] TOP_K 15"#;
+    let aql =
+        r#"ATTEND TO docs WHERE QUERY "test" HEADS [semantic, temporal, structural] TOP_K 15"#;
     let parsed = parse_aql(aql).unwrap();
     let plan = plan_query(get_query(parsed)).unwrap();
     let index = create_test_index_with_dim(256);
@@ -42,7 +43,10 @@ fn test_temporal_decay_pipeline() {
     let plan = plan_query(get_query(parsed)).unwrap();
     let index = create_test_index_with_dim(256);
     let _result = QueryExecutor::execute(&plan, &index, &[0.3; 256]).unwrap();
-    let temporal_weight = plan.hnsw_search.heads.iter()
+    let temporal_weight = plan
+        .hnsw_search
+        .heads
+        .iter()
         .find(|(n, _)| n == "temporal")
         .map(|(_, w)| *w);
     assert!((temporal_weight.unwrap() - 0.5).abs() < 1e-6);
@@ -113,7 +117,8 @@ fn test_alter_collection_ddl() {
 
 #[test]
 fn test_alter_collection_executor() {
-    let create_aql = r#"CREATE COLLECTION metrics (name TEXT) WITH (ef_search = 256, similarity = "cosine")"#;
+    let create_aql =
+        r#"CREATE COLLECTION metrics (name TEXT) WITH (ef_search = 256, similarity = "cosine")"#;
     let alter_aql = r#"ALTER COLLECTION metrics SET (ef_search = 128, exact_rerank = false)"#;
 
     let create_parsed = parse_aql(create_aql).unwrap();
@@ -122,8 +127,11 @@ fn test_alter_collection_executor() {
     let mut indexes = HashMap::new();
     let mut managers = HashMap::new();
 
-    let _create_result = QueryExecutor::execute_statement(&create_parsed, &mut indexes, &mut managers, None).unwrap();
-    let result = QueryExecutor::execute_statement(&alter_parsed, &mut indexes, &mut managers, None).unwrap();
+    let _create_result =
+        QueryExecutor::execute_statement(&create_parsed, &mut indexes, &mut managers, None)
+            .unwrap();
+    let result =
+        QueryExecutor::execute_statement(&alter_parsed, &mut indexes, &mut managers, None).unwrap();
 
     assert!(result.success);
     assert_eq!(result.affected_collection, Some("metrics".to_string()));

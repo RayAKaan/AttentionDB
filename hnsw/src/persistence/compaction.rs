@@ -1,12 +1,14 @@
 use crate::persistence::error::PersistenceError;
-use std::path::Path;
 use std::fs::File;
 use std::io::{Read, Write};
+use std::path::Path;
 
 pub fn compact_index(dir: &Path) -> Result<usize, PersistenceError> {
     let vectors_path = dir.join("vectors.bin");
     if !vectors_path.exists() {
-        return Err(PersistenceError::IndexNotFound(vectors_path.to_string_lossy().to_string()));
+        return Err(PersistenceError::IndexNotFound(
+            vectors_path.to_string_lossy().to_string(),
+        ));
     }
 
     let mut file = File::open(&vectors_path)?;

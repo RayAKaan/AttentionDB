@@ -1,9 +1,9 @@
-use std::sync::Arc;
-use parking_lot::RwLock;
-use attentiondb_hnsw::{HeadIndexManager, HNSWConfig};
-use attentiondb_multihead::{MultiHeadManager, HeadConfig, HeadType, GatingNetwork};
 use crate::bm25::Bm25Index;
 use crate::error::CoreError;
+use attentiondb_hnsw::{HNSWConfig, HeadIndexManager};
+use attentiondb_multihead::{GatingNetwork, HeadConfig, HeadType, MultiHeadManager};
+use parking_lot::RwLock;
+use std::sync::Arc;
 
 pub const OVERFETCH_MULTIPLIER: usize = 5;
 pub const MIN_CANDIDATES_PER_HEAD: usize = 20;
@@ -46,16 +46,24 @@ impl Collection {
         head_type: HeadType,
     ) -> Result<(), CoreError> {
         self.head_manager.read().add_head_with_config(name, config);
-        self.multihead_manager.write().add_head(HeadConfig::new(name, head_type, self.dim));
+        self.multihead_manager
+            .write()
+            .add_head(HeadConfig::new(name, head_type, self.dim));
         Ok(())
     }
 
     pub fn insert_vector(&self, head: &str, id: u64, vector: &[f32]) -> Result<(), CoreError> {
         if self.head_manager.read().get_head(head).is_err() {
-            self.head_manager.read().add_head_with_config(head, HNSWConfig::default());
+            self.head_manager
+                .read()
+                .add_head_with_config(head, HNSWConfig::default());
         }
         if self.multihead_manager.read().get_head(head).is_err() {
-            self.multihead_manager.write().add_head(HeadConfig::new(head, HeadType::Semantic, self.dim));
+            self.multihead_manager.write().add_head(HeadConfig::new(
+                head,
+                HeadType::Semantic,
+                self.dim,
+            ));
         }
         self.head_manager.read().insert(head, id, vector)?;
         Ok(())
@@ -73,7 +81,7 @@ impl Collection {
         vec![w; head_names.len()]
     }
 
-    fn normalize_head_scores(results: &mut Vec<(u64, f32)>) {
+    fn normalize_head_scores(results: &mut [(u64, f32)]) {
         let max_score = results.iter().map(|(_, s)| *s).fold(0.0f32, f32::max);
         if max_score > 0.0 {
             for (_, s) in results.iter_mut() {
@@ -93,10 +101,10 @@ impl Collection {
         top_k: usize,
     ) -> Result<Vec<(u64, f32)>, CoreError> {
         let heads_read = self.head_manager.read();
-        let num_heads = heads.len().max(1);
+        let _num_heads = heads.len().max(1);
         let effective_top_k = (top_k * OVERFETCH_MULTIPLIER).max(MIN_CANDIDATES_PER_HEAD);
 
-        let mut head_results: Vec<(String, Vec<(u64, f32)>)> = heads
+        let head_results: Vec<(String, Vec<(u64, f32)>)> = heads
             .iter()
             .filter_map(|h| {
                 let idx = heads_read.get_head(h).ok()?;
@@ -126,7 +134,7 @@ impl Collection {
         top_k: usize,
     ) -> Result<Vec<(u64, f32)>, CoreError> {
         let heads_read = self.head_manager.read();
-        let num_heads = heads.len().max(1);
+        let _num_heads = heads.len().max(1);
         let effective_top_k = (top_k * OVERFETCH_MULTIPLIER).max(MIN_CANDIDATES_PER_HEAD);
         let head_results: Vec<(String, Vec<(u64, f32)>)> = heads
             .iter()
@@ -139,7 +147,9 @@ impl Collection {
             .collect();
         let mh = self.multihead_manager.read();
         let mut fused = mh.fuse_weighted(&head_results, heads);
-        if fused.len() > top_k { fused.truncate(top_k); }
+        if fused.len() > top_k {
+            fused.truncate(top_k);
+        }
         Ok(fused)
     }
 

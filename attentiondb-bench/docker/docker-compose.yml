@@ -1,0 +1,137 @@
+version: '3.8'
+
+services:
+  # AttentionDB
+  attentiondb:
+    image: attentiondb:latest
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    ports:
+      - "7070:7070"   # gRPC
+      - "8080:8080"   # REST
+    environment:
+      - ATTENTIONDB_GRPC_PORT=7070
+      - ATTENTIONDB_REST_PORT=8080
+      - ATTENTIONDB_DATA_DIR=/data
+      - RUST_LOG=attentiondb=info
+    volumes:
+      - attentiondb_data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 16G
+
+  # Qdrant
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"   # REST
+      - "6334:6334"   # gRPC
+    volumes:
+      - qdrant_data:/qdrant/storage
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 16G
+
+  # Milvus
+  milvus:
+    image: milvusdb/milvus:latest
+    ports:
+      - "19530:19530"  # gRPC
+    environment:
+      - ETCD_ENDPOINTS=etcd:2379
+      - MINIO_ADDRESS=minio:9000
+    depends_on:
+      - etcd
+      - minio
+    volumes:
+      - milvus_data:/var/lib/milvus
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 16G
+
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.5
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_DATA_DIR=/etcd
+    volumes:
+      - etcd_data:/etcd
+
+  minio:
+    image: minio/minio:latest
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+
+  # Weaviate
+  weaviate:
+    image: semitechnologies/weaviate:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - QUERY_DEFAULTS_LIMIT=100
+      - AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=true
+      - PERSISTENCE_DATA_PATH=/data
+    volumes:
+      - weaviate_data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 16G
+
+  # PostgreSQL + pgvector
+  pgvector:
+    image: pgvector/pgvector:pg16
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    volumes:
+      - pgvector_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+
+  # Elasticsearch
+  elasticsearch:
+    image: elasticsearch:8.15.0
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms8g -Xmx8g
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 16G
+
+volumes:
+  attentiondb_data:
+  qdrant_data:
+  milvus_data:
+  etcd_data:
+  minio_data:
+  weaviate_data:
+  pgvector_data:
+  es_data:

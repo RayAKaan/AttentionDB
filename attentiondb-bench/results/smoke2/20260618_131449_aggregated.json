@@ -1,0 +1,24 @@
+[
+  {
+    "database": "AttentionDB (CPU)",
+    "dataset": "synthetic",
+    "difficulty": "Easy",
+    "index_build_time_s": 0.0,
+    "latency_mean_ms": {
+      "ci_lower": 2.3868136125728805,
+      "ci_upper": 2.92286738742712,
+      "mean": 2.6548405
+    },
+    "ndcg_at_10": {
+      "ci_lower": 1.0,
+      "ci_upper": 1.0,
+      "mean": 1.0
+    },
+    "recall_at_10": {
+      "ci_lower": 0.03332142357062866,
+      "ci_upper": 0.11967857642937108,
+      "mean": 0.07649999999999987
+    },
+    "scale": 1000
+  }
+]

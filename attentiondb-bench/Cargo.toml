@@ -1,0 +1,68 @@
+[workspace]
+
+[package]
+name        = "attentiondb-bench"
+version     = "0.2.0"
+edition     = "2021"
+description = "Publication-grade benchmark for AttentionDB — VLDB/SIGMOD target"
+authors     = ["AttentionDB Research Team"]
+
+[dependencies]
+tokio            = { version = "1",    features = ["full"] }
+clap             = { version = "4",    features = ["derive"] }
+serde            = { version = "1",    features = ["derive"] }
+serde_json       = "1"
+toml             = "0.8"
+anyhow           = "1"
+thiserror        = "1"
+tracing          = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
+chrono           = { version = "0.4",  features = ["serde"] }
+uuid             = { version = "1",    features = ["v4"] }
+async-trait      = "0.1"
+futures          = "0.3"
+arc-swap         = "1"
+
+statrs           = "0.17"
+rand             = "0.8"
+rand_distr       = "0.4"
+ndarray          = "0.16"
+ndarray-stats    = "0.6"
+kdtree           = "0.6"
+
+
+
+qdrant-client    = { version = "1",    optional = true }
+tonic            = { version = "0.12", optional = true }
+prost            = { version = "0.13", optional = true }
+reqwest          = { version = "0.12", features = ["json", "blocking"] }
+sqlx             = { version = "0.8",  features = ["runtime-tokio", "postgres"], optional = true }
+
+hdf5             = { version = "0.8", optional = true }
+csv              = "1"
+memmap2          = "0.9"
+indicatif        = "0.17"
+
+libc             = "0.2"
+
+tabled           = "0.16"
+plotters         = "0.3"
+
+[build-dependencies]
+tonic-build = { version = "0.12", optional = true }
+
+[features]
+default        = ["qdrant", "pgvector"]
+qdrant         = ["dep:qdrant-client"]
+milvus         = ["dep:tonic", "dep:prost", "dep:tonic-build"]
+weaviate       = []
+pgvector       = ["dep:sqlx"]
+elasticsearch  = []
+pinecone       = []
+gpu            = []
+all-databases  = ["qdrant", "milvus", "weaviate", "pgvector"]
+
+[dev-dependencies]
+criterion    = "0.5"
+approx       = "0.5"
+proptest     = "1"

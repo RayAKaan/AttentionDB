@@ -10,12 +10,7 @@
 //! ```
 //! If unset, authentication is **disabled** (open access for development).
 
-use axum::{
-    extract::Request,
-    http::StatusCode,
-    middleware::Next,
-    response::Response,
-};
+use axum::{extract::Request, http::StatusCode, middleware::Next, response::Response};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -45,26 +40,38 @@ impl ApiKeyStore {
                     .collect();
                 let count = key_hashes.len();
                 tracing::info!(count, "API key authentication enabled");
-                Self { key_hashes, enabled: true }
+                Self {
+                    key_hashes,
+                    enabled: true,
+                }
             }
             _ => {
-                tracing::warn!("ATTENTIONDB_API_KEYS not set — authentication DISABLED (open access)");
-                Self { key_hashes: HashSet::new(), enabled: false }
+                tracing::warn!(
+                    "ATTENTIONDB_API_KEYS not set — authentication DISABLED (open access)"
+                );
+                Self {
+                    key_hashes: HashSet::new(),
+                    enabled: false,
+                }
             }
         }
     }
 
     /// Create with explicit keys (for testing).
     pub fn with_keys(keys: &[&str]) -> Self {
-        let key_hashes: HashSet<String> = keys.iter()
-            .map(|k| Self::hash_key(k))
-            .collect();
-        Self { key_hashes, enabled: !keys.is_empty() }
+        let key_hashes: HashSet<String> = keys.iter().map(|k| Self::hash_key(k)).collect();
+        Self {
+            key_hashes,
+            enabled: !keys.is_empty(),
+        }
     }
 
     /// Create with auth disabled.
     pub fn disabled() -> Self {
-        Self { key_hashes: HashSet::new(), enabled: false }
+        Self {
+            key_hashes: HashSet::new(),
+            enabled: false,
+        }
     }
 
     fn hash_key(key: &str) -> String {
@@ -111,10 +118,7 @@ fn extract_api_key(req: &Request) -> Option<String> {
 }
 
 /// Axum middleware layer for API key authentication.
-pub async fn auth_middleware(
-    req: Request,
-    next: Next,
-) -> Result<Response, StatusCode> {
+pub async fn auth_middleware(req: Request, next: Next) -> Result<Response, StatusCode> {
     let store = req.extensions().get::<Arc<ApiKeyStore>>().cloned();
 
     let store = match store {
@@ -127,7 +131,12 @@ pub async fn auth_middleware(
     }
 
     let path = req.uri().path();
-    if path == "/health" || path.starts_with("/health/") || path == "/metrics" || path == "/openapi.json" || path == "/docs" {
+    if path == "/health"
+        || path.starts_with("/health/")
+        || path == "/metrics"
+        || path == "/openapi.json"
+        || path == "/docs"
+    {
         return Ok(next.run(req).await);
     }
 

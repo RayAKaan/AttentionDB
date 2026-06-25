@@ -14,8 +14,7 @@ pub struct CudaBackend {
 
 impl CudaBackend {
     pub fn new() -> Result<Self, GpuError> {
-        let device = CudaDevice::new(0)
-            .map_err(|e| GpuError::Cuda(e.to_string()))?;
+        let device = CudaDevice::new(0).map_err(|e| GpuError::Cuda(e.to_string()))?;
 
         let dot_kernel = r#"
             extern "C" __global__ void dot_product(
@@ -146,28 +145,36 @@ impl GpuBackend for CudaBackend {
 
         for (id, vec) in candidates {
             if vec.len() != dim {
-                return Err(GpuError::InvalidInput("Candidate dimension mismatch".into()));
+                return Err(GpuError::InvalidInput(
+                    "Candidate dimension mismatch".into(),
+                ));
             }
             candidate_vectors.extend_from_slice(vec);
             ids.push(*id);
         }
 
-        let d_query = self.device.htod_sync_copy(query)
+        let d_query = self
+            .device
+            .htod_sync_copy(query)
             .map_err(|e| GpuError::Cuda(e.to_string()))?;
 
-        let d_candidates = self.device.htod_sync_copy(&candidate_vectors)
+        let d_candidates = self
+            .device
+            .htod_sync_copy(&candidate_vectors)
             .map_err(|e| GpuError::Cuda(e.to_string()))?;
 
-        let mut d_scores = self.device.alloc_zeros::<f32>(num_candidates)
+        let mut d_scores = self
+            .device
+            .alloc_zeros::<f32>(num_candidates)
             .map_err(|e| GpuError::Cuda(e.to_string()))?;
 
-        let module = self.device.load_ptx(
-            self.dot_product_ptx.clone(),
-            "dot_product",
-            &[],
-        ).map_err(|e| GpuError::Cuda(e.to_string()))?;
+        let module = self
+            .device
+            .load_ptx(self.dot_product_ptx.clone(), "dot_product", &[])
+            .map_err(|e| GpuError::Cuda(e.to_string()))?;
 
-        let func = module.get_func("dot_product")
+        let func = module
+            .get_func("dot_product")
             .map_err(|e| GpuError::Cuda(e.to_string()))?;
 
         let block_size = 256;
@@ -180,11 +187,22 @@ impl GpuBackend for CudaBackend {
         };
 
         unsafe {
-            func.launch(config, (&d_query, &d_candidates, &mut d_scores, dim as i32, num_candidates as i32))
-                .map_err(|e| GpuError::Cuda(e.to_string()))?;
+            func.launch(
+                config,
+                (
+                    &d_query,
+                    &d_candidates,
+                    &mut d_scores,
+                    dim as i32,
+                    num_candidates as i32,
+                ),
+            )
+            .map_err(|e| GpuError::Cuda(e.to_string()))?;
         }
 
-        let scores = self.device.dtoh_sync_copy(&d_scores)
+        let scores = self
+            .device
+            .dtoh_sync_copy(&d_scores)
             .map_err(|e| GpuError::Cuda(e.to_string()))?;
 
         let mut scored: Vec<(u64, f32)> = ids.into_iter().zip(scores.into_iter()).collect();
@@ -207,35 +225,46 @@ impl GpuBackend for CudaBackend {
         let num_vectors = vectors.len();
 
         if matrix.len() != dim * dim {
-            return Err(GpuError::InvalidInput(
-                format!("Matrix must be dim x dim ({} x {}), got {}", dim, dim, matrix.len())
-            ));
+            return Err(GpuError::InvalidInput(format!(
+                "Matrix must be dim x dim ({} x {}), got {}",
+                dim,
+                dim,
+                matrix.len()
+            )));
         }
 
         let mut flat_vectors = Vec::with_capacity(num_vectors * dim);
         for vec in &vectors {
             if vec.len() != dim {
-                return Err(GpuError::InvalidInput("All vectors must have same dimension".into()));
+                return Err(GpuError::InvalidInput(
+                    "All vectors must have same dimension".into(),
+                ));
             }
             flat_vectors.extend_from_slice(vec);
         }
 
-        let d_matrix = self.device.htod_sync_copy(matrix)
+        let d_matrix = self
+            .device
+            .htod_sync_copy(matrix)
             .map_err(|e| GpuError::Cuda(e.to_string()))?;
 
-        let d_vectors = self.device.htod_sync_copy(&flat_vectors)
+        let d_vectors = self
+            .device
+            .htod_sync_copy(&flat_vectors)
             .map_err(|e| GpuError::Cuda(e.to_string()))?;
 
-        let mut d_output = self.device.alloc_zeros::<f32>(num_vectors * dim)
+        let mut d_output = self
+            .device
+            .alloc_zeros::<f32>(num_vectors * dim)
             .map_err(|e| GpuError::Cuda(e.to_string()))?;
 
-        let module = self.device.load_ptx(
-            self.matvec_ptx.clone(),
-            "matvec_batch",
-            &[],
-        ).map_err(|e| GpuError::Cuda(e.to_string()))?;
+        let module = self
+            .device
+            .load_ptx(self.matvec_ptx.clone(), "matvec_batch", &[])
+            .map_err(|e| GpuError::Cuda(e.to_string()))?;
 
-        let func = module.get_func("matvec_batch")
+        let func = module
+            .get_func("matvec_batch")
             .map_err(|e| GpuError::Cuda(e.to_string()))?;
 
         let config = LaunchConfig {
@@ -245,11 +274,22 @@ impl GpuBackend for CudaBackend {
         };
 
         unsafe {
-            func.launch(config, (&d_matrix, &d_vectors, &mut d_output, dim as i32, num_vectors as i32))
-                .map_err(|e| GpuError::Cuda(e.to_string()))?;
+            func.launch(
+                config,
+                (
+                    &d_matrix,
+                    &d_vectors,
+                    &mut d_output,
+                    dim as i32,
+                    num_vectors as i32,
+                ),
+            )
+            .map_err(|e| GpuError::Cuda(e.to_string()))?;
         }
 
-        let flat_output = self.device.dtoh_sync_copy(&d_output)
+        let flat_output = self
+            .device
+            .dtoh_sync_copy(&d_output)
             .map_err(|e| GpuError::Cuda(e.to_string()))?;
 
         let mut results = Vec::with_capacity(num_vectors);
@@ -297,20 +337,26 @@ impl GpuBackend for CudaBackend {
         }
 
         // Transfer to GPU
-        let d_flat_scores = self.device.htod_sync_copy(&flat_scores)
+        let d_flat_scores = self
+            .device
+            .htod_sync_copy(&flat_scores)
             .map_err(|e| GpuError::Cuda(e.to_string()))?;
-        let d_gate_weights = self.device.htod_sync_copy(gate_weights)
+        let d_gate_weights = self
+            .device
+            .htod_sync_copy(gate_weights)
             .map_err(|e| GpuError::Cuda(e.to_string()))?;
-        let mut d_output = self.device.alloc_zeros::<f32>(num_candidates)
+        let mut d_output = self
+            .device
+            .alloc_zeros::<f32>(num_candidates)
             .map_err(|e| GpuError::Cuda(e.to_string()))?;
 
-        let module = self.device.load_ptx(
-            self.fuse_ptx.clone(),
-            "fuse_weighted",
-            &[],
-        ).map_err(|e| GpuError::Cuda(e.to_string()))?;
+        let module = self
+            .device
+            .load_ptx(self.fuse_ptx.clone(), "fuse_weighted", &[])
+            .map_err(|e| GpuError::Cuda(e.to_string()))?;
 
-        let func = module.get_func("fuse_weighted")
+        let func = module
+            .get_func("fuse_weighted")
             .map_err(|e| GpuError::Cuda(e.to_string()))?;
 
         let block_size = 256;
@@ -323,21 +369,26 @@ impl GpuBackend for CudaBackend {
         };
 
         unsafe {
-            func.launch(config, (
-                &d_flat_scores,
-                &d_gate_weights,
-                &mut d_output,
-                num_heads as i32,
-                num_candidates as i32,
-            )).map_err(|e| GpuError::Cuda(e.to_string()))?;
+            func.launch(
+                config,
+                (
+                    &d_flat_scores,
+                    &d_gate_weights,
+                    &mut d_output,
+                    num_heads as i32,
+                    num_candidates as i32,
+                ),
+            )
+            .map_err(|e| GpuError::Cuda(e.to_string()))?;
         }
 
-        let fused_scores = self.device.dtoh_sync_copy(&d_output)
+        let fused_scores = self
+            .device
+            .dtoh_sync_copy(&d_output)
             .map_err(|e| GpuError::Cuda(e.to_string()))?;
 
-        let mut final_scores: Vec<(u64, f32)> = all_ids.into_iter()
-            .zip(fused_scores.into_iter())
-            .collect();
+        let mut final_scores: Vec<(u64, f32)> =
+            all_ids.into_iter().zip(fused_scores.into_iter()).collect();
         final_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         Ok(final_scores)
@@ -353,25 +404,35 @@ impl GpuBackend for CudaBackend {
         let num_heads = bias.len();
 
         if weights.len() != num_heads * dim {
-            return Err(GpuError::InvalidInput("Weights must be num_heads × dim".into()));
+            return Err(GpuError::InvalidInput(
+                "Weights must be num_heads × dim".into(),
+            ));
         }
 
-        let d_query = self.device.htod_sync_copy(query_embedding)
+        let d_query = self
+            .device
+            .htod_sync_copy(query_embedding)
             .map_err(|e| GpuError::Cuda(e.to_string()))?;
-        let d_weights = self.device.htod_sync_copy(weights)
+        let d_weights = self
+            .device
+            .htod_sync_copy(weights)
             .map_err(|e| GpuError::Cuda(e.to_string()))?;
-        let d_bias = self.device.htod_sync_copy(bias)
+        let d_bias = self
+            .device
+            .htod_sync_copy(bias)
             .map_err(|e| GpuError::Cuda(e.to_string()))?;
-        let mut d_logits = self.device.alloc_zeros::<f32>(num_heads)
+        let mut d_logits = self
+            .device
+            .alloc_zeros::<f32>(num_heads)
             .map_err(|e| GpuError::Cuda(e.to_string()))?;
 
-        let module = self.device.load_ptx(
-            self.gating_ptx.clone(),
-            "gating_forward",
-            &[],
-        ).map_err(|e| GpuError::Cuda(e.to_string()))?;
+        let module = self
+            .device
+            .load_ptx(self.gating_ptx.clone(), "gating_forward", &[])
+            .map_err(|e| GpuError::Cuda(e.to_string()))?;
 
-        let func = module.get_func("gating_forward")
+        let func = module
+            .get_func("gating_forward")
             .map_err(|e| GpuError::Cuda(e.to_string()))?;
 
         let block_size = 256;
@@ -384,17 +445,23 @@ impl GpuBackend for CudaBackend {
         };
 
         unsafe {
-            func.launch(config, (
-                &d_query,
-                &d_weights,
-                &d_bias,
-                &mut d_logits,
-                dim as i32,
-                num_heads as i32,
-            )).map_err(|e| GpuError::Cuda(e.to_string()))?;
+            func.launch(
+                config,
+                (
+                    &d_query,
+                    &d_weights,
+                    &d_bias,
+                    &mut d_logits,
+                    dim as i32,
+                    num_heads as i32,
+                ),
+            )
+            .map_err(|e| GpuError::Cuda(e.to_string()))?;
         }
 
-        let logits = self.device.dtoh_sync_copy(&d_logits)
+        let logits = self
+            .device
+            .dtoh_sync_copy(&d_logits)
             .map_err(|e| GpuError::Cuda(e.to_string()))?;
 
         // Softmax on CPU (small num_heads, negligible overhead)

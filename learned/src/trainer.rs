@@ -1,6 +1,6 @@
-use crate::projection::{ProjectionMatrix, ProjectionConfig};
 use crate::contrastive::ContrastiveLoss;
 use crate::error::LearnedError;
+use crate::projection::{ProjectionConfig, ProjectionMatrix};
 use ndarray::{Array1, Array2};
 
 pub struct ProjectionTrainer {
@@ -11,7 +11,11 @@ pub struct ProjectionTrainer {
 
 impl ProjectionTrainer {
     pub fn new(dim: usize, learning_rate: f32) -> Self {
-        let config = ProjectionConfig { dim, num_heads: 4, head_dim: 64 };
+        let config = ProjectionConfig {
+            dim,
+            num_heads: 4,
+            head_dim: 64,
+        };
         Self {
             projection: ProjectionMatrix::new(config),
             loss_fn: ContrastiveLoss::new(0.07),
@@ -28,7 +32,9 @@ impl ProjectionTrainer {
             return Err(LearnedError::Training("No positive pairs provided".into()));
         }
         if negatives.is_empty() {
-            return Err(LearnedError::Training("No negative samples provided".into()));
+            return Err(LearnedError::Training(
+                "No negative samples provided".into(),
+            ));
         }
 
         let mut total_loss = 0.0;
@@ -42,7 +48,8 @@ impl ProjectionTrainer {
         for (raw_q, raw_pos) in positive_pairs {
             let q = self.projection.project_query(raw_q);
             let pos = self.projection.project_key(raw_pos);
-            let negs: Vec<Vec<f32>> = negatives.iter()
+            let negs: Vec<Vec<f32>> = negatives
+                .iter()
                 .map(|neg| self.projection.project_key(neg))
                 .collect();
 
@@ -51,14 +58,10 @@ impl ProjectionTrainer {
 
             let q_arr = Array1::from(q);
             let pos_arr = Array1::from(pos);
-            let neg_arrs: Vec<Array1<f32>> = negs.into_iter()
-                .map(Array1::from)
-                .collect();
+            let neg_arrs: Vec<Array1<f32>> = negs.into_iter().map(Array1::from).collect();
 
             let s_pos = q_arr.dot(&pos_arr) / tau;
-            let s_negs: Vec<f32> = neg_arrs.iter()
-                .map(|n| q_arr.dot(n) / tau)
-                .collect();
+            let s_negs: Vec<f32> = neg_arrs.iter().map(|n| q_arr.dot(n) / tau).collect();
 
             let mut all_s = s_negs.clone();
             all_s.push(s_pos);
@@ -134,10 +137,7 @@ mod tests {
             (vec![1.0, 0.0, 0.0, 0.0], vec![0.9, 0.1, 0.0, 0.0]),
             (vec![0.0, 1.0, 0.0, 0.0], vec![0.0, 0.9, 0.1, 0.0]),
         ];
-        let negs = vec![
-            vec![0.0, 0.0, 1.0, 0.0],
-            vec![0.0, 0.0, 0.0, 1.0],
-        ];
+        let negs = vec![vec![0.0, 0.0, 1.0, 0.0], vec![0.0, 0.0, 0.0, 1.0]];
 
         let l1 = trainer.train_step(&pairs, &negs).unwrap();
         let l2 = trainer.train_step(&pairs, &negs).unwrap();

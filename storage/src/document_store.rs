@@ -1,13 +1,12 @@
-use std::collections::{HashMap, BinaryHeap};
-use std::cmp::Reverse;
-use std::path::PathBuf;
-use std::sync::atomic::{AtomicUsize, AtomicU64, Ordering};
 use parking_lot::RwLock;
+use std::collections::{BinaryHeap, HashMap};
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use uuid::Uuid;
 
-use crate::record::Record;
 use crate::error::StorageError;
-use crate::sstable::{SSTableWriter, SSTableReader};
+use crate::record::Record;
+use crate::sstable::{SSTableReader, SSTableWriter};
 
 /// Heap entry ordered by access_time (oldest first for LRU eviction).
 #[derive(Debug, Clone)]
@@ -17,11 +16,15 @@ pub struct LruHeapEntry {
 }
 
 impl PartialEq for LruHeapEntry {
-    fn eq(&self, other: &Self) -> bool { self.access_time == other.access_time }
+    fn eq(&self, other: &Self) -> bool {
+        self.access_time == other.access_time
+    }
 }
 impl Eq for LruHeapEntry {}
 impl PartialOrd for LruHeapEntry {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> { Some(self.cmp(other)) }
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
 }
 impl Ord for LruHeapEntry {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
@@ -50,8 +53,11 @@ impl Clone for CacheStats {
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct CacheStatsSnapshot {
-    pub hits: usize, pub misses: usize, pub evictions: usize,
-    pub size_bytes: usize, pub entries: usize,
+    pub hits: usize,
+    pub misses: usize,
+    pub evictions: usize,
+    pub size_bytes: usize,
+    pub entries: usize,
 }
 
 /// LRU block cache using BinaryHeap<LruHeapEntry>.
@@ -81,7 +87,10 @@ impl BlockCache {
     pub fn get(&mut self, id: &Uuid) -> Option<Record> {
         if let Some(record) = self.cache.get(id) {
             self.access_counter += 1;
-            self.lru.push(LruHeapEntry { access_time: self.access_counter, id: *id });
+            self.lru.push(LruHeapEntry {
+                access_time: self.access_counter,
+                id: *id,
+            });
             self.stats.hits.fetch_add(1, Ordering::Relaxed);
             return Some(record.clone());
         }
@@ -94,7 +103,9 @@ impl BlockCache {
         let size = estimate_record_size(&record);
         // Lazy deletion: pop stale entries
         while let Some(top) = self.lru.peek() {
-            if self.cache.contains_key(&top.id) { break; }
+            if self.cache.contains_key(&top.id) {
+                break;
+            }
             self.lru.pop();
         }
         // Evict until under capacity and budget
@@ -104,11 +115,16 @@ impl BlockCache {
                     self.memory_used = self.memory_used.saturating_sub(256);
                     self.stats.evictions.fetch_add(1, Ordering::Relaxed);
                 }
-            } else { break; }
+            } else {
+                break;
+            }
         }
         self.memory_used += size;
         self.cache.insert(id, record);
-        self.lru.push(LruHeapEntry { access_time: self.access_counter, id });
+        self.lru.push(LruHeapEntry {
+            access_time: self.access_counter,
+            id,
+        });
     }
 
     pub fn remove(&mut self, id: &Uuid) {
@@ -150,6 +166,12 @@ pub struct DocumentStore {
     pub block_cache: RwLock<BlockCache>,
 }
 
+impl Default for DocumentStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DocumentStore {
     pub fn new() -> Self {
         Self {
@@ -163,26 +185,40 @@ impl DocumentStore {
         }
     }
 
-    pub fn with_wal(mut self, wal: crate::wal::Wal) -> Self { self.wal = Some(wal); self }
-    pub fn with_storage_dir(mut self, dir: PathBuf) -> Result<Self, StorageError> {
-        std::fs::create_dir_all(&dir)?; self.storage_dir = Some(dir); Ok(self)
+    pub fn with_wal(mut self, wal: crate::wal::Wal) -> Self {
+        self.wal = Some(wal);
+        self
     }
-    pub fn with_memtable_threshold(mut self, t: usize) -> Self { self.memtable_threshold = t; self }
+    pub fn with_storage_dir(mut self, dir: PathBuf) -> Result<Self, StorageError> {
+        std::fs::create_dir_all(&dir)?;
+        self.storage_dir = Some(dir);
+        Ok(self)
+    }
+    pub fn with_memtable_threshold(mut self, t: usize) -> Self {
+        self.memtable_threshold = t;
+        self
+    }
 
     pub fn open(dir: PathBuf) -> Result<Self, StorageError> {
         std::fs::create_dir_all(&dir)?;
         let mut sstables = Vec::new();
         let mut flushed = HashMap::new();
         if let Ok(entries) = std::fs::read_dir(&dir) {
-            let mut paths: Vec<_> = entries.filter_map(|e| e.ok()).map(|e| e.path())
-                .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("sst")).collect();
+            let mut paths: Vec<_> = entries
+                .filter_map(|e| e.ok())
+                .map(|e| e.path())
+                .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("sst"))
+                .collect();
             paths.sort();
             for p in paths {
                 if let Ok(r) = SSTableReader::open(&p) {
                     for e in r.iter() {
                         if let Ok(rec) = Record::from_msgpack(&e.value) {
-                            if rec.tags.contains(&"__TOMBSTONE__".into()) { flushed.remove(&rec.id); }
-                            else { flushed.insert(rec.id, rec); }
+                            if rec.tags.contains(&"__TOMBSTONE__".into()) {
+                                flushed.remove(&rec.id);
+                            } else {
+                                flushed.insert(rec.id, rec);
+                            }
                         }
                     }
                     sstables.push(r);
@@ -196,22 +232,37 @@ impl DocumentStore {
         for e in entries {
             match e.op {
                 crate::wal::OpType::Insert => {
-                    if let Ok(rec) = Record::from_msgpack(&e.data) { memtable.insert(rec.id, rec); }
+                    if let Ok(rec) = Record::from_msgpack(&e.data) {
+                        memtable.insert(rec.id, rec);
+                    }
                 }
-                crate::wal::OpType::Delete => { memtable.remove(&e.record_id); flushed.remove(&e.record_id); }
+                crate::wal::OpType::Delete => {
+                    memtable.remove(&e.record_id);
+                    flushed.remove(&e.record_id);
+                }
                 _ => {}
             }
         }
         Ok(Self {
-            memtable, flushed_records: flushed, wal: Some(wal), storage_dir: Some(dir),
-            memtable_threshold: 1000, sstables, block_cache: RwLock::new(BlockCache::new(50_000)),
+            memtable,
+            flushed_records: flushed,
+            wal: Some(wal),
+            storage_dir: Some(dir),
+            memtable_threshold: 1000,
+            sstables,
+            block_cache: RwLock::new(BlockCache::new(50_000)),
         })
     }
 
     pub fn insert(&mut self, record: Record) -> Result<Uuid, StorageError> {
         let id = record.id;
         if let Some(ref mut w) = self.wal {
-            w.append(crate::wal::OpType::Insert, "default", id, record.to_msgpack()?)?;
+            w.append(
+                crate::wal::OpType::Insert,
+                "default",
+                id,
+                record.to_msgpack()?,
+            )?;
         }
         self.memtable.insert(id, record.clone());
         self.block_cache.write().insert(id, record);
@@ -222,13 +273,17 @@ impl DocumentStore {
     }
 
     pub fn flush_memtable(&mut self) -> Result<(), StorageError> {
-        if self.memtable.is_empty() { return Ok(()); }
+        if self.memtable.is_empty() {
+            return Ok(());
+        }
         if let Some(ref dir) = self.storage_dir {
             std::fs::create_dir_all(dir)?;
             let ts = chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0);
             let p = dir.join(format!("sstable_{}.sst", ts));
             let mut w = SSTableWriter::new(&p)?;
-            for (id, rec) in &self.memtable { w.append(id.as_bytes().to_vec(), rec.to_msgpack()?)?; }
+            for (id, rec) in &self.memtable {
+                w.append(id.as_bytes().to_vec(), rec.to_msgpack()?)?;
+            }
             w.flush()?;
             self.sstables.push(SSTableReader::open(&p)?);
             let config = crate::compaction::CompactionConfig::default();
@@ -236,27 +291,41 @@ impl DocumentStore {
                 let _ = crate::compaction::cleanup_merged_files(&result);
                 self.sstables.clear();
                 if let Ok(entries) = std::fs::read_dir(dir) {
-                    let mut paths: Vec<_> = entries.filter_map(|e| e.ok()).map(|e| e.path())
-                        .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("sst")).collect();
+                    let mut paths: Vec<_> = entries
+                        .filter_map(|e| e.ok())
+                        .map(|e| e.path())
+                        .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("sst"))
+                        .collect();
                     paths.sort();
-                    for p in paths { if let Ok(r) = SSTableReader::open(&p) { self.sstables.push(r); } }
+                    for p in paths {
+                        if let Ok(r) = SSTableReader::open(&p) {
+                            self.sstables.push(r);
+                        }
+                    }
                 }
             }
         }
         for (id, rec) in self.memtable.drain() {
-            if rec.tags.contains(&"__TOMBSTONE__".into()) { self.flushed_records.remove(&id); }
-            else { self.flushed_records.insert(id, rec); }
+            if rec.tags.contains(&"__TOMBSTONE__".into()) {
+                self.flushed_records.remove(&id);
+            } else {
+                self.flushed_records.insert(id, rec);
+            }
         }
         Ok(())
     }
 
     pub fn get(&self, id: &Uuid) -> Option<&Record> {
         if let Some(r) = self.memtable.get(id) {
-            if r.tags.contains(&"__TOMBSTONE__".into()) { return None; }
+            if r.tags.contains(&"__TOMBSTONE__".into()) {
+                return None;
+            }
             return Some(r);
         }
         if let Some(r) = self.flushed_records.get(id) {
-            if r.tags.contains(&"__TOMBSTONE__".into()) { return None; }
+            if r.tags.contains(&"__TOMBSTONE__".into()) {
+                return None;
+            }
             return Some(r);
         }
         None
@@ -264,22 +333,30 @@ impl DocumentStore {
 
     pub fn get_record(&self, id: &Uuid) -> Option<Record> {
         if let Some(r) = self.memtable.get(id) {
-            if r.tags.contains(&"__TOMBSTONE__".into()) { return None; }
+            if r.tags.contains(&"__TOMBSTONE__".into()) {
+                return None;
+            }
             return Some(r.clone());
         }
         if let Some(r) = self.flushed_records.get(id) {
-            if r.tags.contains(&"__TOMBSTONE__".into()) { return None; }
+            if r.tags.contains(&"__TOMBSTONE__".into()) {
+                return None;
+            }
             return Some(r.clone());
         }
         if let Some(cached) = self.block_cache.write().get(id) {
-            if cached.tags.contains(&"__TOMBSTONE__".into()) { return None; }
+            if cached.tags.contains(&"__TOMBSTONE__".into()) {
+                return None;
+            }
             return Some(cached);
         }
         for sst in self.sstables.iter().rev() {
             if let Some(entry) = sst.get(id.as_bytes()) {
                 if let Ok(rec) = Record::from_msgpack(&entry.value) {
                     self.block_cache.write().insert(*id, rec.clone());
-                    if rec.tags.contains(&"__TOMBSTONE__".into()) { return None; }
+                    if rec.tags.contains(&"__TOMBSTONE__".into()) {
+                        return None;
+                    }
                     return Some(rec);
                 }
             }
@@ -297,7 +374,9 @@ impl DocumentStore {
             tombstone.tags.push("__TOMBSTONE__".into());
             self.memtable.insert(*id, tombstone.clone());
             self.block_cache.write().insert(*id, tombstone);
-            if self.memtable.len() >= self.memtable_threshold { self.flush_memtable()?; }
+            if self.memtable.len() >= self.memtable_threshold {
+                self.flush_memtable()?;
+            }
         } else {
             self.memtable.remove(id);
             self.flushed_records.remove(id);
@@ -307,26 +386,45 @@ impl DocumentStore {
     }
 
     pub fn len(&self) -> usize {
-        let mc = self.memtable.values().filter(|r| !r.tags.contains(&"__TOMBSTONE__".into())).count();
-        let fc = self.flushed_records.values().filter(|r| !r.tags.contains(&"__TOMBSTONE__".into()) && !self.memtable.contains_key(&r.id)).count();
+        let mc = self
+            .memtable
+            .values()
+            .filter(|r| !r.tags.contains(&"__TOMBSTONE__".into()))
+            .count();
+        let fc = self
+            .flushed_records
+            .values()
+            .filter(|r| {
+                !r.tags.contains(&"__TOMBSTONE__".into()) && !self.memtable.contains_key(&r.id)
+            })
+            .count();
         mc + fc
     }
 
-    pub fn is_empty(&self) -> bool { self.len() == 0 }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 
     pub fn list_all_records(&self) -> Vec<Record> {
-        let mut r: HashMap<Uuid, Record> = self.flushed_records.iter()
+        let mut r: HashMap<Uuid, Record> = self
+            .flushed_records
+            .iter()
             .filter(|(_, rec)| !rec.tags.contains(&"__TOMBSTONE__".into()))
-            .map(|(id, rec)| (*id, rec.clone())).collect();
+            .map(|(id, rec)| (*id, rec.clone()))
+            .collect();
         for (id, rec) in &self.memtable {
-            if rec.tags.contains(&"__TOMBSTONE__".into()) { r.remove(id); }
-            else { r.insert(*id, rec.clone()); }
+            if rec.tags.contains(&"__TOMBSTONE__".into()) {
+                r.remove(id);
+            } else {
+                r.insert(*id, rec.clone());
+            }
         }
         r.into_values().collect()
     }
 
     pub fn update_record(&mut self, record: Record) -> Result<(), StorageError> {
-        self.insert(record)?; Ok(())
+        self.insert(record)?;
+        Ok(())
     }
 
     pub fn cache_stats(&self) -> CacheStatsSnapshot {

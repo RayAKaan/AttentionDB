@@ -1,12 +1,12 @@
-use criterion::{Criterion, BenchmarkId};
-use attentiondb_hnsw::{HNSWIndex, HNSWConfig};
+use attentiondb_hnsw::{HNSWConfig, HNSWIndex};
+use clap::Parser;
+use criterion::{BenchmarkId, Criterion};
 use rand::Rng;
-use std::time::Instant;
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{Read, Write};
-use serde::{Serialize, Deserialize};
-use clap::Parser;
+use std::time::Instant;
 
 #[derive(Parser, Debug)]
 #[command(name = "recall_bench")]
@@ -87,9 +87,21 @@ impl Default for BenchmarkConfig {
             k: 10,
             ef_values: vec![64, 128, 256],
             graph_configs: vec![
-                GraphConfig { name: "Balanced".to_string(),     max_nb_connection: 16, ef_construction: 400 },
-                GraphConfig { name: "HighQuality".to_string(),  max_nb_connection: 32, ef_construction: 600 },
-                GraphConfig { name: "MaxQuality".to_string(),   max_nb_connection: 48, ef_construction: 800 },
+                GraphConfig {
+                    name: "Balanced".to_string(),
+                    max_nb_connection: 16,
+                    ef_construction: 400,
+                },
+                GraphConfig {
+                    name: "HighQuality".to_string(),
+                    max_nb_connection: 32,
+                    ef_construction: 600,
+                },
+                GraphConfig {
+                    name: "MaxQuality".to_string(),
+                    max_nb_connection: 48,
+                    ef_construction: 800,
+                },
             ],
             use_normalization: true,
             dataset_path: Some("data/glove-100k.fvecs".to_string()),
@@ -100,7 +112,11 @@ impl Default for BenchmarkConfig {
 
 fn normalize(vec: &[f32]) -> Vec<f32> {
     let norm: f32 = vec.iter().map(|x| x * x).sum::<f32>().sqrt();
-    if norm > 0.0 { vec.iter().map(|x| x / norm).collect() } else { vec.to_vec() }
+    if norm > 0.0 {
+        vec.iter().map(|x| x / norm).collect()
+    } else {
+        vec.to_vec()
+    }
 }
 
 fn random_vector(dim: usize) -> Vec<f32> {
@@ -108,14 +124,19 @@ fn random_vector(dim: usize) -> Vec<f32> {
     (0..dim).map(|_| rng.gen::<f32>() - 0.5).collect()
 }
 
-fn load_fvecs(path: &str, max_vectors: usize) -> Result<Vec<(u64, Vec<f32>)>, Box<dyn std::error::Error>> {
+fn load_fvecs(
+    path: &str,
+    max_vectors: usize,
+) -> Result<Vec<(u64, Vec<f32>)>, Box<dyn std::error::Error>> {
     let mut file = File::open(path)?;
     let mut data = Vec::new();
     let mut id = 0u64;
 
     while data.len() < max_vectors {
         let mut dim_buf = [0u8; 4];
-        if file.read_exact(&mut dim_buf).is_err() { break; }
+        if file.read_exact(&mut dim_buf).is_err() {
+            break;
+        }
         let dim = i32::from_le_bytes(dim_buf) as usize;
 
         let mut vec = vec![0f32; dim];
@@ -144,7 +165,9 @@ fn generate_semantic_dataset(dim: usize, size: usize) -> Vec<(u64, Vec<f32>)> {
 
         for i in 0..per_cluster {
             let mut vec = center.clone();
-            for v in &mut vec { *v += rng.gen_range(-0.035..0.035); }
+            for v in &mut vec {
+                *v += rng.gen_range(-0.035..0.035);
+            }
             vec = normalize(&vec);
             let id = (c * per_cluster + i) as u64;
             data.push((id, vec));
@@ -184,7 +207,9 @@ fn mrr(results: &[(u64, f32)], gt: &[(u64, f32)]) -> f32 {
 }
 
 fn percentile(values: &[f64], p: f64) -> f64 {
-    if values.is_empty() { return 0.0; }
+    if values.is_empty() {
+        return 0.0;
+    }
     let mut sorted = values.to_vec();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let idx = ((p / 100.0) * (sorted.len() as f64 - 1.0)).round() as usize;
@@ -225,20 +250,29 @@ fn recall_benchmark(c: &mut Criterion, args: &Args) {
     };
 
     let dataset: Vec<(u64, Vec<f32>)> = if config.use_normalization {
-        raw_dataset.into_iter().map(|(id, vec)| (id, normalize(&vec))).collect()
+        raw_dataset
+            .into_iter()
+            .map(|(id, vec)| (id, normalize(&vec)))
+            .collect()
     } else {
         raw_dataset
     };
 
-    println!("Dataset ready: {} vectors (dim={}, normalized={})\n",
-             dataset.len(), config.dim, config.use_normalization);
+    println!(
+        "Dataset ready: {} vectors (dim={}, normalized={})\n",
+        dataset.len(),
+        config.dim,
+        config.use_normalization
+    );
 
     let mut all_results: Vec<BenchmarkResult> = Vec::new();
     let mut group = c.benchmark_group("hnsw_recall");
 
     for graph_cfg in &config.graph_configs {
-        println!("▶ Building graph: {} (conn={}, ef_constr={})",
-                 graph_cfg.name, graph_cfg.max_nb_connection, graph_cfg.ef_construction);
+        println!(
+            "▶ Building graph: {} (conn={}, ef_constr={})",
+            graph_cfg.name, graph_cfg.max_nb_connection, graph_cfg.ef_construction
+        );
 
         let hnsw_config = HNSWConfig {
             max_nb_connection: graph_cfg.max_nb_connection,
@@ -258,7 +292,11 @@ fn recall_benchmark(c: &mut Criterion, args: &Args) {
         let queries: Vec<Vec<f32>> = (0..config.num_queries)
             .map(|_| {
                 let v = random_vector(config.dim);
-                if config.use_normalization { normalize(&v) } else { v }
+                if config.use_normalization {
+                    normalize(&v)
+                } else {
+                    v
+                }
             })
             .collect();
 
@@ -324,14 +362,24 @@ fn recall_benchmark(c: &mut Criterion, args: &Args) {
     println!("\n╔════════════════════════════════════════════════════════════════════════════╗");
     println!("║                           FINAL RESULTS SUMMARY                            ║");
     println!("╠════════════════════════════════════════════════════════════════════════════╣");
-    println!("║ {:<15} {:>6} {:>10} {:>8} {:>10} {:>8} {:>8} {:>8} ║",
-             "Config", "ef", "Recall@10", "MRR", "Mean(ms)", "p50", "p95", "p99");
+    println!(
+        "║ {:<15} {:>6} {:>10} {:>8} {:>10} {:>8} {:>8} {:>8} ║",
+        "Config", "ef", "Recall@10", "MRR", "Mean(ms)", "p50", "p95", "p99"
+    );
     println!("╠════════════════════════════════════════════════════════════════════════════╣");
 
     for r in &all_results {
-        println!("║ {:<15} {:>6} {:>10.3} {:>8.3} {:>10.2} {:>8.2} {:>8.2} {:>8.2} ║",
-                 r.graph_config, r.ef, r.recall_at_10, r.mrr, r.mean_latency_ms,
-                 r.p50_ms, r.p95_ms, r.p99_ms);
+        println!(
+            "║ {:<15} {:>6} {:>10.3} {:>8.3} {:>10.2} {:>8.2} {:>8.2} {:>8.2} ║",
+            r.graph_config,
+            r.ef,
+            r.recall_at_10,
+            r.mrr,
+            r.mean_latency_ms,
+            r.p50_ms,
+            r.p95_ms,
+            r.p99_ms
+        );
     }
     println!("╚════════════════════════════════════════════════════════════════════════════╝\n");
 
@@ -345,7 +393,8 @@ fn recall_benchmark(c: &mut Criterion, args: &Args) {
 
 fn main() {
     let raw: Vec<String> = std::env::args().collect();
-    let filtered: Vec<String> = raw.iter()
+    let filtered: Vec<String> = raw
+        .iter()
         .filter(|a| !a.starts_with("--bench"))
         .cloned()
         .collect();

@@ -1,6 +1,6 @@
 //! Basic example of using the Phase 1 storage layer
 
-use attentiondb_storage::{Record, DocumentStore};
+use attentiondb_storage::{DocumentStore, Record};
 use std::collections::HashMap;
 
 fn main() {

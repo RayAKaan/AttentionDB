@@ -1,0 +1,2 @@
+database,dataset,scale,difficulty,recall_at_1,recall_at_10,recall_at_100,mrr,ndcg_at_10,ndcg_at_100,latency_mean_ms,latency_p99_ms,index_build_time_s,peak_memory_mb
+AttentionDB (CPU),synthetic,1000,Easy,0.0100,0.0772,0.7517,1.0000,1.0000,0.9937,2.59,0.01,0.00,0.0

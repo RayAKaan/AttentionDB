@@ -1,0 +1,12 @@
+\begin{table}[htbp]
+\centering
+\caption{Retrieval quality comparison at $n=1000$. Significance markers use Benjamini-Hochberg FDR correction at $q=0.05$. $\dagger$: significantly worse than AttentionDB. Quality metrics use binary relevance.}
+\label{tab:main}
+\begin{tabular}{lcccccc}
+\toprule
+System & R@1 & R@10 & MRR & NDCG@10 & Mean Lat. (ms) & QPS \\
+\midrule
+AttentionDB (CPU) & 0.010$\pm$0.000 & 0.076$\pm$0.043 & 1.000$\pm$0.000 & 1.000$\pm$0.000 & 2.65$\pm$0.27 & 1000 \\
+\bottomrule
+\end{tabular}
+\end{table}

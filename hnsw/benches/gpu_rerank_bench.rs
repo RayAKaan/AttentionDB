@@ -1,5 +1,5 @@
-use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
 use attentiondb_hnsw::gpu::{CpuBackend, GpuBackend};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use rand::Rng;
 
 fn bench_rerank_cpu(c: &mut Criterion) {
@@ -21,11 +21,7 @@ fn bench_rerank_cpu(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("cpu", num_candidates),
             &candidate_sizes,
-            |b, _| {
-                b.iter(|| {
-                    backend.rerank_exact(&query, &candidates, k).unwrap()
-                })
-            },
+            |b, _| b.iter(|| backend.rerank_exact(&query, &candidates, k).unwrap()),
         );
     }
 

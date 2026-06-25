@@ -1,0 +1,121 @@
+[general]
+random_seed = 42
+vector_dimension = 128
+warmup_runs = 1
+bootstrap_resamples = 100
+confidence_level = 0.95
+data_dir = "datasets/"
+output_dir = "results/smoke/"
+
+[translation]
+primary_strategy = "SemanticOnly"
+sensitivity_strategies = ["Concatenation"]
+
+[run_protocol]
+tier1_max_scale = 100000
+tier2_max_scale = 1000000
+tier1_full_runs = 2
+tier2_index_builds = 1
+tier2_queries_per_build = 2
+tier3_query_runs = 2
+
+[pareto_sweep]
+ef_search_values = [
+    20,
+    100,
+]
+queries_per_point = 100
+reps_per_point = 1
+target_recalls = [0.9]
+concurrency = 1
+
+[throughput]
+concurrency_levels = [1]
+warmup_duration_secs = 5
+measurement_duration_secs = 10
+
+[network_calibration]
+enabled = true
+num_null_queries = 10
+
+[power_analysis]
+effect_sizes = [0.5]
+desired_power = 0.8
+estimated_num_comparisons = 2
+
+[scales]
+values = [1000]
+
+[difficulties]
+values = ["Easy"]
+
+[databases.attentiondb_cpu]
+enabled = true
+host = "localhost"
+port = 7070
+transport = "LocalGrpc"
+
+[databases.attentiondb_gpu]
+enabled = false
+host = "localhost"
+port = 7071
+transport = "LocalGrpc"
+requires_cuda = true
+
+[databases.qdrant]
+enabled = false
+host = "localhost"
+port = 6334
+transport = "LocalGrpc"
+
+[databases.milvus]
+enabled = false
+host = "localhost"
+port = 19530
+transport = "LocalGrpc"
+
+[databases.weaviate]
+enabled = false
+host = "localhost"
+port = 8080
+transport = "LocalRest"
+
+[databases.pgvector]
+enabled = false
+host = "localhost"
+port = 5432
+transport = "LocalTcp"
+
+[databases.elasticsearch]
+enabled = false
+host = "localhost"
+port = 9200
+transport = "LocalRest"
+
+[databases.pinecone]
+enabled = false
+host = ""
+port = 0
+transport = "Cloud"
+
+[experiments]
+run_standard = true
+run_head_ablations = false
+run_failure_modes = false
+run_ann_benchmark_compat = false
+
+[real_datasets.sift128]
+enabled = false
+path = "datasets/sift-128-euclidean.hdf5"
+
+[real_datasets.glove100]
+enabled = false
+path = "datasets/glove-100-angular.hdf5"
+
+[real_datasets.nytimes256]
+enabled = false
+path = "datasets/nytimes-256-angular.hdf5"
+
+[real_datasets.gist960]
+enabled = false
+path = "datasets/gist-960-euclidean.hdf5"

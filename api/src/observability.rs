@@ -26,8 +26,11 @@ pub type MetricsHandle = metrics_exporter_prometheus::PrometheusHandle;
 pub fn init_logging() {
     use tracing_subscriber::{fmt, EnvFilter};
 
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("attentiondb=info,tower_http=info,attentiondb_api=info,attentiondb_core=info"));
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        EnvFilter::new(
+            "attentiondb=info,tower_http=info,attentiondb_api=info,attentiondb_core=info",
+        )
+    });
 
     let subscriber = fmt()
         .with_env_filter(filter)
@@ -53,14 +56,23 @@ pub fn init_metrics() -> Option<MetricsHandle> {
             Some(handle)
         }
         Err(e) => {
-            tracing::warn!("Failed to install Prometheus exporter: {} (metrics will be no-ops)", e);
+            tracing::warn!(
+                "Failed to install Prometheus exporter: {} (metrics will be no-ops)",
+                e
+            );
             None
         }
     }
 }
 
 /// Record an ATTEND query with all relevant dimensions.
-pub fn record_attend(collection: &str, heads: &[String], top_k: usize, result_count: usize, latency_ms: f64) {
+pub fn record_attend(
+    collection: &str,
+    heads: &[String],
+    top_k: usize,
+    result_count: usize,
+    latency_ms: f64,
+) {
     counter!("attentiondb_attend_total").increment(1);
     histogram!("attentiondb_attend_latency_ms").record(latency_ms);
     histogram!("attentiondb_attend_result_count").record(result_count as f64);
@@ -96,7 +108,12 @@ pub fn record_delete(collection: &str, doc_id: &str, success: bool) {
     if !success {
         counter!("attentiondb_delete_not_found_total").increment(1);
     }
-    tracing::info!(collection = collection, doc_id = doc_id, success = success, "Document deleted");
+    tracing::info!(
+        collection = collection,
+        doc_id = doc_id,
+        success = success,
+        "Document deleted"
+    );
 }
 
 /// Record collection creation.
@@ -131,7 +148,10 @@ pub struct LatencyTimer {
 
 impl LatencyTimer {
     pub fn new(operation: &'static str) -> Self {
-        Self { operation, start: Instant::now() }
+        Self {
+            operation,
+            start: Instant::now(),
+        }
     }
 
     pub fn elapsed_ms(&self) -> f64 {
@@ -143,6 +163,10 @@ impl Drop for LatencyTimer {
     fn drop(&mut self) {
         let ms = self.elapsed_ms();
         histogram!("attentiondb_operation_latency_ms").record(ms);
-        tracing::debug!(operation = self.operation, latency_ms = format!("{:.2}", ms), "Operation latency recorded");
+        tracing::debug!(
+            operation = self.operation,
+            latency_ms = format!("{:.2}", ms),
+            "Operation latency recorded"
+        );
     }
 }

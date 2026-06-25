@@ -1,9 +1,9 @@
-use crate::planner::PhysicalPlan;
-use crate::parser::AQLStatement;
 use crate::error::QueryError;
+use crate::parser::AQLStatement;
+use crate::planner::PhysicalPlan;
+use attentiondb_distributed::shard::ShardManager;
 use attentiondb_hnsw::HNSWIndex;
 use attentiondb_multihead::MultiHeadManager;
-use attentiondb_distributed::shard::ShardManager;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -34,13 +34,18 @@ impl QueryExecutor {
             return Err(QueryError::Execution("Empty query vector".into()));
         }
 
-        let results = index.search(query_vector, plan.top_k, Some(plan.hnsw_search.ef))
+        let results = index
+            .search(query_vector, plan.top_k, Some(plan.hnsw_search.ef))
             .map_err(|e| QueryError::Execution(e.to_string()))?;
 
         let (ids, scores): (Vec<u64>, Vec<f32>) = results.into_iter().unzip();
         let latency = start.elapsed().as_secs_f64() * 1000.0;
 
-        Ok(QueryResult { ids, scores, latency_ms: latency })
+        Ok(QueryResult {
+            ids,
+            scores,
+            latency_ms: latency,
+        })
     }
 
     pub fn execute_distributed<F>(
@@ -54,15 +59,20 @@ impl QueryExecutor {
     {
         let start = std::time::Instant::now();
         if query_vector.is_empty() {
-            return Err(QueryError::Execution("Empty query vector in distributed search".into()));
+            return Err(QueryError::Execution(
+                "Empty query vector in distributed search".into(),
+            ));
         }
 
         let shard_ids = shard_manager.list_shards();
         if shard_ids.is_empty() {
-            return Err(QueryError::Execution("Active ShardManager contains no quorum shards".into()));
+            return Err(QueryError::Execution(
+                "Active ShardManager contains no quorum shards".into(),
+            ));
         }
 
-        let mut gathered_results: Vec<(String, Vec<(u64, f32)>)> = Vec::with_capacity(shard_ids.len());
+        let mut gathered_results: Vec<(String, Vec<(u64, f32)>)> =
+            Vec::with_capacity(shard_ids.len());
 
         for shard_id in shard_ids {
             let shard_hits = dispatch_to_shard(shard_id, plan, query_vector)?;
@@ -71,13 +81,18 @@ impl QueryExecutor {
         }
 
         let gate_weights = vec![1.0; gathered_results.len()];
-        let mut global_fused = attentiondb_multihead::fusion::fuse_scores(&gathered_results, &gate_weights);
+        let mut global_fused =
+            attentiondb_multihead::fusion::fuse_scores(&gathered_results, &gate_weights);
 
         global_fused.truncate(plan.top_k);
         let (ids, scores): (Vec<u64>, Vec<f32>) = global_fused.into_iter().unzip();
         let latency = start.elapsed().as_secs_f64() * 1000.0;
 
-        Ok(QueryResult { ids, scores, latency_ms: latency })
+        Ok(QueryResult {
+            ids,
+            scores,
+            latency_ms: latency,
+        })
     }
 
     pub fn execute_statement(
@@ -114,12 +129,14 @@ impl QueryExecutor {
 
                     if head_results.is_empty() {
                         return Err(QueryError::Execution(format!(
-                            "No heads available for collection '{}'", q.collection
+                            "No heads available for collection '{}'",
+                            q.collection
                         )));
                     }
 
                     let gate_weights = vec![1.0; head_results.len()];
-                    let mut fused = attentiondb_multihead::fusion::fuse_scores(&head_results, &gate_weights);
+                    let mut fused =
+                        attentiondb_multihead::fusion::fuse_scores(&head_results, &gate_weights);
                     fused.truncate(q.top_k);
 
                     let count = fused.len();
@@ -128,7 +145,9 @@ impl QueryExecutor {
                         success: true,
                         message: format!(
                             "Query executed on '{}' via {} head(s), {} results",
-                            q.collection, head_results.len(), count
+                            q.collection,
+                            head_results.len(),
+                            count
                         ),
                         affected_collection: Some(q.collection.clone()),
                     });
@@ -156,7 +175,9 @@ impl QueryExecutor {
                     success: true,
                     message: format!(
                         "Query executed on '{}', {} results, {:.2}ms",
-                        q.collection, result.ids.len(), result.latency_ms
+                        q.collection,
+                        result.ids.len(),
+                        result.latency_ms
                     ),
                     affected_collection: Some(q.collection.clone()),
                 })
@@ -183,7 +204,9 @@ impl QueryExecutor {
 
                 let mut msg = format!("Created collection '{}'", c.collection);
                 if !c.fields.is_empty() {
-                    let field_str: Vec<String> = c.fields.iter()
+                    let field_str: Vec<String> = c
+                        .fields
+                        .iter()
                         .map(|(n, t)| format!("{}: {}", n, t))
                         .collect();
                     msg.push_str(&format!(" with fields [{}]", field_str.join(", ")));
@@ -197,7 +220,9 @@ impl QueryExecutor {
                     c.settings.enable_exact_reranking,
                 ));
                 if !c.head_settings.is_empty() {
-                    let head_str: Vec<String> = c.head_settings.iter()
+                    let head_str: Vec<String> = c
+                        .head_settings
+                        .iter()
                         .map(|(name, s)| format!("{}: (ef_search={})", name, s.ef_search))
                         .collect();
                     msg.push_str(&format!(". Per-head settings: [{}]", head_str.join(", ")));
@@ -212,7 +237,8 @@ impl QueryExecutor {
 
             AQLStatement::AlterCollection(a) => {
                 if let Some(index) = indexes.get_mut(&a.collection) {
-                    index.update_settings(a.settings.clone())
+                    index
+                        .update_settings(a.settings.clone())
                         .map_err(|e| QueryError::Execution(e.to_string()))?;
 
                     let mut msg = format!(
@@ -225,7 +251,9 @@ impl QueryExecutor {
                         a.settings.enable_exact_reranking,
                     );
                     if !a.head_settings.is_empty() {
-                        let head_str: Vec<String> = a.head_settings.iter()
+                        let head_str: Vec<String> = a
+                            .head_settings
+                            .iter()
                             .map(|(name, s)| format!("{}: (ef_search={})", name, s.ef_search))
                             .collect();
                         msg.push_str(&format!(". Per-head settings: [{}]", head_str.join(", ")));
@@ -237,7 +265,10 @@ impl QueryExecutor {
                         affected_collection: Some(a.collection.clone()),
                     })
                 } else {
-                    Err(QueryError::Execution(format!("Collection '{}' not found", a.collection)))
+                    Err(QueryError::Execution(format!(
+                        "Collection '{}' not found",
+                        a.collection
+                    )))
                 }
             }
         }
@@ -260,7 +291,11 @@ mod tests {
     #[test]
     fn test_execute_basic() {
         let plan = PhysicalPlan {
-            hnsw_search: HNSWSearchStep { heads: vec![("semantic".into(), 1.0)], ef: 64, k: 30 },
+            hnsw_search: HNSWSearchStep {
+                heads: vec![("semantic".into(), 1.0)],
+                ef: 64,
+                k: 30,
+            },
             exact_rerank: None,
             filter_steps: vec![],
             top_k: 5,
@@ -275,7 +310,11 @@ mod tests {
     #[test]
     fn test_execute_empty_vector() {
         let plan = PhysicalPlan {
-            hnsw_search: HNSWSearchStep { heads: vec![("semantic".into(), 1.0)], ef: 64, k: 30 },
+            hnsw_search: HNSWSearchStep {
+                heads: vec![("semantic".into(), 1.0)],
+                ef: 64,
+                k: 30,
+            },
             exact_rerank: None,
             filter_steps: vec![],
             top_k: 10,
@@ -293,7 +332,9 @@ mod tests {
         let stmt = parse_aql(aql).unwrap();
         let mut empty_indexes = HashMap::new();
         let mut empty_managers = HashMap::new();
-        let result = QueryExecutor::execute_statement(&stmt, &mut empty_indexes, &mut empty_managers, None).unwrap();
+        let result =
+            QueryExecutor::execute_statement(&stmt, &mut empty_indexes, &mut empty_managers, None)
+                .unwrap();
         assert!(result.success);
         assert_eq!(result.affected_collection.as_deref(), Some("papers"));
         assert!(result.message.contains("ef_search=256"));
@@ -314,18 +355,36 @@ mod tests {
         let index = create_test_index();
         indexes.insert("docs".to_string(), index);
 
-        let result = QueryExecutor::execute_statement(&stmt, &mut indexes, &mut managers, Some(&[1.0, 0.0, 0.0, 0.0])).unwrap();
+        let result = QueryExecutor::execute_statement(
+            &stmt,
+            &mut indexes,
+            &mut managers,
+            Some(&[1.0, 0.0, 0.0, 0.0]),
+        )
+        .unwrap();
         assert!(result.success);
     }
 
     #[test]
     fn test_execute_distributed_scatter_gather() {
         let mut sm = ShardManager::with_virtual_nodes(10);
-        sm.add_shard(attentiondb_distributed::shard::Shard::new(1, vec!["semantic".into()], "addr1"));
-        sm.add_shard(attentiondb_distributed::shard::Shard::new(2, vec!["semantic".into()], "addr2"));
+        sm.add_shard(attentiondb_distributed::shard::Shard::new(
+            1,
+            vec!["semantic".into()],
+            "addr1",
+        ));
+        sm.add_shard(attentiondb_distributed::shard::Shard::new(
+            2,
+            vec!["semantic".into()],
+            "addr2",
+        ));
 
         let plan = PhysicalPlan {
-            hnsw_search: HNSWSearchStep { heads: vec![("semantic".into(), 1.0)], ef: 64, k: 10 },
+            hnsw_search: HNSWSearchStep {
+                heads: vec![("semantic".into(), 1.0)],
+                ef: 64,
+                k: 10,
+            },
             exact_rerank: None,
             filter_steps: vec![],
             top_k: 5,
@@ -342,8 +401,9 @@ mod tests {
                 } else {
                     Ok(vec![(201, 0.90), (202, 0.85)])
                 }
-            }
-        ).unwrap();
+            },
+        )
+        .unwrap();
 
         assert_eq!(result.ids.len(), 4);
         assert_eq!(result.ids[0], 101);
@@ -359,7 +419,12 @@ mod tests {
         let stmt = parse_aql(aql).unwrap();
         let mut empty_indexes = HashMap::new();
         let mut empty_managers = HashMap::new();
-        let result = QueryExecutor::execute_statement(&stmt, &mut empty_indexes, &mut empty_managers, Some(&[1.0, 0.0, 0.0, 0.0]));
+        let result = QueryExecutor::execute_statement(
+            &stmt,
+            &mut empty_indexes,
+            &mut empty_managers,
+            Some(&[1.0, 0.0, 0.0, 0.0]),
+        );
         assert!(result.is_err());
     }
 }

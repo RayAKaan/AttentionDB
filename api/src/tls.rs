@@ -24,9 +24,9 @@
 
 use axum_server::tls_rustls::RustlsConfig;
 use std::path::PathBuf;
-use tracing::{info, warn};
-use tonic::transport::{Identity, ServerTlsConfig};
 use tokio::fs;
+use tonic::transport::{Identity, ServerTlsConfig};
+use tracing::{info, warn};
 
 /// Result of TLS configuration attempt.
 pub enum TlsMode {
@@ -90,7 +90,9 @@ pub async fn resolve_tls() -> TlsMode {
     }
 
     // ── Disabled ────────────────────────────────────────────────────────
-    info!("TLS disabled (set ATTENTIONDB_TLS_CERT/KEY or ATTENTIONDB_TLS_SELF_SIGNED=true to enable)");
+    info!(
+        "TLS disabled (set ATTENTIONDB_TLS_CERT/KEY or ATTENTIONDB_TLS_SELF_SIGNED=true to enable)"
+    );
     TlsMode::Disabled
 }
 

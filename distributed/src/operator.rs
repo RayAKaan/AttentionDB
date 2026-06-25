@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::info;
 
@@ -51,16 +51,25 @@ impl KubernetesOperator {
     pub async fn deploy(&mut self, replicas: u32) {
         self.current_replicas = replicas;
         self.active_spec.replicas = replicas;
-        info!("[Operator] Deploying '{}' to {} replicas", self.deployment_name, replicas);
+        info!(
+            "[Operator] Deploying '{}' to {} replicas",
+            self.deployment_name, replicas
+        );
     }
 
     pub async fn scale(&mut self, replicas: u32) {
         self.current_replicas = replicas;
         self.active_spec.replicas = replicas;
-        info!("[Operator] Scaling '{}' to {} replicas", self.deployment_name, replicas);
+        info!(
+            "[Operator] Scaling '{}' to {} replicas",
+            self.deployment_name, replicas
+        );
     }
 
-    pub async fn reconcile(&mut self, desired_spec: AttentionDBClusterSpec) -> Result<bool, String> {
+    pub async fn reconcile(
+        &mut self,
+        desired_spec: AttentionDBClusterSpec,
+    ) -> Result<bool, String> {
         let mut changed = false;
         if self.current_replicas != desired_spec.replicas {
             self.scale(desired_spec.replicas).await;
@@ -68,7 +77,10 @@ impl KubernetesOperator {
         }
         if self.active_spec.version != desired_spec.version {
             self.active_spec.version = desired_spec.version.clone();
-            info!("[Operator] Rolling update '{}' to {}", self.deployment_name, desired_spec.version);
+            info!(
+                "[Operator] Rolling update '{}' to {}",
+                self.deployment_name, desired_spec.version
+            );
             changed = true;
         }
         self.active_spec = desired_spec;
@@ -80,7 +92,9 @@ impl KubernetesOperator {
         info!("[Operator] Rolling update of '{}'", self.deployment_name);
     }
 
-    pub fn get_replicas(&self) -> u32 { self.current_replicas }
+    pub fn get_replicas(&self) -> u32 {
+        self.current_replicas
+    }
 
     pub fn generate_stateful_set_spec(&self) -> serde_json::Value {
         let mut labels = HashMap::new();
@@ -179,9 +193,12 @@ mod tests {
     fn test_reconcile_updates_state() {
         let mut op = KubernetesOperator::new("prod", "adb-cluster");
         let desired = AttentionDBClusterSpec {
-            replicas: 7, storage_class: Some("fast-ssd".to_string()),
-            storage_size: "500Gi".to_string(), version: "v1.0.0".to_string(),
-            enable_gpu_reranking: true, enable_auto_reprojection: true,
+            replicas: 7,
+            storage_class: Some("fast-ssd".to_string()),
+            storage_size: "500Gi".to_string(),
+            version: "v1.0.0".to_string(),
+            enable_gpu_reranking: true,
+            enable_auto_reprojection: true,
         };
         let rt = tokio::runtime::Runtime::new().unwrap();
         let changed = rt.block_on(op.reconcile(desired.clone())).unwrap();

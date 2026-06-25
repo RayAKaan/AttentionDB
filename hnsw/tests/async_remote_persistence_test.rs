@@ -1,8 +1,8 @@
-use attentiondb_hnsw::{HNSWIndex, HNSWConfig};
 use attentiondb_hnsw::persistence::{
     async_compaction::compact_index_async,
-    remote_backup::{upload_backup, download_backup},
+    remote_backup::{download_backup, upload_backup},
 };
+use attentiondb_hnsw::{HNSWConfig, HNSWIndex};
 use tempfile::tempdir;
 
 fn create_test_index(head_name: &str, dim: usize, count: usize) -> HNSWIndex {

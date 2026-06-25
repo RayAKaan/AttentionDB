@@ -1,10 +1,10 @@
-use crate::hnsw_index::{HNSWIndex, HNSWConfig};
+use crate::hnsw_index::{HNSWConfig, HNSWIndex};
 use crate::persistence::error::PersistenceError;
 use crate::persistence::strategy::PersistenceStrategy;
-use std::path::Path;
+use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{Read, Write};
-use serde::{Serialize, Deserialize};
+use std::path::Path;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphMetadata {
@@ -58,7 +58,9 @@ impl PersistenceStrategy for GraphPersistence {
     fn load(&self, dir: &Path) -> Result<HNSWIndex, PersistenceError> {
         let meta_path = dir.join("graph_metadata.json");
         if !meta_path.exists() {
-            return Err(PersistenceError::IndexNotFound(dir.to_string_lossy().to_string()));
+            return Err(PersistenceError::IndexNotFound(
+                dir.to_string_lossy().to_string(),
+            ));
         }
 
         let meta_json = std::fs::read_to_string(&meta_path)?;
@@ -107,7 +109,9 @@ impl PersistenceStrategy for GraphPersistence {
         let mut index = HNSWIndex::new(&metadata.head_name, metadata.dim, metadata.config);
 
         for (id, vec) in vectors {
-            index.insert(id, &vec).map_err(|e| PersistenceError::Serialization(e.to_string()))?;
+            index
+                .insert(id, &vec)
+                .map_err(|e| PersistenceError::Serialization(e.to_string()))?;
         }
 
         Ok(index)

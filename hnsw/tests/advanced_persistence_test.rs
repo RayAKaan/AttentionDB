@@ -1,9 +1,9 @@
-use attentiondb_hnsw::{HNSWIndex, HNSWConfig};
 use attentiondb_hnsw::persistence::{
     async_persistence::save_index_async,
-    compaction::compact_index,
     backup::{create_backup, list_backups},
+    compaction::compact_index,
 };
+use attentiondb_hnsw::{HNSWConfig, HNSWIndex};
 use tempfile::tempdir;
 
 fn create_test_index(head_name: &str, dim: usize, count: usize) -> HNSWIndex {

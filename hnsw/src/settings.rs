@@ -3,7 +3,7 @@
 //! These parameters allow users to tune the recall vs speed trade-off
 //! per collection, without recompiling.
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Collection-level settings for HNSW retrieval behavior.
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,13 +1,13 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::path::Path;
-use parking_lot::RwLock;
-use uuid::Uuid;
-use attentiondb_query::parse_aql;
-use attentiondb_storage::{Wal, OpType, Record};
 use crate::collection::Collection;
 use crate::error::CoreError;
 use crate::transaction::TransactionManager;
+use attentiondb_query::parse_aql;
+use attentiondb_storage::{OpType, Record, Wal};
+use parking_lot::RwLock;
+use std::collections::HashMap;
+use std::path::Path;
+use std::sync::Arc;
+use uuid::Uuid;
 
 /// Bidirectional IdMapper — no hashing, no collisions.
 pub struct IdMapper {
@@ -56,11 +56,15 @@ impl IdMapper {
     }
 
     pub fn to_json(&self) -> serde_json::Value {
-        let mappings: Vec<serde_json::Value> = self.uuid_to_u64.iter()
-            .map(|(uuid, id)| serde_json::json!({
-                "uuid": uuid.to_string(),
-                "numeric_id": id
-            }))
+        let mappings: Vec<serde_json::Value> = self
+            .uuid_to_u64
+            .iter()
+            .map(|(uuid, id)| {
+                serde_json::json!({
+                    "uuid": uuid.to_string(),
+                    "numeric_id": id
+                })
+            })
             .collect();
         serde_json::json!({
             "mappings": mappings,
@@ -135,9 +139,15 @@ impl AttentionEngine {
         }
     }
 
-    pub fn open(wal_path: &str, durability: attentiondb_storage::Durability) -> Result<Self, CoreError> {
+    pub fn open(
+        wal_path: &str,
+        durability: attentiondb_storage::Durability,
+    ) -> Result<Self, CoreError> {
         let wal = Wal::new(Path::new(wal_path))?.with_durability(durability);
-        let dir = Path::new(wal_path).parent().unwrap_or(Path::new(".")).to_path_buf();
+        let dir = Path::new(wal_path)
+            .parent()
+            .unwrap_or(Path::new("."))
+            .to_path_buf();
         let document_store = attentiondb_storage::DocumentStore::open(dir)?;
         Ok(Self {
             collections: Arc::new(RwLock::new(HashMap::new())),
@@ -148,8 +158,18 @@ impl AttentionEngine {
         })
     }
 
-    pub fn create_collection(&self, name: &str, dim: usize, heads: &[&str]) -> Result<(), CoreError> {
-        self.create_collection_with_settings(name, dim, heads, attentiondb_hnsw::CollectionSettings::default())
+    pub fn create_collection(
+        &self,
+        name: &str,
+        dim: usize,
+        heads: &[&str],
+    ) -> Result<(), CoreError> {
+        self.create_collection_with_settings(
+            name,
+            dim,
+            heads,
+            attentiondb_hnsw::CollectionSettings::default(),
+        )
     }
 
     pub fn create_collection_with_settings(
@@ -165,26 +185,51 @@ impl AttentionEngine {
         }
         let collection = Arc::new(Collection::new(name, dim));
         *collection.settings.write() = settings;
-        for &h in heads { collection.add_default_head(h)?; }
+        for &h in heads {
+            collection.add_default_head(h)?;
+        }
         collections.insert(name.to_string(), collection);
         Ok(())
     }
 
     pub fn get_collection(&self, name: &str) -> Result<Arc<Collection>, CoreError> {
-        self.collections.read().get(name).cloned()
+        self.collections
+            .read()
+            .get(name)
+            .cloned()
             .ok_or_else(|| CoreError::CollectionNotFound(name.to_string()))
     }
 
-    pub fn attend(&self, collection: &str, heads: &[String], query: &[f32], top_k: usize) -> Result<Vec<(u64, f32)>, CoreError> {
+    pub fn attend(
+        &self,
+        collection: &str,
+        heads: &[String],
+        query: &[f32],
+        top_k: usize,
+    ) -> Result<Vec<(u64, f32)>, CoreError> {
         self.get_collection(collection)?.attend(heads, query, top_k)
     }
 
-    pub fn attend_weighted(&self, collection: &str, heads: &[(String, f32)], query: &[f32], top_k: usize) -> Result<Vec<(u64, f32)>, CoreError> {
-        self.get_collection(collection)?.attend_weighted(heads, query, top_k)
+    pub fn attend_weighted(
+        &self,
+        collection: &str,
+        heads: &[(String, f32)],
+        query: &[f32],
+        top_k: usize,
+    ) -> Result<Vec<(u64, f32)>, CoreError> {
+        self.get_collection(collection)?
+            .attend_weighted(heads, query, top_k)
     }
 
-    pub fn insert_vector(&self, collection: &str, head: &str, id: u64, vector: &[f32]) -> Result<(), CoreError> {
-        self.get_collection(collection)?.insert_vector(head, id, vector)
+    pub fn insert_vector(
+        &self,
+        collection: &str,
+        head: &str,
+        id: u64,
+        vector: &[f32],
+    ) -> Result<(), CoreError> {
+        self.get_collection(collection)?
+            .insert_vector(head, id, vector)
     }
 
     pub fn delete_collection(&self, name: &str) -> Result<(), CoreError> {
@@ -196,7 +241,11 @@ impl AttentionEngine {
         self.collections.read().keys().cloned().collect()
     }
 
-    pub fn insert_document(&self, collection_name: &str, mut record: Record) -> Result<String, CoreError> {
+    pub fn insert_document(
+        &self,
+        collection_name: &str,
+        record: Record,
+    ) -> Result<String, CoreError> {
         let collection = self.get_collection(collection_name)?;
         let uuid = record.id;
         let numeric_id = self.id_mapper.write().register(uuid);
@@ -207,7 +256,9 @@ impl AttentionEngine {
         for (head, vec) in &record.k_vecs {
             collection.insert_vector(head, numeric_id, vec)?;
         }
-        let full_text: String = record.fields.values()
+        let full_text: String = record
+            .fields
+            .values()
             .filter_map(|v| v.as_str())
             .collect::<Vec<_>>()
             .join(" ");
@@ -215,15 +266,27 @@ impl AttentionEngine {
         Ok(uuid.to_string())
     }
 
-    pub fn attend_hybrid(&self, collection: &str, heads: &[String], query: &[f32], text: &str, top_k: usize) -> Result<Vec<(u64, f32)>, CoreError> {
-        self.get_collection(collection)?.attend_hybrid(heads, query, text, top_k)
+    pub fn attend_hybrid(
+        &self,
+        collection: &str,
+        heads: &[String],
+        query: &[f32],
+        text: &str,
+        top_k: usize,
+    ) -> Result<Vec<(u64, f32)>, CoreError> {
+        self.get_collection(collection)?
+            .attend_hybrid(heads, query, text, top_k)
     }
 
     pub fn begin_transaction(&self, collection: &str) -> u64 {
         self.txn_manager.begin_transaction(collection)
     }
 
-    pub fn record_transaction_operation(&self, id: u64, op: crate::transaction::TxnOp) -> Result<(), CoreError> {
+    pub fn record_transaction_operation(
+        &self,
+        id: u64,
+        op: crate::transaction::TxnOp,
+    ) -> Result<(), CoreError> {
         self.txn_manager.record_operation(id, op)
     }
 
@@ -236,12 +299,18 @@ impl AttentionEngine {
             let cn = &txn.collection_name;
             for op in txn.operations {
                 match op {
-                    crate::transaction::TxnOp::Insert(r) => { self.insert_document(cn, r)?; }
-                    crate::transaction::TxnOp::Delete(u) => { self.delete_document(cn, &u.to_string())?; }
+                    crate::transaction::TxnOp::Insert(r) => {
+                        self.insert_document(cn, r)?;
+                    }
+                    crate::transaction::TxnOp::Delete(u) => {
+                        self.delete_document(cn, &u.to_string())?;
+                    }
                 }
             }
             Ok(true)
-        } else { Ok(false) }
+        } else {
+            Ok(false)
+        }
     }
 
     pub fn get_document_fields(&self, numeric_id: u64) -> HashMap<String, String> {
@@ -249,9 +318,19 @@ impl AttentionEngine {
         if let Some(uuid) = mapper.id_to_uuid(numeric_id) {
             let store = self.document_store.read();
             if let Some(rec) = store.get(uuid) {
-                return rec.fields.iter().map(|(k, v)| {
-                    (k.clone(), match v { serde_json::Value::String(s) => s.clone(), o => o.to_string() })
-                }).collect();
+                return rec
+                    .fields
+                    .iter()
+                    .map(|(k, v)| {
+                        (
+                            k.clone(),
+                            match v {
+                                serde_json::Value::String(s) => s.clone(),
+                                o => o.to_string(),
+                            },
+                        )
+                    })
+                    .collect();
             }
         }
         HashMap::new()
@@ -262,27 +341,41 @@ impl AttentionEngine {
         if let Ok(uuid) = Uuid::parse_str(id_str) {
             self.document_store.write().delete(&uuid)?;
             Ok(true)
-        } else { Ok(false) }
+        } else {
+            Ok(false)
+        }
     }
 
     pub fn execute_aql(&self, aql: &str) -> Result<String, CoreError> {
         self.execute_aql_with_vector(aql, None)
     }
 
-    pub fn execute_aql_with_vector(&self, aql: &str, query_vector: Option<&[f32]>) -> Result<String, CoreError> {
+    pub fn execute_aql_with_vector(
+        &self,
+        aql: &str,
+        query_vector: Option<&[f32]>,
+    ) -> Result<String, CoreError> {
         let stmt = parse_aql(aql)?;
         match stmt {
             attentiondb_query::AQLStatement::Query(q) => {
                 let c = self.get_collection(&q.collection)?;
-                let heads = if q.heads.is_empty() { c.list_heads() } else { q.heads };
-                let vec = query_vector.ok_or_else(|| CoreError::InvalidOperation(
-                    "ATTEND requires a query vector".into()
-                ))?;
+                let heads = if q.heads.is_empty() {
+                    c.list_heads()
+                } else {
+                    q.heads
+                };
+                let vec = query_vector.ok_or_else(|| {
+                    CoreError::InvalidOperation("ATTEND requires a query vector".into())
+                })?;
                 let r = c.attend(&heads, vec, q.top_k)?;
                 Ok(format!("[{} results]", r.len()))
             }
             attentiondb_query::AQLStatement::CreateCollection(coll) => {
-                let heads: Vec<&str> = if coll.head_settings.is_empty() { vec!["default"] } else { coll.head_settings.keys().map(|s| s.as_str()).collect() };
+                let heads: Vec<&str> = if coll.head_settings.is_empty() {
+                    vec!["default"]
+                } else {
+                    coll.head_settings.keys().map(|s| s.as_str()).collect()
+                };
                 self.create_collection(&coll.collection, 64, &heads)?;
                 Ok(format!("Created '{}'", coll.collection))
             }
@@ -293,7 +386,10 @@ impl AttentionEngine {
         }
     }
 
-    pub fn execute_reprojection_job(&self, job: &attentiondb_learned::ReprojectionJob) -> Result<(), CoreError> {
+    pub fn execute_reprojection_job(
+        &self,
+        job: &attentiondb_learned::ReprojectionJob,
+    ) -> Result<(), CoreError> {
         let c = self.get_collection(&job.collection)?;
         let records = self.document_store.read().list_all_records();
         let mut updated = Vec::new();
@@ -310,24 +406,37 @@ impl AttentionEngine {
                 updated.push(rec);
             }
         }
-        for rec in updated { self.document_store.write().update_record(rec)?; }
+        for rec in updated {
+            self.document_store.write().update_record(rec)?;
+        }
         Ok(())
     }
 
-    pub fn is_persistent(&self) -> bool { self.wal.lock().is_some() }
+    pub fn is_persistent(&self) -> bool {
+        self.wal.lock().is_some()
+    }
 
     pub fn flush_wal(&self) -> Result<(), CoreError> {
         if let Some(ref mut wal) = *self.wal.lock() {
-            wal.fsync().map_err(|e| CoreError::InvalidOperation(e.to_string()))
-        } else { Ok(()) }
+            wal.fsync()
+                .map_err(|e| CoreError::InvalidOperation(e.to_string()))
+        } else {
+            Ok(())
+        }
     }
 
     pub fn stats(&self) -> EngineStats {
         let cols = self.collections.read();
         EngineStats {
             collection_count: cols.len(),
-            total_heads: cols.values().map(|c| c.head_manager.read().head_count()).sum(),
-            total_vectors: cols.values().map(|c| c.head_manager.read().total_vectors()).sum(),
+            total_heads: cols
+                .values()
+                .map(|c| c.head_manager.read().head_count())
+                .sum(),
+            total_vectors: cols
+                .values()
+                .map(|c| c.head_manager.read().total_vectors())
+                .sum(),
         }
     }
 
@@ -341,7 +450,9 @@ impl AttentionEngine {
 }
 
 impl Default for AttentionEngine {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -398,7 +509,9 @@ mod tests {
         let e = AttentionEngine::new();
         e.create_collection("d", 4, &["s"]).unwrap();
         e.insert_vector("d", "s", 1, &[1.0, 0.0, 0.0, 0.0]).unwrap();
-        let r = e.attend("d", &["s".into()], &[1.0, 0.0, 0.0, 0.0], 5).unwrap();
+        let r = e
+            .attend("d", &["s".into()], &[1.0, 0.0, 0.0, 0.0], 5)
+            .unwrap();
         assert!(!r.is_empty());
     }
 

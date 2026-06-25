@@ -31,9 +31,8 @@ pub fn weighted_fuse(
 ) -> Vec<(u64, f32)> {
     let mut aggregated: std::collections::HashMap<u64, f32> = std::collections::HashMap::new();
 
-    let weight_map: std::collections::HashMap<&str, f32> = head_weights.iter()
-        .map(|(n, w)| (*n, *w))
-        .collect();
+    let weight_map: std::collections::HashMap<&str, f32> =
+        head_weights.iter().map(|(n, w)| (*n, *w)).collect();
 
     for (head_name, results) in head_results {
         let head_weight = weight_map.get(head_name.as_str()).copied().unwrap_or(1.0);

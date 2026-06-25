@@ -1,0 +1,284 @@
+{
+  "completed_experiments": [
+    "AttentionDB/synthetic/1000@Easy"
+  ],
+  "partial_results": [
+    {
+      "benchmark_version": "0.2.0",
+      "config_hash": "",
+      "consensus_accuracy": null,
+      "database": "AttentionDB (CPU)",
+      "database_version": "0.2.0",
+      "dataset": "synthetic",
+      "difficulty": "Easy",
+      "disk_usage_gb": 0.0,
+      "energy": {
+        "available": false,
+        "energy_per_query_mj": 0.0,
+        "measurement_method": "NotAvailable",
+        "total_energy_joules": 0.0,
+        "total_queries": 0
+      },
+      "experiment_type": "Standard",
+      "failure_mode": null,
+      "gating_efficiency_vs_uniform": null,
+      "git_hash": null,
+      "hardware": {
+        "benchmark_version": "0.2.0",
+        "cpu_cores": 4,
+        "cpu_model": "unknown",
+        "cpu_threads": 8,
+        "git_hash": "dca4b91afbda66bc941e4856b25b82af76a53190",
+        "gpu_model": null,
+        "gpu_vram_gb": null,
+        "kernel": "windows",
+        "os": "windows",
+        "ram_total_gb": 16.0,
+        "rust_version": "0.2.0"
+      },
+      "head_combination": "AllHeads",
+      "index_build_time_s": 0.0,
+      "latency_mean_ms": {
+        "bootstrap_ci_lower": 2.542749,
+        "bootstrap_ci_upper": 2.6364517499999995,
+        "ci_lower_95": 2.5383967940990506,
+        "ci_upper_95": 2.637538205900951,
+        "mean": 2.587967500000001,
+        "n": 400,
+        "std_dev": 0.5042984651957082
+      },
+      "latency_p50_ms": {
+        "bootstrap_ci_lower": 0.010000000000000007,
+        "bootstrap_ci_upper": 0.010000000000000007,
+        "ci_lower_95": 0.010000000000000007,
+        "ci_upper_95": 0.010000000000000007,
+        "mean": 0.010000000000000007,
+        "n": 4,
+        "std_dev": 0.0
+      },
+      "latency_p90_ms": {
+        "bootstrap_ci_lower": 0.010000000000000007,
+        "bootstrap_ci_upper": 0.010000000000000007,
+        "ci_lower_95": 0.010000000000000007,
+        "ci_upper_95": 0.010000000000000007,
+        "mean": 0.010000000000000007,
+        "n": 4,
+        "std_dev": 0.0
+      },
+      "latency_p95_ms": {
+        "bootstrap_ci_lower": 0.010000000000000007,
+        "bootstrap_ci_upper": 0.010000000000000007,
+        "ci_lower_95": 0.010000000000000007,
+        "ci_upper_95": 0.010000000000000007,
+        "mean": 0.010000000000000007,
+        "n": 4,
+        "std_dev": 0.0
+      },
+      "latency_p999_ms": {
+        "bootstrap_ci_lower": 0.010000000000000007,
+        "bootstrap_ci_upper": 0.010000000000000007,
+        "ci_lower_95": 0.010000000000000007,
+        "ci_upper_95": 0.010000000000000007,
+        "mean": 0.010000000000000007,
+        "n": 4,
+        "std_dev": 0.0
+      },
+      "latency_p99_ms": {
+        "bootstrap_ci_lower": 0.010000000000000007,
+        "bootstrap_ci_upper": 0.010000000000000007,
+        "ci_lower_95": 0.010000000000000007,
+        "ci_upper_95": 0.010000000000000007,
+        "mean": 0.010000000000000007,
+        "n": 4,
+        "std_dev": 0.0
+      },
+      "measured_difficulty": {
+        "contrast_ratio": 0.0,
+        "hubness_skewness": 0.8566112211773428,
+        "mean_lid": 37.120679305609066,
+        "std_lid": 12.396422348513516,
+        "unambiguous_top1_fraction": 0.0
+      },
+      "mrr": {
+        "bootstrap_ci_lower": 1.0,
+        "bootstrap_ci_upper": 1.0,
+        "ci_lower_95": 1.0,
+        "ci_upper_95": 1.0,
+        "mean": 1.0,
+        "n": 4,
+        "std_dev": 0.0
+      },
+      "ndcg_at_10": {
+        "bootstrap_ci_lower": 1.0,
+        "bootstrap_ci_upper": 1.0,
+        "ci_lower_95": 1.0,
+        "ci_upper_95": 1.0,
+        "mean": 1.0,
+        "n": 4,
+        "std_dev": 0.0
+      },
+      "ndcg_at_100": {
+        "bootstrap_ci_lower": 0.9873532724367975,
+        "bootstrap_ci_upper": 1.0,
+        "ci_lower_95": 0.9820581746722461,
+        "ci_upper_95": 1.0052950977645514,
+        "mean": 0.9936766362183987,
+        "n": 4,
+        "std_dev": 0.007301591562982828
+      },
+      "network_overhead_profile": null,
+      "pareto_result": {
+        "database": "AttentionDB",
+        "dataset": "synthetic",
+        "dominates": {},
+        "points": [],
+        "qps_at_target_recall": {},
+        "scale": 1000
+      },
+      "peak_memory_rss_mb": {
+        "bootstrap_ci_lower": 0.010000000000000007,
+        "bootstrap_ci_upper": 0.010000000000000007,
+        "ci_lower_95": 0.010000000000000007,
+        "ci_upper_95": 0.010000000000000007,
+        "mean": 0.010000000000000007,
+        "n": 4,
+        "std_dev": 0.0
+      },
+      "per_head_weights": null,
+      "raw_runs": [
+        {
+          "duration_ms": 413.23749999999995,
+          "energy": {
+            "available": false,
+            "energy_per_query_mj": 0.0,
+            "measurement_method": "NotAvailable",
+            "total_energy_joules": 0.0,
+            "total_queries": 100
+          },
+          "latency_mean_ms": 2.4781120000000003,
+          "quality": {
+            "mrr": 1.0,
+            "ndcg_at_10": 1.0,
+            "ndcg_at_100": 0.9873532724367975,
+            "precision_at_10": 1.0,
+            "recall_at_1": 0.010000000000000007,
+            "recall_at_10": 0.09999999999999981,
+            "recall_at_100": 0.9823999999999995
+          },
+          "run_id": 0,
+          "timestamp": "2026-06-18T12:37:26.136497500Z"
+        },
+        {
+          "duration_ms": 387.7354,
+          "energy": {
+            "available": false,
+            "energy_per_query_mj": 0.0,
+            "measurement_method": "NotAvailable",
+            "total_energy_joules": 0.0,
+            "total_queries": 100
+          },
+          "latency_mean_ms": 2.3850139999999986,
+          "quality": {
+            "mrr": 1.0,
+            "ndcg_at_10": 1.0,
+            "ndcg_at_100": 0.9873532724367975,
+            "precision_at_10": 1.0,
+            "recall_at_1": 0.010000000000000007,
+            "recall_at_10": 0.09999999999999981,
+            "recall_at_100": 0.9823999999999995
+          },
+          "run_id": 1,
+          "timestamp": "2026-06-18T12:37:26.136501800Z"
+        },
+        {
+          "duration_ms": 474.76099999999997,
+          "energy": {
+            "available": false,
+            "energy_per_query_mj": 0.0,
+            "measurement_method": "NotAvailable",
+            "total_energy_joules": 0.0,
+            "total_queries": 100
+          },
+          "latency_mean_ms": 2.874592999999999,
+          "quality": {
+            "mrr": 1.0,
+            "ndcg_at_10": 1.0,
+            "ndcg_at_100": 1.0,
+            "precision_at_10": 1.0,
+            "recall_at_1": 0.010000000000000007,
+            "recall_at_10": 0.05439999999999991,
+            "recall_at_100": 0.5209000000000006
+          },
+          "run_id": 2,
+          "timestamp": "2026-06-18T12:37:26.136501900Z"
+        },
+        {
+          "duration_ms": 420.8693,
+          "energy": {
+            "available": false,
+            "energy_per_query_mj": 0.0,
+            "measurement_method": "NotAvailable",
+            "total_energy_joules": 0.0,
+            "total_queries": 100
+          },
+          "latency_mean_ms": 2.6141510000000006,
+          "quality": {
+            "mrr": 1.0,
+            "ndcg_at_10": 1.0,
+            "ndcg_at_100": 1.0,
+            "precision_at_10": 1.0,
+            "recall_at_1": 0.010000000000000007,
+            "recall_at_10": 0.05439999999999991,
+            "recall_at_100": 0.5209000000000006
+          },
+          "run_id": 3,
+          "timestamp": "2026-06-18T12:37:26.136502200Z"
+        }
+      ],
+      "recall_at_1": {
+        "bootstrap_ci_lower": 0.010000000000000007,
+        "bootstrap_ci_upper": 0.010000000000000007,
+        "ci_lower_95": 0.010000000000000007,
+        "ci_upper_95": 0.010000000000000007,
+        "mean": 0.010000000000000007,
+        "n": 4,
+        "std_dev": 0.0
+      },
+      "recall_at_10": {
+        "bootstrap_ci_lower": 0.06579999999999987,
+        "bootstrap_ci_upper": 0.09999999999999981,
+        "ci_lower_95": 0.03530759393235459,
+        "ci_upper_95": 0.11909240606764512,
+        "mean": 0.07719999999999985,
+        "n": 4,
+        "std_dev": 0.02632717227504688
+      },
+      "recall_at_100": {
+        "bootstrap_ci_lower": 0.5209000000000006,
+        "bootstrap_ci_upper": 0.9823999999999995,
+        "ci_lower_95": 0.3276731271881956,
+        "ci_upper_95": 1.1756268728118044,
+        "mean": 0.75165,
+        "n": 4,
+        "std_dev": 0.26644714923101165
+      },
+      "run_protocol": {
+        "Full": {
+          "num_runs": 2
+        }
+      },
+      "scale": 1000,
+      "statistical_comparisons": [],
+      "throughput_profile": {
+        "database": "AttentionDB",
+        "peak_qps": 1000.0,
+        "points": [],
+        "saturation_concurrency": 1
+      },
+      "timestamp": "2026-06-18T12:37:26.136502600Z",
+      "translation_strategy": "SemanticOnly"
+    }
+  ],
+  "timestamp": "2026-06-18T12:37:26.256213700Z",
+  "total_experiments": 1
+}

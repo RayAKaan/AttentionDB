@@ -1,4 +1,4 @@
-use attentiondb_multihead::{MultiHeadManager, HeadConfig, HeadType};
+use attentiondb_multihead::{HeadConfig, HeadType, MultiHeadManager};
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");
@@ -13,20 +13,35 @@ fn main() {
 
     println!("→ Registered {} heads:", manager.head_count());
     for (name, config) in &manager.heads {
-        println!("   {:12}  type: {:?}  weight: {:.1}", name, config.head_type, config.weight);
+        println!(
+            "   {:12}  type: {:?}  weight: {:.1}",
+            name, config.head_type, config.weight
+        );
     }
 
     let query_emb: Vec<f32> = (0..256).map(|i| (i as f32).sin() * 0.1).collect();
 
     let head_results = vec![
-        ("semantic".to_string(),   vec![(1, 0.92), (2, 0.85), (3, 0.71), (4, 0.65)]),
-        ("temporal".to_string(),   vec![(2, 0.88), (4, 0.79), (1, 0.65)]),
-        ("structural".to_string(), vec![(1, 0.81), (3, 0.77), (5, 0.60)]),
+        (
+            "semantic".to_string(),
+            vec![(1, 0.92), (2, 0.85), (3, 0.71), (4, 0.65)],
+        ),
+        (
+            "temporal".to_string(),
+            vec![(2, 0.88), (4, 0.79), (1, 0.65)],
+        ),
+        (
+            "structural".to_string(),
+            vec![(1, 0.81), (3, 0.77), (5, 0.60)],
+        ),
     ];
 
     println!("\n→ Raw results per head:");
     for (head, results) in &head_results {
-        let ids: Vec<String> = results.iter().map(|(id, s)| format!("{}:{:.2}", id, s)).collect();
+        let ids: Vec<String> = results
+            .iter()
+            .map(|(id, s)| format!("{}:{:.2}", id, s))
+            .collect();
         println!("   {:12}  [{}]", head, ids.join(", "));
     }
 
@@ -42,7 +57,12 @@ fn main() {
 
     println!("\n   Final fused results:");
     for (i, (id, score)) in fused.iter().enumerate() {
-        println!("   {:>3}.  ID: {:>4}   Fused Score: {:.4}", i + 1, id, score);
+        println!(
+            "   {:>3}.  ID: {:>4}   Fused Score: {:.4}",
+            i + 1,
+            id,
+            score
+        );
     }
 
     // Weighted fusion bypassing gate

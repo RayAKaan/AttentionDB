@@ -1,9 +1,4 @@
-use axum::{
-    extract::Request,
-    http::StatusCode,
-    middleware::Next,
-    response::Response,
-};
+use axum::{extract::Request, http::StatusCode, middleware::Next, response::Response};
 use metrics::counter;
 use parking_lot::Mutex;
 use std::collections::HashMap;
@@ -88,7 +83,9 @@ impl RateLimiter {
                         tracing::info!(rps, "Rate limiting enabled");
                         Self::new(rps)
                     } else {
-                        tracing::warn!("ATTENTIONDB_RATE_LIMIT_RPS is 0 or negative — rate limiting disabled");
+                        tracing::warn!(
+                            "ATTENTIONDB_RATE_LIMIT_RPS is 0 or negative — rate limiting disabled"
+                        );
                         Self::disabled()
                     }
                 } else {
@@ -108,9 +105,9 @@ impl RateLimiter {
             return Ok(());
         }
         let mut buckets = self.buckets.lock();
-        let bucket = buckets.entry(key.to_string()).or_insert_with(|| {
-            TokenBucket::new(self.capacity, self.refill_rate)
-        });
+        let bucket = buckets
+            .entry(key.to_string())
+            .or_insert_with(|| TokenBucket::new(self.capacity, self.refill_rate));
         if bucket.try_consume(1.0) {
             Ok(())
         } else {
@@ -128,7 +125,10 @@ pub struct RateLimitExceeded {
 fn extract_api_key(req: &Request) -> Option<String> {
     if let Some(header) = req.headers().get("authorization") {
         if let Ok(val) = header.to_str() {
-            if let Some(token) = val.strip_prefix("Bearer ").or_else(|| val.strip_prefix("bearer ")) {
+            if let Some(token) = val
+                .strip_prefix("Bearer ")
+                .or_else(|| val.strip_prefix("bearer "))
+            {
                 return Some(token.to_string());
             }
         }
@@ -141,10 +141,7 @@ fn extract_api_key(req: &Request) -> Option<String> {
     None
 }
 
-pub async fn rate_limit_middleware(
-    req: Request,
-    next: Next,
-) -> Result<Response, StatusCode> {
+pub async fn rate_limit_middleware(req: Request, next: Next) -> Result<Response, StatusCode> {
     let limiter = req.extensions().get::<Arc<RateLimiter>>().cloned();
 
     let limiter = match limiter {
@@ -157,7 +154,12 @@ pub async fn rate_limit_middleware(
     }
 
     let path = req.uri().path();
-    if path == "/health" || path.starts_with("/health/") || path == "/metrics" || path == "/openapi.json" || path == "/docs" {
+    if path == "/health"
+        || path.starts_with("/health/")
+        || path == "/metrics"
+        || path == "/openapi.json"
+        || path == "/docs"
+    {
         return Ok(next.run(req).await);
     }
 
@@ -168,14 +170,13 @@ pub async fn rate_limit_middleware(
         Err(exceeded) => {
             let secs = exceeded.retry_after.as_secs().max(1);
             tracing::warn!(api_key = %api_key, retry_after = secs, "Rate limit exceeded");
-            let mut resp = Response::new(axum::body::Body::from(
-                format!("Rate limit exceeded. Retry after {} seconds", secs),
-            ));
+            let mut resp = Response::new(axum::body::Body::from(format!(
+                "Rate limit exceeded. Retry after {} seconds",
+                secs
+            )));
             *resp.status_mut() = StatusCode::TOO_MANY_REQUESTS;
-            resp.headers_mut().insert(
-                "Retry-After",
-                secs.to_string().parse().unwrap(),
-            );
+            resp.headers_mut()
+                .insert("Retry-After", secs.to_string().parse().unwrap());
             Ok(resp)
         }
     }

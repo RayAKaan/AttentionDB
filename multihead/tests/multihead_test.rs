@@ -1,4 +1,6 @@
-use attentiondb_multihead::{MultiHeadManager, HeadConfig, HeadType, fuse_scores, normalize_scores};
+use attentiondb_multihead::{
+    fuse_scores, normalize_scores, HeadConfig, HeadType, MultiHeadManager,
+};
 
 fn make_test_manager() -> MultiHeadManager {
     let mut m = MultiHeadManager::new(8, 3);
@@ -119,9 +121,7 @@ fn test_fuse_weighted() {
 
 #[test]
 fn test_multiple_ids_same_head() {
-    let results = vec![
-        ("semantic".to_string(), vec![(1, 0.9), (2, 0.8), (3, 0.7)]),
-    ];
+    let results = vec![("semantic".to_string(), vec![(1, 0.9), (2, 0.8), (3, 0.7)])];
     let gates = vec![1.0];
     let fused = fuse_scores(&results, &gates);
     assert_eq!(fused.len(), 3);

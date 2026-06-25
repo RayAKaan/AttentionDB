@@ -1,17 +1,21 @@
 use crate::persistence::error::PersistenceError;
-use std::path::{Path, PathBuf};
 use std::fs;
+use std::path::{Path, PathBuf};
 
 pub fn create_backup(dir: &Path) -> Result<PathBuf, PersistenceError> {
     if !dir.exists() {
-        return Err(PersistenceError::IndexNotFound(dir.to_string_lossy().to_string()));
+        return Err(PersistenceError::IndexNotFound(
+            dir.to_string_lossy().to_string(),
+        ));
     }
 
     let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S").to_string();
-    let dir_name = dir.file_name()
+    let dir_name = dir
+        .file_name()
         .and_then(|n| Some(n.to_string_lossy().to_string()))
         .unwrap_or_else(|| "attentiondb_backup".to_string());
-    let backup_dir = dir.parent()
+    let backup_dir = dir
+        .parent()
         .unwrap_or(dir)
         .join(format!("backup_{}_{}", dir_name, timestamp));
 

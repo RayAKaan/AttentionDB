@@ -38,7 +38,10 @@ fn main() {
     let projected = trainer.get_projection().project_key(&sample);
     println!("   Input dim:  {}", sample.len());
     println!("   Output dim: {}", projected.len());
-    println!("   First 5 values: {:?}", &projected[..5.min(projected.len())]);
+    println!(
+        "   First 5 values: {:?}",
+        &projected[..5.min(projected.len())]
+    );
 
     println!("\n   w_k shape: {:?}", trainer.get_projection().w_k.shape());
     println!("   w_v shape: {:?}", trainer.get_projection().w_v.shape());

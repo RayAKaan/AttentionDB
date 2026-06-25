@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use crate::error::QueryError;
 use pest::Parser;
 use pest_derive::Parser;
-use crate::error::QueryError;
+use std::collections::HashMap;
 
 #[derive(Parser)]
 #[grammar = "aql.pest"]
@@ -48,27 +48,32 @@ fn parse_collection_settings(
     for (key, val) in raw {
         match *key {
             "ef_search" => {
-                settings.ef_search = val.parse().map_err(|_|
-                    QueryError::Parse(format!("Invalid ef_search value: {}", val)))?;
+                settings.ef_search = val
+                    .parse()
+                    .map_err(|_| QueryError::Parse(format!("Invalid ef_search value: {}", val)))?;
             }
             "ef_construction" => {
-                settings.ef_construction = val.parse().map_err(|_|
-                    QueryError::Parse(format!("Invalid ef_construction value: {}", val)))?;
+                settings.ef_construction = val.parse().map_err(|_| {
+                    QueryError::Parse(format!("Invalid ef_construction value: {}", val))
+                })?;
             }
             "max_connections" => {
-                settings.max_nb_connection = val.parse().map_err(|_|
-                    QueryError::Parse(format!("Invalid max_connections value: {}", val)))?;
+                settings.max_nb_connection = val.parse().map_err(|_| {
+                    QueryError::Parse(format!("Invalid max_connections value: {}", val))
+                })?;
             }
             "similarity" => {
                 settings.similarity_metric = val.clone();
             }
             "exact_rerank" => {
-                settings.enable_exact_reranking = val.parse().map_err(|_|
-                    QueryError::Parse(format!("Invalid exact_rerank value: {}", val)))?;
+                settings.enable_exact_reranking = val.parse().map_err(|_| {
+                    QueryError::Parse(format!("Invalid exact_rerank value: {}", val))
+                })?;
             }
             "enable_gpu_fusion" => {
-                settings.enable_gpu_fusion = val.parse().map_err(|_|
-                    QueryError::Parse(format!("Invalid enable_gpu_fusion value: {}", val)))?;
+                settings.enable_gpu_fusion = val.parse().map_err(|_| {
+                    QueryError::Parse(format!("Invalid enable_gpu_fusion value: {}", val))
+                })?;
             }
             _ => {
                 return Err(QueryError::Parse(format!("Unknown setting: {}", key)));
@@ -76,8 +81,9 @@ fn parse_collection_settings(
         }
     }
 
-    settings.validate().map_err(|e|
-        QueryError::Parse(format!("Invalid collection settings: {}", e)))?;
+    settings
+        .validate()
+        .map_err(|e| QueryError::Parse(format!("Invalid collection settings: {}", e)))?;
 
     Ok(settings)
 }
@@ -87,12 +93,16 @@ fn parse_head_settings(
 ) -> Result<HashMap<String, attentiondb_hnsw::CollectionSettings>, QueryError> {
     let mut head_map: HashMap<String, Vec<(&str, String)>> = HashMap::new();
     for (key, val) in raw {
-        let dot = key.find('.').ok_or_else(|| QueryError::Parse(
-            format!("Expected head-qualified setting key (head_name.key), got: {}", key)
-        ))?;
+        let dot = key.find('.').ok_or_else(|| {
+            QueryError::Parse(format!(
+                "Expected head-qualified setting key (head_name.key), got: {}",
+                key
+            ))
+        })?;
         let head_name = &key[..dot];
-        let setting_key = &key[dot+1..];
-        head_map.entry(head_name.to_string())
+        let setting_key = &key[dot + 1..];
+        head_map
+            .entry(head_name.to_string())
             .or_default()
             .push((setting_key, val.clone()));
     }
@@ -106,18 +116,29 @@ fn parse_head_settings(
 }
 
 pub fn parse_aql(input: &str) -> Result<AQLStatement, QueryError> {
-    let mut pairs = AQLParser::parse(Rule::query, input)
-        .map_err(|e| QueryError::Parse(e.to_string()))?;
+    let mut pairs =
+        AQLParser::parse(Rule::query, input).map_err(|e| QueryError::Parse(e.to_string()))?;
 
-    let query_pair = pairs.next().ok_or_else(|| QueryError::Parse("Empty input".into()))?;
-    let inner = query_pair.into_inner().next()
+    let query_pair = pairs
+        .next()
+        .ok_or_else(|| QueryError::Parse("Empty input".into()))?;
+    let inner = query_pair
+        .into_inner()
+        .next()
         .ok_or_else(|| QueryError::Parse("No statement found".into()))?;
 
     match inner.as_rule() {
         Rule::attend => Ok(AQLStatement::Query(parse_attend(inner))),
-        Rule::create_collection => Ok(AQLStatement::CreateCollection(parse_create_collection(inner)?)),
-        Rule::alter_collection => Ok(AQLStatement::AlterCollection(parse_alter_collection(inner)?)),
-        _ => Err(QueryError::Parse(format!("Unexpected rule: {:?}", inner.as_rule()))),
+        Rule::create_collection => Ok(AQLStatement::CreateCollection(parse_create_collection(
+            inner,
+        )?)),
+        Rule::alter_collection => Ok(AQLStatement::AlterCollection(parse_alter_collection(
+            inner,
+        )?)),
+        _ => Err(QueryError::Parse(format!(
+            "Unexpected rule: {:?}",
+            inner.as_rule()
+        ))),
     }
 }
 
@@ -141,7 +162,7 @@ fn parse_attend(pair: pest::iterators::Pair<Rule>) -> AQLQuery {
             }
             Rule::query_text => {
                 let s = pair.as_str();
-                query.query_text = s[1..s.len()-1].to_string();
+                query.query_text = s[1..s.len() - 1].to_string();
             }
             Rule::heads => {
                 for head in pair.into_inner() {
@@ -164,7 +185,9 @@ fn parse_attend(pair: pest::iterators::Pair<Rule>) -> AQLQuery {
     query
 }
 
-fn parse_create_collection(pair: pest::iterators::Pair<Rule>) -> Result<CreateCollection, QueryError> {
+fn parse_create_collection(
+    pair: pest::iterators::Pair<Rule>,
+) -> Result<CreateCollection, QueryError> {
     let mut collection = String::new();
     let mut fields = Vec::new();
     let mut raw_settings: Vec<(String, String)> = Vec::new();
@@ -180,18 +203,27 @@ fn parse_create_collection(pair: pest::iterators::Pair<Rule>) -> Result<CreateCo
                 for field_def in pair.into_inner() {
                     if field_def.as_rule() == Rule::field_def {
                         let mut parts = field_def.into_inner();
-                        let name = parts.next().map(|p| p.as_str().to_string()).unwrap_or_default();
-                        let ty = parts.next().map(|p| p.as_str().to_string()).unwrap_or_default();
+                        let name = parts
+                            .next()
+                            .map(|p| p.as_str().to_string())
+                            .unwrap_or_default();
+                        let ty = parts
+                            .next()
+                            .map(|p| p.as_str().to_string())
+                            .unwrap_or_default();
                         fields.push((name, ty));
                     }
                 }
             }
             Rule::setting_pair => {
                 let mut parts = pair.into_inner();
-                let key = parts.next().map(|p| p.as_str().trim().to_string()).unwrap_or_default();
+                let key = parts
+                    .next()
+                    .map(|p| p.as_str().trim().to_string())
+                    .unwrap_or_default();
                 let raw_val = parts.next().map(|p| p.as_str()).unwrap_or_default();
                 let val = if raw_val.starts_with('"') && raw_val.ends_with('"') {
-                    raw_val[1..raw_val.len()-1].to_string()
+                    raw_val[1..raw_val.len() - 1].to_string()
                 } else {
                     raw_val.to_string()
                 };
@@ -206,16 +238,29 @@ fn parse_create_collection(pair: pest::iterators::Pair<Rule>) -> Result<CreateCo
         .partition(|(key, _)| key.contains('.'));
 
     let settings = parse_collection_settings(
-        &collection_settings.iter().map(|(k, v)| (k.as_str(), v.clone())).collect::<Vec<_>>()
+        &collection_settings
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.clone()))
+            .collect::<Vec<_>>(),
     )?;
     let head_settings = parse_head_settings(
-        &head_settings.iter().map(|(k, v)| (k.as_str(), v.clone())).collect::<Vec<_>>()
+        &head_settings
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.clone()))
+            .collect::<Vec<_>>(),
     )?;
 
-    Ok(CreateCollection { collection, fields, settings, head_settings })
+    Ok(CreateCollection {
+        collection,
+        fields,
+        settings,
+        head_settings,
+    })
 }
 
-fn parse_alter_collection(pair: pest::iterators::Pair<Rule>) -> Result<AlterCollection, QueryError> {
+fn parse_alter_collection(
+    pair: pest::iterators::Pair<Rule>,
+) -> Result<AlterCollection, QueryError> {
     let mut collection = String::new();
     let mut raw_settings: Vec<(String, String)> = Vec::new();
 
@@ -228,10 +273,13 @@ fn parse_alter_collection(pair: pest::iterators::Pair<Rule>) -> Result<AlterColl
             }
             Rule::setting_pair => {
                 let mut parts = pair.into_inner();
-                let key = parts.next().map(|p| p.as_str().trim().to_string()).unwrap_or_default();
+                let key = parts
+                    .next()
+                    .map(|p| p.as_str().trim().to_string())
+                    .unwrap_or_default();
                 let raw_val = parts.next().map(|p| p.as_str()).unwrap_or_default();
                 let val = if raw_val.starts_with('"') && raw_val.ends_with('"') {
-                    raw_val[1..raw_val.len()-1].to_string()
+                    raw_val[1..raw_val.len() - 1].to_string()
                 } else {
                     raw_val.to_string()
                 };
@@ -246,18 +294,30 @@ fn parse_alter_collection(pair: pest::iterators::Pair<Rule>) -> Result<AlterColl
         .partition(|(key, _)| key.contains('.'));
 
     let settings = parse_collection_settings(
-        &collection_settings.iter().map(|(k, v)| (k.as_str(), v.clone())).collect::<Vec<_>>()
+        &collection_settings
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.clone()))
+            .collect::<Vec<_>>(),
     )?;
     let head_settings = parse_head_settings(
-        &head_settings.iter().map(|(k, v)| (k.as_str(), v.clone())).collect::<Vec<_>>()
+        &head_settings
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.clone()))
+            .collect::<Vec<_>>(),
     )?;
 
-    Ok(AlterCollection { collection, settings, head_settings })
+    Ok(AlterCollection {
+        collection,
+        settings,
+        head_settings,
+    })
 }
 
 /// Extract per-head settings from a parsed AQL statement.
 /// Returns a map of head_name -> CollectionSettings.
-pub fn get_per_head_settings(statement: &AQLStatement) -> HashMap<String, attentiondb_hnsw::CollectionSettings> {
+pub fn get_per_head_settings(
+    statement: &AQLStatement,
+) -> HashMap<String, attentiondb_hnsw::CollectionSettings> {
     match statement {
         AQLStatement::CreateCollection(c) => c.head_settings.clone(),
         AQLStatement::AlterCollection(a) => a.head_settings.clone(),
@@ -425,7 +485,8 @@ mod tests {
 
     #[test]
     fn test_alter_collection_with_string_settings() {
-        let aql = r#"ALTER COLLECTION papers SET (similarity = "dot_product", exact_rerank = true)"#;
+        let aql =
+            r#"ALTER COLLECTION papers SET (similarity = "dot_product", exact_rerank = true)"#;
         let stmt = parse_aql(aql).unwrap();
         match stmt {
             AQLStatement::AlterCollection(a) => {

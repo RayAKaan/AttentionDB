@@ -1,0 +1,277 @@
+[
+  {
+    "benchmark_version": "0.2.0",
+    "timestamp": "2026-06-18T12:37:26.136502600Z",
+    "git_hash": null,
+    "config_hash": "",
+    "hardware": {
+      "cpu_model": "unknown",
+      "cpu_cores": 4,
+      "cpu_threads": 8,
+      "ram_total_gb": 16.0,
+      "gpu_model": null,
+      "gpu_vram_gb": null,
+      "os": "windows",
+      "kernel": "windows",
+      "rust_version": "0.2.0",
+      "benchmark_version": "0.2.0",
+      "git_hash": "dca4b91afbda66bc941e4856b25b82af76a53190"
+    },
+    "database": "AttentionDB (CPU)",
+    "database_version": "0.2.0",
+    "dataset": "synthetic",
+    "scale": 1000,
+    "difficulty": "Easy",
+    "experiment_type": "Standard",
+    "head_combination": "AllHeads",
+    "failure_mode": null,
+    "translation_strategy": "SemanticOnly",
+    "run_protocol": {
+      "Full": {
+        "num_runs": 2
+      }
+    },
+    "measured_difficulty": {
+      "contrast_ratio": 0.0,
+      "mean_lid": 37.120679305609066,
+      "std_lid": 12.396422348513516,
+      "hubness_skewness": 0.8566112211773428,
+      "unambiguous_top1_fraction": 0.0
+    },
+    "recall_at_1": {
+      "mean": 0.010000000000000007,
+      "std_dev": 0.0,
+      "ci_lower_95": 0.010000000000000007,
+      "ci_upper_95": 0.010000000000000007,
+      "bootstrap_ci_lower": 0.010000000000000007,
+      "bootstrap_ci_upper": 0.010000000000000007,
+      "n": 4
+    },
+    "recall_at_10": {
+      "mean": 0.07719999999999985,
+      "std_dev": 0.02632717227504688,
+      "ci_lower_95": 0.03530759393235459,
+      "ci_upper_95": 0.11909240606764512,
+      "bootstrap_ci_lower": 0.06579999999999987,
+      "bootstrap_ci_upper": 0.09999999999999981,
+      "n": 4
+    },
+    "recall_at_100": {
+      "mean": 0.75165,
+      "std_dev": 0.26644714923101165,
+      "ci_lower_95": 0.3276731271881956,
+      "ci_upper_95": 1.1756268728118044,
+      "bootstrap_ci_lower": 0.5209000000000006,
+      "bootstrap_ci_upper": 0.9823999999999995,
+      "n": 4
+    },
+    "mrr": {
+      "mean": 1.0,
+      "std_dev": 0.0,
+      "ci_lower_95": 1.0,
+      "ci_upper_95": 1.0,
+      "bootstrap_ci_lower": 1.0,
+      "bootstrap_ci_upper": 1.0,
+      "n": 4
+    },
+    "ndcg_at_10": {
+      "mean": 1.0,
+      "std_dev": 0.0,
+      "ci_lower_95": 1.0,
+      "ci_upper_95": 1.0,
+      "bootstrap_ci_lower": 1.0,
+      "bootstrap_ci_upper": 1.0,
+      "n": 4
+    },
+    "ndcg_at_100": {
+      "mean": 0.9936766362183987,
+      "std_dev": 0.007301591562982828,
+      "ci_lower_95": 0.9820581746722461,
+      "ci_upper_95": 1.0052950977645514,
+      "bootstrap_ci_lower": 0.9873532724367975,
+      "bootstrap_ci_upper": 1.0,
+      "n": 4
+    },
+    "latency_mean_ms": {
+      "mean": 2.587967500000001,
+      "std_dev": 0.5042984651957082,
+      "ci_lower_95": 2.5383967940990506,
+      "ci_upper_95": 2.637538205900951,
+      "bootstrap_ci_lower": 2.542749,
+      "bootstrap_ci_upper": 2.6364517499999995,
+      "n": 400
+    },
+    "latency_p50_ms": {
+      "mean": 0.010000000000000007,
+      "std_dev": 0.0,
+      "ci_lower_95": 0.010000000000000007,
+      "ci_upper_95": 0.010000000000000007,
+      "bootstrap_ci_lower": 0.010000000000000007,
+      "bootstrap_ci_upper": 0.010000000000000007,
+      "n": 4
+    },
+    "latency_p90_ms": {
+      "mean": 0.010000000000000007,
+      "std_dev": 0.0,
+      "ci_lower_95": 0.010000000000000007,
+      "ci_upper_95": 0.010000000000000007,
+      "bootstrap_ci_lower": 0.010000000000000007,
+      "bootstrap_ci_upper": 0.010000000000000007,
+      "n": 4
+    },
+    "latency_p95_ms": {
+      "mean": 0.010000000000000007,
+      "std_dev": 0.0,
+      "ci_lower_95": 0.010000000000000007,
+      "ci_upper_95": 0.010000000000000007,
+      "bootstrap_ci_lower": 0.010000000000000007,
+      "bootstrap_ci_upper": 0.010000000000000007,
+      "n": 4
+    },
+    "latency_p99_ms": {
+      "mean": 0.010000000000000007,
+      "std_dev": 0.0,
+      "ci_lower_95": 0.010000000000000007,
+      "ci_upper_95": 0.010000000000000007,
+      "bootstrap_ci_lower": 0.010000000000000007,
+      "bootstrap_ci_upper": 0.010000000000000007,
+      "n": 4
+    },
+    "latency_p999_ms": {
+      "mean": 0.010000000000000007,
+      "std_dev": 0.0,
+      "ci_lower_95": 0.010000000000000007,
+      "ci_upper_95": 0.010000000000000007,
+      "bootstrap_ci_lower": 0.010000000000000007,
+      "bootstrap_ci_upper": 0.010000000000000007,
+      "n": 4
+    },
+    "network_overhead_profile": null,
+    "throughput_profile": {
+      "database": "AttentionDB",
+      "points": [],
+      "saturation_concurrency": 1,
+      "peak_qps": 1000.0
+    },
+    "pareto_result": {
+      "database": "AttentionDB",
+      "dataset": "synthetic",
+      "scale": 1000,
+      "points": [],
+      "qps_at_target_recall": {},
+      "dominates": {}
+    },
+    "peak_memory_rss_mb": {
+      "mean": 0.010000000000000007,
+      "std_dev": 0.0,
+      "ci_lower_95": 0.010000000000000007,
+      "ci_upper_95": 0.010000000000000007,
+      "bootstrap_ci_lower": 0.010000000000000007,
+      "bootstrap_ci_upper": 0.010000000000000007,
+      "n": 4
+    },
+    "disk_usage_gb": 0.0,
+    "index_build_time_s": 0.0,
+    "energy": {
+      "total_queries": 0,
+      "total_energy_joules": 0.0,
+      "energy_per_query_mj": 0.0,
+      "measurement_method": "NotAvailable",
+      "available": false
+    },
+    "statistical_comparisons": [],
+    "consensus_accuracy": null,
+    "gating_efficiency_vs_uniform": null,
+    "per_head_weights": null,
+    "raw_runs": [
+      {
+        "run_id": 0,
+        "timestamp": "2026-06-18T12:37:26.136497500Z",
+        "quality": {
+          "recall_at_1": 0.010000000000000007,
+          "recall_at_10": 0.09999999999999981,
+          "recall_at_100": 0.9823999999999995,
+          "mrr": 1.0,
+          "ndcg_at_10": 1.0,
+          "ndcg_at_100": 0.9873532724367975,
+          "precision_at_10": 1.0
+        },
+        "latency_mean_ms": 2.4781120000000003,
+        "duration_ms": 413.23749999999995,
+        "energy": {
+          "total_queries": 100,
+          "total_energy_joules": 0.0,
+          "energy_per_query_mj": 0.0,
+          "measurement_method": "NotAvailable",
+          "available": false
+        }
+      },
+      {
+        "run_id": 1,
+        "timestamp": "2026-06-18T12:37:26.136501800Z",
+        "quality": {
+          "recall_at_1": 0.010000000000000007,
+          "recall_at_10": 0.09999999999999981,
+          "recall_at_100": 0.9823999999999995,
+          "mrr": 1.0,
+          "ndcg_at_10": 1.0,
+          "ndcg_at_100": 0.9873532724367975,
+          "precision_at_10": 1.0
+        },
+        "latency_mean_ms": 2.3850139999999986,
+        "duration_ms": 387.7354,
+        "energy": {
+          "total_queries": 100,
+          "total_energy_joules": 0.0,
+          "energy_per_query_mj": 0.0,
+          "measurement_method": "NotAvailable",
+          "available": false
+        }
+      },
+      {
+        "run_id": 2,
+        "timestamp": "2026-06-18T12:37:26.136501900Z",
+        "quality": {
+          "recall_at_1": 0.010000000000000007,
+          "recall_at_10": 0.05439999999999991,
+          "recall_at_100": 0.5209000000000006,
+          "mrr": 1.0,
+          "ndcg_at_10": 1.0,
+          "ndcg_at_100": 1.0,
+          "precision_at_10": 1.0
+        },
+        "latency_mean_ms": 2.874592999999999,
+        "duration_ms": 474.76099999999997,
+        "energy": {
+          "total_queries": 100,
+          "total_energy_joules": 0.0,
+          "energy_per_query_mj": 0.0,
+          "measurement_method": "NotAvailable",
+          "available": false
+        }
+      },
+      {
+        "run_id": 3,
+        "timestamp": "2026-06-18T12:37:26.136502200Z",
+        "quality": {
+          "recall_at_1": 0.010000000000000007,
+          "recall_at_10": 0.05439999999999991,
+          "recall_at_100": 0.5209000000000006,
+          "mrr": 1.0,
+          "ndcg_at_10": 1.0,
+          "ndcg_at_100": 1.0,
+          "precision_at_10": 1.0
+        },
+        "latency_mean_ms": 2.6141510000000006,
+        "duration_ms": 420.8693,
+        "energy": {
+          "total_queries": 100,
+          "total_energy_joules": 0.0,
+          "energy_per_query_mj": 0.0,
+          "measurement_method": "NotAvailable",
+          "available": false
+        }
+      }
+    ]
+  }
+]

@@ -1,0 +1,137 @@
+[general]
+random_seed = 42
+vector_dimension = 128
+warmup_runs = 2
+bootstrap_resamples = 1000
+confidence_level = 0.95
+data_dir = "datasets/"
+output_dir = "results/quick/"
+
+[translation]
+primary_strategy = "SemanticOnly"
+sensitivity_strategies = ["Concatenation"]
+
+[run_protocol]
+tier1_max_scale = 100000
+tier2_max_scale = 1000000
+tier1_full_runs = 1
+tier2_index_builds = 1
+tier2_queries_per_build = 3
+tier3_query_runs = 3
+
+[pareto_sweep]
+ef_search_values = [
+    20,
+    100,
+    400,
+]
+queries_per_point = 100
+reps_per_point = 2
+target_recalls = [
+    0.9,
+    0.99,
+]
+concurrency = 1
+
+[throughput]
+concurrency_levels = [
+    1,
+    8,
+]
+warmup_duration_secs = 3
+measurement_duration_secs = 10
+
+[network_calibration]
+enabled = true
+num_null_queries = 100
+
+[power_analysis]
+effect_sizes = [
+    0.2,
+    0.5,
+    0.8,
+]
+desired_power = 0.8
+estimated_num_comparisons = 10
+
+[scales]
+values = [
+    2000,
+    10000,
+]
+
+[difficulties]
+values = [
+    "Easy",
+    "Hard",
+]
+
+[databases.attentiondb_cpu]
+enabled = true
+host = "localhost"
+port = 7070
+transport = "LocalGrpc"
+
+[databases.attentiondb_gpu]
+enabled = false
+host = ""
+port = 0
+transport = ""
+
+[databases.qdrant]
+enabled = true
+host = "localhost"
+port = 6334
+transport = "LocalGrpc"
+
+[databases.milvus]
+enabled = false
+host = ""
+port = 0
+transport = ""
+
+[databases.weaviate]
+enabled = false
+host = ""
+port = 0
+transport = ""
+
+[databases.pgvector]
+enabled = true
+host = "localhost"
+port = 5432
+transport = "LocalTcp"
+
+[databases.elasticsearch]
+enabled = false
+host = ""
+port = 0
+transport = ""
+
+[databases.pinecone]
+enabled = false
+host = ""
+port = 0
+transport = ""
+
+[experiments]
+run_standard = true
+run_head_ablations = false
+run_failure_modes = false
+run_ann_benchmark_compat = false
+
+[real_datasets.sift128]
+enabled = false
+path = ""
+
+[real_datasets.glove100]
+enabled = false
+path = ""
+
+[real_datasets.nytimes256]
+enabled = false
+path = ""
+
+[real_datasets.gist960]
+enabled = false
+path = ""

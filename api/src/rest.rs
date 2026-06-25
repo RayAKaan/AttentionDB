@@ -1,3 +1,12 @@
+use crate::auth::{auth_middleware, ApiKeyStore};
+use crate::observability;
+use crate::openapi;
+use crate::rate_limiter::{rate_limit_middleware, RateLimiter};
+use crate::server::AttentionDBService;
+use crate::validation::{
+    validate_collection_name, validate_fields, validate_heads, validate_top_k,
+    validate_vector_dimension,
+};
 use axum::{
     extract::{Extension, Path, State},
     http::StatusCode,
@@ -6,15 +15,9 @@ use axum::{
     routing::{get, post, put},
     Json, Router,
 };
-use serde::{Deserialize, Serialize};
 use metrics_exporter_prometheus::PrometheusHandle;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use crate::auth::{ApiKeyStore, auth_middleware};
-use crate::rate_limiter::{RateLimiter, rate_limit_middleware};
-use crate::server::AttentionDBService;
-use crate::observability;
-use crate::validation::{validate_collection_name, validate_fields, validate_heads, validate_top_k, validate_vector_dimension};
-use crate::openapi;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -117,15 +120,17 @@ pub async fn attend_handler(
     Json(payload): Json<AttendRequest>,
 ) -> Result<Json<AttendResponse>, (StatusCode, String)> {
     let _permit = state.semaphore.acquire().await.map_err(|_| {
-        (StatusCode::SERVICE_UNAVAILABLE, "Too many concurrent requests".to_string())
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Too many concurrent requests".to_string(),
+        )
     })?;
     let _timer = observability::LatencyTimer::new("rest_attend");
 
     validate_collection_name(&payload.collection)
         .map_err(|e| (StatusCode::BAD_REQUEST, e.message().to_string()))?;
     let top_k = payload.top_k.unwrap_or(10);
-    validate_top_k(top_k)
-        .map_err(|e| (StatusCode::BAD_REQUEST, e.message().to_string()))?;
+    validate_top_k(top_k).map_err(|e| (StatusCode::BAD_REQUEST, e.message().to_string()))?;
     let offset = payload.offset.unwrap_or(0);
 
     if let Some(ref heads_list) = payload.heads {
@@ -133,8 +138,12 @@ pub async fn attend_handler(
             .map_err(|e| (StatusCode::BAD_REQUEST, e.message().to_string()))?;
     }
 
-    let query_vec = crate::server::parse_float_vector(&payload.query)
-        .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid query vector format".to_string()))?;
+    let query_vec = crate::server::parse_float_vector(&payload.query).map_err(|_| {
+        (
+            StatusCode::BAD_REQUEST,
+            "Invalid query vector format".to_string(),
+        )
+    })?;
     validate_vector_dimension(query_vec.len())
         .map_err(|e| (StatusCode::BAD_REQUEST, e.message().to_string()))?;
 
@@ -153,13 +162,25 @@ pub async fn attend_handler(
     let start = std::time::Instant::now();
     let raw_results = if use_hybrid {
         let query_text = payload.query_text.as_deref().unwrap_or(&payload.query);
-        state.service.engine.attend_hybrid(&payload.collection, &heads, &query_vec, query_text, fetch_count)
+        state
+            .service
+            .engine
+            .attend_hybrid(
+                &payload.collection,
+                &heads,
+                &query_vec,
+                query_text,
+                fetch_count,
+            )
             .map_err(|e| {
                 observability::record_error("rest_attend", &e.to_string());
                 (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
             })?
     } else {
-        state.service.engine.attend(&payload.collection, &heads, &query_vec, fetch_count)
+        state
+            .service
+            .engine
+            .attend(&payload.collection, &heads, &query_vec, fetch_count)
             .map_err(|e| {
                 observability::record_error("rest_attend", &e.to_string());
                 (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
@@ -168,19 +189,32 @@ pub async fn attend_handler(
     let latency = start.elapsed().as_secs_f64() * 1000.0;
 
     let total_count = raw_results.len() as u32;
-    let paged: Vec<(u64, f32)> = raw_results.into_iter().skip(offset_usize).take(top_k as usize).collect();
+    let paged: Vec<(u64, f32)> = raw_results
+        .into_iter()
+        .skip(offset_usize)
+        .take(top_k as usize)
+        .collect();
     let has_more = (offset_usize + paged.len()) < total_count as usize;
 
-    let results: Vec<serde_json::Value> = paged.into_iter().map(|(numeric_id, score)| {
-        let fields = state.service.engine.get_document_fields(numeric_id);
-        serde_json::json!({
-            "id": numeric_id.to_string(),
-            "score": score,
-            "fields": fields,
+    let results: Vec<serde_json::Value> = paged
+        .into_iter()
+        .map(|(numeric_id, score)| {
+            let fields = state.service.engine.get_document_fields(numeric_id);
+            serde_json::json!({
+                "id": numeric_id.to_string(),
+                "score": score,
+                "fields": fields,
+            })
         })
-    }).collect();
+        .collect();
 
-    observability::record_attend(&payload.collection, &heads, top_k as usize, results.len(), latency);
+    observability::record_attend(
+        &payload.collection,
+        &heads,
+        top_k as usize,
+        results.len(),
+        latency,
+    );
 
     Ok(Json(AttendResponse {
         results,
@@ -197,7 +231,10 @@ pub async fn insert_handler(
     Json(payload): Json<InsertRestRequest>,
 ) -> Result<Json<InsertRestResponse>, (StatusCode, String)> {
     let _permit = state.semaphore.acquire().await.map_err(|_| {
-        (StatusCode::SERVICE_UNAVAILABLE, "Too many concurrent requests".to_string())
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Too many concurrent requests".to_string(),
+        )
     })?;
     let _timer = observability::LatencyTimer::new("rest_insert");
 
@@ -212,7 +249,10 @@ pub async fn insert_handler(
     for (k, v) in &payload.fields {
         if let Ok(vec) = crate::server::parse_float_vector(v) {
             if !vec.is_empty() {
-                let head_name = if k.ends_with("_vector") || k.ends_with("_embedding") || k.ends_with("_head") {
+                let head_name = if k.ends_with("_vector")
+                    || k.ends_with("_embedding")
+                    || k.ends_with("_head")
+                {
                     k.split('_').next().unwrap_or("default").to_string()
                 } else {
                     k.clone()
@@ -224,7 +264,10 @@ pub async fn insert_handler(
     }
 
     if k_vecs.is_empty() {
-        return Err((StatusCode::BAD_REQUEST, "No vector embeddings found in fields".to_string()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "No vector embeddings found in fields".to_string(),
+        ));
     }
 
     let num_vectors = k_vecs.len();
@@ -232,7 +275,10 @@ pub async fn insert_handler(
     record.k_vecs = k_vecs;
 
     let start = std::time::Instant::now();
-    let id = state.service.engine.insert_document(&payload.collection, record)
+    let id = state
+        .service
+        .engine
+        .insert_document(&payload.collection, record)
         .map_err(|e| {
             observability::record_error("rest_insert", &e.to_string());
             (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
@@ -241,10 +287,7 @@ pub async fn insert_handler(
 
     observability::record_insert(&payload.collection, &id, num_vectors, latency);
 
-    Ok(Json(InsertRestResponse {
-        id,
-        success: true,
-    }))
+    Ok(Json(InsertRestResponse { id, success: true }))
 }
 
 pub async fn liveness_handler() -> (StatusCode, &'static str) {
@@ -255,9 +298,18 @@ pub async fn readiness_handler(State(state): State<AppState>) -> (StatusCode, St
     let is_healthy = state.service.engine.is_persistent();
     if is_healthy {
         let stats = state.service.engine.stats();
-        (StatusCode::OK, format!("ready (collections: {}, heads: {}, vectors: {})", stats.collection_count, stats.total_heads, stats.total_vectors))
+        (
+            StatusCode::OK,
+            format!(
+                "ready (collections: {}, heads: {}, vectors: {})",
+                stats.collection_count, stats.total_heads, stats.total_vectors
+            ),
+        )
     } else {
-        (StatusCode::SERVICE_UNAVAILABLE, "not ready — engine not fully initialized".to_string())
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "not ready — engine not fully initialized".to_string(),
+        )
     }
 }
 
@@ -267,9 +319,16 @@ pub async fn startup_handler() -> (StatusCode, &'static str) {
 
 pub async fn health_handler(State(state): State<AppState>) -> Json<HealthResponse> {
     let stats = state.service.engine.stats();
-    observability::record_engine_stats(stats.collection_count, stats.total_heads, stats.total_vectors);
+    observability::record_engine_stats(
+        stats.collection_count,
+        stats.total_heads,
+        stats.total_vectors,
+    );
     Json(HealthResponse {
-        status: format!("healthy (collections: {}, heads: {}, vectors: {})", stats.collection_count, stats.total_heads, stats.total_vectors),
+        status: format!(
+            "healthy (collections: {}, heads: {}, vectors: {})",
+            stats.collection_count, stats.total_heads, stats.total_vectors
+        ),
         version: env!("CARGO_PKG_VERSION").to_string(),
     })
 }
@@ -289,7 +348,8 @@ pub async fn create_collection_handler(
         hnsw_settings.ef_search = s.ef_search.unwrap_or(64) as usize;
         hnsw_settings.ef_construction = s.ef_construction.unwrap_or(400) as usize;
         hnsw_settings.max_nb_connection = s.max_connections.unwrap_or(16) as usize;
-        hnsw_settings.similarity_metric = s.similarity.clone().unwrap_or_else(|| "cosine".to_string());
+        hnsw_settings.similarity_metric =
+            s.similarity.clone().unwrap_or_else(|| "cosine".to_string());
         hnsw_settings.enable_exact_reranking = s.exact_rerank.unwrap_or(true);
         hnsw_settings.enable_gpu_fusion = s.enable_gpu_fusion.unwrap_or(false);
         hnsw_settings.enable_gpu_projections = s.enable_gpu_projections.unwrap_or(false);
@@ -329,12 +389,21 @@ pub async fn create_collection_handler(
         64
     };
     let ef_search = hnsw_settings.ef_search;
-    match state.service.engine.create_collection_with_settings(&payload.collection, dim, &head_refs, hnsw_settings.clone()) {
+    match state.service.engine.create_collection_with_settings(
+        &payload.collection,
+        dim,
+        &head_refs,
+        hnsw_settings.clone(),
+    ) {
         Ok(_) => {
             observability::record_create_collection(&payload.collection, &head_refs, ef_search);
             Json(CreateCollectionRestResponse {
                 success: true,
-                message: format!("Created collection '{}' with {} heads", payload.collection, heads.len()),
+                message: format!(
+                    "Created collection '{}' with {} heads",
+                    payload.collection,
+                    heads.len()
+                ),
             })
         }
         Err(e) => {
@@ -370,7 +439,11 @@ pub async fn alter_collection_handler(
     hnsw_settings.enable_gpu_projections = s.enable_gpu_projections.unwrap_or(false);
 
     let ef_search = hnsw_settings.ef_search;
-    match state.service.engine.alter_collection_settings(&collection, hnsw_settings) {
+    match state
+        .service
+        .engine
+        .alter_collection_settings(&collection, hnsw_settings)
+    {
         Ok(_) => {
             observability::record_create_collection(&collection, &[], ef_search);
             Json(AlterCollectionRestResponse {
@@ -412,13 +485,22 @@ pub fn create_rest_router_with_service(
     rate_limiter: Arc<RateLimiter>,
 ) -> Router {
     let semaphore = default_semaphore();
-    let state = AppState { service, api_keys: api_keys.clone(), metrics, rate_limiter: rate_limiter.clone(), semaphore };
+    let state = AppState {
+        service,
+        api_keys: api_keys.clone(),
+        metrics,
+        rate_limiter: rate_limiter.clone(),
+        semaphore,
+    };
 
     Router::new()
         .route("/v1/attend", post(attend_handler))
         .route("/v1/insert", post(insert_handler))
         .route("/v1/collections", post(create_collection_handler))
-        .route("/v1/collections/{collection}", put(alter_collection_handler))
+        .route(
+            "/v1/collections/{collection}",
+            put(alter_collection_handler),
+        )
         .route("/v1/admin/backup", post(crate::admin::backup_handler))
         .route("/v1/admin/backups", get(crate::admin::list_backups_handler))
         .route("/v1/admin/restore", post(crate::admin::restore_handler))
@@ -439,16 +521,32 @@ pub fn create_rest_router_with_service(
 pub async fn metrics_handler(State(state): State<AppState>) -> impl IntoResponse {
     if let Some(handle) = &state.metrics {
         let metrics = handle.render();
-        (StatusCode::OK, [("Content-Type", "text/plain; version=0.0.4")], metrics)
+        (
+            StatusCode::OK,
+            [("Content-Type", "text/plain; version=0.0.4")],
+            metrics,
+        )
     } else {
-        (StatusCode::SERVICE_UNAVAILABLE, [("Content-Type", "text/plain; charset=utf-8")], "Metrics not available".to_string())
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            [("Content-Type", "text/plain; charset=utf-8")],
+            "Metrics not available".to_string(),
+        )
     }
 }
 
 pub async fn openapi_json_handler() -> impl IntoResponse {
-    (StatusCode::OK, [("Content-Type", "application/json")], openapi::OPENAPI_SPEC)
+    (
+        StatusCode::OK,
+        [("Content-Type", "application/json")],
+        openapi::OPENAPI_SPEC,
+    )
 }
 
 pub async fn swagger_ui_handler() -> impl IntoResponse {
-    (StatusCode::OK, [("Content-Type", "text/html; charset=utf-8")], include_str!("swagger_ui.html"))
+    (
+        StatusCode::OK,
+        [("Content-Type", "text/html; charset=utf-8")],
+        include_str!("swagger_ui.html"),
+    )
 }

@@ -1,7 +1,7 @@
-use attentiondb_storage::sstable::{SSTableReader, SSTableWriter};
 use attentiondb_storage::record::Record;
-use tempfile::tempdir;
+use attentiondb_storage::sstable::{SSTableReader, SSTableWriter};
 use rand::Rng;
+use tempfile::tempdir;
 
 #[test]
 fn write_and_read_roundtrip() {
@@ -30,7 +30,9 @@ fn detect_crc_mismatch() {
     let path = dir.path().join("corrupt.sst");
 
     let mut writer = SSTableWriter::create(&path).unwrap();
-    writer.append(&Record::new(b"k".to_vec(), b"v".to_vec())).unwrap();
+    writer
+        .append(&Record::new(b"k".to_vec(), b"v".to_vec()))
+        .unwrap();
     writer.finish().unwrap();
 
     // flip a byte in the payload to corrupt CRC
@@ -78,7 +80,9 @@ fn large_payloads() {
     for i in 0..10 {
         let mut v = vec![0u8; 1024 * 1024];
         rng.fill(&mut v[..]);
-        writer.append(&Record::new(i.to_string().into_bytes(), v)).unwrap();
+        writer
+            .append(&Record::new(i.to_string().into_bytes(), v))
+            .unwrap();
     }
     writer.finish().unwrap();
 

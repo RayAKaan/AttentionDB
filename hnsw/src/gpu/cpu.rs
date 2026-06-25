@@ -33,7 +33,11 @@ impl GpuBackend for CpuBackend {
         matrix: &[f32],
         vectors: &[Vec<f32>],
     ) -> Result<Vec<Vec<f32>>, GpuError> {
-        let dim = if vectors.is_empty() { return Ok(Vec::new()); } else { vectors[0].len() };
+        let dim = if vectors.is_empty() {
+            return Ok(Vec::new());
+        } else {
+            vectors[0].len()
+        };
         let mut results = Vec::with_capacity(vectors.len());
 
         for vec in vectors {

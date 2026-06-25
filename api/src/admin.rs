@@ -2,12 +2,12 @@
 //!
 //! Provides administrative API endpoints for backup and restore operations.
 
+use crate::rest::AppState;
 use axum::{http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
-use crate::rest::AppState;
 
 #[derive(Serialize)]
 pub struct BackupResponse {
@@ -64,36 +64,51 @@ pub async fn backup_handler(
     let timestamp = format_timestamp(SystemTime::now());
     let backup_id = format!("backup_{}", timestamp);
 
-    let dest = payload.destination.map(PathBuf::from).unwrap_or_else(|| {
-        backups_dir().join(&backup_id)
-    });
-    std::fs::create_dir_all(&dest).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let dest = payload
+        .destination
+        .map(PathBuf::from)
+        .unwrap_or_else(|| backups_dir().join(&backup_id));
+    std::fs::create_dir_all(&dest)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let mut total_bytes = 0u64;
     let mut backed_up_collections = Vec::new();
 
     for coll_name in &collections {
-        let coll = engine.get_collection(coll_name)
+        let coll = engine
+            .get_collection(coll_name)
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
         let heads = coll.list_heads();
         let coll_dir = dest.join(coll_name);
-        std::fs::create_dir_all(&coll_dir).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        std::fs::create_dir_all(&coll_dir)
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
         for head_name in &heads {
             let head_dir = coll_dir.join(head_name);
-            std::fs::create_dir_all(&head_dir).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            std::fs::create_dir_all(&head_dir)
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
             match coll.head_manager.read().get_head(head_name) {
                 Ok(idx) => {
                     let idx_guard = idx.read();
-                    if let Err(e) = attentiondb_hnsw::persistence::save_index(&idx_guard, &head_dir) {
-                        return Err((StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to save index for {}/{}: {}", coll_name, head_name, e)));
+                    if let Err(e) = attentiondb_hnsw::persistence::save_index(&idx_guard, &head_dir)
+                    {
+                        return Err((
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            format!(
+                                "Failed to save index for {}/{}: {}",
+                                coll_name, head_name, e
+                            ),
+                        ));
                     }
                     total_bytes += dir_size(&head_dir);
                 }
                 Err(e) => {
-                    return Err((StatusCode::INTERNAL_SERVER_ERROR, format!("Head '{}' not found in '{}': {}", head_name, coll_name, e)));
+                    return Err((
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Head '{}' not found in '{}': {}", head_name, coll_name, e),
+                    ));
                 }
             }
         }
@@ -125,7 +140,10 @@ pub async fn backup_handler(
         if wal_path.exists() {
             let wal_backup = dest.join("engine.wal");
             if let Err(e) = std::fs::copy(&wal_path, &wal_backup) {
-                return Err((StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to copy WAL: {}", e)));
+                return Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to copy WAL: {}", e),
+                ));
             }
             if let Ok(meta) = std::fs::metadata(&wal_path) {
                 total_bytes += meta.len();
@@ -144,8 +162,7 @@ pub async fn backup_handler(
     }))
 }
 
-pub async fn list_backups_handler(
-) -> Result<Json<BackupsListResponse>, (StatusCode, String)> {
+pub async fn list_backups_handler() -> Result<Json<BackupsListResponse>, (StatusCode, String)> {
     let backup_dir = backups_dir();
     let mut backups = Vec::new();
 
@@ -161,7 +178,8 @@ pub async fn list_backups_handler(
         if !path.is_dir() {
             continue;
         }
-        let dir_name = path.file_name()
+        let dir_name = path
+            .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("")
             .to_string();
@@ -173,8 +191,13 @@ pub async fn list_backups_handler(
         let (collections, size_bytes) = if manifest_path.exists() {
             if let Ok(content) = std::fs::read_to_string(&manifest_path) {
                 if let Ok(manifest) = serde_json::from_str::<serde_json::Value>(&content) {
-                    let cols = manifest["collections"].as_array()
-                        .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect::<Vec<_>>())
+                    let cols = manifest["collections"]
+                        .as_array()
+                        .map(|a| {
+                            a.iter()
+                                .filter_map(|v| v.as_str().map(String::from))
+                                .collect::<Vec<_>>()
+                        })
                         .unwrap_or_default();
                     let size = manifest_path.metadata().map(|m| m.len()).unwrap_or(0);
                     (cols, dir_size(&path) + size)
@@ -207,12 +230,21 @@ pub async fn restore_handler(
     let backup_dir = backups_dir().join(&payload.backup_id);
 
     if !backup_dir.exists() {
-        return Err((StatusCode::NOT_FOUND, format!("Backup '{}' not found", payload.backup_id)));
+        return Err((
+            StatusCode::NOT_FOUND,
+            format!("Backup '{}' not found", payload.backup_id),
+        ));
     }
 
     let manifest_path = backup_dir.join("manifest.json");
     if !manifest_path.exists() {
-        return Err((StatusCode::BAD_REQUEST, format!("Backup '{}' is corrupted — manifest missing", payload.backup_id)));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!(
+                "Backup '{}' is corrupted — manifest missing",
+                payload.backup_id
+            ),
+        ));
     }
 
     let manifest_content = std::fs::read_to_string(&manifest_path)
@@ -220,7 +252,8 @@ pub async fn restore_handler(
     let manifest: serde_json::Value = serde_json::from_str(&manifest_content)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let collections = manifest["collections"].as_array()
+    let collections = manifest["collections"]
+        .as_array()
         .map(|a| a.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>())
         .unwrap_or_default();
 
@@ -228,7 +261,13 @@ pub async fn restore_handler(
     for coll in &collections {
         let coll_dir = backup_dir.join(coll);
         if !coll_dir.exists() {
-            return Err((StatusCode::BAD_REQUEST, format!("Backup is incomplete — collection '{}' directory missing", coll)));
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!(
+                    "Backup is incomplete — collection '{}' directory missing",
+                    coll
+                ),
+            ));
         }
     }
 

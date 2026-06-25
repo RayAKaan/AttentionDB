@@ -1,10 +1,10 @@
-use tonic::{Request, Response, Status};
+use crate::auth::ApiKeyStore;
+use crate::observability;
+use crate::validation;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tonic::{Request, Response, Status};
 use tracing::{debug, warn};
-use crate::auth::ApiKeyStore;
-use crate::validation;
-use crate::observability;
 
 pub mod attentiondb {
     tonic::include_proto!("attentiondb");
@@ -12,16 +12,11 @@ pub mod attentiondb {
 
 use attentiondb::attention_db_server::AttentionDb;
 use attentiondb::{
-    AttendRequest, AttendResponse, InsertRequest, InsertResponse,
-    DeleteRequest, DeleteResponse, HealthRequest, HealthResponse,
-    CreateCollectionRequest, CreateCollectionResponse,
-    GetCollectionSettingsRequest, GetCollectionSettingsResponse,
-    AlterCollectionRequest, AlterCollectionResponse,
-    CreateBackupRequest, CreateBackupResponse,
-    ListBackupsRequest, ListBackupsResponse,
-    RestoreBackupRequest, RestoreBackupResponse,
-    BackupInfo,
-    CollectionSettings,
+    AlterCollectionRequest, AlterCollectionResponse, AttendRequest, AttendResponse, BackupInfo,
+    CollectionSettings, CreateBackupRequest, CreateBackupResponse, CreateCollectionRequest,
+    CreateCollectionResponse, DeleteRequest, DeleteResponse, GetCollectionSettingsRequest,
+    GetCollectionSettingsResponse, HealthRequest, HealthResponse, InsertRequest, InsertResponse,
+    ListBackupsRequest, ListBackupsResponse, RestoreBackupRequest, RestoreBackupResponse,
 };
 
 #[derive(Clone)]
@@ -32,10 +27,16 @@ pub struct AttentionDBService {
 
 impl AttentionDBService {
     pub fn new(engine: Arc<attentiondb_core::engine::AttentionEngine>) -> Self {
-        Self { engine, api_keys: Arc::new(ApiKeyStore::disabled()) }
+        Self {
+            engine,
+            api_keys: Arc::new(ApiKeyStore::disabled()),
+        }
     }
 
-    pub fn with_auth(engine: Arc<attentiondb_core::engine::AttentionEngine>, api_keys: Arc<ApiKeyStore>) -> Self {
+    pub fn with_auth(
+        engine: Arc<attentiondb_core::engine::AttentionEngine>,
+        api_keys: Arc<ApiKeyStore>,
+    ) -> Self {
         Self { engine, api_keys }
     }
 }
@@ -49,11 +50,15 @@ impl Default for AttentionDBService {
 pub fn parse_float_vector(s: &str) -> Result<Vec<f32>, ()> {
     let s = s.trim();
     let s = if s.starts_with('[') && s.ends_with(']') {
-        &s[1..s.len()-1]
+        &s[1..s.len() - 1]
     } else {
         s
     };
-    let parts: Vec<&str> = s.split(',').map(|p| p.trim()).filter(|p| !p.is_empty()).collect();
+    let parts: Vec<&str> = s
+        .split(',')
+        .map(|p| p.trim())
+        .filter(|p| !p.is_empty())
+        .collect();
     if parts.is_empty() {
         return Err(());
     }
@@ -68,14 +73,20 @@ pub fn parse_float_vector(s: &str) -> Result<Vec<f32>, ()> {
     Ok(vec)
 }
 
-fn check_grpc_auth(api_keys: &ApiKeyStore, metadata: &tonic::metadata::MetadataMap) -> Result<(), Status> {
+fn check_grpc_auth(
+    api_keys: &ApiKeyStore,
+    metadata: &tonic::metadata::MetadataMap,
+) -> Result<(), Status> {
     if !api_keys.enabled {
         return Ok(());
     }
 
     if let Some(val) = metadata.get("authorization") {
         if let Ok(s) = val.to_str() {
-            if let Some(token) = s.strip_prefix("Bearer ").or_else(|| s.strip_prefix("bearer ")) {
+            if let Some(token) = s
+                .strip_prefix("Bearer ")
+                .or_else(|| s.strip_prefix("bearer "))
+            {
                 if api_keys.validate(token) {
                     return Ok(());
                 }
@@ -96,7 +107,9 @@ fn check_grpc_auth(api_keys: &ApiKeyStore, metadata: &tonic::metadata::MetadataM
     }
 
     warn!("gRPC: missing API key");
-    Err(Status::unauthenticated("API key required. Set Authorization: Bearer <key> or x-api-key metadata."))
+    Err(Status::unauthenticated(
+        "API key required. Set Authorization: Bearer <key> or x-api-key metadata.",
+    ))
 }
 
 #[tonic::async_trait]
@@ -113,8 +126,9 @@ impl AttentionDb for AttentionDBService {
         validation::validate_top_k(req.top_k)?;
         validation::validate_heads(&req.heads)?;
 
-        let query_vec = parse_float_vector(&req.query)
-            .map_err(|_| Status::invalid_argument(format!("Invalid query vector format: '{}'", req.query)))?;
+        let query_vec = parse_float_vector(&req.query).map_err(|_| {
+            Status::invalid_argument(format!("Invalid query vector format: '{}'", req.query))
+        })?;
         validation::validate_vector_dimension(query_vec.len())?;
 
         debug!(collection = %req.collection, heads = ?req.heads, top_k = req.top_k, offset = req.offset, "ATTEND request received");
@@ -134,30 +148,50 @@ impl AttentionDb for AttentionDBService {
 
         let start = std::time::Instant::now();
         let raw_results = if req.hybrid {
-            let query_text = if req.query_text.is_empty() { &req.query } else { &req.query_text };
-            self.engine.attend_hybrid(&req.collection, &heads, &query_vec, query_text, fetch_count)
+            let query_text = if req.query_text.is_empty() {
+                &req.query
+            } else {
+                &req.query_text
+            };
+            self.engine
+                .attend_hybrid(&req.collection, &heads, &query_vec, query_text, fetch_count)
         } else {
-            self.engine.attend(&req.collection, &heads, &query_vec, fetch_count)
-        }.map_err(|e| {
-                observability::record_error("attend", &e.to_string());
-                Status::internal(e.to_string())
-            })?;
+            self.engine
+                .attend(&req.collection, &heads, &query_vec, fetch_count)
+        }
+        .map_err(|e| {
+            observability::record_error("attend", &e.to_string());
+            Status::internal(e.to_string())
+        })?;
         let latency = start.elapsed().as_secs_f64() * 1000.0;
 
         let total_count = raw_results.len() as u32;
-        let paged: Vec<(u64, f32)> = raw_results.into_iter().skip(offset).take(req.top_k as usize).collect();
+        let paged: Vec<(u64, f32)> = raw_results
+            .into_iter()
+            .skip(offset)
+            .take(req.top_k as usize)
+            .collect();
         let has_more = (offset + paged.len()) < total_count as usize;
 
-        let results: Vec<attentiondb::Result> = paged.into_iter().map(|(numeric_id, score)| {
-            let fields = self.engine.get_document_fields(numeric_id);
-            attentiondb::Result {
-                id: numeric_id.to_string(),
-                score,
-                fields,
-            }
-        }).collect();
+        let results: Vec<attentiondb::Result> = paged
+            .into_iter()
+            .map(|(numeric_id, score)| {
+                let fields = self.engine.get_document_fields(numeric_id);
+                attentiondb::Result {
+                    id: numeric_id.to_string(),
+                    score,
+                    fields,
+                }
+            })
+            .collect();
 
-        observability::record_attend(&req.collection, &heads, req.top_k as usize, results.len(), latency);
+        observability::record_attend(
+            &req.collection,
+            &heads,
+            req.top_k as usize,
+            results.len(),
+            latency,
+        );
 
         Ok(Response::new(AttendResponse {
             results,
@@ -186,7 +220,10 @@ impl AttentionDb for AttentionDBService {
         for (k, v) in &req.fields {
             if let Ok(vec) = parse_float_vector(v) {
                 if !vec.is_empty() {
-                    let head_name = if k.ends_with("_vector") || k.ends_with("_embedding") || k.ends_with("_head") {
+                    let head_name = if k.ends_with("_vector")
+                        || k.ends_with("_embedding")
+                        || k.ends_with("_head")
+                    {
                         k.split('_').next().unwrap_or("default").to_string()
                     } else {
                         k.clone()
@@ -208,7 +245,9 @@ impl AttentionDb for AttentionDBService {
 
         let num_vecs = record.k_vecs.len();
         let start = std::time::Instant::now();
-        let id_str = self.engine.insert_document(&req.collection, record)
+        let id_str = self
+            .engine
+            .insert_document(&req.collection, record)
             .map_err(|e| {
                 observability::record_error("insert", &e.to_string());
                 Status::internal(e.to_string())
@@ -231,7 +270,9 @@ impl AttentionDb for AttentionDBService {
         let req = request.into_inner();
         validation::validate_collection_name(&req.collection)?;
 
-        let success = self.engine.delete_document(&req.collection, &req.id)
+        let success = self
+            .engine
+            .delete_document(&req.collection, &req.id)
             .map_err(|e| {
                 observability::record_error("delete", &e.to_string());
                 Status::internal(e.to_string())
@@ -246,10 +287,17 @@ impl AttentionDb for AttentionDBService {
         _request: Request<HealthRequest>,
     ) -> Result<Response<HealthResponse>, Status> {
         let stats = self.engine.stats();
-        observability::record_engine_stats(stats.collection_count, stats.total_heads, stats.total_vectors);
+        observability::record_engine_stats(
+            stats.collection_count,
+            stats.total_heads,
+            stats.total_vectors,
+        );
 
         Ok(Response::new(HealthResponse {
-            status: format!("healthy (collections: {}, heads: {}, vectors: {})", stats.collection_count, stats.total_heads, stats.total_vectors),
+            status: format!(
+                "healthy (collections: {}, heads: {}, vectors: {})",
+                stats.collection_count, stats.total_heads, stats.total_vectors
+            ),
             version: env!("CARGO_PKG_VERSION").to_string(),
         }))
     }
@@ -272,7 +320,9 @@ impl AttentionDb for AttentionDBService {
             hnsw_settings.enable_gpu_projections = s.enable_gpu_projections;
         }
 
-        hnsw_settings.validate().map_err(|e| Status::invalid_argument(e))?;
+        hnsw_settings
+            .validate()
+            .map_err(|e| Status::invalid_argument(e))?;
 
         let heads: Vec<String> = if req.head_settings.is_empty() {
             vec!["default".to_string()]
@@ -289,13 +339,23 @@ impl AttentionDb for AttentionDBService {
             64
         };
 
-        self.engine.create_collection_with_settings(&req.collection, dimension, &head_refs, hnsw_settings.clone())
+        self.engine
+            .create_collection_with_settings(
+                &req.collection,
+                dimension,
+                &head_refs,
+                hnsw_settings.clone(),
+            )
             .map_err(|e| {
                 observability::record_error("create_collection", &e.to_string());
                 Status::internal(e.to_string())
             })?;
 
-        observability::record_create_collection(&req.collection, &head_refs, hnsw_settings.ef_search);
+        observability::record_create_collection(
+            &req.collection,
+            &head_refs,
+            hnsw_settings.ef_search,
+        );
 
         let per_head_count = req.head_settings.len();
         let mut msg = format!(
@@ -311,7 +371,9 @@ impl AttentionDb for AttentionDBService {
         );
 
         if per_head_count > 0 {
-            let head_info: Vec<String> = req.head_settings.iter()
+            let head_info: Vec<String> = req
+                .head_settings
+                .iter()
                 .map(|(name, s)| format!("{}: (ef_search={})", name, s.ef_search))
                 .collect();
             msg.push_str(&format!(". Per-head settings: [{}]", head_info.join(", ")));
@@ -330,7 +392,9 @@ impl AttentionDb for AttentionDBService {
         check_grpc_auth(&self.api_keys, request.metadata())?;
         let req = request.into_inner();
         validation::validate_collection_name(&req.collection)?;
-        let coll = self.engine.get_collection(&req.collection)
+        let coll = self
+            .engine
+            .get_collection(&req.collection)
             .map_err(|e| Status::not_found(e.to_string()))?;
 
         let s = coll.settings.read();
@@ -367,9 +431,12 @@ impl AttentionDb for AttentionDBService {
             enable_gpu_projections: s.enable_gpu_projections,
         };
 
-        hnsw_settings.validate().map_err(|e| Status::invalid_argument(e))?;
+        hnsw_settings
+            .validate()
+            .map_err(|e| Status::invalid_argument(e))?;
 
-        self.engine.alter_collection_settings(&req.collection, hnsw_settings.clone())
+        self.engine
+            .alter_collection_settings(&req.collection, hnsw_settings.clone())
             .map_err(|e| {
                 observability::record_error("alter_collection", &e.to_string());
                 Status::internal(e.to_string())
@@ -388,7 +455,9 @@ impl AttentionDb for AttentionDBService {
         );
 
         if per_head_count > 0 {
-            let head_info: Vec<String> = req.head_settings.iter()
+            let head_info: Vec<String> = req
+                .head_settings
+                .iter()
                 .map(|(name, s)| format!("{}: (ef_search={})", name, s.ef_search))
                 .collect();
             msg.push_str(&format!(". Per-head settings: [{}]", head_info.join(", ")));
@@ -413,19 +482,25 @@ impl AttentionDb for AttentionDBService {
         let backup_id = format!("backup_{}", timestamp);
 
         let dest = if req.destination.is_empty() {
-            std::path::PathBuf::from(std::env::var("ATTENTIONDB_DATA_DIR").unwrap_or_else(|_| "/data".into()))
-                .parent().unwrap_or(std::path::Path::new("/data"))
-                .join("backups").join(&backup_id)
+            std::path::PathBuf::from(
+                std::env::var("ATTENTIONDB_DATA_DIR").unwrap_or_else(|_| "/data".into()),
+            )
+            .parent()
+            .unwrap_or(std::path::Path::new("/data"))
+            .join("backups")
+            .join(&backup_id)
         } else {
             std::path::PathBuf::from(&req.destination)
         };
-        std::fs::create_dir_all(&dest).map_err(|e| Status::internal(format!("Failed to create backup directory: {}", e)))?;
+        std::fs::create_dir_all(&dest)
+            .map_err(|e| Status::internal(format!("Failed to create backup directory: {}", e)))?;
 
         let mut backed_up_collections = Vec::new();
         let mut total_bytes = 0u64;
 
         for coll_name in &collections {
-            let coll = engine.get_collection(coll_name)
+            let coll = engine
+                .get_collection(coll_name)
                 .map_err(|e| Status::internal(e.to_string()))?;
             let heads = coll.list_heads();
             let coll_dir = dest.join(coll_name);
@@ -438,8 +513,9 @@ impl AttentionDb for AttentionDBService {
                 match coll.head_manager.read().get_head(head_name) {
                     Ok(idx) => {
                         let idx_guard = idx.read();
-                        attentiondb_hnsw::persistence::save_index(&idx_guard, &head_dir)
-                            .map_err(|e| Status::internal(format!("Failed to save index: {}", e)))?;
+                        attentiondb_hnsw::persistence::save_index(&idx_guard, &head_dir).map_err(
+                            |e| Status::internal(format!("Failed to save index: {}", e)),
+                        )?;
                         if let Ok(meta) = std::fs::metadata(&head_dir) {
                             total_bytes += meta.len();
                         }
@@ -459,14 +535,17 @@ impl AttentionDb for AttentionDBService {
                 "backup_id": backup_id,
                 "timestamp": timestamp,
                 "collections": backed_up_collections,
-            })).map_err(|e| Status::internal(e.to_string()))?
-        ).map_err(|e| Status::internal(e.to_string()))?;
+            }))
+            .map_err(|e| Status::internal(e.to_string()))?,
+        )
+        .map_err(|e| Status::internal(e.to_string()))?;
 
         // Copy WAL if persistent
         if engine.is_persistent() {
             let wal_path = std::path::PathBuf::from(
-                std::env::var("ATTENTIONDB_DATA_DIR").unwrap_or_else(|_| "/data".into())
-            ).join("engine.wal");
+                std::env::var("ATTENTIONDB_DATA_DIR").unwrap_or_else(|_| "/data".into()),
+            )
+            .join("engine.wal");
             if wal_path.exists() {
                 std::fs::copy(&wal_path, dest.join("engine.wal"))
                     .map_err(|e| Status::internal(format!("Failed to copy WAL: {}", e)))?;
@@ -491,15 +570,29 @@ impl AttentionDb for AttentionDBService {
     ) -> Result<Response<ListBackupsResponse>, Status> {
         check_grpc_auth(&self.api_keys, _request.metadata())?;
         let data_dir = std::env::var("ATTENTIONDB_DATA_DIR").unwrap_or_else(|_| "/data".into());
-        let backup_root = std::path::Path::new(&data_dir).parent().unwrap_or(std::path::Path::new("/data")).join("backups");
+        let backup_root = std::path::Path::new(&data_dir)
+            .parent()
+            .unwrap_or(std::path::Path::new("/data"))
+            .join("backups");
 
         let mut backups = Vec::new();
         if backup_root.exists() {
-            for entry in std::fs::read_dir(&backup_root).map_err(|e| Status::internal(e.to_string()))?.flatten() {
+            for entry in std::fs::read_dir(&backup_root)
+                .map_err(|e| Status::internal(e.to_string()))?
+                .flatten()
+            {
                 let path = entry.path();
-                if !path.is_dir() { continue; }
-                let dir_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
-                if !dir_name.starts_with("backup_") { continue; }
+                if !path.is_dir() {
+                    continue;
+                }
+                let dir_name = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("")
+                    .to_string();
+                if !dir_name.starts_with("backup_") {
+                    continue;
+                }
 
                 let mut collections = Vec::new();
                 let mut size_bytes = 0u64;
@@ -536,16 +629,25 @@ impl AttentionDb for AttentionDBService {
         check_grpc_auth(&self.api_keys, request.metadata())?;
         let req = request.into_inner();
         let data_dir = std::env::var("ATTENTIONDB_DATA_DIR").unwrap_or_else(|_| "/data".into());
-        let backup_dir = std::path::Path::new(&data_dir).parent().unwrap_or(std::path::Path::new("/data"))
-            .join("backups").join(&req.backup_id);
+        let backup_dir = std::path::Path::new(&data_dir)
+            .parent()
+            .unwrap_or(std::path::Path::new("/data"))
+            .join("backups")
+            .join(&req.backup_id);
 
         if !backup_dir.exists() {
-            return Err(Status::not_found(format!("Backup '{}' not found", req.backup_id)));
+            return Err(Status::not_found(format!(
+                "Backup '{}' not found",
+                req.backup_id
+            )));
         }
 
         let manifest_path = backup_dir.join("manifest.json");
         if !manifest_path.exists() {
-            return Err(Status::failed_precondition(format!("Backup '{}' is corrupted — manifest missing", req.backup_id)));
+            return Err(Status::failed_precondition(format!(
+                "Backup '{}' is corrupted — manifest missing",
+                req.backup_id
+            )));
         }
 
         Ok(Response::new(RestoreBackupResponse {

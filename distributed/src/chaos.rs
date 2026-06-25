@@ -44,7 +44,7 @@ mod tests {
     #[test]
     fn test_availability_threshold() {
         let chaos = ChaosTester::new(5);
-        assert!(chaos.verify_availability(3));  // 3/5 >= 50%
+        assert!(chaos.verify_availability(3)); // 3/5 >= 50%
         assert!(!chaos.verify_availability(2)); // 2/5 < 50%
     }
 

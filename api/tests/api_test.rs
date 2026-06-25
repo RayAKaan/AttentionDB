@@ -1,9 +1,14 @@
-use attentiondb_api::{AttentionDBService, ApiKeyStore, create_rest_router_with_service};
 use attentiondb_api::server::attentiondb::attention_db_server::AttentionDb;
-use attentiondb_api::server::attentiondb::{InsertRequest, AttendRequest, CreateCollectionRequest, CollectionSettings};
+use attentiondb_api::server::attentiondb::{
+    AttendRequest, CollectionSettings, CreateCollectionRequest, InsertRequest,
+};
+use attentiondb_api::{create_rest_router_with_service, ApiKeyStore, AttentionDBService};
+use axum::{
+    body::Body,
+    http::{self, Request as AxumRequest, StatusCode},
+};
 use std::sync::Arc;
 use tonic::Request;
-use axum::{body::Body, http::{self, Request as AxumRequest, StatusCode}};
 use tower::ServiceExt;
 
 #[tokio::test]
@@ -41,7 +46,9 @@ async fn test_grpc_end_to_end_insert_and_attend() {
         }),
         head_settings: std::collections::HashMap::new(),
     };
-    svc.create_collection(Request::new(create_req)).await.unwrap();
+    svc.create_collection(Request::new(create_req))
+        .await
+        .unwrap();
 
     let mut test_vec = vec![0.0f32; 64];
     test_vec[0] = 1.0;
@@ -55,7 +62,11 @@ async fn test_grpc_end_to_end_insert_and_attend() {
         collection: "papers".to_string(),
         fields,
     };
-    let insert_res = svc.insert(Request::new(insert_req)).await.unwrap().into_inner();
+    let insert_res = svc
+        .insert(Request::new(insert_req))
+        .await
+        .unwrap()
+        .into_inner();
     assert!(insert_res.success);
 
     let attend_req = AttendRequest {
@@ -66,10 +77,20 @@ async fn test_grpc_end_to_end_insert_and_attend() {
         min_weight: 0.0,
         temporal_decay: None,
     };
-    let attend_res = svc.attend(Request::new(attend_req)).await.unwrap().into_inner();
+    let attend_res = svc
+        .attend(Request::new(attend_req))
+        .await
+        .unwrap()
+        .into_inner();
 
     assert_eq!(attend_res.results.len(), 1);
-    assert_eq!(attend_res.results[0].fields.get("title").map(|s| s.as_str()), Some("Attention Is All You Need"));
+    assert_eq!(
+        attend_res.results[0]
+            .fields
+            .get("title")
+            .map(|s| s.as_str()),
+        Some("Attention Is All You Need")
+    );
 }
 
 #[tokio::test]
@@ -126,7 +147,9 @@ async fn test_rest_end_to_end_insert_and_attend() {
     let res = app.oneshot(req).await.unwrap();
     assert_eq!(res.status(), StatusCode::OK);
 
-    let body_bytes = axum::body::to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let body_bytes = axum::body::to_bytes(res.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let attend_res: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
 
     let results = attend_res["results"].as_array().unwrap();

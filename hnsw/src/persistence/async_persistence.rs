@@ -4,13 +4,11 @@ use std::path::Path;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 
-pub async fn save_index_async(
-    index: &HNSWIndex,
-    dir: &Path,
-) -> Result<(), PersistenceError> {
+pub async fn save_index_async(index: &HNSWIndex, dir: &Path) -> Result<(), PersistenceError> {
     fs::create_dir_all(dir).await?;
 
-    let checksum: u64 = index.vectors
+    let checksum: u64 = index
+        .vectors
         .iter()
         .flat_map(|(_, vec)| vec)
         .map(|v| v.to_bits() as u64)

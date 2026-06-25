@@ -8,12 +8,12 @@
 //!
 //! Future Improvement: Real graph serialization (requires changes to hnsw_rs or custom implementation).
 
-use crate::hnsw_index::{HNSWIndex, HNSWConfig};
+use crate::hnsw_index::{HNSWConfig, HNSWIndex};
 use crate::persistence::error::PersistenceError;
-use std::path::Path;
+use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{Read, Write};
-use serde::{Serialize, Deserialize};
+use std::path::Path;
 
 /// Metadata stored with each persisted index
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -31,7 +31,8 @@ pub struct IndexMetadata {
 pub fn save_index(index: &HNSWIndex, dir: &Path) -> Result<(), PersistenceError> {
     std::fs::create_dir_all(dir)?;
 
-    let checksum = index.vectors
+    let checksum = index
+        .vectors
         .iter()
         .flat_map(|(_, vec)| vec)
         .map(|v| v.to_bits() as u64)
@@ -77,7 +78,10 @@ pub fn save_index(index: &HNSWIndex, dir: &Path) -> Result<(), PersistenceError>
 }
 
 /// Append new vectors to an existing persisted index (incremental update)
-pub fn append_vectors(dir: &Path, new_vectors: &[(u64, Vec<f32>)]) -> Result<usize, PersistenceError> {
+pub fn append_vectors(
+    dir: &Path,
+    new_vectors: &[(u64, Vec<f32>)],
+) -> Result<usize, PersistenceError> {
     if new_vectors.is_empty() {
         return Ok(0);
     }
@@ -157,10 +161,7 @@ fn migrate_metadata(metadata: &mut IndexMetadata) -> Result<(), PersistenceError
 /// Load an HNSW index from disk (rebuilds the graph).
 ///
 /// Optionally accepts a progress callback that is invoked periodically during loading.
-pub fn load_index<F>(
-    dir: &Path,
-    progress: Option<F>,
-) -> Result<HNSWIndex, PersistenceError>
+pub fn load_index<F>(dir: &Path, progress: Option<F>) -> Result<HNSWIndex, PersistenceError>
 where
     F: FnMut(LoadProgress),
 {
@@ -176,7 +177,9 @@ where
 {
     let meta_path = dir.join("metadata.json");
     if !meta_path.exists() {
-        return Err(PersistenceError::IndexNotFound(dir.to_string_lossy().to_string()));
+        return Err(PersistenceError::IndexNotFound(
+            dir.to_string_lossy().to_string(),
+        ));
     }
 
     let meta_json = std::fs::read_to_string(&meta_path)?;
@@ -187,7 +190,9 @@ where
 
     let vectors_path = dir.join("vectors.bin");
     if !vectors_path.exists() {
-        return Err(PersistenceError::IndexNotFound(vectors_path.to_string_lossy().to_string()));
+        return Err(PersistenceError::IndexNotFound(
+            vectors_path.to_string_lossy().to_string(),
+        ));
     }
 
     let mut file = File::open(&vectors_path)?;

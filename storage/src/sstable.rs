@@ -1,9 +1,9 @@
-use std::fs::File;
-use std::io::{Write, Read};
-use std::path::Path;
-use serde::{Serialize, Deserialize};
 use crate::error::StorageError;
 use crc32fast::Hasher;
+use serde::{Deserialize, Serialize};
+use std::fs::File;
+use std::io::{Read, Write};
+use std::path::Path;
 
 const SSTABLE_MAGIC: u32 = 0xA54D_4244; // 'A' 'M' 'B' 'D'
 
@@ -43,8 +43,8 @@ impl SSTableWriter {
     pub fn flush(&mut self) -> Result<(), StorageError> {
         self.entries.sort_by(|a, b| a.key.cmp(&b.key));
 
-        let payload = bincode::serialize(&self.entries)
-            .map_err(|e| StorageError::Sstable(e.to_string()))?;
+        let payload =
+            bincode::serialize(&self.entries).map_err(|e| StorageError::Sstable(e.to_string()))?;
         let mut hasher = Hasher::new();
         hasher.update(&payload);
         let crc32 = hasher.finalize();
@@ -79,17 +79,17 @@ impl SSTableReader {
                 hasher.update(payload);
                 let actual_crc = hasher.finalize();
                 if actual_crc != expected_crc {
-                    return Err(StorageError::Sstable(format!("SSTable checksum mismatch: expected {:08x}, actual {:08x}", expected_crc, actual_crc)));
+                    return Err(StorageError::Sstable(format!(
+                        "SSTable checksum mismatch: expected {:08x}, actual {:08x}",
+                        expected_crc, actual_crc
+                    )));
                 }
-                bincode::deserialize(payload)
-                    .map_err(|e| StorageError::Sstable(e.to_string()))?
+                bincode::deserialize(payload).map_err(|e| StorageError::Sstable(e.to_string()))?
             } else {
-                bincode::deserialize(&buf)
-                    .map_err(|e| StorageError::Sstable(e.to_string()))?
+                bincode::deserialize(&buf).map_err(|e| StorageError::Sstable(e.to_string()))?
             }
         } else {
-            bincode::deserialize(&buf)
-                .map_err(|e| StorageError::Sstable(e.to_string()))?
+            bincode::deserialize(&buf).map_err(|e| StorageError::Sstable(e.to_string()))?
         };
 
         Ok(Self { entries })
@@ -103,10 +103,12 @@ impl SSTableReader {
     }
 
     pub fn range(&self, start: &[u8], end: &[u8]) -> Vec<&SSTableEntry> {
-        let start_idx = self.entries
+        let start_idx = self
+            .entries
             .binary_search_by(|e| e.key.as_slice().cmp(start))
             .unwrap_or_else(|i| i);
-        let end_idx = self.entries
+        let end_idx = self
+            .entries
             .binary_search_by(|e| e.key.as_slice().cmp(end))
             .unwrap_or_else(|i| i);
         self.entries[start_idx..end_idx].iter().collect()
@@ -125,9 +127,15 @@ impl SSTableReader {
     }
 }
 
-pub fn sstable_entries_from_map(map: std::collections::BTreeMap<Vec<u8>, Vec<u8>>) -> Vec<SSTableEntry> {
+pub fn sstable_entries_from_map(
+    map: std::collections::BTreeMap<Vec<u8>, Vec<u8>>,
+) -> Vec<SSTableEntry> {
     let now = chrono::Utc::now().timestamp_millis();
     map.into_iter()
-        .map(|(key, value)| SSTableEntry { key, value, timestamp: now })
+        .map(|(key, value)| SSTableEntry {
+            key,
+            value,
+            timestamp: now,
+        })
         .collect()
 }

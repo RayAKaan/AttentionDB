@@ -8,9 +8,18 @@ const CYAN: &str = "\x1b[36m";
 const BOLD: &str = "\x1b[1m";
 
 fn print_banner() {
-    println!("{}{}╔════════════════════════════════════════════════════════════╗{}", BOLD, CYAN, RESET);
-    println!("{}{}║                    AttentionDB REPL                        ║{}", BOLD, CYAN, RESET);
-    println!("{}{}╚════════════════════════════════════════════════════════════╝{}", BOLD, CYAN, RESET);
+    println!(
+        "{}{}╔════════════════════════════════════════════════════════════╗{}",
+        BOLD, CYAN, RESET
+    );
+    println!(
+        "{}{}║                    AttentionDB REPL                        ║{}",
+        BOLD, CYAN, RESET
+    );
+    println!(
+        "{}{}╚════════════════════════════════════════════════════════════╝{}",
+        BOLD, CYAN, RESET
+    );
     println!();
     println!("Type 'help' for available commands, 'quit' to exit.");
     println!();
@@ -19,15 +28,42 @@ fn print_banner() {
 fn print_help() {
     println!("{}Available commands:{}", BOLD, RESET);
     println!();
-    println!("  {}create <name>{}              Create a new collection", CYAN, RESET);
-    println!("  {}list / ls{}                  List all collections", CYAN, RESET);
-    println!("  {}insert <collection>{}        Insert a vector interactively", CYAN, RESET);
-    println!("  {}query <collection> <text>{}  Run a simple query", CYAN, RESET);
-    println!("  {}aql <statement>{}            Execute a raw AQL statement", CYAN, RESET);
-    println!("  {}status{}                     Show current engine state", CYAN, RESET);
-    println!("  {}clear{}                      Clear the screen", CYAN, RESET);
-    println!("  {}help / ?{}                   Show this help message", CYAN, RESET);
-    println!("  {}quit / exit{}                Exit the REPL", CYAN, RESET);
+    println!(
+        "  {}create <name>{}              Create a new collection",
+        CYAN, RESET
+    );
+    println!(
+        "  {}list / ls{}                  List all collections",
+        CYAN, RESET
+    );
+    println!(
+        "  {}insert <collection>{}        Insert a vector interactively",
+        CYAN, RESET
+    );
+    println!(
+        "  {}query <collection> <text>{}  Run a simple query",
+        CYAN, RESET
+    );
+    println!(
+        "  {}aql <statement>{}            Execute a raw AQL statement",
+        CYAN, RESET
+    );
+    println!(
+        "  {}status{}                     Show current engine state",
+        CYAN, RESET
+    );
+    println!(
+        "  {}clear{}                      Clear the screen",
+        CYAN, RESET
+    );
+    println!(
+        "  {}help / ?{}                   Show this help message",
+        CYAN, RESET
+    );
+    println!(
+        "  {}quit / exit{}                Exit the REPL",
+        CYAN, RESET
+    );
     println!();
     println!("{}Examples:{}", BOLD, RESET);
     println!("  create papers");
@@ -88,7 +124,14 @@ fn main() {
             "status" => {
                 println!("{}Engine Status:{}", BOLD, RESET);
                 println!("  Collections: {}", collections.len());
-                println!("  Persistence: {}", if engine.is_persistent() { "Enabled" } else { "In-memory only" });
+                println!(
+                    "  Persistence: {}",
+                    if engine.is_persistent() {
+                        "Enabled"
+                    } else {
+                        "In-memory only"
+                    }
+                );
             }
 
             "create" => {
@@ -130,11 +173,17 @@ fn main() {
                 let collection = parts[1];
 
                 if !collections.contains(&collection.to_string()) {
-                    print_error(&format!("Collection '{}' does not exist. Create it first with 'create {}'.", collection, collection));
+                    print_error(&format!(
+                        "Collection '{}' does not exist. Create it first with 'create {}'.",
+                        collection, collection
+                    ));
                     continue;
                 }
 
-                println!("Enter vector data in the format {}head_name=value1,value2,...{}.", CYAN, RESET);
+                println!(
+                    "Enter vector data in the format {}head_name=value1,value2,...{}.",
+                    CYAN, RESET
+                );
                 println!("Example: {}semantic=0.1,0.2,0.3,0.4{}", CYAN, RESET);
                 println!("Type 'done' when finished, or 'cancel' to abort.");
 
@@ -162,7 +211,9 @@ fn main() {
                             .collect();
 
                         if vec.is_empty() {
-                            print_error("No valid numbers found. Use format: head_name=0.1,0.2,0.3");
+                            print_error(
+                                "No valid numbers found. Use format: head_name=0.1,0.2,0.3",
+                            );
                             continue;
                         }
 
@@ -170,7 +221,9 @@ fn main() {
                             Ok(_) => {
                                 print_success(&format!(
                                     "Inserted id={} into head '{}' (dim={})",
-                                    next_id, head_name, vec.len()
+                                    next_id,
+                                    head_name,
+                                    vec.len()
                                 ));
                                 next_id += 1;
                             }

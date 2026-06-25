@@ -46,7 +46,9 @@ impl AttentionDBClient {
         });
 
         let response = self.client.attend(request).await?;
-        let results = response.into_inner().results
+        let results = response
+            .into_inner()
+            .results
             .into_iter()
             .map(|r| (r.id, r.score))
             .collect();

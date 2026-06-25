@@ -1,5 +1,5 @@
+use attentiondb_query::{parse_aql, plan_query, AQLStatement, QueryExecutor};
 use std::collections::HashMap;
-use attentiondb_query::{parse_aql, plan_query, QueryExecutor, AQLStatement};
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");
@@ -40,14 +40,30 @@ fn main() {
             println!("   HNSW heads:     {:?}", plan.hnsw_search.heads);
             println!("   ef:             {}", plan.hnsw_search.ef);
             println!("   Overfetch:      {}", plan.hnsw_search.k);
-            println!("   Exact rerank:   {}", if plan.exact_rerank.is_some() { "yes" } else { "no" });
+            println!(
+                "   Exact rerank:   {}",
+                if plan.exact_rerank.is_some() {
+                    "yes"
+                } else {
+                    "no"
+                }
+            );
 
             println!("\n→ Executing...");
-            let index = attentiondb_hnsw::HNSWIndex::new("papers", 256, attentiondb_hnsw::HNSWConfig::default());
+            let index = attentiondb_hnsw::HNSWIndex::new(
+                "papers",
+                256,
+                attentiondb_hnsw::HNSWConfig::default(),
+            );
             let query_vector = vec![0.1; 256];
             let result = QueryExecutor::execute(&plan, &index, &query_vector).unwrap();
-            println!("   Status: Heads: {} | Top-K: {} | Results: {} | Latency: {:.3}ms",
-                     plan.hnsw_search.heads.len(), plan.top_k, result.ids.len(), result.latency_ms);
+            println!(
+                "   Status: Heads: {} | Top-K: {} | Results: {} | Latency: {:.3}ms",
+                plan.hnsw_search.heads.len(),
+                plan.top_k,
+                result.ids.len(),
+                result.latency_ms
+            );
             println!("\n   Results:");
             for (i, (id, score)) in result.ids.iter().zip(result.scores.iter()).enumerate() {
                 println!("   {:>3}.  ID: {:>6}  Score: {:.4}", i + 1, id, score);
@@ -88,15 +104,25 @@ fn main() {
     match &alter_parsed {
         AQLStatement::AlterCollection(a) => {
             println!("   Collection: {}", a.collection);
-            println!("   New Settings: ef_search={}, max_connections={}, exact_rerank={}",
-                     a.settings.ef_search, a.settings.max_nb_connection, a.settings.enable_exact_reranking);
+            println!(
+                "   New Settings: ef_search={}, max_connections={}, exact_rerank={}",
+                a.settings.ef_search,
+                a.settings.max_nb_connection,
+                a.settings.enable_exact_reranking
+            );
         }
         _ => {}
     }
 
     let mut empty_indexes = HashMap::new();
     let mut empty_managers = HashMap::new();
-    let alter_result = QueryExecutor::execute_statement(&alter_parsed, &mut empty_indexes, &mut empty_managers, None).unwrap();
+    let alter_result = QueryExecutor::execute_statement(
+        &alter_parsed,
+        &mut empty_indexes,
+        &mut empty_managers,
+        None,
+    )
+    .unwrap();
     println!("\n→ Executor result: {}", alter_result.message);
 
     println!("\n✅ Phase 3 demo completed successfully.");

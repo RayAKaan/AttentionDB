@@ -1,5 +1,5 @@
-use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId, black_box};
-use attentiondb_hnsw::{HNSWIndex, HNSWConfig};
+use attentiondb_hnsw::{HNSWConfig, HNSWIndex};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use rand::Rng;
 
 fn generate_vector(dim: usize) -> Vec<f32> {
@@ -37,14 +37,16 @@ fn hnsw_benchmark(c: &mut Criterion) {
 
     group.finish();
 
-    println!("\nDone. {} vectors indexed, {} queries across 5 ef values",
-             index.len(), 5);
+    println!(
+        "\nDone. {} vectors indexed, {} queries across 5 ef values",
+        index.len(),
+        5
+    );
 }
 
 fn hnsw_insert_benchmark(c: &mut Criterion) {
     let dim = 256;
-    let config = HNSWConfig::new()
-        .with_vector_storage(true);
+    let config = HNSWConfig::new().with_vector_storage(true);
 
     c.bench_function("hnsw_insert_10k", |b| {
         b.iter_with_setup(
@@ -60,7 +62,7 @@ fn hnsw_insert_benchmark(c: &mut Criterion) {
                 for (id, vec) in vectors {
                     index.insert(id, &vec).unwrap();
                 }
-            }
+            },
         )
     });
 }

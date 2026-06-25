@@ -1,11 +1,11 @@
+pub mod contrastive;
 pub mod error;
 pub mod projection;
-pub mod contrastive;
-pub mod trainer;
 pub mod reprojection;
+pub mod trainer;
 
-pub use projection::{ProjectionMatrix, ProjectionConfig};
 pub use contrastive::ContrastiveLoss;
-pub use trainer::ProjectionTrainer;
-pub use reprojection::ReprojectionJob;
 pub use error::LearnedError;
+pub use projection::{ProjectionConfig, ProjectionMatrix};
+pub use reprojection::ReprojectionJob;
+pub use trainer::ProjectionTrainer;

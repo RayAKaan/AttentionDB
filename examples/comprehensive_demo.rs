@@ -1,20 +1,26 @@
-use attentiondb_query::parse_aql;
 use attentiondb_hnsw::HNSWConfig;
-use attentiondb_multihead::{MultiHeadManager, HeadConfig, HeadType};
+use attentiondb_multihead::{HeadConfig, HeadType, MultiHeadManager};
+use attentiondb_query::parse_aql;
 use std::collections::HashMap;
 use std::time::Instant;
 
 fn generate_distinct(seed: u64, dim: usize) -> Vec<f32> {
-    let mut v: Vec<f32> = (0..dim).map(|x| {
-        let f = (seed as f32) * 0.1 + (x as f32) * 0.3;
-        f.sin() * (seed % 7 + 1) as f32 * 0.15
-    }).collect();
+    let mut v: Vec<f32> = (0..dim)
+        .map(|x| {
+            let f = (seed as f32) * 0.1 + (x as f32) * 0.3;
+            f.sin() * (seed % 7 + 1) as f32 * 0.15
+        })
+        .collect();
     let cluster = (seed % 10) as usize;
     for i in (cluster..dim).step_by(10) {
         v[i] += 0.5;
     }
     let norm: f32 = v.iter().map(|x| x * x).sum::<f32>().sqrt();
-    if norm > 0.0 { v.iter().map(|x| x / norm).collect() } else { v }
+    if norm > 0.0 {
+        v.iter().map(|x| x / norm).collect()
+    } else {
+        v
+    }
 }
 
 fn main() {
@@ -81,8 +87,12 @@ fn main() {
     tmp_head.settings = Some(tmp_config);
     manager.add_head(tmp_head);
 
-    let mut sem_idx = manager.create_hnsw_index_for_head("semantic", 256, base_config.clone()).unwrap();
-    let mut tmp_idx = manager.create_hnsw_index_for_head("temporal", 256, base_config.clone()).unwrap();
+    let mut sem_idx = manager
+        .create_hnsw_index_for_head("semantic", 256, base_config.clone())
+        .unwrap();
+    let mut tmp_idx = manager
+        .create_hnsw_index_for_head("temporal", 256, base_config.clone())
+        .unwrap();
 
     println!("   semantic: ef_search=256, max_connections=32 (high recall)");
     println!("   temporal: ef_search=64, max_connections=16 (faster queries)");
@@ -95,7 +105,9 @@ fn main() {
         let v = generate_distinct(i, 256);
         let _ = sem_idx.insert(i, &v);
         let mut tv = v.clone();
-        if i % 4 == 0 { tv[0] = (tv[0] + 0.15).min(1.0); }
+        if i % 4 == 0 {
+            tv[0] = (tv[0] + 0.15).min(1.0);
+        }
         let _ = tmp_idx.insert(i, &tv);
     }
     println!("   Indexed 2,000 documents in {:.2?}\n", start.elapsed());
@@ -114,20 +126,34 @@ fn main() {
     let tmp_latency = tmp_start.elapsed();
 
     println!("╔════════════════════════════════════════════════════════════════════════════╗");
-    println!("║                        SEMANTIC HEAD (ef=256, {:.2?})                      ║", sem_latency);
+    println!(
+        "║                        SEMANTIC HEAD (ef=256, {:.2?})                      ║",
+        sem_latency
+    );
     println!("╠════════════════════════════════════════════════════════════════════════════╣");
     for (rank, (id, score)) in sem_results.iter().enumerate() {
-        println!("║   {:<3}   ID: {:>6}   Similarity: {:.4}                                ║",
-            rank + 1, id, score);
+        println!(
+            "║   {:<3}   ID: {:>6}   Similarity: {:.4}                                ║",
+            rank + 1,
+            id,
+            score
+        );
     }
     println!("╚════════════════════════════════════════════════════════════════════════════╝\n");
 
     println!("╔════════════════════════════════════════════════════════════════════════════╗");
-    println!("║                        TEMPORAL HEAD (ef=64, {:.2?})                        ║", tmp_latency);
+    println!(
+        "║                        TEMPORAL HEAD (ef=64, {:.2?})                        ║",
+        tmp_latency
+    );
     println!("╠════════════════════════════════════════════════════════════════════════════╣");
     for (rank, (id, score)) in tmp_results.iter().enumerate() {
-        println!("║   {:<3}   ID: {:>6}   Similarity: {:.4}                                ║",
-            rank + 1, id, score);
+        println!(
+            "║   {:<3}   ID: {:>6}   Similarity: {:.4}                                ║",
+            rank + 1,
+            id,
+            score
+        );
     }
     println!("╚════════════════════════════════════════════════════════════════════════════╝\n");
 
@@ -135,12 +161,18 @@ fn main() {
     println!("▶ Step 5: Fusing results (semantic weight=1.0, temporal weight=0.7)...\n");
 
     let mut fused: HashMap<u64, f32> = HashMap::new();
-    for (id, s) in &sem_results { *fused.entry(*id).or_insert(0.0) += s; }
-    for (id, s) in &tmp_results { *fused.entry(*id).or_insert(0.0) += s * 0.7; }
+    for (id, s) in &sem_results {
+        *fused.entry(*id).or_insert(0.0) += s;
+    }
+    for (id, s) in &tmp_results {
+        *fused.entry(*id).or_insert(0.0) += s * 0.7;
+    }
 
     let max_val = fused.values().cloned().fold(0.0f32, f32::max);
     if max_val > 0.0 {
-        for v in fused.values_mut() { *v /= max_val; }
+        for v in fused.values_mut() {
+            *v /= max_val;
+        }
     }
 
     let mut final_results: Vec<_> = fused.into_iter().collect();
@@ -153,18 +185,32 @@ fn main() {
     println!("╔════════════════════════════════════════════════════════════════════════════╗");
     println!("║                           FUSED RESULTS (Normalized)                       ║");
     println!("╠════════════════════════════════════════════════════════════════════════════╣");
-    println!("║   {:<5} {:>8} {:>12} {:>12} {:>12} ║", "Rank", "ID", "Fused", "Semantic", "Temporal");
-    println!("║   {}  {}  {}  {}  {} ║",
-        "-----", "--------", "------------", "------------", "------------");
+    println!(
+        "║   {:<5} {:>8} {:>12} {:>12} {:>12} ║",
+        "Rank", "ID", "Fused", "Semantic", "Temporal"
+    );
+    println!(
+        "║   {}  {}  {}  {}  {} ║",
+        "-----", "--------", "------------", "------------", "------------"
+    );
     for (rank, (id, score)) in final_results.iter().enumerate() {
         let ss = sem_map.get(id).copied().unwrap_or(0.0);
         let ts = tmp_map.get(id).copied().unwrap_or(0.0);
-        println!("║   {:<5} {:>8} {:>12.4} {:>12.4} {:>12.4} ║",
-            rank + 1, id, score, ss, ts);
+        println!(
+            "║   {:<5} {:>8} {:>12.4} {:>12.4} {:>12.4} ║",
+            rank + 1,
+            id,
+            score,
+            ss,
+            ts
+        );
     }
     println!("╚════════════════════════════════════════════════════════════════════════════╝\n");
 
     println!("✅ Comprehensive demo completed successfully.");
-    println!("   Collection '{}' with 2 per-head settings, 2000 documents indexed.", collection_name);
+    println!(
+        "   Collection '{}' with 2 per-head settings, 2000 documents indexed.",
+        collection_name
+    );
     println!("   Per-head settings demonstrate tunable recall/performance tradeoffs.\n");
 }

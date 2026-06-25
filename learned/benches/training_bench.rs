@@ -1,5 +1,5 @@
-use criterion::{criterion_group, criterion_main, Criterion, black_box};
 use attentiondb_learned::ProjectionTrainer;
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 fn training_benchmark(c: &mut Criterion) {
     let mut trainer = ProjectionTrainer::new(256, 0.001);

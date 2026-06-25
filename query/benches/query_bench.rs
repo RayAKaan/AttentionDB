@@ -1,5 +1,5 @@
-use criterion::{criterion_group, criterion_main, Criterion};
 use attentiondb_query::{parse_aql, plan_query, QueryExecutor};
+use criterion::{criterion_group, criterion_main, Criterion};
 
 const AQL: &str = r#"ATTEND TO papers WHERE QUERY "attention mechanisms in transformers" HEADS [semantic, temporal] TOP_K 10 MIN_WEIGHT 0.05 TEMPORAL_DECAY 0.3"#;
 

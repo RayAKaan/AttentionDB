@@ -1,5 +1,5 @@
 use attentiondb_learned::{
-    ProjectionTrainer, ProjectionMatrix, ContrastiveLoss, ReprojectionJob, ProjectionConfig,
+    ContrastiveLoss, ProjectionConfig, ProjectionMatrix, ProjectionTrainer, ReprojectionJob,
 };
 
 #[test]
@@ -12,7 +12,11 @@ fn test_projection_creation() {
 
 #[test]
 fn test_project_key_output_len() {
-    let config = ProjectionConfig { dim: 64, num_heads: 4, head_dim: 16 };
+    let config = ProjectionConfig {
+        dim: 64,
+        num_heads: 4,
+        head_dim: 16,
+    };
     let pm = ProjectionMatrix::new(config);
     let input = vec![0.1; 64];
     let output = pm.project_key(&input);
@@ -21,7 +25,11 @@ fn test_project_key_output_len() {
 
 #[test]
 fn test_project_value_output_len() {
-    let config = ProjectionConfig { dim: 64, num_heads: 4, head_dim: 16 };
+    let config = ProjectionConfig {
+        dim: 64,
+        num_heads: 4,
+        head_dim: 16,
+    };
     let pm = ProjectionMatrix::new(config);
     let input = vec![0.1; 64];
     let output = pm.project_value(&input);
@@ -59,7 +67,11 @@ fn test_reprojection_job_run() {
 
 #[test]
 fn test_projection_update() {
-    let config = ProjectionConfig { dim: 8, num_heads: 2, head_dim: 4 };
+    let config = ProjectionConfig {
+        dim: 8,
+        num_heads: 2,
+        head_dim: 4,
+    };
     let mut pm = ProjectionMatrix::new(config);
     let new_k = ndarray::Array2::from_shape_fn((8, 8), |_| 0.5);
     let new_v = ndarray::Array2::from_shape_fn((8, 8), |_| 0.5);
@@ -84,7 +96,11 @@ fn test_training_step_no_negs() {
 #[test]
 fn test_different_dims() {
     for dim in [16, 32, 64] {
-        let config = ProjectionConfig { dim, num_heads: 2, head_dim: dim / 2 };
+        let config = ProjectionConfig {
+            dim,
+            num_heads: 2,
+            head_dim: dim / 2,
+        };
         let pm = ProjectionMatrix::new(config);
         let input = vec![0.1; dim];
         assert_eq!(pm.project_key(&input).len(), dim);

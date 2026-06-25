@@ -1,4 +1,4 @@
-use attentiondb_hnsw::{HNSWIndex, HeadIndexManager, HNSWConfig};
+use attentiondb_hnsw::{HNSWConfig, HNSWIndex, HeadIndexManager};
 
 #[test]
 fn test_insert_basic() {
@@ -84,9 +84,9 @@ fn test_multi_head_weighted() {
     }
 
     let query: Vec<f32> = (0..8).map(|x| (x as f32) * 0.05).collect();
-    let results = manager.search_multi_weighted(
-        &[("a", 1.0), ("b", 0.5)], &query, 5, None,
-    ).unwrap();
+    let results = manager
+        .search_multi_weighted(&[("a", 1.0), ("b", 0.5)], &query, 5, None)
+        .unwrap();
     assert!(!results.is_empty());
 }
 
@@ -164,9 +164,7 @@ fn test_remove_head() {
 #[test]
 fn test_insert_batch() {
     let mut index = HNSWIndex::new("test", 4, HNSWConfig::default());
-    let batch: Vec<(u64, Vec<f32>)> = (0..10)
-        .map(|i| (i, vec![i as f32 * 0.1; 4]))
-        .collect();
+    let batch: Vec<(u64, Vec<f32>)> = (0..10).map(|i| (i, vec![i as f32 * 0.1; 4])).collect();
 
     index.insert_batch(&batch).unwrap();
     assert_eq!(index.len(), 10);

@@ -1,5 +1,5 @@
-use crate::parser::AQLQuery;
 use crate::error::QueryError;
+use crate::parser::AQLQuery;
 
 #[derive(Debug, Clone)]
 pub struct LogicalPlan {
@@ -69,10 +69,14 @@ pub fn plan_query(query: AQLQuery) -> Result<PhysicalPlan, QueryError> {
 
     // Assign weights — temporal head gets decay weight if present
     let heads: Vec<(String, f32)> = if let Some(decay) = logical.temporal_decay {
-        logical.heads.iter().map(|h| {
-            let w = if h == "temporal" { decay } else { 1.0 };
-            (h.clone(), w)
-        }).collect()
+        logical
+            .heads
+            .iter()
+            .map(|h| {
+                let w = if h == "temporal" { decay } else { 1.0 };
+                (h.clone(), w)
+            })
+            .collect()
     } else {
         logical.heads.iter().map(|h| (h.clone(), 1.0)).collect()
     };
@@ -135,9 +139,13 @@ mod tests {
 
     #[test]
     fn test_temporal_decay_weight() {
-        let aql = r#"ATTEND TO papers WHERE QUERY "test" HEADS [semantic, temporal] TEMPORAL_DECAY 0.3"#;
+        let aql =
+            r#"ATTEND TO papers WHERE QUERY "test" HEADS [semantic, temporal] TEMPORAL_DECAY 0.3"#;
         let plan = plan_query(extract_query(parse_aql(aql).unwrap())).unwrap();
-        let temporal_weight = plan.hnsw_search.heads.iter()
+        let temporal_weight = plan
+            .hnsw_search
+            .heads
+            .iter()
             .find(|(n, _)| n == "temporal")
             .map(|(_, w)| *w);
         assert!((temporal_weight.unwrap() - 0.3).abs() < 1e-6);
@@ -149,8 +157,26 @@ mod tests {
         let aql_med = r#"ATTEND TO papers WHERE QUERY "test" TOP_K 15"#;
         let aql_large = r#"ATTEND TO papers WHERE QUERY "test" TOP_K 50"#;
 
-        assert_eq!(plan_query(extract_query(parse_aql(aql_small).unwrap())).unwrap().hnsw_search.ef, 32);
-        assert_eq!(plan_query(extract_query(parse_aql(aql_med).unwrap())).unwrap().hnsw_search.ef, 64);
-        assert_eq!(plan_query(extract_query(parse_aql(aql_large).unwrap())).unwrap().hnsw_search.ef, 128);
+        assert_eq!(
+            plan_query(extract_query(parse_aql(aql_small).unwrap()))
+                .unwrap()
+                .hnsw_search
+                .ef,
+            32
+        );
+        assert_eq!(
+            plan_query(extract_query(parse_aql(aql_med).unwrap()))
+                .unwrap()
+                .hnsw_search
+                .ef,
+            64
+        );
+        assert_eq!(
+            plan_query(extract_query(parse_aql(aql_large).unwrap()))
+                .unwrap()
+                .hnsw_search
+                .ef,
+            128
+        );
     }
 }

@@ -4,7 +4,7 @@
 //! multi-head vector indexes and relational document chunks across quorum peers.
 
 use std::collections::{BTreeMap, HashMap};
-use std::hash::{Hash, Hasher, DefaultHasher};
+use std::hash::{DefaultHasher, Hash, Hasher};
 
 #[derive(Debug, Clone)]
 pub struct HeadPartition {
@@ -23,7 +23,12 @@ pub struct Shard {
 
 impl Shard {
     pub fn new(id: u32, heads: Vec<String>, address: &str) -> Self {
-        Self { id, heads, address: address.to_string(), is_leader: false }
+        Self {
+            id,
+            heads,
+            address: address.to_string(),
+            is_leader: false,
+        }
     }
 
     pub fn assign_head(&mut self, head: &str) {
@@ -100,7 +105,9 @@ impl ShardManager {
     }
 
     pub fn get_shard_for_head(&self, head: &str) -> Option<&Shard> {
-        self.shards.values().find(|s| s.heads.contains(&head.to_string()))
+        self.shards
+            .values()
+            .find(|s| s.heads.contains(&head.to_string()))
     }
 
     pub fn shard_count(&self) -> usize {
@@ -133,7 +140,11 @@ mod tests {
     #[test]
     fn test_get_shard_for_head() {
         let mut sm = ShardManager::new();
-        sm.add_shard(Shard::new(1, vec!["semantic".into(), "temporal".into()], "10.0.0.1:7400"));
+        sm.add_shard(Shard::new(
+            1,
+            vec!["semantic".into(), "temporal".into()],
+            "10.0.0.1:7400",
+        ));
         sm.add_shard(Shard::new(2, vec!["structural".into()], "10.0.0.2:7400"));
         assert_eq!(sm.get_shard_for_head("temporal").unwrap().id, 1);
         assert_eq!(sm.get_shard_for_head("structural").unwrap().id, 2);

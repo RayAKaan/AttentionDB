@@ -1,4 +1,4 @@
-use attentiondb_hnsw::{HNSWIndex, HNSWConfig};
+use attentiondb_hnsw::{HNSWConfig, HNSWIndex};
 use tempfile::tempdir;
 
 fn create_test_index(head_name: &str, dim: usize, count: usize) -> HNSWIndex {
@@ -30,7 +30,8 @@ fn test_load_with_progress_reports() {
 
     let loaded = HNSWIndex::load_with_progress(dir.path(), |p| {
         progress_calls.push((p.loaded_vectors, p.total_vectors));
-    }).unwrap();
+    })
+    .unwrap();
 
     assert_eq!(loaded.len(), 2500);
     assert!(!progress_calls.is_empty());

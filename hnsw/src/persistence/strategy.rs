@@ -23,7 +23,10 @@ impl PersistenceStrategy for VectorRebuildPersistence {
     }
 
     fn load(&self, dir: &Path) -> Result<HNSWIndex, PersistenceError> {
-        crate::persistence::index_persistence::load_index(dir, None::<fn(crate::persistence::LoadProgress)>)
+        crate::persistence::index_persistence::load_index(
+            dir,
+            None::<fn(crate::persistence::LoadProgress)>,
+        )
     }
 
     fn append(&self, dir: &Path, vectors: &[(u64, Vec<f32>)]) -> Result<usize, PersistenceError> {

@@ -1,13 +1,13 @@
-use hnsw_rs::hnsw::{Hnsw, Neighbour};
-use hnsw_rs::prelude::*;
-use std::path::Path;
-use std::collections::HashMap;
-use std::sync::Arc;
-use serde::{Serialize, Deserialize};
 use crate::error::HNSWError;
-use crate::gpu::{GpuBackend, CpuBackend};
+use crate::gpu::{CpuBackend, GpuBackend};
 use crate::persistence::strategy::PersistenceStrategy;
 use crate::settings::CollectionSettings;
+use hnsw_rs::hnsw::{Hnsw, Neighbour};
+use hnsw_rs::prelude::*;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::Path;
+use std::sync::Arc;
 
 #[cfg(feature = "cuda")]
 use crate::gpu::CudaBackend;
@@ -123,14 +123,18 @@ impl HNSWIndex {
         config: HNSWConfig,
         settings: CollectionSettings,
     ) -> Result<Self, HNSWError> {
-        settings.validate().map_err(|e| HNSWError::InvalidConfig(e))?;
+        settings
+            .validate()
+            .map_err(|e| HNSWError::InvalidConfig(e))?;
         let mut index = Self::new(head_name, dim, config);
         index.settings = settings;
         Ok(index)
     }
 
     pub fn update_settings(&mut self, settings: CollectionSettings) -> Result<(), HNSWError> {
-        settings.validate().map_err(|e| HNSWError::InvalidConfig(e))?;
+        settings
+            .validate()
+            .map_err(|e| HNSWError::InvalidConfig(e))?;
         self.settings = settings;
         Ok(())
     }
@@ -143,7 +147,10 @@ impl HNSWIndex {
 
     pub fn insert(&mut self, id: u64, vector: &[f32]) -> Result<(), HNSWError> {
         if vector.len() != self.dim {
-            return Err(HNSWError::DimensionMismatch { expected: self.dim, got: vector.len() });
+            return Err(HNSWError::DimensionMismatch {
+                expected: self.dim,
+                got: vector.len(),
+            });
         }
 
         let arc_vec = Arc::new(vector.to_vec());
@@ -172,9 +179,17 @@ impl HNSWIndex {
         Ok(())
     }
 
-    pub fn search(&self, query: &[f32], k: usize, ef: Option<usize>) -> Result<Vec<(u64, f32)>, HNSWError> {
+    pub fn search(
+        &self,
+        query: &[f32],
+        k: usize,
+        ef: Option<usize>,
+    ) -> Result<Vec<(u64, f32)>, HNSWError> {
         if query.len() != self.dim {
-            return Err(HNSWError::DimensionMismatch { expected: self.dim, got: query.len() });
+            return Err(HNSWError::DimensionMismatch {
+                expected: self.dim,
+                got: query.len(),
+            });
         }
         if !self.is_built {
             return Err(HNSWError::IndexNotBuilt);
@@ -182,30 +197,42 @@ impl HNSWIndex {
 
         let ef = ef.unwrap_or(self.settings.ef_search);
         let neighbors: Vec<Neighbour> = self.inner.search(query, k, ef);
-        let results: Vec<(u64, f32)> = neighbors.into_iter()
+        let results: Vec<(u64, f32)> = neighbors
+            .into_iter()
             .map(|n| (n.d_id as u64, 1.0 - n.distance))
             .collect();
 
         Ok(results)
     }
 
-    pub fn rerank_exact(&self, query: &[f32], candidates: &[u64], k: usize) -> Result<Vec<(u64, f32)>, HNSWError> {
+    pub fn rerank_exact(
+        &self,
+        query: &[f32],
+        candidates: &[u64],
+        k: usize,
+    ) -> Result<Vec<(u64, f32)>, HNSWError> {
         if query.len() != self.dim {
-            return Err(HNSWError::DimensionMismatch { expected: self.dim, got: query.len() });
+            return Err(HNSWError::DimensionMismatch {
+                expected: self.dim,
+                got: query.len(),
+            });
         }
 
         let candidate_vectors: Vec<(u64, Vec<f32>)> = candidates
             .iter()
             .filter_map(|id| {
-                self.id_to_idx.get(id).and_then(|&idx| {
-                    self.vectors.get(idx).map(|(_, vec)| (*id, vec.clone()))
-                })
+                self.id_to_idx
+                    .get(id)
+                    .and_then(|&idx| self.vectors.get(idx).map(|(_, vec)| (*id, vec.clone())))
             })
             .collect();
 
-        let results = self.gpu_backend.rerank_exact(query, &candidate_vectors, k)
+        let results = self
+            .gpu_backend
+            .rerank_exact(query, &candidate_vectors, k)
             .unwrap_or_else(|_| {
-                let mut scored: Vec<(u64, f32)> = candidate_vectors.iter()
+                let mut scored: Vec<(u64, f32)> = candidate_vectors
+                    .iter()
                     .map(|(id, vec)| {
                         let score: f32 = query.iter().zip(vec.iter()).map(|(a, b)| a * b).sum();
                         (*id, score)
@@ -219,7 +246,12 @@ impl HNSWIndex {
         Ok(results)
     }
 
-    pub fn search_with_rerank(&self, query: &[f32], k: usize, ef: Option<usize>) -> Result<Vec<(u64, f32)>, HNSWError> {
+    pub fn search_with_rerank(
+        &self,
+        query: &[f32],
+        k: usize,
+        ef: Option<usize>,
+    ) -> Result<Vec<(u64, f32)>, HNSWError> {
         let candidates = self.search(query, k * 3, ef)?;
         let candidate_ids: Vec<u64> = candidates.into_iter().map(|(id, _)| id).collect();
         self.rerank_exact(query, &candidate_ids, k)
@@ -234,7 +266,8 @@ impl HNSWIndex {
     }
 
     pub fn get_vector(&self, id: u64) -> Option<&[f32]> {
-        self.id_to_idx.get(&id)
+        self.id_to_idx
+            .get(&id)
             .and_then(|&idx| self.vectors.get(idx))
             .map(|(_, v)| v.as_slice())
     }
@@ -262,7 +295,11 @@ impl HNSWIndex {
                 Err(_) => {}
             }
         }
-        let dim = if vectors.is_empty() { return vec![]; } else { vectors[0].len() };
+        let dim = if vectors.is_empty() {
+            return vec![];
+        } else {
+            vectors[0].len()
+        };
         let mut results = Vec::with_capacity(vectors.len());
         for vec in vectors {
             let mut output = vec![0.0; dim];
@@ -291,15 +328,13 @@ impl HNSWIndex {
     }
 
     pub fn load(dir: &Path) -> Result<Self, HNSWError> {
-        let index = crate::persistence::load_index(dir, None::<fn(crate::persistence::LoadProgress)>)
-            .map_err(|e| HNSWError::Persistence(e.to_string()))?;
+        let index =
+            crate::persistence::load_index(dir, None::<fn(crate::persistence::LoadProgress)>)
+                .map_err(|e| HNSWError::Persistence(e.to_string()))?;
         Ok(index)
     }
 
-    pub fn load_with_progress<F>(
-        dir: &Path,
-        progress_callback: F,
-    ) -> Result<Self, HNSWError>
+    pub fn load_with_progress<F>(dir: &Path, progress_callback: F) -> Result<Self, HNSWError>
     where
         F: FnMut(crate::persistence::LoadProgress),
     {
@@ -323,14 +358,16 @@ impl HNSWIndex {
     /// Save using graph-aware persistence (preserves insertion order)
     pub fn save_graph(&self, dir: &Path) -> Result<(), HNSWError> {
         let strategy = crate::persistence::GraphPersistence;
-        strategy.save(self, dir)
+        strategy
+            .save(self, dir)
             .map_err(|e| HNSWError::Persistence(e.to_string()))
     }
 
     /// Load using graph-aware persistence
     pub fn load_graph(dir: &Path) -> Result<Self, HNSWError> {
         let strategy = crate::persistence::GraphPersistence;
-        strategy.load(dir)
+        strategy
+            .load(dir)
             .map_err(|e| HNSWError::Persistence(e.to_string()))
     }
 }

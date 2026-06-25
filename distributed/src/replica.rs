@@ -11,7 +11,13 @@ pub struct ReadReplica {
 
 impl ReadReplica {
     pub fn new(id: u32, shard_id: u32, address: &str) -> Self {
-        Self { id, shard_id, address: address.to_string(), last_applied_index: 0, healthy: true }
+        Self {
+            id,
+            shard_id,
+            address: address.to_string(),
+            last_applied_index: 0,
+            healthy: true,
+        }
     }
 
     pub fn apply_log(&mut self, index: u64) {
@@ -29,11 +35,16 @@ pub struct ReplicaManager {
 
 impl ReplicaManager {
     pub fn new() -> Self {
-        Self { replicas: HashMap::new() }
+        Self {
+            replicas: HashMap::new(),
+        }
     }
 
     pub fn add_replica(&mut self, replica: ReadReplica) {
-        self.replicas.entry(replica.shard_id).or_default().push(replica);
+        self.replicas
+            .entry(replica.shard_id)
+            .or_default()
+            .push(replica);
     }
 
     pub fn remove_replica(&mut self, shard_id: u32, replica_id: u32) {

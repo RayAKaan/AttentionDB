@@ -1,13 +1,13 @@
+pub mod chaos;
 pub mod error;
-pub mod shard;
+pub mod operator;
 pub mod raft;
 pub mod replica;
-pub mod operator;
-pub mod chaos;
+pub mod shard;
 
-pub use shard::{Shard, HeadPartition, ShardManager};
-pub use raft::{RaftNode, RaftLogEntry, RaftMessage, RaftRole, RaftPayload};
-pub use replica::{ReadReplica, ReplicaManager};
-pub use operator::KubernetesOperator;
 pub use chaos::ChaosTester;
 pub use error::DistributedError;
+pub use operator::KubernetesOperator;
+pub use raft::{RaftLogEntry, RaftMessage, RaftNode, RaftPayload, RaftRole};
+pub use replica::{ReadReplica, ReplicaManager};
+pub use shard::{HeadPartition, Shard, ShardManager};

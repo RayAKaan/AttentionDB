@@ -1,15 +1,15 @@
-pub mod record;
-pub mod wal;
-pub mod sstable;
-pub mod projection_store;
-pub mod document_store;
 pub mod compaction;
+pub mod document_store;
 pub mod error;
+pub mod projection_store;
+pub mod record;
+pub mod sstable;
+pub mod wal;
 
-pub use record::Record;
-pub use error::StorageError;
+pub use compaction::{cleanup_merged_files, compact, CompactionConfig, CompactionResult};
 pub use document_store::DocumentStore;
-pub use wal::{Wal, OpType, WalEntry, Durability};
-pub use sstable::{SSTableWriter, SSTableReader, SSTableEntry};
+pub use error::StorageError;
 pub use projection_store::ProjectionStore;
-pub use compaction::{compact, cleanup_merged_files, CompactionConfig, CompactionResult};
+pub use record::Record;
+pub use sstable::{SSTableEntry, SSTableReader, SSTableWriter};
+pub use wal::{Durability, OpType, Wal, WalEntry};

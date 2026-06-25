@@ -1,8 +1,8 @@
-use std::fs::{File, OpenOptions};
-use std::io::{Write, BufWriter, Read};
-use std::path::Path;
 use crc32fast::Hasher;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::fs::{File, OpenOptions};
+use std::io::{BufWriter, Read, Write};
+use std::path::Path;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,10 +40,7 @@ pub struct Wal {
 
 impl Wal {
     pub fn new(path: &Path) -> Result<Self, crate::error::StorageError> {
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)?;
+        let file = OpenOptions::new().create(true).append(true).open(path)?;
 
         Ok(Self {
             file: BufWriter::new(file),

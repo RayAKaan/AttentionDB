@@ -1,0 +1,13 @@
+{
+  "cpu_model": "unknown",
+  "cpu_cores": 4,
+  "cpu_threads": 8,
+  "ram_total_gb": 16.0,
+  "gpu_model": null,
+  "gpu_vram_gb": null,
+  "os": "windows",
+  "kernel": "windows",
+  "rust_version": "0.2.0",
+  "benchmark_version": "0.2.0",
+  "git_hash": "dca4b91afbda66bc941e4856b25b82af76a53190"
+}

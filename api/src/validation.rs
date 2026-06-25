@@ -2,11 +2,10 @@
 //!
 //! Prevents abuse, injection, and resource exhaustion attacks.
 
-use tonic::Status;
 use attentiondb_core::constants::{
-    MAX_COLLECTION_NAME_LEN, MAX_HEADS, MAX_TOP_K,
-    MAX_DIMENSION, MAX_FIELDS, MAX_FIELD_VALUE_BYTES,
+    MAX_COLLECTION_NAME_LEN, MAX_DIMENSION, MAX_FIELDS, MAX_FIELD_VALUE_BYTES, MAX_HEADS, MAX_TOP_K,
 };
+use tonic::Status;
 
 /// Maximum allowed pagination page size.
 pub const MAX_PAGE_SIZE: u32 = 1000;
@@ -21,11 +20,16 @@ pub fn validate_collection_name(name: &str) -> Result<(), Status> {
         return Err(Status::invalid_argument("Collection name cannot be empty"));
     }
     if name.len() > MAX_COLLECTION_NAME_LEN {
-        return Err(Status::invalid_argument(
-            format!("Collection name too long: {} chars (max {})", name.len(), MAX_COLLECTION_NAME_LEN)
-        ));
+        return Err(Status::invalid_argument(format!(
+            "Collection name too long: {} chars (max {})",
+            name.len(),
+            MAX_COLLECTION_NAME_LEN
+        )));
     }
-    if !name.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
+    if !name
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+    {
         return Err(Status::invalid_argument(
             format!("Collection name contains invalid characters: '{}'. Only alphanumeric, underscore, and hyphen allowed.", name)
         ));
@@ -39,9 +43,10 @@ pub fn validate_top_k(top_k: u32) -> Result<(), Status> {
         return Err(Status::invalid_argument("top_k must be at least 1"));
     }
     if top_k > MAX_TOP_K {
-        return Err(Status::invalid_argument(
-            format!("top_k too large: {} (max {})", top_k, MAX_TOP_K)
-        ));
+        return Err(Status::invalid_argument(format!(
+            "top_k too large: {} (max {})",
+            top_k, MAX_TOP_K
+        )));
     }
     Ok(())
 }
@@ -52,9 +57,10 @@ pub fn validate_page(page: u32) -> Result<(), Status> {
         return Err(Status::invalid_argument("page must be at least 1"));
     }
     if page > MAX_PAGE_NUMBER {
-        return Err(Status::invalid_argument(
-            format!("page number too large: {} (max {})", page, MAX_PAGE_NUMBER)
-        ));
+        return Err(Status::invalid_argument(format!(
+            "page number too large: {} (max {})",
+            page, MAX_PAGE_NUMBER
+        )));
     }
     Ok(())
 }
@@ -65,9 +71,10 @@ pub fn validate_page_size(page_size: u32) -> Result<(), Status> {
         return Err(Status::invalid_argument("page_size must be at least 1"));
     }
     if page_size > MAX_PAGE_SIZE {
-        return Err(Status::invalid_argument(
-            format!("page_size too large: {} (max {})", page_size, MAX_PAGE_SIZE)
-        ));
+        return Err(Status::invalid_argument(format!(
+            "page_size too large: {} (max {})",
+            page_size, MAX_PAGE_SIZE
+        )));
     }
     Ok(())
 }
@@ -75,20 +82,24 @@ pub fn validate_page_size(page_size: u32) -> Result<(), Status> {
 /// Validate head names.
 pub fn validate_heads(heads: &[String]) -> Result<(), Status> {
     if heads.len() > MAX_HEADS {
-        return Err(Status::invalid_argument(
-            format!("Too many heads: {} (max {})", heads.len(), MAX_HEADS)
-        ));
+        return Err(Status::invalid_argument(format!(
+            "Too many heads: {} (max {})",
+            heads.len(),
+            MAX_HEADS
+        )));
     }
     for head in heads {
         if head.is_empty() || head.len() > 64 {
-            return Err(Status::invalid_argument(
-                format!("Invalid head name: '{}' (must be 1-64 chars)", head)
-            ));
+            return Err(Status::invalid_argument(format!(
+                "Invalid head name: '{}' (must be 1-64 chars)",
+                head
+            )));
         }
         if !head.chars().all(|c| c.is_alphanumeric() || c == '_') {
-            return Err(Status::invalid_argument(
-                format!("Head name '{}' contains invalid characters", head)
-            ));
+            return Err(Status::invalid_argument(format!(
+                "Head name '{}' contains invalid characters",
+                head
+            )));
         }
     }
     Ok(())
@@ -100,9 +111,10 @@ pub fn validate_vector_dimension(dim: usize) -> Result<(), Status> {
         return Err(Status::invalid_argument("Vector dimension cannot be 0"));
     }
     if dim > MAX_DIMENSION {
-        return Err(Status::invalid_argument(
-            format!("Vector dimension too large: {} (max {})", dim, MAX_DIMENSION)
-        ));
+        return Err(Status::invalid_argument(format!(
+            "Vector dimension too large: {} (max {})",
+            dim, MAX_DIMENSION
+        )));
     }
     Ok(())
 }
@@ -110,20 +122,26 @@ pub fn validate_vector_dimension(dim: usize) -> Result<(), Status> {
 /// Validate document fields count and sizes.
 pub fn validate_fields(fields: &std::collections::HashMap<String, String>) -> Result<(), Status> {
     if fields.len() > MAX_FIELDS {
-        return Err(Status::invalid_argument(
-            format!("Too many fields: {} (max {})", fields.len(), MAX_FIELDS)
-        ));
+        return Err(Status::invalid_argument(format!(
+            "Too many fields: {} (max {})",
+            fields.len(),
+            MAX_FIELDS
+        )));
     }
     for (key, value) in fields {
         if key.is_empty() || key.len() > 256 {
-            return Err(Status::invalid_argument(
-                format!("Invalid field name length: {} (must be 1-256)", key.len())
-            ));
+            return Err(Status::invalid_argument(format!(
+                "Invalid field name length: {} (must be 1-256)",
+                key.len()
+            )));
         }
         if value.len() > MAX_FIELD_VALUE_BYTES {
-            return Err(Status::invalid_argument(
-                format!("Field '{}' value too large: {} bytes (max {})", key, value.len(), MAX_FIELD_VALUE_BYTES)
-            ));
+            return Err(Status::invalid_argument(format!(
+                "Field '{}' value too large: {} bytes (max {})",
+                key,
+                value.len(),
+                MAX_FIELD_VALUE_BYTES
+            )));
         }
     }
     Ok(())

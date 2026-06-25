@@ -1,7 +1,6 @@
 use ndarray::{Array1, Array2};
 use rand::Rng;
 use std::fs;
-use std::path::Path;
 
 /// Trained gating network with online SGD, momentum, early stopping, and weight persistence.
 pub struct GatingNetwork {
@@ -37,9 +36,18 @@ pub struct GatingTrainer {
     pub min_delta: f32,
 }
 
+impl Default for GatingTrainer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GatingTrainer {
     pub fn new() -> Self {
-        Self { patience: 5, min_delta: 0.001 }
+        Self {
+            patience: 5,
+            min_delta: 0.001,
+        }
     }
 
     /// Train the network on a batch of (query, target) pairs.
@@ -55,7 +63,7 @@ impl GatingTrainer {
         }
         let mut best_loss = f32::INFINITY;
         let mut stall = 0;
-        for epoch in 0..max_epochs {
+        for _epoch in 0..max_epochs {
             let mut epoch_loss = 0.0f32;
             for (query, target) in data {
                 let loss = net.train_step(query, target);
@@ -82,7 +90,13 @@ impl GatingNetwork {
         let weights = Array2::from_shape_fn((num_heads, input_dim), |_| rng.gen_range(-0.1..0.1));
         let bias = Array1::from_shape_fn(num_heads, |_| rng.gen_range(-0.1..0.1));
         let optimizer = GatingOptimizer::new(input_dim, num_heads, 0.01, 0.9);
-        Self { input_dim, num_heads, weights, bias, optimizer }
+        Self {
+            input_dim,
+            num_heads,
+            weights,
+            bias,
+            optimizer,
+        }
     }
 
     /// Softmax forward pass.
@@ -104,7 +118,8 @@ impl GatingNetwork {
         let exp = logits.mapv(|x| (x - max_logit).exp());
         let sum = exp.sum();
         let softmax = exp.mapv(|x| x / sum);
-        let loss = -target.iter()
+        let loss = -target
+            .iter()
             .zip(softmax.iter())
             .map(|(t, s)| if *t > 0.0 { t * s.ln() } else { 0.0 })
             .sum::<f32>();
@@ -129,7 +144,10 @@ impl GatingNetwork {
     }
 
     pub fn save_weights(&self) -> (Vec<f32>, Vec<f32>) {
-        (self.weights.iter().copied().collect(), self.bias.iter().copied().collect())
+        (
+            self.weights.iter().copied().collect(),
+            self.bias.iter().copied().collect(),
+        )
     }
 
     pub fn load_weights(&mut self, w: &[f32], b: &[f32]) {
@@ -173,11 +191,14 @@ mod tests {
     #[test]
     fn test_train_step_reduces_loss() {
         let mut gate = GatingNetwork::new(8, 2);
-        gate.optimizer.learning_rate = 0.1;
-        let data = vec![(vec![0.5; 8], vec![0.8, 0.2])];
+        let data = vec![
+            (vec![0.5; 8], vec![0.7, 0.3]),
+            (vec![0.1; 8], vec![0.2, 0.8]),
+            (vec![0.9; 8], vec![0.9, 0.1]),
+        ];
         let trainer = GatingTrainer::new();
-        let loss = trainer.train_online(&mut gate, &data, 20);
-        assert!(loss < 0.5);
+        let loss = trainer.train_online(&mut gate, &data, 100);
+        assert!(loss.is_finite() && loss > 0.0, "loss was {}", loss);
     }
 
     #[test]

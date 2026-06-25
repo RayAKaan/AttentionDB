@@ -1,6 +1,6 @@
 //! Basic storage layer tests for Phase 1
 
-use attentiondb_storage::{Record, DocumentStore, Wal};
+use attentiondb_storage::{DocumentStore, Record, Wal};
 use std::collections::HashMap;
 use tempfile::tempdir;
 

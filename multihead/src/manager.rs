@@ -1,15 +1,15 @@
-use crate::head::HeadConfig;
-use crate::gating::GatingNetwork;
-use crate::fusion::{fuse_scores, weighted_fuse};
 use crate::error::MultiHeadError;
+use crate::fusion::{fuse_scores, weighted_fuse};
+use crate::gating::GatingNetwork;
+use crate::head::HeadConfig;
 use std::collections::HashMap;
 #[cfg(feature = "gpu")]
 use tracing::{info, warn};
 
 #[cfg(feature = "gpu")]
-use attentiondb_hnsw::gpu::{GpuBackend, CpuBackend};
-#[cfg(feature = "gpu")]
 use attentiondb_hnsw::gpu::CudaBackend;
+#[cfg(feature = "gpu")]
+use attentiondb_hnsw::gpu::{CpuBackend, GpuBackend};
 
 pub struct MultiHeadManager {
     pub heads: HashMap<String, HeadConfig>,
@@ -30,7 +30,10 @@ impl MultiHeadManager {
                 (Box::new(cuda) as Box<dyn GpuBackend>, true)
             }
             Err(e) => {
-                warn!("[MultiHeadManager] CUDA init failed (falling back to CPU): {:?}", e);
+                warn!(
+                    "[MultiHeadManager] CUDA init failed (falling back to CPU): {:?}",
+                    e
+                );
                 (Box::new(CpuBackend) as Box<dyn GpuBackend>, false)
             }
         };
@@ -54,11 +57,15 @@ impl MultiHeadManager {
     }
 
     pub fn get_head(&self, name: &str) -> Result<&HeadConfig, MultiHeadError> {
-        self.heads.get(name).ok_or_else(|| MultiHeadError::HeadNotFound(name.to_string()))
+        self.heads
+            .get(name)
+            .ok_or_else(|| MultiHeadError::HeadNotFound(name.to_string()))
     }
 
     pub fn get_head_mut(&mut self, name: &str) -> Result<&mut HeadConfig, MultiHeadError> {
-        self.heads.get_mut(name).ok_or_else(|| MultiHeadError::HeadNotFound(name.to_string()))
+        self.heads
+            .get_mut(name)
+            .ok_or_else(|| MultiHeadError::HeadNotFound(name.to_string()))
     }
 
     #[cfg(feature = "gpu")]
@@ -74,7 +81,10 @@ impl MultiHeadManager {
                 Ok(())
             }
             Err(e) => {
-                warn!("[MultiHeadManager] GPU fusion requested but CUDA unavailable: {:?}", e);
+                warn!(
+                    "[MultiHeadManager] GPU fusion requested but CUDA unavailable: {:?}",
+                    e
+                );
                 self.gpu_backend = Box::new(CpuBackend);
                 self.gpu_available = false;
                 Ok(())
@@ -88,9 +98,11 @@ impl MultiHeadManager {
         head_results: &[(String, Vec<(u64, f32)>)],
     ) -> Result<Vec<(u64, f32)>, MultiHeadError> {
         if query_embedding.len() != self.dim {
-            return Err(MultiHeadError::InvalidConfig(
-                format!("Query embedding dimension mismatch: expected {}, got {}", self.dim, query_embedding.len())
-            ));
+            return Err(MultiHeadError::InvalidConfig(format!(
+                "Query embedding dimension mismatch: expected {}, got {}",
+                self.dim,
+                query_embedding.len()
+            )));
         }
 
         #[cfg(feature = "gpu")]
@@ -100,7 +112,10 @@ impl MultiHeadManager {
                 match self.gpu_backend.fuse_scores(head_results, &gate_weights) {
                     Ok(fused) => return Ok(fused),
                     Err(e) => {
-                        warn!("[MultiHeadManager] GPU fusion failed (falling back to CPU): {:?}", e);
+                        warn!(
+                            "[MultiHeadManager] GPU fusion failed (falling back to CPU): {:?}",
+                            e
+                        );
                     }
                 }
             }
@@ -116,7 +131,8 @@ impl MultiHeadManager {
         head_results: &[(String, Vec<(u64, f32)>)],
         explicit_weights: &[(String, f32)],
     ) -> Vec<(u64, f32)> {
-        let weight_refs: Vec<(&str, f32)> = explicit_weights.iter()
+        let weight_refs: Vec<(&str, f32)> = explicit_weights
+            .iter()
             .map(|(n, w)| (n.as_str(), *w))
             .collect();
         weighted_fuse(head_results, &weight_refs)
@@ -140,7 +156,10 @@ impl MultiHeadManager {
     }
 
     pub fn get_head_weights(&self) -> HashMap<String, f32> {
-        self.heads.iter().map(|(k, v)| (k.clone(), v.weight)).collect()
+        self.heads
+            .iter()
+            .map(|(k, v)| (k.clone(), v.weight))
+            .collect()
     }
 
     #[cfg(feature = "gpu")]
@@ -165,12 +184,9 @@ impl MultiHeadManager {
         final_config.ef_search = settings.ef_search;
         final_config.ef_construction = settings.ef_construction;
         final_config.max_nb_connection = settings.max_nb_connection;
-        let index = attentiondb_hnsw::HNSWIndex::with_settings(
-            head_name,
-            dim,
-            final_config,
-            settings,
-        ).map_err(|e| MultiHeadError::InvalidConfig(e.to_string()))?;
+        let index =
+            attentiondb_hnsw::HNSWIndex::with_settings(head_name, dim, final_config, settings)
+                .map_err(|e| MultiHeadError::InvalidConfig(e.to_string()))?;
         Ok(index)
     }
 }

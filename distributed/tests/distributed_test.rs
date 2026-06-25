@@ -1,6 +1,5 @@
 use attentiondb_distributed::{
-    ShardManager, Shard, RaftNode, ReplicaManager, ReadReplica,
-    KubernetesOperator, ChaosTester,
+    ChaosTester, KubernetesOperator, RaftNode, ReadReplica, ReplicaManager, Shard, ShardManager,
 };
 #[test]
 fn test_shard_create_and_find() {
@@ -62,7 +61,11 @@ fn test_chaos_availability() {
 fn test_multi_shard_assignment() {
     let mut sm = ShardManager::new();
     for i in 0..5 {
-        sm.add_shard(Shard::new(i, vec![], &format!("10.0.{}.{}:7400", i / 256, i % 256)));
+        sm.add_shard(Shard::new(
+            i,
+            vec![],
+            &format!("10.0.{}.{}:7400", i / 256, i % 256),
+        ));
     }
     assert_eq!(sm.shard_count(), 5);
 }

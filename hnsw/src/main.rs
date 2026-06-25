@@ -1,6 +1,6 @@
-use attentiondb_hnsw::{HeadIndexManager, HNSWConfig};
-use std::time::Instant;
+use attentiondb_hnsw::{HNSWConfig, HeadIndexManager};
 use std::path::Path;
+use std::time::Instant;
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");
@@ -36,8 +36,7 @@ fn main() {
     println!("→ Per-head stats:");
     for head in manager.list_heads() {
         if let Ok(index) = manager.get_head(&head) {
-            println!("   {:<12}  {:>6} vectors",
-                     head, index.read().len());
+            println!("   {:<12}  {:>6} vectors", head, index.read().len());
         }
     }
 
@@ -60,10 +59,14 @@ fn main() {
     }
 
     println!("\n→ Weighted Multi-Head Search:");
-    let weighted = manager.search_multi_weighted(
-        &[("semantic", 1.0), ("temporal", 0.7), ("structural", 0.4)],
-        &query, 6, None,
-    ).unwrap();
+    let weighted = manager
+        .search_multi_weighted(
+            &[("semantic", 1.0), ("temporal", 0.7), ("structural", 0.4)],
+            &query,
+            6,
+            None,
+        )
+        .unwrap();
     for (id, score) in weighted {
         println!("   ID: {:>6}  Weighted Score: {:.4}", id, score);
     }

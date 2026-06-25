@@ -1,5 +1,5 @@
-use criterion::{criterion_group, criterion_main, Criterion, black_box};
-use attentiondb_distributed::{RaftNode, ShardManager, Shard, ReplicaManager, ReadReplica};
+use attentiondb_distributed::{RaftNode, ReadReplica, ReplicaManager, Shard, ShardManager};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 fn raft_benchmark(c: &mut Criterion) {
     let mut raft = RaftNode::new(1, vec![2, 3, 4, 5]);

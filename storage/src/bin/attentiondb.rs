@@ -1,7 +1,7 @@
 //! Simple CLI for AttentionDB Phase 1
 
+use attentiondb::{DocumentStore, Record};
 use clap::{Parser, Subcommand};
-use attentiondb::{Record, DocumentStore};
 use std::collections::HashMap;
 
 #[derive(Parser)]
@@ -15,9 +15,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Insert a record
-    Insert {
-        name: String,
-    },
+    Insert { name: String },
     /// Show stats
     Stats,
 }

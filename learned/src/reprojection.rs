@@ -1,5 +1,5 @@
-use crate::projection::ProjectionMatrix;
 use crate::error::LearnedError;
+use crate::projection::ProjectionMatrix;
 
 pub struct ReprojectionJob {
     pub collection: String,
@@ -8,11 +8,7 @@ pub struct ReprojectionJob {
 }
 
 impl ReprojectionJob {
-    pub fn new(
-        collection: &str,
-        old: ProjectionMatrix,
-        new: ProjectionMatrix,
-    ) -> Self {
+    pub fn new(collection: &str, old: ProjectionMatrix, new: ProjectionMatrix) -> Self {
         Self {
             collection: collection.to_string(),
             old_projection: old,
@@ -33,19 +29,28 @@ impl ReprojectionJob {
         F: FnMut(&str) -> Vec<(u64, String, Vec<f32>)>,
         U: FnMut(&str, u64, &[f32]),
     {
-        println!("[Reprojection] Starting active job for collection: {}", self.collection);
+        println!(
+            "[Reprojection] Starting active job for collection: {}",
+            self.collection
+        );
         println!("  Target Dim: {}", self.new_projection.config.dim);
         println!("  Target Heads: {}", self.new_projection.config.num_heads);
 
         let items = fetch_records(&self.collection);
-        println!("[Reprojection] Retrieved {} vector entries for batch remapping", items.len());
+        println!(
+            "[Reprojection] Retrieved {} vector entries for batch remapping",
+            items.len()
+        );
 
         for (id, head_name, raw_vec) in items {
             let reprojected = self.new_projection.project_key(&raw_vec);
             update_vector(&head_name, id, &reprojected);
         }
 
-        println!("[Reprojection] Complete for collection: {}", self.collection);
+        println!(
+            "[Reprojection] Complete for collection: {}",
+            self.collection
+        );
         Ok(())
     }
 }
@@ -74,7 +79,11 @@ mod tests {
 
     #[test]
     fn test_authentic_reprojection_callbacks() {
-        let config = crate::projection::ProjectionConfig { dim: 4, num_heads: 1, head_dim: 4 };
+        let config = crate::projection::ProjectionConfig {
+            dim: 4,
+            num_heads: 1,
+            head_dim: 4,
+        };
         let old = ProjectionMatrix::new(config.clone());
         let new = ProjectionMatrix::new(config);
         let job = ReprojectionJob::new("papers", old, new);
@@ -90,7 +99,7 @@ mod tests {
             },
             |head, id, new_vec| {
                 updated_items.push((head.to_string(), id, new_vec.to_vec()));
-            }
+            },
         );
 
         assert!(result.is_ok());

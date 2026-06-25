@@ -1,9 +1,9 @@
+use crate::error::HNSWError;
+use crate::hnsw_index::{HNSWConfig, HNSWIndex};
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
-use parking_lot::RwLock;
-use crate::hnsw_index::{HNSWIndex, HNSWConfig};
-use crate::error::HNSWError;
 
 pub struct HeadIndexManager {
     heads: RwLock<HashMap<String, Arc<RwLock<HNSWIndex>>>>,
@@ -12,7 +12,10 @@ pub struct HeadIndexManager {
 
 impl HeadIndexManager {
     pub fn new(dim: usize) -> Self {
-        Self { heads: RwLock::new(HashMap::new()), dim }
+        Self {
+            heads: RwLock::new(HashMap::new()),
+            dim,
+        }
     }
 
     pub fn add_head(&self, name: &str) {
@@ -27,7 +30,10 @@ impl HeadIndexManager {
     }
 
     pub fn get_head(&self, name: &str) -> Result<Arc<RwLock<HNSWIndex>>, HNSWError> {
-        self.heads.read().get(name).cloned()
+        self.heads
+            .read()
+            .get(name)
+            .cloned()
             .ok_or_else(|| HNSWError::HeadNotFound(name.to_string()))
     }
 
@@ -78,7 +84,9 @@ impl HeadIndexManager {
     }
 
     pub fn remove_head(&self, name: &str) -> Result<(), HNSWError> {
-        self.heads.write().remove(name)
+        self.heads
+            .write()
+            .remove(name)
             .ok_or_else(|| HNSWError::HeadNotFound(name.to_string()))?;
         Ok(())
     }
@@ -98,9 +106,7 @@ impl HeadIndexManager {
     }
 
     pub fn total_vectors(&self) -> usize {
-        self.heads.read().values()
-            .map(|idx| idx.read().len())
-            .sum()
+        self.heads.read().values().map(|idx| idx.read().len()).sum()
     }
 
     pub fn head_count(&self) -> usize {

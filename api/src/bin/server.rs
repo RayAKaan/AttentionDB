@@ -1,17 +1,17 @@
-use attentiondb_api::server::AttentionDBService;
+use attentiondb_api::auth::{grpc_auth_interceptor, ApiKeyStore};
 use attentiondb_api::create_rest_router_with_service;
-use attentiondb_api::auth::{ApiKeyStore, grpc_auth_interceptor};
 use attentiondb_api::observability;
+use attentiondb_api::server::AttentionDBService;
 use attentiondb_api::tls;
 use attentiondb_api::RateLimiter;
-use tonic::transport::Server;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::signal;
+use tonic::transport::Server;
 use tower_http::cors::CorsLayer;
 use tower_http::limit::RequestBodyLimitLayer;
-use tokio::signal;
-use tracing::{info, error, warn};
+use tracing::{error, info, warn};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -43,7 +43,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let wal_dir = std::env::var("ATTENTIONDB_DATA_DIR").unwrap_or_else(|_| "/data".into());
     let wal_path = format!("{}/engine.wal", wal_dir);
 
-    let engine = match attentiondb_core::AttentionEngine::open(&wal_path, attentiondb_storage::Durability::GroupCommit) {
+    let engine = match attentiondb_core::AttentionEngine::open(
+        &wal_path,
+        attentiondb_storage::Durability::GroupCommit,
+    ) {
         Ok(e) => {
             info!(wal_path = %wal_path, "Engine opened with persistent WAL");
             Arc::new(e)
@@ -87,20 +90,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         grpc_builder = grpc_builder.tls_config(tls_config)?;
     }
     let grpc_shutdown = shutdown.clone();
-    let grpc_server = grpc_builder
-        .add_service(grpc_service)
-        .serve_with_shutdown(grpc_addr, async move {
-            grpc_shutdown.notified().await;
-            info!("gRPC server stopping (shutdown requested)");
-        });
+    let grpc_server =
+        grpc_builder
+            .add_service(grpc_service)
+            .serve_with_shutdown(grpc_addr, async move {
+                grpc_shutdown.notified().await;
+                info!("gRPC server stopping (shutdown requested)");
+            });
 
     // ── REST Server (HTTP or HTTPS) ──────────────────────────────────────
     let rest_svc = Arc::new(AttentionDBService::new(engine.clone()));
-    let app = create_rest_router_with_service(rest_svc, api_keys.clone(), metrics_handle.clone(), rate_limiter.clone())
-        .layer(CorsLayer::permissive())
-        .layer(RequestBodyLimitLayer::new(
-            attentiondb_api::validation::MAX_REQUEST_BODY_BYTES,
-        ));
+    let app = create_rest_router_with_service(
+        rest_svc,
+        api_keys.clone(),
+        metrics_handle.clone(),
+        rate_limiter.clone(),
+    )
+    .layer(CorsLayer::permissive())
+    .layer(RequestBodyLimitLayer::new(
+        attentiondb_api::validation::MAX_REQUEST_BODY_BYTES,
+    ));
 
     info!("Server ready — press Ctrl+C for graceful shutdown");
 
@@ -112,8 +121,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let rest_server = match tls_mode {
         tls::TlsMode::Enabled(tls_config) => {
-            let result = axum_server::bind_rustls(rest_addr, tls_config)
-                .serve(app.into_make_service());
+            let result =
+                axum_server::bind_rustls(rest_addr, tls_config).serve(app.into_make_service());
             tokio::select! {
                 r = result => { r.map_err(|e| Box::new(e) as Box<dyn std::error::Error>) }
                 _ = rest_shutdown_fut => { Ok(()) }
@@ -123,7 +132,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let listener = tokio::net::TcpListener::bind(&rest_addr).await?;
             let server = axum::serve(listener, app.into_make_service())
                 .with_graceful_shutdown(rest_shutdown_fut);
-            server.await.map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+            server
+                .await
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
         }
     };
 
@@ -132,15 +143,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // ── Wait for gRPC server (with timeout) ──────────────────────────────
-    let grpc_result = tokio::time::timeout(
-        Duration::from_secs(shutdown_timeout_secs),
-        grpc_server,
-    ).await;
+    let grpc_result =
+        tokio::time::timeout(Duration::from_secs(shutdown_timeout_secs), grpc_server).await;
 
     match grpc_result {
         Ok(Ok(())) => info!("gRPC server stopped cleanly"),
         Ok(Err(e)) => error!(error = %e, "gRPC server error"),
-        Err(_) => warn!("gRPC server shutdown timed out after {}s", shutdown_timeout_secs),
+        Err(_) => warn!(
+            "gRPC server shutdown timed out after {}s",
+            shutdown_timeout_secs
+        ),
     }
 
     // ── Flush WAL ──────────────────────────────────────────────────────────

@@ -1,9 +1,15 @@
+pub mod error;
+pub mod executor;
 pub mod parser;
 pub mod planner;
-pub mod executor;
-pub mod error;
 
-pub use parser::{parse_aql, AQLQuery, AQLStatement, CreateCollection, AlterCollection, get_per_head_settings, has_per_head_settings};
-pub use planner::{plan_query, build_logical, LogicalPlan, PhysicalPlan, HNSWSearchStep, ExactRerankStep, FilterStep};
-pub use executor::{QueryExecutor, QueryResult, ExecuteResult};
 pub use error::QueryError;
+pub use executor::{ExecuteResult, QueryExecutor, QueryResult};
+pub use parser::{
+    get_per_head_settings, has_per_head_settings, parse_aql, AQLQuery, AQLStatement,
+    AlterCollection, CreateCollection,
+};
+pub use planner::{
+    build_logical, plan_query, ExactRerankStep, FilterStep, HNSWSearchStep, LogicalPlan,
+    PhysicalPlan,
+};
