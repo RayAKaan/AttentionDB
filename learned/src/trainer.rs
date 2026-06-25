@@ -111,8 +111,8 @@ impl ProjectionTrainer {
         }
 
         let num_pairs = positive_pairs.len() as f32;
-        batch_grad_w_q = batch_grad_w_q / num_pairs;
-        batch_grad_w_k = batch_grad_w_k / num_pairs;
+        batch_grad_w_q /= num_pairs;
+        batch_grad_w_k /= num_pairs;
 
         self.projection.w_q = &self.projection.w_q - &(&batch_grad_w_q * self.learning_rate);
         self.projection.w_k = &self.projection.w_k - &(&batch_grad_w_k * self.learning_rate);

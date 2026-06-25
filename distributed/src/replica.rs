@@ -33,6 +33,12 @@ pub struct ReplicaManager {
     pub replicas: HashMap<u32, Vec<ReadReplica>>, // shard_id -> replicas
 }
 
+impl Default for ReplicaManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ReplicaManager {
     pub fn new() -> Self {
         Self {

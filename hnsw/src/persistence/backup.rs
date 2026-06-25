@@ -12,7 +12,7 @@ pub fn create_backup(dir: &Path) -> Result<PathBuf, PersistenceError> {
     let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S").to_string();
     let dir_name = dir
         .file_name()
-        .and_then(|n| Some(n.to_string_lossy().to_string()))
+        .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_else(|| "attentiondb_backup".to_string());
     let backup_dir = dir
         .parent()
@@ -44,7 +44,7 @@ pub fn list_backups(dir: &Path) -> Result<Vec<PathBuf>, PersistenceError> {
     let prefix = format!(
         "backup_{}_",
         dir.file_name()
-            .and_then(|n| Some(n.to_string_lossy().to_string()))
+            .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_else(|| "attentiondb_backup".to_string())
     );
 

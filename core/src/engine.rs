@@ -192,6 +192,16 @@ impl AttentionEngine {
         Ok(())
     }
 
+    pub fn alter_collection_settings(
+        &self,
+        name: &str,
+        settings: attentiondb_hnsw::CollectionSettings,
+    ) -> Result<(), CoreError> {
+        let collection = self.get_collection(name)?;
+        *collection.settings.write() = settings;
+        Ok(())
+    }
+
     pub fn get_collection(&self, name: &str) -> Result<Arc<Collection>, CoreError> {
         self.collections
             .read()

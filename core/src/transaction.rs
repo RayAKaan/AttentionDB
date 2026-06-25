@@ -30,6 +30,12 @@ pub struct TransactionManager {
     next_id: AtomicU64,
 }
 
+impl Default for TransactionManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TransactionManager {
     pub fn new() -> Self {
         Self {

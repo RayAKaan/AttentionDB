@@ -1,3 +1,5 @@
+#![allow(clippy::result_large_err)]
+
 //! Request Validation — Input sanitization, size limits, parameter bounds
 //!
 //! Prevents abuse, injection, and resource exhaustion attacks.

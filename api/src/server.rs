@@ -47,6 +47,7 @@ impl Default for AttentionDBService {
     }
 }
 
+#[allow(clippy::result_unit_err)]
 pub fn parse_float_vector(s: &str) -> Result<Vec<f32>, ()> {
     let s = s.trim();
     let s = if s.starts_with('[') && s.ends_with(']') {
@@ -73,6 +74,7 @@ pub fn parse_float_vector(s: &str) -> Result<Vec<f32>, ()> {
     Ok(vec)
 }
 
+#[allow(clippy::result_large_err)]
 fn check_grpc_auth(
     api_keys: &ApiKeyStore,
     metadata: &tonic::metadata::MetadataMap,
@@ -320,9 +322,7 @@ impl AttentionDb for AttentionDBService {
             hnsw_settings.enable_gpu_projections = s.enable_gpu_projections;
         }
 
-        hnsw_settings
-            .validate()
-            .map_err(|e| Status::invalid_argument(e))?;
+        hnsw_settings.validate().map_err(Status::invalid_argument)?;
 
         let heads: Vec<String> = if req.head_settings.is_empty() {
             vec!["default".to_string()]
@@ -431,9 +431,7 @@ impl AttentionDb for AttentionDBService {
             enable_gpu_projections: s.enable_gpu_projections,
         };
 
-        hnsw_settings
-            .validate()
-            .map_err(|e| Status::invalid_argument(e))?;
+        hnsw_settings.validate().map_err(Status::invalid_argument)?;
 
         self.engine
             .alter_collection_settings(&req.collection, hnsw_settings.clone())

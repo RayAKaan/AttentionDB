@@ -136,8 +136,9 @@ pub struct RaftNode {
     pub votes_received: usize,
     pub next_index: HashMap<u32, u64>,
     pub match_index: HashMap<u32, u64>,
+    #[allow(clippy::type_complexity)]
     on_commit: Option<Arc<Mutex<dyn FnMut(&RaftLogEntry) + Send>>>,
-    pub     election_timeout_ms: u64,
+    pub election_timeout_ms: u64,
     pub heartbeat_interval_ms: u64,
 }
 
@@ -328,7 +329,7 @@ impl RaftNode {
                 last_log_term,
             } => {
                 let grant = msg.term >= self.current_term
-                    && self.voted_for.map_or(true, |v| v == msg.from)
+                    && self.voted_for.is_none_or(|v| v == msg.from)
                     && (last_log_term > self.last_log_term()
                         || (last_log_term == self.last_log_term()
                             && last_log_index >= self.log.len() as u64));
@@ -348,7 +349,7 @@ impl RaftNode {
                 if self.role == RaftRole::Candidate && msg.term == self.current_term && vote_granted
                 {
                     self.votes_received += 1;
-                    if self.votes_received > (self.peers.len() + 1) / 2 {
+                    if self.votes_received > self.peers.len().div_ceil(2) {
                         out.extend(self.become_leader());
                     }
                 }
@@ -424,7 +425,7 @@ impl RaftNode {
                         self.next_index.insert(msg.from, match_index + 1);
                         for n in (self.commit_index + 1)..=(self.log.len() as u64) {
                             if self.match_index.values().filter(|&&m| m >= n).count()
-                                > (self.peers.len() + 1) / 2
+                                > self.peers.len().div_ceil(2)
                                 && self.log[(n - 1) as usize].term == self.current_term
                             {
                                 self.commit_index = n;

@@ -56,8 +56,8 @@ fn main() {
 
     println!("\n→ Kubernetes Operator:");
     let mut operator = KubernetesOperator::new("attentiondb", "attentiondb-cluster");
-    operator.deploy(3);
-    operator.scale(5);
+    drop(operator.deploy(3));
+    drop(operator.scale(5));
     println!(
         "   Deployed '{}' in '{}' — {} replicas",
         operator.deployment_name,

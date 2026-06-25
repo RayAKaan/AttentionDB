@@ -72,7 +72,7 @@ fn test_multi_shard_assignment() {
 
 #[test]
 fn test_raft_no_peers() {
-    let mut raft = RaftNode::new(1, vec![]);
+    let raft = RaftNode::new(1, vec![]);
     let msgs = raft.broadcast_append_entries();
     assert!(msgs.is_empty());
 }

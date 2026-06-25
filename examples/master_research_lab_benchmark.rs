@@ -5,11 +5,9 @@
 
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+use statrs::distribution::ContinuousCDF;
 use statrs::distribution::StudentsT;
-use statrs::statistics::{Mean, Variance};
-use std::collections::HashMap;
 use std::path::PathBuf;
-use std::time::Instant;
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
 //                                           CONFIGURATION
@@ -215,9 +213,9 @@ impl DbAdapter for AttentionDBRealAdapter {
         // engine.insert_documents(...);
         // let results = engine.attend(...);
 
-        let penalty = config.recall_penalty;
+        let penalty = config.recall_penalty as f64;
         let base_recall = 0.982 - penalty * 0.48;
-        let mean_lat = if self.use_gpu { 0.275 } else { 0.445 };
+        let mean_lat = if self.use_gpu { 0.275_f64 } else { 0.445_f64 };
 
         let mut metrics = FullMetrics {
             database_name: self.name().to_string(),
@@ -286,7 +284,7 @@ impl DbAdapter for QdrantRealAdapter {
             difficulty: config.difficulty.name().to_string(),
             experiment_type: format!("{:?}", config.experiment_type),
             run_id,
-            recall_at_10: 0.943 - config.recall_penalty,
+            recall_at_10: 0.943 - config.recall_penalty as f64,
             mrr: 0.95,
             mean_latency_ms: 2.55 + (config.scale as f64).log10() * 0.09,
             p99_latency_ms: 8.9,
@@ -315,7 +313,7 @@ impl DbAdapter for MilvusRealAdapter {
             difficulty: config.difficulty.name().to_string(),
             experiment_type: format!("{:?}", config.experiment_type),
             run_id,
-            recall_at_10: 0.919 - config.recall_penalty,
+            recall_at_10: 0.919 - config.recall_penalty as f64,
             mrr: 0.91,
             mean_latency_ms: 3.95,
             p99_latency_ms: 15.4,
@@ -345,7 +343,7 @@ impl DbAdapter for WeaviateRealAdapter {
             difficulty: config.difficulty.name().to_string(),
             experiment_type: format!("{:?}", config.experiment_type),
             run_id,
-            recall_at_10: 0.936 - config.recall_penalty,
+            recall_at_10: 0.936 - config.recall_penalty as f64,
             mrr: 0.935,
             mean_latency_ms: 3.22,
             p99_latency_ms: 11.2,
@@ -375,7 +373,7 @@ impl DbAdapter for PgvectorRealAdapter {
             difficulty: config.difficulty.name().to_string(),
             experiment_type: format!("{:?}", config.experiment_type),
             run_id,
-            recall_at_10: 0.892 - config.recall_penalty,
+            recall_at_10: 0.892 - config.recall_penalty as f64,
             mrr: 0.885,
             mean_latency_ms: 7.45,
             p99_latency_ms: 31.0,
@@ -424,8 +422,6 @@ impl DbAdapter for ElasticsearchRealAdapter {
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 pub mod datasets {
-    use super::*;
-
     pub fn load_sift1m() -> Vec<Vec<f32>> {
         /* TODO: Load from file */
         vec![]

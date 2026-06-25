@@ -123,18 +123,14 @@ impl HNSWIndex {
         config: HNSWConfig,
         settings: CollectionSettings,
     ) -> Result<Self, HNSWError> {
-        settings
-            .validate()
-            .map_err(|e| HNSWError::InvalidConfig(e))?;
+        settings.validate().map_err(HNSWError::InvalidConfig)?;
         let mut index = Self::new(head_name, dim, config);
         index.settings = settings;
         Ok(index)
     }
 
     pub fn update_settings(&mut self, settings: CollectionSettings) -> Result<(), HNSWError> {
-        settings
-            .validate()
-            .map_err(|e| HNSWError::InvalidConfig(e))?;
+        settings.validate().map_err(HNSWError::InvalidConfig)?;
         self.settings = settings;
         Ok(())
     }
@@ -290,9 +286,8 @@ impl HNSWIndex {
     /// Perform batched projection using GPU if available, otherwise CPU
     pub fn project_batch(&self, matrix: &[f32], vectors: &[Vec<f32>]) -> Vec<Vec<f32>> {
         if self.settings.enable_gpu_fusion && self.gpu_backend.is_available() {
-            match self.gpu_backend.project_batch(matrix, vectors) {
-                Ok(result) => return result,
-                Err(_) => {}
+            if let Ok(result) = self.gpu_backend.project_batch(matrix, vectors) {
+                return result;
             }
         }
         let dim = if vectors.is_empty() {

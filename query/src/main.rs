@@ -86,13 +86,10 @@ fn main() {
     println!("   {}", ddl);
 
     let ddl_parsed = parse_aql(ddl).unwrap();
-    match &ddl_parsed {
-        AQLStatement::CreateCollection(coll) => {
-            println!("   Collection: {}", coll.collection);
-            println!("   Fields:     {:?}", coll.fields);
-            println!("   Settings:   {:?}", coll.settings);
-        }
-        _ => {}
+    if let AQLStatement::CreateCollection(coll) = &ddl_parsed {
+        println!("   Collection: {}", coll.collection);
+        println!("   Fields:     {:?}", coll.fields);
+        println!("   Settings:   {:?}", coll.settings);
     }
 
     let alter = r#"ALTER COLLECTION papers SET (ef_search = 512, max_connections = 64, exact_rerank = false)"#;
@@ -101,17 +98,12 @@ fn main() {
     println!("   {}", alter);
 
     let alter_parsed = parse_aql(alter).unwrap();
-    match &alter_parsed {
-        AQLStatement::AlterCollection(a) => {
-            println!("   Collection: {}", a.collection);
-            println!(
-                "   New Settings: ef_search={}, max_connections={}, exact_rerank={}",
-                a.settings.ef_search,
-                a.settings.max_nb_connection,
-                a.settings.enable_exact_reranking
-            );
-        }
-        _ => {}
+    if let AQLStatement::AlterCollection(a) = &alter_parsed {
+        println!("   Collection: {}", a.collection);
+        println!(
+            "   New Settings: ef_search={}, max_connections={}, exact_rerank={}",
+            a.settings.ef_search, a.settings.max_nb_connection, a.settings.enable_exact_reranking
+        );
     }
 
     let mut empty_indexes = HashMap::new();

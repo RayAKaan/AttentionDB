@@ -98,10 +98,8 @@ fn extract_bearer_token(req: &Request) -> Option<String> {
     let value = header.to_str().ok()?;
     if let Some(token) = value.strip_prefix("Bearer ") {
         Some(token.to_string())
-    } else if let Some(token) = value.strip_prefix("bearer ") {
-        Some(token.to_string())
     } else {
-        None
+        value.strip_prefix("bearer ").map(|token| token.to_string())
     }
 }
 
@@ -157,6 +155,7 @@ pub async fn auth_middleware(req: Request, next: Next) -> Result<Response, Statu
 }
 
 /// Create a gRPC interceptor for API key authentication.
+#[allow(clippy::result_large_err)]
 pub fn grpc_auth_interceptor(
     store: Arc<ApiKeyStore>,
 ) -> impl Fn(GrpcRequest<()>) -> Result<GrpcRequest<()>, Status> + Clone {

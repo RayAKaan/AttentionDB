@@ -45,6 +45,7 @@ async fn test_grpc_end_to_end_insert_and_attend() {
             enable_gpu_projections: false,
         }),
         head_settings: std::collections::HashMap::new(),
+        dimension: 64,
     };
     svc.create_collection(Request::new(create_req))
         .await
@@ -76,6 +77,11 @@ async fn test_grpc_end_to_end_insert_and_attend() {
         top_k: 5,
         min_weight: 0.0,
         temporal_decay: None,
+        offset: 0,
+        hybrid: false,
+        bm25_weight: 0.3,
+        vector_weight: 0.7,
+        query_text: String::new(),
     };
     let attend_res = svc
         .attend(Request::new(attend_req))
@@ -97,7 +103,8 @@ async fn test_grpc_end_to_end_insert_and_attend() {
 async fn test_rest_end_to_end_insert_and_attend() {
     let svc = Arc::new(AttentionDBService::default());
     let api_keys = Arc::new(ApiKeyStore::disabled());
-    let app = create_rest_router_with_service(svc.clone(), api_keys, None);
+    let rate_limiter = Arc::new(attentiondb_api::RateLimiter::disabled());
+    let app = create_rest_router_with_service(svc.clone(), api_keys, None, rate_limiter);
 
     let coll_body = serde_json::json!({
         "collection": "rest_papers",

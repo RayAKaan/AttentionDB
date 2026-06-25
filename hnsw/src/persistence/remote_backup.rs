@@ -21,7 +21,7 @@ pub async fn upload_backup(backup_dir: &Path, remote_url: &str) -> Result<(), Pe
 
     let metadata = tokio::fs::read_to_string(&meta_path)
         .await
-        .map_err(|e| PersistenceError::Io(e))?;
+        .map_err(PersistenceError::Io)?;
 
     let backup_name = backup_dir
         .file_name()
@@ -38,26 +38,20 @@ pub async fn upload_backup(backup_dir: &Path, remote_url: &str) -> Result<(), Pe
         .multipart(form)
         .send()
         .await
-        .map_err(|e| {
-            PersistenceError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                e.to_string(),
-            ))
-        })?;
+        .map_err(|e| PersistenceError::Io(std::io::Error::other(e.to_string())))?;
 
     if response.status().is_success() {
         Ok(())
     } else {
-        Err(PersistenceError::Io(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("Remote backup failed with status: {}", response.status()),
-        )))
+        Err(PersistenceError::Io(std::io::Error::other(format!(
+            "Remote backup failed with status: {}",
+            response.status()
+        ))))
     }
 }
 
 pub async fn download_backup(_remote_url: &str, _local_dir: &Path) -> Result<(), PersistenceError> {
-    Err(PersistenceError::Io(std::io::Error::new(
-        std::io::ErrorKind::Other,
+    Err(PersistenceError::Io(std::io::Error::other(
         "Remote download not yet implemented",
     )))
 }
