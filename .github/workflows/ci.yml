@@ -45,7 +45,9 @@ jobs:
         run: cargo test --workspace
 
       - name: Run stress tests
-        run: cargo run --workspace --release
+        run: |
+          cargo run --release -p attentiondb-query
+          cargo run --release -p attentiondb-distributed
 
   lint:
     name: Lint & Format

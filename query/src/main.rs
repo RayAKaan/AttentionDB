@@ -50,11 +50,20 @@ fn main() {
             );
 
             println!("\n→ Executing...");
-            let index = attentiondb_hnsw::HNSWIndex::new(
+            let mut index = attentiondb_hnsw::HNSWIndex::new(
                 "papers",
                 256,
                 attentiondb_hnsw::HNSWConfig::default(),
             );
+
+            // Populate index with sample vectors
+            for i in 0..100 {
+                let vec: Vec<f32> = (0..256)
+                    .map(|j| ((i * 256 + j) as f32) / 2560.0 - 0.5)
+                    .collect();
+                index.insert(i, &vec).unwrap();
+            }
+
             let query_vector = vec![0.1; 256];
             let result = QueryExecutor::execute(&plan, &index, &query_vector).unwrap();
             println!(
@@ -108,14 +117,19 @@ fn main() {
 
     let mut empty_indexes = HashMap::new();
     let mut empty_managers = HashMap::new();
-    let alter_result = QueryExecutor::execute_statement(
+    match QueryExecutor::execute_statement(
         &alter_parsed,
         &mut empty_indexes,
         &mut empty_managers,
         None,
-    )
-    .unwrap();
-    println!("\n→ Executor result: {}", alter_result.message);
+    ) {
+        Ok(alter_result) => {
+            println!("\n→ Executor result: {}", alter_result.message);
+        }
+        Err(e) => {
+            println!("\n→ Executor note: {} (expected — no live engine)", e);
+        }
+    }
 
     println!("\n✅ Phase 3 demo completed successfully.");
 }

@@ -51,7 +51,7 @@ fn hnsw_insert_benchmark(c: &mut Criterion) {
     c.bench_function("hnsw_insert_10k", |b| {
         b.iter_with_setup(
             || {
-                let mut index = HNSWIndex::new("bench_insert", dim, config.clone());
+                let index = HNSWIndex::new("bench_insert", dim, config.clone());
                 let mut rng = rand::thread_rng();
                 let vectors: Vec<(u64, Vec<f32>)> = (0..10_000)
                     .map(|i| (i, (0..dim).map(|_| rng.gen::<f32>() - 0.5).collect()))

@@ -17,6 +17,7 @@ attentiondb-distributed = { path = "../distributed" }
 
 [dev-dependencies]
 criterion = { workspace = true }
+rand = { workspace = true }
 
 [[bench]]
 name = "query_bench"
