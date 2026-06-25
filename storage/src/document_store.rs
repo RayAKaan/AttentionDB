@@ -1,55 +1,40 @@
-//! Real LSM-style Document Store (.adb)
-//!
-//! Implements memtable buffering, WAL logging, SSTable flushing,
-//! highly concurrent LRU disk frame block caching, and disk recovery.
-
 use std::collections::{HashMap, BinaryHeap};
 use std::cmp::Reverse;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, AtomicU64, Ordering};
 use parking_lot::RwLock;
 use uuid::Uuid;
-use tracing::info;
+
 use crate::record::Record;
 use crate::error::StorageError;
 use crate::sstable::{SSTableWriter, SSTableReader};
 
-/// A cache entry ordered by reverse access time for true LRU eviction.
+/// Heap entry ordered by access_time (oldest first for LRU eviction).
 #[derive(Debug, Clone)]
-pub struct CacheEntry {
-    pub record: Record,
-    /// Monotonically increasing access counter (higher = more recent).
-    pub access_order: u64,
+pub struct LruHeapEntry {
+    pub access_time: u64,
+    pub id: Uuid,
 }
 
-impl PartialEq for CacheEntry {
-    fn eq(&self, other: &Self) -> bool {
-        self.access_order == other.access_order
-    }
+impl PartialEq for LruHeapEntry {
+    fn eq(&self, other: &Self) -> bool { self.access_time == other.access_time }
 }
-
-impl Eq for CacheEntry {}
-
-impl PartialOrd for CacheEntry {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
+impl Eq for LruHeapEntry {}
+impl PartialOrd for LruHeapEntry {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> { Some(self.cmp(other)) }
 }
-
-impl Ord for CacheEntry {
+impl Ord for LruHeapEntry {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.access_order.cmp(&other.access_order)
+        other.access_time.cmp(&self.access_time)
     }
 }
 
-/// Statistics for the block cache.
 #[derive(Debug, Default)]
 pub struct CacheStats {
     pub hits: AtomicUsize,
     pub misses: AtomicUsize,
     pub evictions: AtomicUsize,
-    pub current_entries: AtomicUsize,
-    pub memory_usage_bytes: AtomicU64,
+    pub size_bytes: AtomicUsize,
 }
 
 impl Clone for CacheStats {
@@ -58,154 +43,101 @@ impl Clone for CacheStats {
             hits: AtomicUsize::new(self.hits.load(Ordering::Relaxed)),
             misses: AtomicUsize::new(self.misses.load(Ordering::Relaxed)),
             evictions: AtomicUsize::new(self.evictions.load(Ordering::Relaxed)),
-            current_entries: AtomicUsize::new(self.current_entries.load(Ordering::Relaxed)),
-            memory_usage_bytes: AtomicU64::new(self.memory_usage_bytes.load(Ordering::Relaxed)),
+            size_bytes: AtomicUsize::new(self.size_bytes.load(Ordering::Relaxed)),
         }
     }
 }
 
-impl CacheStats {
-    pub fn snapshot(&self) -> CacheStatsSnapshot {
-        CacheStatsSnapshot {
-            hits: self.hits.load(Ordering::Relaxed),
-            misses: self.misses.load(Ordering::Relaxed),
-            evictions: self.evictions.load(Ordering::Relaxed),
-            current_entries: self.current_entries.load(Ordering::Relaxed),
-            memory_usage_bytes: self.memory_usage_bytes.load(Ordering::Relaxed),
-        }
-    }
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct CacheStatsSnapshot {
-    pub hits: usize,
-    pub misses: usize,
-    pub evictions: usize,
-    pub current_entries: usize,
-    pub memory_usage_bytes: u64,
+    pub hits: usize, pub misses: usize, pub evictions: usize,
+    pub size_bytes: usize, pub entries: usize,
 }
 
-/// Block cache using a BinaryHeap for true O(log n) LRU eviction.
+/// LRU block cache using BinaryHeap<LruHeapEntry>.
 pub struct BlockCache {
-    pub cache: HashMap<Uuid, CacheEntry>,
-    pub lru_heap: BinaryHeap<Reverse<(u64, Uuid)>>,
+    pub cache: HashMap<Uuid, Record>,
+    pub lru: BinaryHeap<LruHeapEntry>,
     pub capacity: usize,
+    pub memory_budget: usize,
+    pub memory_used: usize,
     pub stats: CacheStats,
-    /// Approximate memory budget in bytes (0 = unlimited).
-    pub memory_budget: u64,
-    access_counter: AtomicU64,
+    access_counter: u64,
 }
 
 impl BlockCache {
     pub fn new(capacity: usize) -> Self {
         Self {
             cache: HashMap::with_capacity(capacity),
-            lru_heap: BinaryHeap::with_capacity(capacity),
+            lru: BinaryHeap::with_capacity(capacity),
             capacity,
+            memory_budget: 50 * 1024 * 1024,
+            memory_used: 0,
             stats: CacheStats::default(),
-            memory_budget: 0,
-            access_counter: AtomicU64::new(1),
+            access_counter: 0,
         }
     }
 
-    pub fn with_memory_budget(mut self, bytes: u64) -> Self {
-        self.memory_budget = bytes;
-        self
-    }
-
-    fn next_access(&self) -> u64 {
-        self.access_counter.fetch_add(1, Ordering::Relaxed)
-    }
-
     pub fn get(&mut self, id: &Uuid) -> Option<Record> {
-        if self.cache.contains_key(id) {
-            let new_order = self.next_access();
-            if let Some(entry) = self.cache.get_mut(id) {
-                entry.access_order = new_order;
-                self.lru_heap.push(Reverse((new_order, *id)));
-                self.stats.hits.fetch_add(1, Ordering::Relaxed);
-                return Some(entry.record.clone());
-            }
+        if let Some(record) = self.cache.get(id) {
+            self.access_counter += 1;
+            self.lru.push(LruHeapEntry { access_time: self.access_counter, id: *id });
+            self.stats.hits.fetch_add(1, Ordering::Relaxed);
+            return Some(record.clone());
         }
         self.stats.misses.fetch_add(1, Ordering::Relaxed);
         None
     }
 
     pub fn insert(&mut self, id: Uuid, record: Record) {
-        let access_order = self.next_access();
-        let size_estimate = estimate_record_size(&record);
-
-        // Evict until capacity or memory budget is satisfied
-        while self.cache.len() >= self.capacity || (self.memory_budget > 0 && self.estimate_memory_usage() + size_estimate as u64 > self.memory_budget) {
-            if let Some(Reverse((_, evict_id))) = self.lru_heap.pop() {
-                if self.cache.remove(&evict_id).is_some() {
+        self.access_counter += 1;
+        let size = estimate_record_size(&record);
+        // Lazy deletion: pop stale entries
+        while let Some(top) = self.lru.peek() {
+            if self.cache.contains_key(&top.id) { break; }
+            self.lru.pop();
+        }
+        // Evict until under capacity and budget
+        while self.cache.len() >= self.capacity || (self.memory_used + size > self.memory_budget) {
+            if let Some(entry) = self.lru.pop() {
+                if self.cache.remove(&entry.id).is_some() {
+                    self.memory_used = self.memory_used.saturating_sub(256);
                     self.stats.evictions.fetch_add(1, Ordering::Relaxed);
-                    self.stats.current_entries.fetch_sub(1, Ordering::Relaxed);
                 }
-            } else {
-                break;
-            }
+            } else { break; }
         }
-
-        // Clean stale heap entries lazily
-        while let Some(Reverse((order, id))) = self.lru_heap.peek() {
-            if let Some(entry) = self.cache.get(id) {
-                if entry.access_order != *order {
-                    self.lru_heap.pop();
-                } else {
-                    break;
-                }
-            } else {
-                self.lru_heap.pop();
-            }
-        }
-
-        self.cache.insert(id, CacheEntry { record, access_order });
-        self.lru_heap.push(Reverse((access_order, id)));
-        self.stats.current_entries.fetch_add(1, Ordering::Relaxed);
-        self.stats.memory_usage_bytes.fetch_add(size_estimate as u64, Ordering::Relaxed);
+        self.memory_used += size;
+        self.cache.insert(id, record);
+        self.lru.push(LruHeapEntry { access_time: self.access_counter, id });
     }
 
     pub fn remove(&mut self, id: &Uuid) {
-        if self.cache.remove(id).is_some() {
-            self.stats.current_entries.fetch_sub(1, Ordering::Relaxed);
+        if let Some(record) = self.cache.remove(id) {
+            let size = estimate_record_size(&record);
+            self.memory_used = self.memory_used.saturating_sub(size);
         }
     }
 
     pub fn clear(&mut self) {
         self.cache.clear();
-        self.lru_heap.clear();
-        self.stats.current_entries.store(0, Ordering::Relaxed);
-        self.stats.memory_usage_bytes.store(0, Ordering::Relaxed);
+        self.lru.clear();
+        self.memory_used = 0;
+        self.stats.size_bytes.store(0, Ordering::Relaxed);
     }
 
-    fn estimate_memory_usage(&self) -> u64 {
-        self.stats.memory_usage_bytes.load(Ordering::Relaxed)
-    }
-
-    /// Resize the cache capacity (triggers eviction if shrinking).
-    pub fn resize(&mut self, new_capacity: usize) {
-        self.capacity = new_capacity;
-        while self.cache.len() > self.capacity {
-            if let Some(Reverse((_, evict_id))) = self.lru_heap.pop() {
-                if self.cache.remove(&evict_id).is_some() {
-                    self.stats.evictions.fetch_add(1, Ordering::Relaxed);
-                    self.stats.current_entries.fetch_sub(1, Ordering::Relaxed);
-                }
-            } else {
-                break;
-            }
+    pub fn snapshot(&self) -> CacheStatsSnapshot {
+        CacheStatsSnapshot {
+            hits: self.stats.hits.load(Ordering::Relaxed),
+            misses: self.stats.misses.load(Ordering::Relaxed),
+            evictions: self.stats.evictions.load(Ordering::Relaxed),
+            size_bytes: self.memory_used,
+            entries: self.cache.len(),
         }
-        info!("[BlockCache] Resized to capacity={}", new_capacity);
     }
 }
 
-fn estimate_record_size(record: &Record) -> usize {
-    let mut size = std::mem::size_of::<Record>();
-    size += record.fields.len() * 64;
-    size += record.k_vecs.len() * 128;
-    size += record.tags.len() * 32;
-    size
+fn estimate_record_size(r: &Record) -> usize {
+    std::mem::size_of::<Record>() + r.fields.len() * 64 + r.k_vecs.len() * 128 + r.tags.len() * 32
 }
 
 pub struct DocumentStore {
@@ -231,183 +163,124 @@ impl DocumentStore {
         }
     }
 
-    pub fn with_wal(mut self, wal: crate::wal::Wal) -> Self {
-        self.wal = Some(wal);
-        self
-    }
-
+    pub fn with_wal(mut self, wal: crate::wal::Wal) -> Self { self.wal = Some(wal); self }
     pub fn with_storage_dir(mut self, dir: PathBuf) -> Result<Self, StorageError> {
-        std::fs::create_dir_all(&dir)?;
-        self.storage_dir = Some(dir);
-        Ok(self)
+        std::fs::create_dir_all(&dir)?; self.storage_dir = Some(dir); Ok(self)
     }
-
-    pub fn with_memtable_threshold(mut self, threshold: usize) -> Self {
-        self.memtable_threshold = threshold;
-        self
-    }
+    pub fn with_memtable_threshold(mut self, t: usize) -> Self { self.memtable_threshold = t; self }
 
     pub fn open(dir: PathBuf) -> Result<Self, StorageError> {
         std::fs::create_dir_all(&dir)?;
         let mut sstables = Vec::new();
-        let mut flushed_records = HashMap::new();
+        let mut flushed = HashMap::new();
         if let Ok(entries) = std::fs::read_dir(&dir) {
-            let mut paths: Vec<_> = entries
-                .filter_map(Result::ok)
-                .map(|e| e.path())
-                .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("sst"))
-                .collect();
+            let mut paths: Vec<_> = entries.filter_map(|e| e.ok()).map(|e| e.path())
+                .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("sst")).collect();
             paths.sort();
-            for path in paths {
-                if let Ok(reader) = SSTableReader::open(&path) {
-                    for entry in reader.iter() {
-                        if let Ok(record) = Record::from_msgpack(&entry.value) {
-                            if record.tags.contains(&"__TOMBSTONE__".to_string()) {
-                                flushed_records.remove(&record.id);
-                            } else {
-                                flushed_records.insert(record.id, record);
-                            }
+            for p in paths {
+                if let Ok(r) = SSTableReader::open(&p) {
+                    for e in r.iter() {
+                        if let Ok(rec) = Record::from_msgpack(&e.value) {
+                            if rec.tags.contains(&"__TOMBSTONE__".into()) { flushed.remove(&rec.id); }
+                            else { flushed.insert(rec.id, rec); }
                         }
                     }
-                    sstables.push(reader);
+                    sstables.push(r);
                 }
             }
         }
         let wal_path = dir.join("store.wal");
         let mut wal = crate::wal::Wal::new(&wal_path)?;
-        let wal_entries = wal.replay()?;
+        let entries = wal.replay()?;
         let mut memtable = HashMap::new();
-        for entry in wal_entries {
-            match entry.op {
+        for e in entries {
+            match e.op {
                 crate::wal::OpType::Insert => {
-                    if let Ok(record) = Record::from_msgpack(&entry.data) {
-                        memtable.insert(record.id, record);
-                    }
+                    if let Ok(rec) = Record::from_msgpack(&e.data) { memtable.insert(rec.id, rec); }
                 }
-                crate::wal::OpType::Delete => {
-                    memtable.remove(&entry.record_id);
-                    flushed_records.remove(&entry.record_id);
-                }
+                crate::wal::OpType::Delete => { memtable.remove(&e.record_id); flushed.remove(&e.record_id); }
                 _ => {}
             }
         }
         Ok(Self {
-            memtable,
-            flushed_records,
-            wal: Some(wal),
-            storage_dir: Some(dir),
-            memtable_threshold: 1000,
-            sstables,
-            block_cache: RwLock::new(BlockCache::new(50_000)),
+            memtable, flushed_records: flushed, wal: Some(wal), storage_dir: Some(dir),
+            memtable_threshold: 1000, sstables, block_cache: RwLock::new(BlockCache::new(50_000)),
         })
     }
 
     pub fn insert(&mut self, record: Record) -> Result<Uuid, StorageError> {
         let id = record.id;
-        if let Some(ref mut wal) = self.wal {
-            let data = record.to_msgpack()?;
-            wal.append(crate::wal::OpType::Insert, "default", id, data)?;
+        if let Some(ref mut w) = self.wal {
+            w.append(crate::wal::OpType::Insert, "default", id, record.to_msgpack()?)?;
         }
         self.memtable.insert(id, record.clone());
         self.block_cache.write().insert(id, record);
-        if self.memtable.len() >= self.memtable_threshold {
-            if self.storage_dir.is_some() {
-                self.flush_memtable()?;
-            }
+        if self.memtable.len() >= self.memtable_threshold && self.storage_dir.is_some() {
+            self.flush_memtable()?;
         }
         Ok(id)
     }
 
     pub fn flush_memtable(&mut self) -> Result<(), StorageError> {
-        if self.memtable.is_empty() {
-            return Ok(());
-        }
+        if self.memtable.is_empty() { return Ok(()); }
         if let Some(ref dir) = self.storage_dir {
             std::fs::create_dir_all(dir)?;
-            let now = chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0);
-            let sst_path = dir.join(format!("sstable_{}.sst", now));
-            let mut writer = SSTableWriter::new(&sst_path)?;
-            for (id, record) in &self.memtable {
-                let key = id.as_bytes().to_vec();
-                let value = record.to_msgpack()?;
-                writer.append(key, value)?;
-            }
-            writer.flush()?;
-            let reader = SSTableReader::open(&sst_path)?;
-            self.sstables.push(reader);
-            // Trigger compaction
+            let ts = chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0);
+            let p = dir.join(format!("sstable_{}.sst", ts));
+            let mut w = SSTableWriter::new(&p)?;
+            for (id, rec) in &self.memtable { w.append(id.as_bytes().to_vec(), rec.to_msgpack()?)?; }
+            w.flush()?;
+            self.sstables.push(SSTableReader::open(&p)?);
             let config = crate::compaction::CompactionConfig::default();
             if let Ok(Some(result)) = crate::compaction::compact(dir, &config) {
                 let _ = crate::compaction::cleanup_merged_files(&result);
                 self.sstables.clear();
                 if let Ok(entries) = std::fs::read_dir(dir) {
-                    let mut paths: Vec<_> = entries
-                        .filter_map(Result::ok)
-                        .map(|e| e.path())
-                        .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("sst"))
-                        .collect();
+                    let mut paths: Vec<_> = entries.filter_map(|e| e.ok()).map(|e| e.path())
+                        .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("sst")).collect();
                     paths.sort();
-                    for path in paths {
-                        if let Ok(reader) = SSTableReader::open(&path) {
-                            self.sstables.push(reader);
-                        }
-                    }
+                    for p in paths { if let Ok(r) = SSTableReader::open(&p) { self.sstables.push(r); } }
                 }
             }
         }
-        for (id, record) in self.memtable.drain() {
-            if record.tags.contains(&"__TOMBSTONE__".to_string()) {
-                self.flushed_records.remove(&id);
-            } else {
-                self.flushed_records.insert(id, record);
-            }
+        for (id, rec) in self.memtable.drain() {
+            if rec.tags.contains(&"__TOMBSTONE__".into()) { self.flushed_records.remove(&id); }
+            else { self.flushed_records.insert(id, rec); }
         }
         Ok(())
     }
 
     pub fn get(&self, id: &Uuid) -> Option<&Record> {
-        if let Some(record) = self.memtable.get(id) {
-            if record.tags.contains(&"__TOMBSTONE__".to_string()) {
-                return None;
-            }
-            return Some(record);
+        if let Some(r) = self.memtable.get(id) {
+            if r.tags.contains(&"__TOMBSTONE__".into()) { return None; }
+            return Some(r);
         }
-        if let Some(record) = self.flushed_records.get(id) {
-            if record.tags.contains(&"__TOMBSTONE__".to_string()) {
-                return None;
-            }
-            return Some(record);
+        if let Some(r) = self.flushed_records.get(id) {
+            if r.tags.contains(&"__TOMBSTONE__".into()) { return None; }
+            return Some(r);
         }
         None
     }
 
     pub fn get_record(&self, id: &Uuid) -> Option<Record> {
-        if let Some(record) = self.memtable.get(id) {
-            if record.tags.contains(&"__TOMBSTONE__".to_string()) {
-                return None;
-            }
-            return Some(record.clone());
+        if let Some(r) = self.memtable.get(id) {
+            if r.tags.contains(&"__TOMBSTONE__".into()) { return None; }
+            return Some(r.clone());
         }
-        if let Some(record) = self.flushed_records.get(id) {
-            if record.tags.contains(&"__TOMBSTONE__".to_string()) {
-                return None;
-            }
-            return Some(record.clone());
+        if let Some(r) = self.flushed_records.get(id) {
+            if r.tags.contains(&"__TOMBSTONE__".into()) { return None; }
+            return Some(r.clone());
         }
         if let Some(cached) = self.block_cache.write().get(id) {
-            if cached.tags.contains(&"__TOMBSTONE__".to_string()) {
-                return None;
-            }
+            if cached.tags.contains(&"__TOMBSTONE__".into()) { return None; }
             return Some(cached);
         }
         for sst in self.sstables.iter().rev() {
             if let Some(entry) = sst.get(id.as_bytes()) {
-                if let Ok(record) = Record::from_msgpack(&entry.value) {
-                    self.block_cache.write().insert(*id, record.clone());
-                    if record.tags.contains(&"__TOMBSTONE__".to_string()) {
-                        return None;
-                    }
-                    return Some(record);
+                if let Ok(rec) = Record::from_msgpack(&entry.value) {
+                    self.block_cache.write().insert(*id, rec.clone());
+                    if rec.tags.contains(&"__TOMBSTONE__".into()) { return None; }
+                    return Some(rec);
                 }
             }
         }
@@ -415,18 +288,16 @@ impl DocumentStore {
     }
 
     pub fn delete(&mut self, id: &Uuid) -> Result<(), StorageError> {
-        if let Some(ref mut wal) = self.wal {
-            wal.append(crate::wal::OpType::Delete, "default", *id, vec![])?;
+        if let Some(ref mut w) = self.wal {
+            w.append(crate::wal::OpType::Delete, "default", *id, vec![])?;
         }
         if self.storage_dir.is_some() {
             let mut tombstone = Record::new(HashMap::new());
             tombstone.id = *id;
-            tombstone.tags.push("__TOMBSTONE__".to_string());
+            tombstone.tags.push("__TOMBSTONE__".into());
             self.memtable.insert(*id, tombstone.clone());
             self.block_cache.write().insert(*id, tombstone);
-            if self.memtable.len() >= self.memtable_threshold {
-                self.flush_memtable()?;
-            }
+            if self.memtable.len() >= self.memtable_threshold { self.flush_memtable()?; }
         } else {
             self.memtable.remove(id);
             self.flushed_records.remove(id);
@@ -436,39 +307,29 @@ impl DocumentStore {
     }
 
     pub fn len(&self) -> usize {
-        let mem_count = self.memtable.values().filter(|r| !r.tags.contains(&"__TOMBSTONE__".to_string())).count();
-        let flushed_count = self.flushed_records.values().filter(|r| !r.tags.contains(&"__TOMBSTONE__".to_string()) && !self.memtable.contains_key(&r.id)).count();
-        mem_count + flushed_count
+        let mc = self.memtable.values().filter(|r| !r.tags.contains(&"__TOMBSTONE__".into())).count();
+        let fc = self.flushed_records.values().filter(|r| !r.tags.contains(&"__TOMBSTONE__".into()) && !self.memtable.contains_key(&r.id)).count();
+        mc + fc
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
+    pub fn is_empty(&self) -> bool { self.len() == 0 }
 
     pub fn list_all_records(&self) -> Vec<Record> {
-        let mut results: HashMap<Uuid, Record> = HashMap::new();
-        for (id, rec) in &self.flushed_records {
-            if !rec.tags.contains(&"__TOMBSTONE__".to_string()) {
-                results.insert(*id, rec.clone());
-            }
-        }
+        let mut r: HashMap<Uuid, Record> = self.flushed_records.iter()
+            .filter(|(_, rec)| !rec.tags.contains(&"__TOMBSTONE__".into()))
+            .map(|(id, rec)| (*id, rec.clone())).collect();
         for (id, rec) in &self.memtable {
-            if rec.tags.contains(&"__TOMBSTONE__".to_string()) {
-                results.remove(id);
-            } else {
-                results.insert(*id, rec.clone());
-            }
+            if rec.tags.contains(&"__TOMBSTONE__".into()) { r.remove(id); }
+            else { r.insert(*id, rec.clone()); }
         }
-        results.into_values().collect()
+        r.into_values().collect()
     }
 
     pub fn update_record(&mut self, record: Record) -> Result<(), StorageError> {
-        self.insert(record)?;
-        Ok(())
+        self.insert(record)?; Ok(())
     }
 
-    /// Return cache statistics.
     pub fn cache_stats(&self) -> CacheStatsSnapshot {
-        self.block_cache.read().stats.snapshot()
+        self.block_cache.read().snapshot()
     }
 }

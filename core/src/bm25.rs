@@ -1,133 +1,200 @@
-use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use parking_lot::RwLock;
 
+pub const STOP_WORDS: &[&str] = &[
+    "a","an","the","and","or","but","in","on","at","to","for","of","by","with","from",
+    "is","are","was","were","be","been","being","have","has","had","do","does","did",
+    "will","would","can","could","shall","should","may","might","must","i","you","he",
+    "she","it","we","they","me","him","her","us","them","my","your","his","its","our",
+    "their","this","that","these","those","am","not","no","nor","so","if","as","up",
+    "down","out","about","into","over","after","before","between","under","again",
+    "further","then","once","here","there","when","where","why","how","all","each",
+    "every","both","few","more","most","other","some","such","only","own","same",
+    "than","too","very","just","because",
+];
 
-/// Built-in Porter stemming (no external dependency).
+fn is_stopword(w: &str) -> bool { STOP_WORDS.contains(&w) }
+
+/// Full Porter stemmer (steps 1a–5b).
 fn porter_stem(word: &str) -> String {
     let w = word.to_lowercase();
-    if w.len() <= 2 {
-        return w;
-    }
-    let _s = w.as_bytes();
-    let mut stem = w.clone();
+    if w.len() <= 2 { return w; }
+    let mut s = w;
 
     // Step 1a
-    if stem.ends_with("sses") { stem = stem[..stem.len()-2].to_string(); }
-    else if stem.ends_with("ies") { stem = stem[..stem.len()-2].to_string(); }
-    else if stem.ends_with("ss") { /* keep */ }
-    else if stem.ends_with("s") { stem = stem[..stem.len()-1].to_string(); }
+    if s.ends_with("sses") { s = s[..s.len()-2].to_string(); }
+    else if s.ends_with("ies") { s = s[..s.len()-2].to_string(); }
+    else if s.ends_with("ss") { /* keep */ }
+    else if s.ends_with("s") { s = s[..s.len()-1].to_string(); }
 
     // Step 1b
-    if stem.ends_with("eed") {
-        let before = &stem[..stem.len()-3];
-        if count_consonant_sequence(before) > 0 {
-            stem = stem[..stem.len()-1].to_string();
-        }
-    } else if stem.ends_with("ed") {
-        let before = &stem[..stem.len()-2];
-        if before.contains(|c: char| "aeiou".contains(c)) {
-            stem = before.to_string();
-            if stem.ends_with("at") || stem.ends_with("bl") || stem.ends_with("iz") {
-                stem.push('e');
-            } else if let Some(c) = stem.chars().last() {
-                let last_two: String = stem.chars().rev().take(2).collect::<Vec<_>>().into_iter().rev().collect();
-                let is_double = last_two.len() == 2 && last_two.chars().nth(0) == last_two.chars().nth(1);
-                if is_double && "bcdfghjklmnpqrstvwxz".contains(c) {
-                    stem = stem[..stem.len()-1].to_string();
+    let r1b = if s.ends_with("eed") {
+        let stem = &s[..s.len()-3];
+        if measure(stem) > 0 { s = stem.to_string() + "ee"; true } else { false }
+    } else if s.ends_with("ed") {
+        let stem = s[..s.len()-2].to_string();
+        if stem.contains(|c: char| "aeiou".contains(c)) { s = stem; true } else { false }
+    } else if s.ends_with("ing") {
+        let stem = s[..s.len()-3].to_string();
+        if stem.contains(|c: char| "aeiou".contains(c)) { s = stem; true } else { false }
+    } else { false };
+    if r1b {
+        if s.ends_with("at") { s += "e"; } else if s.ends_with("bl") { s += "e"; }
+        else if s.ends_with("iz") { s += "e"; }
+        else if let Some(c) = s.chars().last() {
+            if let Some(c2) = s.chars().nth(s.len().saturating_sub(2)) {
+                if c == c2 && "bcdfghjklmnpqrstvwxz".contains(c) && !"lsz".contains(c) {
+                    s.pop();
                 }
             }
         }
-    } else if stem.ends_with("ing") {
-        let before = &stem[..stem.len()-3];
+        if measure(&s) == 1 && ends_with_cvc(&s) { s += "e"; }
+    }
+
+    // Step 1c
+    if s.ends_with("y") && s.len() > 1 {
+        let before = &s[..s.len()-1];
         if before.contains(|c: char| "aeiou".contains(c)) {
-            stem = before.to_string();
-            if stem.ends_with("at") || stem.ends_with("bl") || stem.ends_with("iz") {
-                stem.push('e');
-            } else if let Some(c) = stem.chars().last() {
-                let last_two: String = stem.chars().rev().take(2).collect::<Vec<_>>().into_iter().rev().collect();
-                let is_double = last_two.len() == 2 && last_two.chars().nth(0) == last_two.chars().nth(1);
-                if is_double && "bcdfghjklmnpqrstvwxz".contains(c) {
-                    stem = stem[..stem.len()-1].to_string();
-                }
-            }
+            s = before.to_string() + "i";
         }
     }
 
-    // Step 1c: replace trailing y with i
-    if stem.ends_with("y") && stem.len() > 1 {
-        let before = &stem[..stem.len()-1];
-        if before.contains(|c: char| "aeiou".contains(c)) {
-            if let Some(c) = stem.chars().last() {
-                if "bcdfghjklmnpqrstvwxz".contains(c) {
-                    let mut chars: Vec<char> = stem.chars().collect();
-                    let last_idx = chars.len() - 1;
-                    if last_idx > 0 {
-                        chars[last_idx] = 'i';
-                        stem = chars.into_iter().collect();
-                    }
-                }
+    // Step 2
+    let step2 = |s: &mut String| {
+        let subs = [
+            ("ational", "ate"), ("tional", "tion"), ("enci", "ence"), ("anci", "ance"),
+            ("izer", "ize"), ("abli", "able"), ("alli", "al"), ("entli", "ent"),
+            ("eli", "e"), ("ousli", "ous"), ("ization", "ize"), ("ation", "ate"),
+            ("ator", "ate"), ("alism", "al"), ("iveness", "ive"), ("fulness", "ful"),
+            ("ousness", "ous"), ("aliti", "al"), ("iviti", "ive"), ("biliti", "ble"),
+        ];
+        for (suff, repl) in &subs {
+            if s.ends_with(suff) {
+                let stem = &s[..s.len()-suff.len()];
+                if measure(stem) > 0 { *s = stem.to_string() + repl; return true; }
             }
         }
+        false
+    };
+    step2(&mut s);
+
+    // Step 3
+    let step3 = |s: &mut String| {
+        let subs = [("icate", "ic"), ("ative", ""), ("alize", "al"), ("iciti", "ic"),
+                    ("ical", "ic"), ("ful", ""), ("ness", "")];
+        for (suff, repl) in &subs {
+            if s.ends_with(suff) {
+                let stem = &s[..s.len()-suff.len()];
+                if measure(stem) > 0 { *s = stem.to_string() + repl; return true; }
+            }
+        }
+        false
+    };
+    step3(&mut s);
+
+    // Step 4
+    let step4 = |s: &mut String| {
+        let suffs = ["al", "ance", "ence", "er", "ic", "able", "ible", "ant", "ement",
+                     "ment", "ent", "ism", "ate", "iti", "ous", "ive", "ize"];
+        for suff in &suffs {
+            if s.ends_with(suff) {
+                let stem = &s[..s.len()-suff.len()];
+                if measure(stem) > 1 { *s = stem.to_string(); return true; }
+            }
+        }
+        if s.ends_with("ion") && s.len() > 3 {
+            let stem = &s[..s.len()-3];
+            if measure(stem) > 1 && (stem.ends_with('s') || stem.ends_with('t')) {
+                *s = stem.to_string(); return true;
+            }
+        }
+        false
+    };
+    step4(&mut s);
+
+    // Step 5a
+    if s.ends_with('e') {
+        let stem = &s[..s.len()-1];
+        if measure(stem) > 1 { s = stem.to_string(); }
+        else if measure(stem) == 1 && !ends_with_cvc(stem) { s = stem.to_string(); }
     }
 
-    stem
+    // Step 5b
+    if s.ends_with('l') && s.len() > 1 {
+        let stem = &s[..s.len()-1];
+        if measure(stem) > 1 && stem.ends_with('l') { s.pop(); }
+    }
+
+    s
 }
 
-fn count_consonant_sequence(s: &str) -> usize {
-    let vowels = ['a', 'e', 'i', 'o', 'u'];
-    let vc: Vec<char> = s.chars().collect();
+fn measure(s: &str) -> usize {
+    let vowels = ['a','e','i','o','u'];
     let mut count = 0;
-    let mut i = 0;
-    while i < vc.len() {
-        if vowels.contains(&vc[i]) {
-            count += 1;
-            i += 1;
+    let mut in_vowel = false;
+    for c in s.chars() {
+        if vowels.contains(&c) {
+            if !in_vowel { count += 1; }
+            in_vowel = true;
+        } else if c != 'y' || !in_vowel {
+            in_vowel = false;
+        }
+    }
+    if count > 0 { count - 1 } else { 0 }
+}
+
+fn ends_with_cvc(s: &str) -> bool {
+    let chars: Vec<char> = s.chars().collect();
+    if chars.len() < 3 { return false; }
+    let c1 = chars[chars.len()-3];
+    let c2 = chars[chars.len()-2];
+    let c3 = chars[chars.len()-1];
+    let cons = |c: char| !"aeiou".contains(c) && c != 'y';
+    cons(c1) && "aeiou".contains(c2) && cons(c3) && !"wxy".contains(c3)
+}
+
+fn tokenize(text: &str) -> Vec<String> {
+    text.split_whitespace()
+        .map(|t| t.trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase())
+        .filter(|t| !t.is_empty() && !is_stopword(t))
+        .map(|t| porter_stem(&t))
+        .collect()
+}
+
+fn tokenize_with_positions(text: &str) -> Vec<(String, usize)> {
+    text.split_whitespace()
+        .enumerate()
+        .map(|(pos, t)| (t.trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase(), pos))
+        .filter(|(t, _)| !t.is_empty() && !is_stopword(t))
+        .map(|(t, pos)| (porter_stem(&t), pos))
+        .collect()
+}
+
+/// Extract query terms, respecting "quoted strings" as phrase queries.
+fn extract_query_terms(query: &str) -> (Vec<String>, Vec<Vec<String>>) {
+    let mut terms = Vec::new();
+    let mut phrases = Vec::new();
+    for part in query.split('"').enumerate() {
+        let (i, seg) = part;
+        if i % 2 == 1 {
+            let phrase: Vec<String> = seg.split_whitespace()
+                .map(|t| t.trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase())
+                .filter(|t| !t.is_empty())
+                .map(|t| porter_stem(&t))
+                .collect();
+            if !phrase.is_empty() {
+                phrases.push(phrase);
+            }
         } else {
-            let mut j = i;
-            while j < vc.len() && !vowels.contains(&vc[j]) { j += 1; }
-            if j > i { count += 1; i = j; } else { i += 1; }
+            for t in seg.split_whitespace() {
+                let clean = t.trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase();
+                if !clean.is_empty() && !is_stopword(&clean) {
+                    terms.push(porter_stem(&clean));
+                }
+            }
         }
     }
-    count
-}
-
-/// Stopwords set.
-pub struct Stopwords {
-    words: Vec<&'static str>,
-}
-
-impl Stopwords {
-    pub fn new() -> Self {
-        Self {
-            words: vec![
-                "a", "an", "the", "and", "or", "but", "in", "on", "at",
-                "to", "for", "of", "by", "with", "from", "is", "are", "was",
-                "were", "be", "been", "being", "have", "has", "had", "do", "does",
-                "did", "will", "would", "can", "could", "shall", "should", "may",
-                "might", "must", "i", "you", "he", "she", "it", "we", "they",
-                "me", "him", "her", "us", "them", "my", "your", "his", "its",
-                "our", "their", "this", "that", "these", "those", "am", "not",
-                "no", "nor", "so", "if", "as", "up", "down", "out", "about",
-                "into", "over", "after", "before", "between", "under", "again",
-                "further", "then", "once", "here", "there", "when", "where",
-                "why", "how", "all", "each", "every", "both", "few", "more",
-                "most", "other", "some", "such", "only", "own", "same", "than",
-                "too", "very", "just", "because",
-            ],
-        }
-    }
-
-    pub fn is_stopword(&self, word: &str) -> bool {
-        self.words.contains(&word)
-    }
-}
-
-/// A token with position information for phrase matching.
-#[derive(Debug, Clone)]
-pub struct Token {
-    pub term: String,
-    pub position: usize,
+    (terms, phrases)
 }
 
 pub struct Posting {
@@ -143,9 +210,7 @@ pub struct Bm25Index {
     pub total_documents: RwLock<usize>,
     pub k1: f32,
     pub b: f32,
-    #[allow(dead_code)]
-    stopwords: Stopwords,
-    idf_cache: RwLock<HashMap<String, f32>>,
+    pub idf_cache: RwLock<HashMap<String, f32>>,
 }
 
 impl Default for Bm25Index {
@@ -155,199 +220,140 @@ impl Default for Bm25Index {
             document_lengths: RwLock::new(HashMap::new()),
             average_doc_length: RwLock::new(0.0),
             total_documents: RwLock::new(0),
-            k1: 1.5,
-            b: 0.75,
-            stopwords: Stopwords::new(),
+            k1: 1.5, b: 0.75,
             idf_cache: RwLock::new(HashMap::new()),
         }
     }
 }
 
-fn tokenize_full(text: &str) -> Vec<Token> {
-    text.split_whitespace()
-        .enumerate()
-        .map(|(pos, t)| Token {
-            term: t.trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase(),
-            position: pos,
-        })
-        .filter(|t| !t.term.is_empty())
-        .filter(|t| !Stopwords::new().is_stopword(&t.term))
-        .map(|t| Token { term: porter_stem(&t.term), position: t.position })
-        .collect()
-}
-
 impl Bm25Index {
     pub fn insert(&self, doc_id: u64, text: &str) {
-        let tokens = tokenize_full(text);
-        let mut frequencies: HashMap<String, (usize, Vec<usize>)> = HashMap::new();
-        for token in tokens.iter() {
-            let entry = frequencies.entry(token.term.clone()).or_default();
-            entry.0 += 1;
-            entry.1.push(token.position);
+        let tokens = tokenize_with_positions(text);
+        let mut freq: HashMap<String, (usize, Vec<usize>)> = HashMap::new();
+        for (term, pos) in tokens {
+            let e = freq.entry(term).or_default();
+            e.0 += 1; e.1.push(pos);
         }
-        let length = tokens.len();
-        {
-            let mut lengths = self.document_lengths.write();
-            lengths.insert(doc_id, length);
+        let len = tokens.len();
+        self.document_lengths.write().insert(doc_id, len);
+        let mut added = false;
+        let mut idx = self.index.write();
+        for (term, (tf, positions)) in freq {
+            let ps = idx.entry(term.clone()).or_default();
+            if ps.iter().any(|p| p.doc_id == doc_id) { continue; }
+            ps.push(Posting { doc_id, term_frequency: tf, positions });
+            added = true;
         }
-        let mut added_new = false;
-        let mut index = self.index.write();
-        for (term, (frequency, positions)) in frequencies {
-            let postings = index.entry(term.clone()).or_default();
-            if postings.iter().any(|p| p.doc_id == doc_id) {
-                continue;
-            }
-            postings.push(Posting { doc_id, term_frequency: frequency, positions });
-            added_new = true;
-        }
-        if added_new {
-            let mut total_docs = self.total_documents.write();
-            *total_docs += 1;
-            let lengths = self.document_lengths.read();
-            let average = lengths.values().copied().sum::<usize>() as f32 / *total_docs as f32;
-            *self.average_doc_length.write() = average;
-            // Invalidate IDF cache
+        if added {
+            *self.total_documents.write() += 1;
+            let avg = self.document_lengths.read().values().copied().sum::<usize>() as f32 / *self.total_documents.read() as f32;
+            *self.average_doc_length.write() = avg;
             self.idf_cache.write().clear();
         }
     }
 
     pub fn search(&self, query: &str, top_k: usize) -> Vec<(u64, f32)> {
-        let query_tokens = tokenize_full(query);
-        let query_terms: Vec<String> = {
-            let mut seen = std::collections::HashSet::new();
-            query_tokens.iter().filter(|t| seen.insert(t.term.clone())).map(|t| t.term.clone()).collect()
-        };
-        let total_documents = *self.total_documents.read();
-        let average_doc_length = *self.average_doc_length.read();
-        if total_documents == 0 || query_terms.is_empty() {
-            return Vec::new();
-        }
+        let (terms, phrases) = extract_query_terms(query);
+        if terms.is_empty() { return Vec::new(); }
+        let td = *self.total_documents.read();
+        let avg = *self.average_doc_length.read();
+        if td == 0 { return Vec::new(); }
+        let idx = self.index.read();
+        let lens = self.document_lengths.read();
+        let mut cache = self.idf_cache.write();
         let mut scores: HashMap<u64, f32> = HashMap::new();
-        let index = self.index.read();
-        let lengths = self.document_lengths.read();
-        let mut idf_cache = self.idf_cache.write();
-        for term in query_terms.iter() {
-            let idf = if let Some(&cached) = idf_cache.get(term) {
-                cached
-            } else {
-                let df = index.get(term).map(|p| p.len()).unwrap_or(0);
-                let computed = if df == 0 {
-                    0.0
-                } else {
-                    ((total_documents as f32 - df as f32 + 0.5) / (df as f32 + 0.5) + 1.0).ln()
-                };
-                idf_cache.insert(term.clone(), computed);
-                computed
-            };
-            if idf == 0.0 {
-                continue;
-            }
-            if let Some(postings) = index.get(term) {
-                for posting in postings {
-                    let doc_length = *lengths.get(&posting.doc_id).unwrap_or(&0) as f32;
-                    let freq = posting.term_frequency as f32;
-                    let denom = freq + self.k1 * (1.0 - self.b + self.b * (doc_length / average_doc_length));
-                    let score = idf * ((freq * (self.k1 + 1.0)) / denom);
-                    *scores.entry(posting.doc_id).or_default() += score;
+        for term in &terms {
+            let idf = *cache.entry(term.clone()).or_insert_with(|| {
+                let df = idx.get(term).map(|p| p.len()).unwrap_or(0);
+                if df == 0 { 0.0 } else { ((td as f32 - df as f32 + 0.5) / (df as f32 + 0.5) + 1.0).ln() }
+            });
+            if idf == 0.0 { continue; }
+            if let Some(ps) = idx.get(term) {
+                for p in ps {
+                    let dl = *lens.get(&p.doc_id).unwrap_or(&0) as f32;
+                    let d = p.term_frequency as f32 + self.k1 * (1.0 - self.b + self.b * dl / avg);
+                    *scores.entry(p.doc_id).or_default() += idf * (p.term_frequency as f32 * (self.k1 + 1.0)) / d;
                 }
             }
         }
-        let mut results: Vec<(u64, f32)> = scores.into_iter().collect();
-        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+        // Phrase match bonus
+        for phrase in &phrases {
+            if let Some(first) = phrase.first() {
+                if let Some(ps) = idx.get(first) {
+                    for posting in ps {
+                        for &pos in &posting.positions {
+                            let mut match_all = true;
+                            for (offset, term) in phrase.iter().enumerate().skip(1) {
+                                if let Some(next) = idx.get(term) {
+                                    if let Some(np) = next.iter().find(|p| p.doc_id == posting.doc_id) {
+                                        if !np.positions.contains(&(pos + offset)) { match_all = false; break; }
+                                    } else { match_all = false; break; }
+                                } else { match_all = false; break; }
+                            }
+                            if match_all {
+                                *scores.entry(posting.doc_id).or_default() += 2.0;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let mut results: Vec<_> = scores.into_iter().collect();
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         results.truncate(top_k);
         results
     }
 
-    /// Phrase query: match documents containing tokens in order within window.
     pub fn search_phrase(&self, phrase: &str, top_k: usize, _window: usize) -> Vec<(u64, f32)> {
-        let tokens = tokenize_full(phrase);
-        if tokens.is_empty() {
-            return Vec::new();
-        }
-        let terms: Vec<String> = tokens.iter().map(|t| t.term.clone()).collect();
-        let first_term = &terms[0];
-        let index = self.index.read();
-        let some_postings = match index.get(first_term) {
-            Some(p) => p,
-            None => return Vec::new(),
-        };
-        let mut candidate_docs: Vec<u64> = Vec::new();
-        for posting in some_postings {
-            if terms.len() == 1 {
-                candidate_docs.push(posting.doc_id);
-                continue;
-            }
-            let mut found = false;
-            for &pos in &posting.positions {
-                let mut all_match = true;
-                for (offset, term) in terms.iter().enumerate().skip(1) {
-                    let target_pos = pos + offset;
-                    if let Some(next_posting) = index.get(term) {
-                        if let Some(np) = next_posting.iter().find(|p| p.doc_id == posting.doc_id) {
-                            if !np.positions.contains(&target_pos) {
-                                all_match = false;
-                                break;
-                            }
-                        } else {
-                            all_match = false;
-                            break;
-                        }
-                    } else {
-                        all_match = false;
-                        break;
-                    }
+        let terms: Vec<String> = tokenize(phrase);
+        if terms.is_empty() { return Vec::new(); }
+        let idx = self.index.read();
+        let Some(first_ps) = idx.get(&terms[0]) else { return Vec::new(); };
+        let mut cand = Vec::new();
+        for p in first_ps {
+            for &pos in &p.positions {
+                let mut ok = true;
+                for (off, term) in terms.iter().enumerate().skip(1) {
+                    if let Some(np) = idx.get(term).and_then(|ps| ps.iter().find(|x| x.doc_id == p.doc_id)) {
+                        if !np.positions.contains(&(pos + off)) { ok = false; break; }
+                    } else { ok = false; break; }
                 }
-                if all_match {
-                    found = true;
-                    break;
-                }
-            }
-            if found {
-                candidate_docs.push(posting.doc_id);
+                if ok { cand.push(p.doc_id); break; }
             }
         }
-        let total_documents = *self.total_documents.read();
-        let average_doc_length = *self.average_doc_length.read();
-        let lengths = self.document_lengths.read();
+        let td = *self.total_documents.read();
+        let avg = *self.average_doc_length.read();
+        let lens = self.document_lengths.read();
         let mut scores: HashMap<u64, f32> = HashMap::new();
-        for doc_id in &candidate_docs {
-            let mut doc_score = 0.0f32;
+        for &doc in &cand {
+            let mut s = 0.0;
             for term in &terms {
-                if let Some(postings) = index.get(term) {
-                    let df = postings.len();
-                    if df == 0 { continue; }
-                    let idf = ((total_documents as f32 - df as f32 + 0.5) / (df as f32 + 0.5) + 1.0).ln();
-                    if let Some(posting) = postings.iter().find(|p| p.doc_id == *doc_id) {
-                        let doc_length = *lengths.get(doc_id).unwrap_or(&0) as f32;
-                        let freq = posting.term_frequency as f32;
-                        let denom = freq + self.k1 * (1.0 - self.b + self.b * (doc_length / average_doc_length));
-                        doc_score += idf * ((freq * (self.k1 + 1.0)) / denom);
+                if let Some(ps) = idx.get(term) {
+                    let df = ps.len();
+                    let idf = if df == 0 { 0.0 } else { ((td as f32 - df as f32 + 0.5) / (df as f32 + 0.5) + 1.0).ln() };
+                    if let Some(p) = ps.iter().find(|p| p.doc_id == doc) {
+                        let dl = *lens.get(&doc).unwrap_or(&0) as f32;
+                        let d = p.term_frequency as f32 + self.k1 * (1.0 - self.b + self.b * dl / avg);
+                        s += idf * (p.term_frequency as f32 * (self.k1 + 1.0)) / d;
                     }
                 }
             }
-            scores.insert(*doc_id, doc_score);
+            scores.insert(doc, s);
         }
-        let mut results: Vec<(u64, f32)> = scores.into_iter().collect();
-        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
-        results.truncate(top_k);
-        results
+        let mut r: Vec<(u64, f32)> = scores.into_iter().collect();
+        r.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        r.truncate(top_k);
+        r
     }
 }
 
-pub fn reciprocal_rank_fusion(
-    dense: &[(u64, f32)],
-    sparse: &[(u64, f32)],
-    top_k: usize,
-) -> Vec<(u64, f32)> {
-    let mut fused: HashMap<u64, f32> = HashMap::new();
-    for (rank, (doc_id, _score)) in dense.iter().enumerate() {
-        *fused.entry(*doc_id).or_default() += 1.0 / (rank as f32 + 1.0);
-    }
-    for (rank, (doc_id, _score)) in sparse.iter().enumerate() {
-        *fused.entry(*doc_id).or_default() += 1.0 / (rank as f32 + 1.0);
-    }
-    let mut fused_results: Vec<(u64, f32)> = fused.into_iter().collect();
-    fused_results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
-    fused_results.truncate(top_k);
-    fused_results
+pub fn reciprocal_rank_fusion(dense: &[(u64, f32)], sparse: &[(u64, f32)], top_k: usize) -> Vec<(u64, f32)> {
+    let mut f: HashMap<u64, f32> = HashMap::new();
+    for (i, (id, _)) in dense.iter().enumerate() { *f.entry(*id).or_default() += 1.0 / (i as f32 + 1.0); }
+    for (i, (id, _)) in sparse.iter().enumerate() { *f.entry(*id).or_default() += 1.0 / (i as f32 + 1.0); }
+    let mut r: Vec<_> = f.into_iter().collect();
+    r.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    r.truncate(top_k);
+    r
 }
