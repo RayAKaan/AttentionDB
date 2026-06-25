@@ -6,6 +6,9 @@ pub mod auth;
 pub mod observability;
 pub mod validation;
 pub mod tls;
+pub mod rate_limiter;
+pub mod admin;
+pub mod openapi;
 
 pub use server::AttentionDBService;
 pub use rest::{create_rest_router, create_rest_router_with_service};
@@ -14,3 +17,4 @@ pub use error::ApiError;
 pub use auth::ApiKeyStore;
 pub use observability::{init_logging, init_metrics};
 pub use tls::{TlsMode, resolve_tls};
+pub use rate_limiter::RateLimiter;

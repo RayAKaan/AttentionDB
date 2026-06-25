@@ -39,6 +39,10 @@ impl AttentionDBClient {
             min_weight: 0.01,
             temporal_decay: None,
             offset: 0,
+            hybrid: false,
+            bm25_weight: 0.3,
+            vector_weight: 0.7,
+            query_text: String::new(),
         });
 
         let response = self.client.attend(request).await?;

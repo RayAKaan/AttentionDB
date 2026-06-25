@@ -27,6 +27,8 @@ http = "1.0"
 atty = "0.2"
 rcgen = "0.13"
 subtle = "2.4"
+parking_lot = { workspace = true }
+chrono = { workspace = true }
 attentiondb-hnsw = { path = "../hnsw" }
 attentiondb-core = { path = "../core" }
 attentiondb-storage = { path = "../storage" }

@@ -126,7 +126,8 @@ pub async fn auth_middleware(
         return Ok(next.run(req).await);
     }
 
-    if req.uri().path() == "/health" || req.uri().path() == "/metrics" {
+    let path = req.uri().path();
+    if path == "/health" || path.starts_with("/health/") || path == "/metrics" || path == "/openapi.json" || path == "/docs" {
         return Ok(next.run(req).await);
     }
 

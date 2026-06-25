@@ -10,15 +10,18 @@ use serde::{Deserialize, Serialize};
 use metrics_exporter_prometheus::PrometheusHandle;
 use std::sync::Arc;
 use crate::auth::{ApiKeyStore, auth_middleware};
+use crate::rate_limiter::{RateLimiter, rate_limit_middleware};
 use crate::server::AttentionDBService;
 use crate::observability;
 use crate::validation::{validate_collection_name, validate_fields, validate_heads, validate_top_k, validate_vector_dimension};
+use crate::openapi;
 
 #[derive(Clone)]
 pub struct AppState {
     pub service: Arc<AttentionDBService>,
     pub api_keys: Arc<ApiKeyStore>,
     pub metrics: Option<Arc<PrometheusHandle>>,
+    pub rate_limiter: Arc<RateLimiter>,
 }
 
 #[derive(Deserialize)]
@@ -30,6 +33,10 @@ pub struct AttendRequest {
     pub min_weight: Option<f32>,
     pub temporal_decay: Option<f32>,
     pub offset: Option<u32>,
+    pub hybrid: Option<bool>,
+    pub bm25_weight: Option<f32>,
+    pub vector_weight: Option<f32>,
+    pub query_text: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -135,14 +142,25 @@ pub async fn attend_handler(
         }
     });
 
+    let use_hybrid = payload.hybrid.unwrap_or(false);
+
     let offset_usize = offset as usize;
     let fetch_count = offset_usize + top_k as usize;
     let start = std::time::Instant::now();
-    let raw_results = state.service.engine.attend(&payload.collection, &heads, &query_vec, fetch_count)
-        .map_err(|e| {
-            observability::record_error("rest_attend", &e.to_string());
-            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-        })?;
+    let raw_results = if use_hybrid {
+        let query_text = payload.query_text.as_deref().unwrap_or(&payload.query);
+        state.service.engine.attend_hybrid(&payload.collection, &heads, &query_vec, query_text, fetch_count)
+            .map_err(|e| {
+                observability::record_error("rest_attend", &e.to_string());
+                (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            })?
+    } else {
+        state.service.engine.attend(&payload.collection, &heads, &query_vec, fetch_count)
+            .map_err(|e| {
+                observability::record_error("rest_attend", &e.to_string());
+                (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            })?
+    };
     let latency = start.elapsed().as_secs_f64() * 1000.0;
 
     let total_count = raw_results.len() as u32;
@@ -220,6 +238,24 @@ pub async fn insert_handler(
         id,
         success: true,
     }))
+}
+
+pub async fn liveness_handler() -> (StatusCode, &'static str) {
+    (StatusCode::OK, "alive")
+}
+
+pub async fn readiness_handler(State(state): State<AppState>) -> (StatusCode, String) {
+    let is_healthy = state.service.engine.is_persistent();
+    if is_healthy {
+        let stats = state.service.engine.stats();
+        (StatusCode::OK, format!("ready (collections: {}, heads: {}, vectors: {})", stats.collection_count, stats.total_heads, stats.total_vectors))
+    } else {
+        (StatusCode::SERVICE_UNAVAILABLE, "not ready — engine not fully initialized".to_string())
+    }
+}
+
+pub async fn startup_handler() -> (StatusCode, &'static str) {
+    (StatusCode::OK, "startup complete")
 }
 
 pub async fn health_handler(State(state): State<AppState>) -> Json<HealthResponse> {
@@ -350,6 +386,7 @@ pub fn create_rest_router() -> Router {
         Arc::new(AttentionDBService::default()),
         Arc::new(ApiKeyStore::disabled()),
         None,
+        Arc::new(RateLimiter::disabled()),
     )
 }
 
@@ -357,17 +394,28 @@ pub fn create_rest_router_with_service(
     service: Arc<AttentionDBService>,
     api_keys: Arc<ApiKeyStore>,
     metrics: Option<Arc<PrometheusHandle>>,
+    rate_limiter: Arc<RateLimiter>,
 ) -> Router {
-    let state = AppState { service, api_keys: api_keys.clone(), metrics };
+    let state = AppState { service, api_keys: api_keys.clone(), metrics, rate_limiter: rate_limiter.clone() };
 
     Router::new()
         .route("/v1/attend", post(attend_handler))
         .route("/v1/insert", post(insert_handler))
         .route("/v1/collections", post(create_collection_handler))
         .route("/v1/collections/{collection}", put(alter_collection_handler))
+        .route("/v1/admin/backup", post(crate::admin::backup_handler))
+        .route("/v1/admin/backups", get(crate::admin::list_backups_handler))
+        .route("/v1/admin/restore", post(crate::admin::restore_handler))
         .route("/health", get(health_handler))
+        .route("/health/live", get(liveness_handler))
+        .route("/health/ready", get(readiness_handler))
+        .route("/health/startup", get(startup_handler))
         .route("/metrics", get(metrics_handler))
+        .route("/openapi.json", get(openapi_json_handler))
+        .route("/docs", get(swagger_ui_handler))
         .layer(Extension(api_keys))
+        .layer(Extension(rate_limiter))
+        .layer(from_fn(rate_limit_middleware))
         .layer(from_fn(auth_middleware))
         .with_state(state)
 }
@@ -379,4 +427,12 @@ pub async fn metrics_handler(State(state): State<AppState>) -> impl IntoResponse
     } else {
         (StatusCode::SERVICE_UNAVAILABLE, [("Content-Type", "text/plain; charset=utf-8")], "Metrics not available".to_string())
     }
+}
+
+pub async fn openapi_json_handler() -> impl IntoResponse {
+    (StatusCode::OK, [("Content-Type", "application/json")], openapi::OPENAPI_SPEC)
+}
+
+pub async fn swagger_ui_handler() -> impl IntoResponse {
+    (StatusCode::OK, [("Content-Type", "text/html; charset=utf-8")], include_str!("swagger_ui.html"))
 }

@@ -1,0 +1,298 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "AttentionDB API",
+    "description": "Multi-head attention vector database REST API.",
+    "version": "0.2.0"
+  },
+  "servers": [
+    { "url": "http://localhost:8080", "description": "Local development" },
+    { "url": "https://localhost:8080", "description": "Local development (TLS)" }
+  ],
+  "paths": {
+    "/v1/attend": {
+      "post": {
+        "summary": "Multi-head attention search",
+        "operationId": "attend",
+        "tags": ["Search"],
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["collection", "query"],
+                "properties": {
+                  "collection": { "type": "string" },
+                  "query": { "type": "string", "description": "Comma-separated float vector" },
+                  "heads": { "type": "array", "items": { "type": "string" } },
+                  "top_k": { "type": "integer", "default": 10, "maximum": 10000 },
+                  "min_weight": { "type": "number", "format": "float", "default": 0.01 },
+                  "temporal_decay": { "type": "number", "format": "float" },
+                  "offset": { "type": "integer", "default": 0 },
+                  "hybrid": { "type": "boolean", "default": false },
+                  "bm25_weight": { "type": "number", "format": "float", "default": 0.3 },
+                  "vector_weight": { "type": "number", "format": "float", "default": 0.7 },
+                  "query_text": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": { "type": "array", "items": { "type": "object" } },
+                    "latency_ms": { "type": "number" },
+                    "total_count": { "type": "integer" },
+                    "has_more": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" },
+          "429": { "description": "Rate limit exceeded" }
+        }
+      }
+    },
+    "/v1/insert": {
+      "post": {
+        "summary": "Insert a document",
+        "operationId": "insert",
+        "tags": ["Documents"],
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["collection", "fields"],
+                "properties": {
+                  "collection": { "type": "string" },
+                  "fields": {
+                    "type": "object",
+                    "additionalProperties": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Insert result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string" },
+                    "success": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/collections": {
+      "post": {
+        "summary": "Create a collection",
+        "operationId": "createCollection",
+        "tags": ["Collections"],
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["collection"],
+                "properties": {
+                  "collection": { "type": "string" },
+                  "dimension": { "type": "integer", "default": 64, "maximum": 4096 },
+                  "settings": { "type": "object" },
+                  "head_settings": { "type": "object" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Creation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/backup": {
+      "post": {
+        "summary": "Create a backup",
+        "operationId": "createBackup",
+        "tags": ["Admin"],
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "destination": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Backup result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "backup_id": { "type": "string" },
+                    "timestamp": { "type": "string" },
+                    "collections": { "type": "array", "items": { "type": "string" } },
+                    "path": { "type": "string" },
+                    "size_bytes": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/backups": {
+      "get": {
+        "summary": "List backups",
+        "operationId": "listBackups",
+        "tags": ["Admin"],
+        "security": [{ "ApiKeyAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of backups",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "backups": { "type": "array", "items": { "type": "object" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health check",
+        "tags": ["Monitoring"],
+        "responses": {
+          "200": {
+            "description": "Health status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string" },
+                    "version": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/live": {
+      "get": {
+        "summary": "Liveness probe",
+        "tags": ["Monitoring"],
+        "responses": {
+          "200": { "description": "Alive" }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "summary": "Readiness probe",
+        "tags": ["Monitoring"],
+        "responses": {
+          "200": { "description": "Ready" },
+          "503": { "description": "Not ready" }
+        }
+      }
+    },
+    "/health/startup": {
+      "get": {
+        "summary": "Startup probe",
+        "tags": ["Monitoring"],
+        "responses": {
+          "200": { "description": "Startup complete" }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "summary": "Prometheus metrics",
+        "tags": ["Monitoring"],
+        "responses": {
+          "200": { "description": "Prometheus metrics in text format" }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "summary": "OpenAPI specification",
+        "tags": ["Documentation"],
+        "responses": {
+          "200": { "description": "OpenAPI 3.0.3 spec in JSON format" }
+        }
+      }
+    },
+    "/docs": {
+      "get": {
+        "summary": "Swagger UI",
+        "tags": ["Documentation"],
+        "responses": {
+          "200": { "description": "Swagger UI HTML page" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
+    }
+  }
+}

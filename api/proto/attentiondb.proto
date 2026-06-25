@@ -10,6 +10,44 @@ service AttentionDB {
     rpc CreateCollection (CreateCollectionRequest) returns (CreateCollectionResponse);
     rpc GetCollectionSettings (GetCollectionSettingsRequest) returns (GetCollectionSettingsResponse);
     rpc AlterCollection (AlterCollectionRequest) returns (AlterCollectionResponse);
+    rpc CreateBackup (CreateBackupRequest) returns (CreateBackupResponse);
+    rpc ListBackups (ListBackupsRequest) returns (ListBackupsResponse);
+    rpc RestoreBackup (RestoreBackupRequest) returns (RestoreBackupResponse);
+}
+
+message CreateBackupRequest {
+    string destination = 1;
+}
+
+message CreateBackupResponse {
+    string backup_id = 1;
+    string timestamp = 2;
+    repeated string collections = 3;
+    string path = 4;
+    uint64 size_bytes = 5;
+}
+
+message ListBackupsRequest {}
+
+message BackupInfo {
+    string backup_id = 1;
+    string timestamp = 2;
+    repeated string collections = 3;
+    string path = 4;
+    uint64 size_bytes = 5;
+}
+
+message ListBackupsResponse {
+    repeated BackupInfo backups = 1;
+}
+
+message RestoreBackupRequest {
+    string backup_id = 1;
+}
+
+message RestoreBackupResponse {
+    bool success = 1;
+    string message = 2;
 }
 
 message AttendRequest {
@@ -20,6 +58,10 @@ message AttendRequest {
     float min_weight = 5;
     optional float temporal_decay = 6;
     uint32 offset = 7;
+    bool hybrid = 8;              // Enable BM25 + vector hybrid search
+    float bm25_weight = 9;        // Weight for BM25 in fusion (default 0.3)
+    float vector_weight = 10;      // Weight for vector in fusion (default 0.7)
+    string query_text = 11;       // Text query for BM25 (defaults to query field if empty)
 }
 
 message AttendResponse {

@@ -343,6 +343,15 @@ impl AttentionEngine {
         self.wal.lock().is_some()
     }
 
+    pub fn flush_wal(&self) -> Result<(), CoreError> {
+        let mut wal_guard = self.wal.lock();
+        if let Some(wal) = wal_guard.as_mut() {
+            wal.fsync().map_err(|e| CoreError::InvalidOperation(e.to_string()))
+        } else {
+            Ok(())
+        }
+    }
+
     pub fn stats(&self) -> EngineStats {
         let collections = self.collections.read();
         let collection_count = collections.len();

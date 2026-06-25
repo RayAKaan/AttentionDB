@@ -17,6 +17,10 @@ use attentiondb::{
     CreateCollectionRequest, CreateCollectionResponse,
     GetCollectionSettingsRequest, GetCollectionSettingsResponse,
     AlterCollectionRequest, AlterCollectionResponse,
+    CreateBackupRequest, CreateBackupResponse,
+    ListBackupsRequest, ListBackupsResponse,
+    RestoreBackupRequest, RestoreBackupResponse,
+    BackupInfo,
     CollectionSettings,
 };
 
@@ -129,8 +133,12 @@ impl AttentionDb for AttentionDBService {
         let fetch_count = offset + req.top_k as usize;
 
         let start = std::time::Instant::now();
-        let raw_results = self.engine.attend(&req.collection, &heads, &query_vec, fetch_count)
-            .map_err(|e| {
+        let raw_results = if req.hybrid {
+            let query_text = if req.query_text.is_empty() { &req.query } else { &req.query_text };
+            self.engine.attend_hybrid(&req.collection, &heads, &query_vec, query_text, fetch_count)
+        } else {
+            self.engine.attend(&req.collection, &heads, &query_vec, fetch_count)
+        }.map_err(|e| {
                 observability::record_error("attend", &e.to_string());
                 Status::internal(e.to_string())
             })?;
@@ -389,6 +397,160 @@ impl AttentionDb for AttentionDBService {
         Ok(Response::new(AlterCollectionResponse {
             success: true,
             message: msg,
+        }))
+    }
+
+    async fn create_backup(
+        &self,
+        request: Request<CreateBackupRequest>,
+    ) -> Result<Response<CreateBackupResponse>, Status> {
+        check_grpc_auth(&self.api_keys, request.metadata())?;
+        let req = request.into_inner();
+        let engine = &self.engine;
+        let collections = engine.list_collections();
+
+        let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S").to_string();
+        let backup_id = format!("backup_{}", timestamp);
+
+        let dest = if req.destination.is_empty() {
+            std::path::PathBuf::from(std::env::var("ATTENTIONDB_DATA_DIR").unwrap_or_else(|_| "/data".into()))
+                .parent().unwrap_or(std::path::Path::new("/data"))
+                .join("backups").join(&backup_id)
+        } else {
+            std::path::PathBuf::from(&req.destination)
+        };
+        std::fs::create_dir_all(&dest).map_err(|e| Status::internal(format!("Failed to create backup directory: {}", e)))?;
+
+        let mut backed_up_collections = Vec::new();
+        let mut total_bytes = 0u64;
+
+        for coll_name in &collections {
+            let coll = engine.get_collection(coll_name)
+                .map_err(|e| Status::internal(e.to_string()))?;
+            let heads = coll.list_heads();
+            let coll_dir = dest.join(coll_name);
+            std::fs::create_dir_all(&coll_dir).map_err(|e| Status::internal(e.to_string()))?;
+
+            for head_name in &heads {
+                let head_dir = coll_dir.join(head_name);
+                std::fs::create_dir_all(&head_dir).map_err(|e| Status::internal(e.to_string()))?;
+
+                match coll.head_manager.read().get_head(head_name) {
+                    Ok(idx) => {
+                        let idx_guard = idx.read();
+                        attentiondb_hnsw::persistence::save_index(&idx_guard, &head_dir)
+                            .map_err(|e| Status::internal(format!("Failed to save index: {}", e)))?;
+                        if let Ok(meta) = std::fs::metadata(&head_dir) {
+                            total_bytes += meta.len();
+                        }
+                    }
+                    Err(e) => {
+                        return Err(Status::internal(format!("Head not found: {}", e)));
+                    }
+                }
+            }
+            backed_up_collections.push(coll_name.clone());
+        }
+
+        // Save manifest
+        std::fs::write(
+            dest.join("manifest.json"),
+            serde_json::to_string_pretty(&serde_json::json!({
+                "backup_id": backup_id,
+                "timestamp": timestamp,
+                "collections": backed_up_collections,
+            })).map_err(|e| Status::internal(e.to_string()))?
+        ).map_err(|e| Status::internal(e.to_string()))?;
+
+        // Copy WAL if persistent
+        if engine.is_persistent() {
+            let wal_path = std::path::PathBuf::from(
+                std::env::var("ATTENTIONDB_DATA_DIR").unwrap_or_else(|_| "/data".into())
+            ).join("engine.wal");
+            if wal_path.exists() {
+                std::fs::copy(&wal_path, dest.join("engine.wal"))
+                    .map_err(|e| Status::internal(format!("Failed to copy WAL: {}", e)))?;
+                if let Ok(meta) = wal_path.metadata() {
+                    total_bytes += meta.len();
+                }
+            }
+        }
+
+        Ok(Response::new(CreateBackupResponse {
+            backup_id,
+            timestamp,
+            collections: backed_up_collections,
+            path: dest.to_string_lossy().to_string(),
+            size_bytes: total_bytes,
+        }))
+    }
+
+    async fn list_backups(
+        &self,
+        _request: Request<ListBackupsRequest>,
+    ) -> Result<Response<ListBackupsResponse>, Status> {
+        check_grpc_auth(&self.api_keys, _request.metadata())?;
+        let data_dir = std::env::var("ATTENTIONDB_DATA_DIR").unwrap_or_else(|_| "/data".into());
+        let backup_root = std::path::Path::new(&data_dir).parent().unwrap_or(std::path::Path::new("/data")).join("backups");
+
+        let mut backups = Vec::new();
+        if backup_root.exists() {
+            for entry in std::fs::read_dir(&backup_root).map_err(|e| Status::internal(e.to_string()))?.flatten() {
+                let path = entry.path();
+                if !path.is_dir() { continue; }
+                let dir_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
+                if !dir_name.starts_with("backup_") { continue; }
+
+                let mut collections = Vec::new();
+                let mut size_bytes = 0u64;
+                if let Ok(read_dir) = std::fs::read_dir(&path) {
+                    for sub in read_dir.flatten() {
+                        let sub_path = sub.path();
+                        if sub_path.is_dir() {
+                            collections.push(sub.file_name().to_string_lossy().to_string());
+                        }
+                        if let Ok(meta) = sub_path.metadata() {
+                            size_bytes += meta.len();
+                        }
+                    }
+                }
+
+                backups.push(BackupInfo {
+                    backup_id: dir_name.clone(),
+                    timestamp: dir_name.trim_start_matches("backup_").replace('_', " "),
+                    collections,
+                    path: path.to_string_lossy().to_string(),
+                    size_bytes,
+                });
+            }
+        }
+
+        backups.sort_by(|a, b| b.backup_id.cmp(&a.backup_id));
+        Ok(Response::new(ListBackupsResponse { backups }))
+    }
+
+    async fn restore_backup(
+        &self,
+        request: Request<RestoreBackupRequest>,
+    ) -> Result<Response<RestoreBackupResponse>, Status> {
+        check_grpc_auth(&self.api_keys, request.metadata())?;
+        let req = request.into_inner();
+        let data_dir = std::env::var("ATTENTIONDB_DATA_DIR").unwrap_or_else(|_| "/data".into());
+        let backup_dir = std::path::Path::new(&data_dir).parent().unwrap_or(std::path::Path::new("/data"))
+            .join("backups").join(&req.backup_id);
+
+        if !backup_dir.exists() {
+            return Err(Status::not_found(format!("Backup '{}' not found", req.backup_id)));
+        }
+
+        let manifest_path = backup_dir.join("manifest.json");
+        if !manifest_path.exists() {
+            return Err(Status::failed_precondition(format!("Backup '{}' is corrupted — manifest missing", req.backup_id)));
+        }
+
+        Ok(Response::new(RestoreBackupResponse {
+            success: true,
+            message: format!("Backup '{}' validated. To restore, restart the server with data directory pointing to this backup.", req.backup_id),
         }))
     }
 }
