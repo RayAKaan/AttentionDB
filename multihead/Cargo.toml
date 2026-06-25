@@ -12,6 +12,8 @@ rand = { workspace = true }
 ndarray = "0.15"
 rayon = { workspace = true }
 attentiondb-hnsw = { path = "../hnsw" }
+tracing = "0.1"
+bincode = "1.3"
 
 [features]
 default = []
@@ -19,6 +21,7 @@ gpu = ["attentiondb-hnsw/cuda"]
 
 [dev-dependencies]
 criterion = { workspace = true }
+tempfile = { workspace = true }
 
 [[bench]]
 name = "fusion_bench"

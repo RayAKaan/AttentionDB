@@ -3,9 +3,13 @@ use crate::gating::GatingNetwork;
 use crate::fusion::{fuse_scores, weighted_fuse};
 use crate::error::MultiHeadError;
 use std::collections::HashMap;
+#[cfg(feature = "gpu")]
+use tracing::{info, warn};
 
 #[cfg(feature = "gpu")]
 use attentiondb_hnsw::gpu::{GpuBackend, CpuBackend};
+#[cfg(feature = "gpu")]
+use attentiondb_hnsw::gpu::CudaBackend;
 
 pub struct MultiHeadManager {
     pub heads: HashMap<String, HeadConfig>,
@@ -13,19 +17,21 @@ pub struct MultiHeadManager {
     pub dim: usize,
     #[cfg(feature = "gpu")]
     gpu_backend: Box<dyn GpuBackend>,
+    #[cfg(feature = "gpu")]
+    gpu_available: bool,
 }
 
 impl MultiHeadManager {
     pub fn new(dim: usize, num_heads: usize) -> Self {
         #[cfg(feature = "gpu")]
-        let gpu_backend: Box<dyn GpuBackend> = match CudaBackend::new() {
+        let (gpu_backend, gpu_available) = match CudaBackend::new() {
             Ok(cuda) => {
-                eprintln!("[MultiHeadManager] CUDA backend initialized successfully");
-                Box::new(cuda)
+                info!("[MultiHeadManager] CUDA backend initialized successfully");
+                (Box::new(cuda) as Box<dyn GpuBackend>, true)
             }
             Err(e) => {
-                eprintln!("[MultiHeadManager] CUDA init failed (falling back to CPU): {:?}", e);
-                Box::new(CpuBackend)
+                warn!("[MultiHeadManager] CUDA init failed (falling back to CPU): {:?}", e);
+                (Box::new(CpuBackend) as Box<dyn GpuBackend>, false)
             }
         };
 
@@ -38,6 +44,8 @@ impl MultiHeadManager {
             dim,
             #[cfg(feature = "gpu")]
             gpu_backend,
+            #[cfg(feature = "gpu")]
+            gpu_available,
         }
     }
 
@@ -55,24 +63,25 @@ impl MultiHeadManager {
 
     #[cfg(feature = "gpu")]
     pub fn enable_gpu_fusion(&mut self) -> Result<(), MultiHeadError> {
-        if self.gpu_backend.is_available() {
+        if self.gpu_available {
             return Ok(());
         }
         match CudaBackend::new() {
             Ok(cuda) => {
-                eprintln!("[MultiHeadManager] GPU fusion enabled with CUDA");
+                info!("[MultiHeadManager] GPU fusion enabled with CUDA");
                 self.gpu_backend = Box::new(cuda);
+                self.gpu_available = true;
                 Ok(())
             }
             Err(e) => {
-                eprintln!("[MultiHeadManager] GPU fusion requested but CUDA unavailable: {:?}", e);
+                warn!("[MultiHeadManager] GPU fusion requested but CUDA unavailable: {:?}", e);
                 self.gpu_backend = Box::new(CpuBackend);
+                self.gpu_available = false;
                 Ok(())
             }
         }
     }
 
-    /// Fuse results from multiple heads using learned gating
     pub fn fuse(
         &self,
         query_embedding: &[f32],
@@ -86,24 +95,22 @@ impl MultiHeadManager {
 
         #[cfg(feature = "gpu")]
         {
-            if self.gpu_backend.is_available() {
+            if self.gpu_available {
                 let gate_weights = self.gating.forward(query_embedding);
                 match self.gpu_backend.fuse_scores(head_results, &gate_weights) {
                     Ok(fused) => return Ok(fused),
                     Err(e) => {
-                        eprintln!("[MultiHeadManager] GPU fusion failed (falling back to CPU): {:?}", e);
+                        warn!("[MultiHeadManager] GPU fusion failed (falling back to CPU): {:?}", e);
                     }
                 }
             }
         }
 
-        // Fallback to CPU
         let gate_weights = self.gating.forward(query_embedding);
         let fused = fuse_scores(head_results, &gate_weights);
         Ok(fused)
     }
 
-    /// Fuse using explicit head weights (bypass gating)
     pub fn fuse_weighted(
         &self,
         head_results: &[(String, Vec<(u64, f32)>)],
@@ -113,6 +120,15 @@ impl MultiHeadManager {
             .map(|(n, w)| (n.as_str(), *w))
             .collect();
         weighted_fuse(head_results, &weight_refs)
+    }
+
+    /// Fuse with gating weights directly (bypasses per-head weight map).
+    pub fn fuse_weighted_with_gating(
+        &self,
+        head_results: &[(String, Vec<(u64, f32)>)],
+        gate_weights: &[f32],
+    ) -> Vec<(u64, f32)> {
+        fuse_scores(head_results, gate_weights)
     }
 
     pub fn list_heads(&self) -> Vec<String> {
@@ -127,10 +143,9 @@ impl MultiHeadManager {
         self.heads.iter().map(|(k, v)| (k.clone(), v.weight)).collect()
     }
 
-    /// Returns whether GPU fusion is enabled and available
     #[cfg(feature = "gpu")]
     pub fn is_gpu_fusion_enabled(&self) -> bool {
-        self.gpu_backend.is_available()
+        self.gpu_available
     }
 
     #[cfg(not(feature = "gpu"))]
@@ -138,7 +153,6 @@ impl MultiHeadManager {
         false
     }
 
-    /// Create an HNSWIndex for a head, respecting per-head settings if available
     pub fn create_hnsw_index_for_head(
         &self,
         head_name: &str,
@@ -147,19 +161,16 @@ impl MultiHeadManager {
     ) -> Result<attentiondb_hnsw::HNSWIndex, MultiHeadError> {
         let head = self.get_head(head_name)?;
         let settings = head.settings.clone().unwrap_or_default();
-
         let mut final_config = base_config;
         final_config.ef_search = settings.ef_search;
         final_config.ef_construction = settings.ef_construction;
         final_config.max_nb_connection = settings.max_nb_connection;
-
         let index = attentiondb_hnsw::HNSWIndex::with_settings(
             head_name,
             dim,
             final_config,
             settings,
         ).map_err(|e| MultiHeadError::InvalidConfig(e.to_string()))?;
-
         Ok(index)
     }
 }

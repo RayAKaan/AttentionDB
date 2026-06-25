@@ -10,9 +10,9 @@ fn raft_benchmark(c: &mut Criterion) {
         });
     });
 
-    c.bench_function("raft_replicate", |b| {
+    c.bench_function("raft_broadcast", |b| {
         b.iter(|| {
-            let _ = raft.replicate_to_peers();
+            let _ = raft.broadcast_append_entries();
         });
     });
 }

@@ -1,20 +1,108 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::path::Path;
 use parking_lot::RwLock;
+use uuid::Uuid;
 use attentiondb_query::parse_aql;
 use attentiondb_storage::{Wal, OpType, Record};
 use crate::collection::Collection;
 use crate::error::CoreError;
 use crate::transaction::TransactionManager;
 
+/// Bi-directional ID mapper ensuring no two UUIDs share the same numeric ID.
+///
+/// This completely eliminates the UUID collision class: maintaining a strict
+/// 1:1 mapping between external UUIDs and internal numeric IDs.
+#[derive(Debug)]
+pub struct IdMapper {
+    uuid_to_numeric: HashMap<Uuid, u64>,
+    numeric_to_uuid: HashMap<u64, Uuid>,
+    next_id: u64,
+}
+
+impl IdMapper {
+    pub fn new() -> Self {
+        Self {
+            uuid_to_numeric: HashMap::new(),
+            numeric_to_uuid: HashMap::new(),
+            next_id: 1,
+        }
+    }
+
+    /// Resolve or allocate a numeric ID for the given UUID.
+    pub fn resolve_or_assign(&mut self, uuid: Uuid) -> u64 {
+        if let Some(&nid) = self.uuid_to_numeric.get(&uuid) {
+            return nid;
+        }
+        let nid = self.next_id;
+        self.next_id += 1;
+        self.uuid_to_numeric.insert(uuid, nid);
+        self.numeric_to_uuid.insert(nid, uuid);
+        nid
+    }
+
+    /// Look up the numeric ID for a UUID (if already mapped).
+    pub fn get_numeric(&self, uuid: &Uuid) -> Option<u64> {
+        self.uuid_to_numeric.get(uuid).copied()
+    }
+
+    /// Look up the UUID for a numeric ID.
+    pub fn get_uuid(&self, numeric_id: u64) -> Option<&Uuid> {
+        self.numeric_to_uuid.get(&numeric_id)
+    }
+
+    /// Number of mapped entries.
+    pub fn len(&self) -> usize {
+        self.uuid_to_numeric.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.uuid_to_numeric.is_empty()
+    }
+
+    /// Serialize the entire mapping for persistence.
+    pub fn save_state(&self) -> (Vec<(Uuid, u64)>, u64) {
+        let mappings: Vec<(Uuid, u64)> = self.uuid_to_numeric.iter().map(|(k, v)| (*k, *v)).collect();
+        (mappings, self.next_id)
+    }
+
+    /// Load state from a serialized form.
+    pub fn load_state(&mut self, mappings: Vec<(Uuid, u64)>, next_id: u64) {
+        self.uuid_to_numeric.clear();
+        self.numeric_to_uuid.clear();
+        for (uuid, nid) in mappings {
+            self.uuid_to_numeric.insert(uuid, nid);
+            self.numeric_to_uuid.insert(nid, uuid);
+        }
+        self.next_id = next_id;
+    }
+
+    /// Return statistics about the mapping.
+    pub fn stats(&self) -> IdMapperStats {
+        IdMapperStats {
+            total_mappings: self.uuid_to_numeric.len(),
+            next_available_id: self.next_id,
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct IdMapperStats {
+    pub total_mappings: usize,
+    pub next_available_id: u64,
+}
+
+impl Default for IdMapper {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct AttentionEngine {
     collections: Arc<RwLock<HashMap<String, Arc<Collection>>>>,
     wal: Arc<parking_lot::Mutex<Option<Wal>>>,
     pub document_store: Arc<RwLock<attentiondb_storage::DocumentStore>>,
-    id_map: Arc<RwLock<HashMap<u64, uuid::Uuid>>>,
-    next_id: AtomicU64,
+    id_mapper: Arc<RwLock<IdMapper>>,
     pub txn_manager: TransactionManager,
 }
 
@@ -30,8 +118,7 @@ impl AttentionEngine {
             collections: Arc::new(RwLock::new(HashMap::new())),
             wal: Arc::new(parking_lot::Mutex::new(None)),
             document_store: Arc::new(RwLock::new(attentiondb_storage::DocumentStore::new())),
-            id_map: Arc::new(RwLock::new(HashMap::new())),
-            next_id: AtomicU64::new(1),
+            id_mapper: Arc::new(RwLock::new(IdMapper::new())),
             txn_manager: TransactionManager::new(),
         }
     }
@@ -40,13 +127,11 @@ impl AttentionEngine {
         let wal = Wal::new(Path::new(wal_path))?.with_durability(durability);
         let dir = Path::new(wal_path).parent().unwrap_or(Path::new(".")).to_path_buf();
         let document_store = attentiondb_storage::DocumentStore::open(dir)?;
-
         Ok(Self {
             collections: Arc::new(RwLock::new(HashMap::new())),
             wal: Arc::new(parking_lot::Mutex::new(Some(wal))),
             document_store: Arc::new(RwLock::new(document_store)),
-            id_map: Arc::new(RwLock::new(HashMap::new())),
-            next_id: AtomicU64::new(1),
+            id_mapper: Arc::new(RwLock::new(IdMapper::new())),
             txn_manager: TransactionManager::new(),
         })
     }
@@ -71,13 +156,11 @@ impl AttentionEngine {
         if collections.contains_key(name) {
             return Err(CoreError::CollectionAlreadyExists(name.to_string()));
         }
-
         let collection = Arc::new(Collection::new(name, dim));
         *collection.settings.write() = settings;
         for head_name in heads {
             collection.add_default_head(head_name)?;
         }
-
         collections.insert(name.to_string(), collection);
         Ok(())
     }
@@ -146,32 +229,25 @@ impl AttentionEngine {
 
     pub fn insert_document(&self, collection_name: &str, record: Record) -> Result<String, CoreError> {
         let collection = self.get_collection(collection_name)?;
-
-        let id = record.id.to_string();
-        let numeric_id = self.next_id.fetch_add(1, Ordering::SeqCst);
-
-        {
-            let mut id_map = self.id_map.write();
-            id_map.insert(numeric_id, record.id);
-        }
-
+        let uuid = record.id;
+        let numeric_id = {
+            let mut mapper = self.id_mapper.write();
+            mapper.resolve_or_assign(uuid)
+        };
         {
             let mut store = self.document_store.write();
             store.insert(record.clone())?;
         }
-
         {
             let mut wal_guard = self.wal.lock();
             if let Some(wal) = wal_guard.as_mut() {
                 let record_bytes = record.to_msgpack()?;
-                wal.append(OpType::Insert, collection_name, record.id, record_bytes)?;
+                wal.append(OpType::Insert, collection_name, uuid, record_bytes)?;
             }
         }
-
         for (head_name, vec_data) in &record.k_vecs {
             collection.insert_vector(head_name, numeric_id, vec_data)?;
         }
-
         let mut full_text = String::new();
         for value in record.fields.values() {
             if let serde_json::Value::String(s) = value {
@@ -180,8 +256,7 @@ impl AttentionEngine {
             }
         }
         collection.bm25.insert(numeric_id, &full_text);
-
-        Ok(id)
+        Ok(uuid.to_string())
     }
 
     pub fn attend_hybrid(
@@ -228,8 +303,8 @@ impl AttentionEngine {
     }
 
     pub fn get_document_fields(&self, numeric_id: u64) -> HashMap<String, String> {
-        let id_map = self.id_map.read();
-        if let Some(uuid) = id_map.get(&numeric_id) {
+        let mapper = self.id_mapper.read();
+        if let Some(uuid) = mapper.get_uuid(numeric_id) {
             let store = self.document_store.read();
             if let Some(record) = store.get(uuid) {
                 return record.fields.iter().map(|(k, v)| {
@@ -246,7 +321,7 @@ impl AttentionEngine {
 
     pub fn delete_document(&self, collection_name: &str, id_str: &str) -> Result<bool, CoreError> {
         let _collection = self.get_collection(collection_name)?;
-        if let Ok(uuid) = uuid::Uuid::parse_str(id_str) {
+        if let Ok(uuid) = Uuid::parse_str(id_str) {
             let mut store = self.document_store.write();
             store.delete(&uuid)?;
             Ok(true)
@@ -261,7 +336,6 @@ impl AttentionEngine {
 
     pub fn execute_aql_with_vector(&self, aql: &str, query_vector: Option<&[f32]>) -> Result<String, CoreError> {
         let statement = parse_aql(aql)?;
-
         match statement {
             attentiondb_query::AQLStatement::Query(query) => {
                 let collection = self.get_collection(&query.collection)?;
@@ -270,14 +344,12 @@ impl AttentionEngine {
                 } else {
                     query.heads.clone()
                 };
-
                 let vec = query_vector.ok_or_else(|| CoreError::InvalidOperation(
                     format!(
                         "ATTEND query requires a pre-computed query vector. query_text='{}' is a semantic label, not a vector. Call execute_aql_with_vector() with the embedded vector.",
                         query.query_text
                     )
                 ))?;
-
                 let results = collection.attend(&heads, vec, query.top_k)?;
                 Ok(format!("[{} results] for '{}' on {}", results.len(), query.query_text, query.collection))
             }
@@ -300,34 +372,30 @@ impl AttentionEngine {
     pub fn execute_reprojection_job(&self, job: &attentiondb_learned::ReprojectionJob) -> Result<(), CoreError> {
         let target_collection = &job.collection;
         let collection = self.get_collection(target_collection)?;
-
         let store = self.document_store.read();
         let records = store.list_all_records();
         drop(store);
-
         let mut updated_records = Vec::new();
-
         for mut record in records {
             if record.tags.contains(&format!("collection:{}", target_collection)) {
-                let numeric_id = self.next_id.fetch_add(1, Ordering::SeqCst);
-
+                let numeric_id = {
+                    let mut mapper = self.id_mapper.write();
+                    mapper.resolve_or_assign(record.id)
+                };
                 let mut new_k_vecs = HashMap::new();
                 for (head_name, vec) in &record.k_vecs {
                     let reprojected = job.new_projection.project_key(vec);
                     collection.insert_vector(head_name, numeric_id, &reprojected)?;
                     new_k_vecs.insert(head_name.clone(), reprojected);
                 }
-
                 record.k_vecs = new_k_vecs;
                 updated_records.push(record);
             }
         }
-
         let mut store_write = self.document_store.write();
         for record in updated_records {
             store_write.update_record(record)?;
         }
-
         Ok(())
     }
 
@@ -361,6 +429,11 @@ impl AttentionEngine {
             total_vectors,
         }
     }
+
+    /// Return IdMapper statistics.
+    pub fn id_mapper_stats(&self) -> IdMapperStats {
+        self.id_mapper.read().stats()
+    }
 }
 
 impl Default for AttentionEngine {
@@ -372,6 +445,27 @@ impl Default for AttentionEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_id_mapper_no_duplicates() {
+        let mut mapper = IdMapper::new();
+        let u1 = Uuid::new_v4();
+        let u2 = Uuid::new_v4();
+        let n1 = mapper.resolve_or_assign(u1);
+        let n2 = mapper.resolve_or_assign(u2);
+        assert_ne!(n1, n2);
+        assert_eq!(mapper.resolve_or_assign(u1), n1);
+        assert_eq!(mapper.resolve_or_assign(u2), n2);
+    }
+
+    #[test]
+    fn test_id_mapper_roundtrip() {
+        let mut mapper = IdMapper::new();
+        let u = Uuid::new_v4();
+        let n = mapper.resolve_or_assign(u);
+        assert_eq!(*mapper.get_uuid(n).unwrap(), u);
+        assert_eq!(mapper.get_numeric(&u).unwrap(), n);
+    }
 
     #[test]
     fn test_create_collection() {
@@ -424,14 +518,12 @@ mod tests {
         engine
             .create_collection("docs", 4, &["semantic"])
             .unwrap();
-
         engine
             .insert_vector("docs", "semantic", 1, &[1.0, 0.0, 0.0, 0.0])
             .unwrap();
         engine
             .insert_vector("docs", "semantic", 2, &[0.0, 1.0, 0.0, 0.0])
             .unwrap();
-
         let results = engine
             .attend("docs", &["semantic".to_string()], &[1.0, 0.0, 0.0, 0.0], 2)
             .unwrap();
@@ -442,19 +534,15 @@ mod tests {
     fn test_execute_reprojection_job() {
         let engine = AttentionEngine::new();
         engine.create_collection("papers", 4, &["semantic"]).unwrap();
-
         let mut fields = HashMap::new();
         fields.insert("title".to_string(), serde_json::json!("Test"));
         let mut rec = Record::new(fields);
         rec.k_vecs.insert("semantic".to_string(), vec![1.0, 0.0, 0.0, 0.0]);
-
         engine.insert_document("papers", rec).unwrap();
-
         let config = attentiondb_learned::ProjectionConfig { dim: 4, num_heads: 1, head_dim: 4 };
         let old = attentiondb_learned::ProjectionMatrix::new(config.clone());
         let new = attentiondb_learned::ProjectionMatrix::new(config);
         let job = attentiondb_learned::ReprojectionJob::new("papers", old, new);
-
         assert!(engine.execute_reprojection_job(&job).is_ok());
     }
 

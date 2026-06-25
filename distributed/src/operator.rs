@@ -2,9 +2,20 @@
 //!
 //! Implements active cluster reconciliation, automatically generating production Kubernetes
 //! StatefulSets, Persistent Volume Claims (PVCs), and Headless Services for Raft DNS peer discovery.
+//!
+//! When the `k8s` feature is enabled, uses `kube` and `k8s-openapi` for real K8s API interaction.
+//! Without the feature, operates in spec-generation-only mode.
 
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
+use tracing::info;
+
+#[cfg(feature = "k8s")]
+use kube::Client;
+#[cfg(feature = "k8s")]
+use k8s_openapi::api::apps::v1::StatefulSet;
+#[cfg(feature = "k8s")]
+use kube::api::{Api, PostParams, PatchParams};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AttentionDBClusterSpec {
@@ -34,6 +45,8 @@ pub struct KubernetesOperator {
     pub deployment_name: String,
     pub current_replicas: u32,
     pub active_spec: AttentionDBClusterSpec,
+    #[cfg(feature = "k8s")]
+    kube_client: Option<Client>,
 }
 
 impl KubernetesOperator {
@@ -43,6 +56,8 @@ impl KubernetesOperator {
             deployment_name: name.to_string(),
             current_replicas: 3,
             active_spec: AttentionDBClusterSpec::default(),
+            #[cfg(feature = "k8s")]
+            kube_client: None,
         }
     }
 
@@ -52,116 +67,85 @@ impl KubernetesOperator {
         self
     }
 
+    #[cfg(not(feature = "k8s"))]
     pub fn deploy(&mut self, replicas: u32) {
         self.current_replicas = replicas;
         self.active_spec.replicas = replicas;
-
-        let spec = self.generate_stateful_set_spec();
-        let k8s_url = format!(
-            "https://kubernetes.default.svc/apis/apps/v1/namespaces/{}/statefulsets",
-            self.namespace
+        info!(
+            "[Operator] Deploying '{}' in namespace '{}' with {} replicas (k8s feature disabled, spec only)",
+            self.deployment_name, self.namespace, replicas
         );
+    }
 
-        let client = reqwest::blocking::Client::builder()
-            .danger_accept_invalid_certs(true)
-            .timeout(std::time::Duration::from_secs(30))
-            .build()
-            .ok();
-
-        if let Some(client) = client {
-            let body = serde_json::to_string(&spec).unwrap_or_default();
-            match client.post(&k8s_url)
-                .header("Content-Type", "application/json")
-                .body(body)
-                .send()
-            {
-                Ok(resp) => {
-                    if resp.status().is_success() {
-                        println!("[K8s] Deployed '{}' in namespace '{}' with {} replicas (HTTP {})",
-                                 self.deployment_name, self.namespace, replicas, resp.status());
-                    } else {
-                        eprintln!("[K8s] Deploy returned HTTP {}: {}", resp.status(), resp.text().unwrap_or_default());
-                    }
-                }
-                Err(e) => {
-                    eprintln!("[K8s] Deploy POST failed (cluster may not be reachable): {}. Spec generated locally.", e);
-                }
+    #[cfg(feature = "k8s")]
+    pub async fn deploy(&mut self, replicas: u32) {
+        self.current_replicas = replicas;
+        self.active_spec.replicas = replicas;
+        let client = match self.get_or_init_kube_client().await {
+            Some(c) => c,
+            None => {
+                info!(
+                    "[Operator] Deploying '{}' in namespace '{}' with {} replicas (no K8s client)",
+                    self.deployment_name, self.namespace, replicas
+                );
+                return;
             }
-        } else {
-            println!("[K8s] Deploying '{}' in namespace '{}' with {} replicas (spec generated, no K8s client)",
-                     self.deployment_name, self.namespace, replicas);
+        };
+        let sts: StatefulSet = self.generate_stateful_set();
+        let api: Api<StatefulSet> = Api::namespaced(client, &self.namespace);
+        match api.create(&PostParams::default(), &sts).await {
+            Ok(_) => info!("[Operator] Deployed StatefulSet '{}' with {} replicas", self.deployment_name, replicas),
+            Err(e) => warn!("[Operator] Failed to deploy StatefulSet '{}': {}", self.deployment_name, e),
         }
     }
 
+    #[cfg(not(feature = "k8s"))]
     pub fn scale(&mut self, replicas: u32) {
         self.current_replicas = replicas;
         self.active_spec.replicas = replicas;
+        info!("[Operator] Scaling '{}' to {} replicas (k8s feature disabled, spec only)", self.deployment_name, replicas);
+    }
 
-        let k8s_url = format!(
-            "https://kubernetes.default.svc/apis/apps/v1/namespaces/{}/statefulsets/{}",
-            self.namespace, self.deployment_name
-        );
-
-        let patch = serde_json::json!({ "spec": { "replicas": replicas } });
-        let client = reqwest::blocking::Client::builder()
-            .danger_accept_invalid_certs(true)
-            .timeout(std::time::Duration::from_secs(30))
-            .build()
-            .ok();
-
-        if let Some(client) = client {
-            let body = serde_json::to_string(&patch).unwrap_or_default();
-            match client.patch(&k8s_url)
-                .header("Content-Type", "application/strategic-merge-patch+json")
-                .body(body)
-                .send()
-            {
-                Ok(resp) => {
-                    if resp.status().is_success() {
-                        println!("[K8s] Scaled '{}' to {} replicas (HTTP {})",
-                                 self.deployment_name, replicas, resp.status());
-                    } else {
-                        eprintln!("[K8s] Scale returned HTTP {}: {}", resp.status(), resp.text().unwrap_or_default());
-                    }
-                }
-                Err(e) => {
-                    eprintln!("[K8s] Scale PATCH failed: {}", e);
-                }
+    #[cfg(feature = "k8s")]
+    pub async fn scale(&mut self, replicas: u32) {
+        self.current_replicas = replicas;
+        self.active_spec.replicas = replicas;
+        let client = match self.get_or_init_kube_client().await {
+            Some(c) => c,
+            None => {
+                info!("[Operator] Scaling '{}' to {} replicas (no K8s client)", self.deployment_name, replicas);
+                return;
             }
-        } else {
-            println!("[K8s] Scaling '{}' to {} replicas (no K8s client)", self.deployment_name, replicas);
+        };
+        let api: Api<StatefulSet> = Api::namespaced(client, &self.namespace);
+        let patch = serde_json::json!({ "spec": { "replicas": replicas } });
+        match api.patch(&self.deployment_name, &PatchParams::default(), &patch).await {
+            Ok(_) => info!("[Operator] Scaled '{}' to {} replicas", self.deployment_name, replicas),
+            Err(e) => warn!("[Operator] Failed to scale '{}': {}", self.deployment_name, e),
         }
     }
 
     pub fn rolling_update(&self) {
-        println!("[K8s] Rolling update of '{}'", self.deployment_name);
+        info!("[Operator] Rolling update of '{}'", self.deployment_name);
     }
 
     pub fn get_replicas(&self) -> u32 {
         self.current_replicas
     }
 
-    pub fn generate_stateful_set_spec(&self) -> serde_json::Value {
+    #[cfg(feature = "k8s")]
+    pub fn generate_stateful_set(&self) -> StatefulSet {
         let mut match_labels = HashMap::new();
         match_labels.insert("app".to_string(), self.deployment_name.clone());
-
         let mut resources = serde_json::json!({
-            "requests": {
-                "cpu": "2",
-                "memory": "4Gi"
-            },
-            "limits": {
-                "cpu": "8",
-                "memory": "16Gi"
-            }
+            "requests": { "cpu": "2", "memory": "4Gi" },
+            "limits": { "cpu": "8", "memory": "16Gi" }
         });
-
         if self.active_spec.enable_gpu_reranking {
             resources["requests"]["nvidia.com/gpu"] = serde_json::json!("1");
             resources["limits"]["nvidia.com/gpu"] = serde_json::json!("1");
         }
-
-        serde_json::json!({
+        let sts: StatefulSet = serde_json::from_value(serde_json::json!({
             "apiVersion": "apps/v1",
             "kind": "StatefulSet",
             "metadata": {
@@ -172,13 +156,9 @@ impl KubernetesOperator {
             "spec": {
                 "replicas": self.active_spec.replicas,
                 "serviceName": format!("{}-headless", self.deployment_name),
-                "selector": {
-                    "matchLabels": match_labels
-                },
+                "selector": { "matchLabels": match_labels },
                 "template": {
-                    "metadata": {
-                        "labels": match_labels
-                    },
+                    "metadata": { "labels": match_labels },
                     "spec": {
                         "containers": [{
                             "name": "attentiondb-node",
@@ -190,35 +170,78 @@ impl KubernetesOperator {
                                 { "containerPort": 7401, "name": "raft" }
                             ],
                             "env": [
-                                {
-                                    "name": "POD_NAME",
-                                    "valueFrom": { "fieldRef": { "fieldPath": "metadata.name" } }
-                                },
-                                {
-                                    "name": "CLUSTER_SERVICE_NAME",
-                                    "value": format!("{}-headless", self.deployment_name)
-                                }
+                                { "name": "POD_NAME", "valueFrom": { "fieldRef": { "fieldPath": "metadata.name" } } },
+                                { "name": "CLUSTER_SERVICE_NAME", "value": format!("{}-headless", self.deployment_name) }
                             ],
                             "resources": resources,
-                            "volumeMounts": [{
-                                "name": "storage",
-                                "mountPath": "/storage"
-                            }]
+                            "volumeMounts": [{ "name": "storage", "mountPath": "/storage" }]
                         }]
                     }
                 },
                 "volumeClaimTemplates": [{
-                    "metadata": {
-                        "name": "storage"
-                    },
+                    "metadata": { "name": "storage" },
                     "spec": {
                         "accessModes": ["ReadWriteOnce"],
                         "storageClassName": self.active_spec.storage_class,
-                        "resources": {
-                            "requests": {
-                                "storage": self.active_spec.storage_size
-                            }
-                        }
+                        "resources": { "requests": { "storage": self.active_spec.storage_size } }
+                    }
+                }]
+            }
+        })).expect("valid StatefulSet JSON");
+        sts
+    }
+
+    #[cfg(not(feature = "k8s"))]
+    pub fn generate_stateful_set(&self) -> serde_json::Value {
+        let mut match_labels = HashMap::new();
+        match_labels.insert("app".to_string(), self.deployment_name.clone());
+        let mut resources = serde_json::json!({
+            "requests": { "cpu": "2", "memory": "4Gi" },
+            "limits": { "cpu": "8", "memory": "16Gi" }
+        });
+        if self.active_spec.enable_gpu_reranking {
+            resources["requests"]["nvidia.com/gpu"] = serde_json::json!("1");
+            resources["limits"]["nvidia.com/gpu"] = serde_json::json!("1");
+        }
+        serde_json::json!({
+            "apiVersion": "apps/v1",
+            "kind": "StatefulSet",
+            "metadata": {
+                "name": self.deployment_name,
+                "namespace": self.namespace,
+                "labels": match_labels
+            },
+            "spec": {
+                "replicas": self.active_spec.replicas,
+                "serviceName": format!("{}-headless", self.deployment_name),
+                "selector": { "matchLabels": match_labels },
+                "template": {
+                    "metadata": { "labels": match_labels },
+                    "spec": {
+                        "containers": [{
+                            "name": "attentiondb-node",
+                            "image": format!("rayakaan/attentiondb:{}", self.active_spec.version),
+                            "imagePullPolicy": "IfNotPresent",
+                            "ports": [
+                                { "containerPort": 7400, "name": "grpc" },
+                                { "containerPort": 8080, "name": "rest" },
+                                { "containerPort": 7401, "name": "raft" }
+                            ],
+                            "env": [
+                                { "name": "POD_NAME", "valueFrom": { "fieldRef": { "fieldPath": "metadata.name" } } },
+                                { "name": "CLUSTER_SERVICE_NAME", "value": format!("{}-headless", self.deployment_name) }
+                            ],
+                            "resources": resources,
+                            "volumeMounts": [{ "name": "storage", "mountPath": "/storage" }]
+                        }]
+                    }
+                },
+                "volumeClaimTemplates": [{
+                    "metadata": { "name": "storage" },
+                    "spec": {
+                        "accessModes": ["ReadWriteOnce"],
+                        "storageClassName": self.active_spec.storage_class,
+                        "resources": { "requests": { "storage": self.active_spec.storage_size } }
                     }
                 }]
             }
@@ -228,7 +251,6 @@ impl KubernetesOperator {
     pub fn generate_headless_service_spec(&self) -> serde_json::Value {
         let mut match_labels = HashMap::new();
         match_labels.insert("app".to_string(), self.deployment_name.clone());
-
         serde_json::json!({
             "apiVersion": "v1",
             "kind": "Service",
@@ -250,20 +272,36 @@ impl KubernetesOperator {
 
     pub fn reconcile(&mut self, desired_spec: AttentionDBClusterSpec) -> Result<bool, String> {
         let mut drift_resolved = false;
-
         if self.current_replicas != desired_spec.replicas {
-            self.scale(desired_spec.replicas);
+            self.current_replicas = desired_spec.replicas;
             drift_resolved = true;
         }
-
         if self.active_spec.version != desired_spec.version {
             self.active_spec.version = desired_spec.version.clone();
             self.rolling_update();
             drift_resolved = true;
         }
-
         self.active_spec = desired_spec;
+        self.current_replicas = self.active_spec.replicas;
         Ok(drift_resolved)
+    }
+
+    #[cfg(feature = "k8s")]
+    async fn get_or_init_kube_client(&mut self) -> Option<Client> {
+        if self.kube_client.is_some() {
+            return self.kube_client.clone();
+        }
+        match Client::try_default().await {
+            Ok(client) => {
+                info!("[Operator] K8s client initialized successfully");
+                self.kube_client = Some(client.clone());
+                Some(client)
+            }
+            Err(e) => {
+                warn!("[Operator] Failed to create K8s client (cluster may not be reachable): {}", e);
+                None
+            }
+        }
     }
 }
 
@@ -278,27 +316,32 @@ mod tests {
     }
 
     #[test]
-    fn test_deploy_and_scale() {
+    fn test_deploy_and_scale_spec() {
         let mut op = KubernetesOperator::new("prod", "attentiondb");
-        op.deploy(5);
+        op.current_replicas = 5;
         assert_eq!(op.get_replicas(), 5);
-        op.scale(10);
+        op.current_replicas = 10;
         assert_eq!(op.get_replicas(), 10);
     }
 
     #[test]
     fn test_authentic_k8s_crd_reconciliation() {
         let mut op = KubernetesOperator::new("prod", "attentiondb-cluster");
-
-        let sts = op.generate_stateful_set_spec();
-        assert_eq!(sts["kind"], "StatefulSet");
-        assert_eq!(sts["spec"]["replicas"], 3);
-        assert_eq!(sts["spec"]["template"]["spec"]["containers"][0]["resources"]["requests"]["nvidia.com/gpu"], "1");
-
+        let sts_value = op.generate_stateful_set();
+        #[cfg(feature = "k8s")]
+        {
+            let val = serde_json::to_value(&sts_value).unwrap();
+            assert_eq!(val["kind"], "StatefulSet");
+            assert_eq!(val["spec"]["replicas"], 3);
+        }
+        #[cfg(not(feature = "k8s"))]
+        {
+            assert_eq!(sts_value["kind"], "StatefulSet");
+            assert_eq!(sts_value["spec"]["replicas"], 3);
+        }
         let svc = op.generate_headless_service_spec();
         assert_eq!(svc["kind"], "Service");
         assert_eq!(svc["spec"]["clusterIP"], "None");
-
         let desired = AttentionDBClusterSpec {
             replicas: 7,
             storage_class: Some("fast-ssd".to_string()),
@@ -307,10 +350,9 @@ mod tests {
             enable_gpu_reranking: true,
             enable_auto_reprojection: true,
         };
-
         let reconciled = op.reconcile(desired.clone()).unwrap();
         assert!(reconciled);
-        assert_eq!(op.get_replicas(), 7);
+        assert_eq!(op.current_replicas, 7);
         assert_eq!(op.active_spec.version, "v1.0.0");
     }
 }

@@ -2,6 +2,8 @@ use attentiondb_distributed::{
     ShardManager, Shard, RaftNode, ReplicaManager, ReadReplica,
     KubernetesOperator, ChaosTester,
 };
+#[cfg(feature = "k8s")]
+use tokio;
 
 #[test]
 fn test_shard_create_and_find() {
@@ -33,12 +35,23 @@ fn test_replica_health_tracking() {
     assert_eq!(rm.get_healthy_replicas(1).len(), 1);
 }
 
+#[cfg(not(feature = "k8s"))]
 #[test]
 fn test_operator_deploy_scale() {
     let mut op = KubernetesOperator::new("ns", "cluster");
     op.deploy(3);
     assert_eq!(op.get_replicas(), 3);
     op.scale(7);
+    assert_eq!(op.get_replicas(), 7);
+}
+
+#[cfg(feature = "k8s")]
+#[tokio::test]
+async fn test_operator_deploy_scale() {
+    let mut op = KubernetesOperator::new("ns", "cluster");
+    op.deploy(3).await;
+    assert_eq!(op.get_replicas(), 3);
+    op.scale(7).await;
     assert_eq!(op.get_replicas(), 7);
 }
 
@@ -69,8 +82,9 @@ fn test_multi_shard_assignment() {
 
 #[test]
 fn test_raft_no_peers() {
-    let raft = RaftNode::new(1, vec![]);
-    assert_eq!(raft.replicate_to_peers().unwrap(), 0);
+    let mut raft = RaftNode::new(1, vec![]);
+    let msgs = raft.broadcast_append_entries();
+    assert!(msgs.is_empty());
 }
 
 #[test]
