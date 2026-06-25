@@ -22,6 +22,7 @@ pub struct AppState {
     pub api_keys: Arc<ApiKeyStore>,
     pub metrics: Option<Arc<PrometheusHandle>>,
     pub rate_limiter: Arc<RateLimiter>,
+    pub semaphore: Arc<tokio::sync::Semaphore>,
 }
 
 #[derive(Deserialize)]
@@ -115,6 +116,9 @@ pub async fn attend_handler(
     State(state): State<AppState>,
     Json(payload): Json<AttendRequest>,
 ) -> Result<Json<AttendResponse>, (StatusCode, String)> {
+    let _permit = state.semaphore.acquire().await.map_err(|_| {
+        (StatusCode::SERVICE_UNAVAILABLE, "Too many concurrent requests".to_string())
+    })?;
     let _timer = observability::LatencyTimer::new("rest_attend");
 
     validate_collection_name(&payload.collection)
@@ -192,6 +196,9 @@ pub async fn insert_handler(
     State(state): State<AppState>,
     Json(payload): Json<InsertRestRequest>,
 ) -> Result<Json<InsertRestResponse>, (StatusCode, String)> {
+    let _permit = state.semaphore.acquire().await.map_err(|_| {
+        (StatusCode::SERVICE_UNAVAILABLE, "Too many concurrent requests".to_string())
+    })?;
     let _timer = observability::LatencyTimer::new("rest_insert");
 
     validate_collection_name(&payload.collection)
@@ -381,6 +388,14 @@ pub async fn alter_collection_handler(
     }
 }
 
+fn default_semaphore() -> Arc<tokio::sync::Semaphore> {
+    let max_concurrent = std::env::var("ATTENTIONDB_MAX_CONCURRENT_REQUESTS")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .unwrap_or(1024);
+    Arc::new(tokio::sync::Semaphore::new(max_concurrent))
+}
+
 pub fn create_rest_router() -> Router {
     create_rest_router_with_service(
         Arc::new(AttentionDBService::default()),
@@ -396,7 +411,8 @@ pub fn create_rest_router_with_service(
     metrics: Option<Arc<PrometheusHandle>>,
     rate_limiter: Arc<RateLimiter>,
 ) -> Router {
-    let state = AppState { service, api_keys: api_keys.clone(), metrics, rate_limiter: rate_limiter.clone() };
+    let semaphore = default_semaphore();
+    let state = AppState { service, api_keys: api_keys.clone(), metrics, rate_limiter: rate_limiter.clone(), semaphore };
 
     Router::new()
         .route("/v1/attend", post(attend_handler))

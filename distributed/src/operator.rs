@@ -55,14 +55,82 @@ impl KubernetesOperator {
     pub fn deploy(&mut self, replicas: u32) {
         self.current_replicas = replicas;
         self.active_spec.replicas = replicas;
-        println!("[K8s] Deploying '{}' in namespace '{}' with {} replicas",
-                 self.deployment_name, self.namespace, replicas);
+
+        let spec = self.generate_stateful_set_spec();
+        let k8s_url = format!(
+            "https://kubernetes.default.svc/apis/apps/v1/namespaces/{}/statefulsets",
+            self.namespace
+        );
+
+        let client = reqwest::blocking::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .ok();
+
+        if let Some(client) = client {
+            let body = serde_json::to_string(&spec).unwrap_or_default();
+            match client.post(&k8s_url)
+                .header("Content-Type", "application/json")
+                .body(body)
+                .send()
+            {
+                Ok(resp) => {
+                    if resp.status().is_success() {
+                        println!("[K8s] Deployed '{}' in namespace '{}' with {} replicas (HTTP {})",
+                                 self.deployment_name, self.namespace, replicas, resp.status());
+                    } else {
+                        eprintln!("[K8s] Deploy returned HTTP {}: {}", resp.status(), resp.text().unwrap_or_default());
+                    }
+                }
+                Err(e) => {
+                    eprintln!("[K8s] Deploy POST failed (cluster may not be reachable): {}. Spec generated locally.", e);
+                }
+            }
+        } else {
+            println!("[K8s] Deploying '{}' in namespace '{}' with {} replicas (spec generated, no K8s client)",
+                     self.deployment_name, self.namespace, replicas);
+        }
     }
 
     pub fn scale(&mut self, replicas: u32) {
         self.current_replicas = replicas;
         self.active_spec.replicas = replicas;
-        println!("[K8s] Scaling '{}' to {} replicas", self.deployment_name, replicas);
+
+        let k8s_url = format!(
+            "https://kubernetes.default.svc/apis/apps/v1/namespaces/{}/statefulsets/{}",
+            self.namespace, self.deployment_name
+        );
+
+        let patch = serde_json::json!({ "spec": { "replicas": replicas } });
+        let client = reqwest::blocking::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .ok();
+
+        if let Some(client) = client {
+            let body = serde_json::to_string(&patch).unwrap_or_default();
+            match client.patch(&k8s_url)
+                .header("Content-Type", "application/strategic-merge-patch+json")
+                .body(body)
+                .send()
+            {
+                Ok(resp) => {
+                    if resp.status().is_success() {
+                        println!("[K8s] Scaled '{}' to {} replicas (HTTP {})",
+                                 self.deployment_name, replicas, resp.status());
+                    } else {
+                        eprintln!("[K8s] Scale returned HTTP {}: {}", resp.status(), resp.text().unwrap_or_default());
+                    }
+                }
+                Err(e) => {
+                    eprintln!("[K8s] Scale PATCH failed: {}", e);
+                }
+            }
+        } else {
+            println!("[K8s] Scaling '{}' to {} replicas (no K8s client)", self.deployment_name, replicas);
+        }
     }
 
     pub fn rolling_update(&self) {

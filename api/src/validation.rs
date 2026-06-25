@@ -3,23 +3,15 @@
 //! Prevents abuse, injection, and resource exhaustion attacks.
 
 use tonic::Status;
+use attentiondb_core::constants::{
+    MAX_COLLECTION_NAME_LEN, MAX_HEADS, MAX_TOP_K,
+    MAX_DIMENSION, MAX_FIELDS, MAX_FIELD_VALUE_BYTES,
+};
 
-/// Maximum allowed collection name length.
-pub const MAX_COLLECTION_NAME_LEN: usize = 128;
-/// Maximum allowed number of heads in a query.
-pub const MAX_HEADS: usize = 32;
-/// Maximum allowed top_k value.
-pub const MAX_TOP_K: u32 = 10_000;
 /// Maximum allowed pagination page size.
 pub const MAX_PAGE_SIZE: u32 = 1000;
 /// Maximum allowed pagination page number.
 pub const MAX_PAGE_NUMBER: u32 = 1000;
-/// Maximum allowed vector dimension.
-pub const MAX_DIMENSION: usize = 4096;
-/// Maximum allowed fields per document.
-pub const MAX_FIELDS: usize = 256;
-/// Maximum allowed field value size in bytes.
-pub const MAX_FIELD_VALUE_BYTES: usize = 1_048_576; // 1 MB
 /// Maximum request body size in bytes (REST).
 pub const MAX_REQUEST_BODY_BYTES: usize = 10_485_760; // 10 MB
 

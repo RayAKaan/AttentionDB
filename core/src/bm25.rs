@@ -2,6 +2,22 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use parking_lot::RwLock;
 
+fn is_stopword(word: &str) -> bool {
+    matches!(word, "a" | "an" | "the" | "and" | "or" | "but" | "in" | "on" | "at"
+        | "to" | "for" | "of" | "by" | "with" | "from" | "is" | "are" | "was"
+        | "were" | "be" | "been" | "being" | "have" | "has" | "had" | "do" | "does"
+        | "did" | "will" | "would" | "can" | "could" | "shall" | "should" | "may"
+        | "might" | "must" | "i" | "you" | "he" | "she" | "it" | "we" | "they"
+        | "me" | "him" | "her" | "us" | "them" | "my" | "your" | "his" | "its"
+        | "our" | "their" | "this" | "that" | "these" | "those" | "am" | "not"
+        | "no" | "nor" | "so" | "if" | "as" | "up" | "down" | "out" | "about"
+        | "into" | "over" | "after" | "before" | "between" | "under" | "again"
+        | "further" | "then" | "once" | "here" | "there" | "when" | "where"
+        | "why" | "how" | "all" | "each" | "every" | "both" | "few" | "more"
+        | "most" | "other" | "some" | "such" | "only" | "own" | "same" | "than"
+        | "too" | "very" | "just" | "because")
+}
+
 pub struct Posting {
     pub doc_id: u64,
     pub term_frequency: usize,
@@ -29,12 +45,20 @@ impl Default for Bm25Index {
     }
 }
 
+fn tokenize(text: &str) -> Vec<String> {
+    let stemmer = rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::English);
+    text.split_whitespace()
+        .map(|t| t.trim_matches(|c: char| !c.is_alphanumeric()))
+        .filter(|t| !t.is_empty())
+        .map(|t| t.to_lowercase())
+        .filter(|t| !is_stopword(t))
+        .map(|t| stemmer.stem(&t).to_string())
+        .collect()
+}
+
 impl Bm25Index {
     pub fn insert(&self, doc_id: u64, text: &str) {
-        let tokens: Vec<String> = text
-            .split_whitespace()
-            .map(|token| token.to_lowercase())
-            .collect();
+        let tokens = tokenize(text);
 
         let mut frequencies: HashMap<String, usize> = HashMap::new();
         for token in tokens.iter() {
@@ -68,10 +92,7 @@ impl Bm25Index {
     }
 
     pub fn search(&self, query: &str, top_k: usize) -> Vec<(u64, f32)> {
-        let query_terms: Vec<String> = query
-            .split_whitespace()
-            .map(|token| token.to_lowercase())
-            .collect();
+        let query_terms = tokenize(query);
 
         let total_documents = *self.total_documents.read();
         let average_doc_length = *self.average_doc_length.read();

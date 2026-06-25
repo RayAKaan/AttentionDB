@@ -1,7 +1,6 @@
 use std::collections::HashMap;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::path::Path;
 use parking_lot::RwLock;
 use attentiondb_query::parse_aql;
@@ -10,21 +9,12 @@ use crate::collection::Collection;
 use crate::error::CoreError;
 use crate::transaction::TransactionManager;
 
-/// Deterministically convert a UUID to a stable u64 hash.
-///
-/// This avoids silently truncating the UUID's high 64 bits and retains a
-/// low probability of collision using a deterministic hash over the full 128 bits.
-fn uuid_to_u64(id: &uuid::Uuid) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    id.hash(&mut hasher);
-    hasher.finish()
-}
-
 pub struct AttentionEngine {
     collections: Arc<RwLock<HashMap<String, Arc<Collection>>>>,
     wal: Arc<parking_lot::Mutex<Option<Wal>>>,
     pub document_store: Arc<RwLock<attentiondb_storage::DocumentStore>>,
     id_map: Arc<RwLock<HashMap<u64, uuid::Uuid>>>,
+    next_id: AtomicU64,
     pub txn_manager: TransactionManager,
 }
 
@@ -41,6 +31,7 @@ impl AttentionEngine {
             wal: Arc::new(parking_lot::Mutex::new(None)),
             document_store: Arc::new(RwLock::new(attentiondb_storage::DocumentStore::new())),
             id_map: Arc::new(RwLock::new(HashMap::new())),
+            next_id: AtomicU64::new(1),
             txn_manager: TransactionManager::new(),
         }
     }
@@ -55,6 +46,7 @@ impl AttentionEngine {
             wal: Arc::new(parking_lot::Mutex::new(Some(wal))),
             document_store: Arc::new(RwLock::new(document_store)),
             id_map: Arc::new(RwLock::new(HashMap::new())),
+            next_id: AtomicU64::new(1),
             txn_manager: TransactionManager::new(),
         })
     }
@@ -156,7 +148,7 @@ impl AttentionEngine {
         let collection = self.get_collection(collection_name)?;
 
         let id = record.id.to_string();
-        let numeric_id = uuid_to_u64(&record.id);
+        let numeric_id = self.next_id.fetch_add(1, Ordering::SeqCst);
 
         {
             let mut id_map = self.id_map.write();
@@ -317,7 +309,7 @@ impl AttentionEngine {
 
         for mut record in records {
             if record.tags.contains(&format!("collection:{}", target_collection)) {
-                let numeric_id = uuid_to_u64(&record.id);
+                let numeric_id = self.next_id.fetch_add(1, Ordering::SeqCst);
 
                 let mut new_k_vecs = HashMap::new();
                 for (head_name, vec) in &record.k_vecs {

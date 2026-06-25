@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use parking_lot::Mutex;
 use crate::error::DistributedError;
+use crate::transport::RaftTransport;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RaftRole {
@@ -15,7 +16,7 @@ pub enum RaftRole {
     Leader,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct RaftLogEntry {
     pub term: u64,
     pub index: u64,
@@ -23,7 +24,7 @@ pub struct RaftLogEntry {
     pub data: Vec<u8>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct RaftMessage {
     pub from: u32,
     pub to: u32,
@@ -31,7 +32,7 @@ pub struct RaftMessage {
     pub payload: RaftPayload,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum RaftPayload {
     RequestVote {
         last_log_index: u64,
@@ -61,21 +62,25 @@ pub struct RaftNode {
     pub commit_index: u64,
     pub last_applied: u64,
     pub peers: Vec<u32>,
+    pub peer_addresses: HashMap<u32, String>,
     pub role: RaftRole,
     pub leader_id: Option<u32>,
     pub votes_received: usize,
     pub next_index: HashMap<u32, u64>,
     pub match_index: HashMap<u32, u64>,
     on_commit: Option<Arc<Mutex<dyn FnMut(&RaftLogEntry) + Send>>>,
+    transport: Option<Box<dyn RaftTransport>>,
 }
 
 impl RaftNode {
     pub fn new(id: u32, peers: Vec<u32>) -> Self {
         let mut next_index = HashMap::new();
         let mut match_index = HashMap::new();
+        let mut peer_addresses = HashMap::new();
         for &peer in &peers {
             next_index.insert(peer, 1);
             match_index.insert(peer, 0);
+            peer_addresses.insert(peer, format!("peer-{}:7401", peer));
         }
 
         Self {
@@ -86,13 +91,25 @@ impl RaftNode {
             commit_index: 0,
             last_applied: 0,
             peers,
+            peer_addresses,
             role: RaftRole::Follower,
             leader_id: None,
             votes_received: 0,
             next_index,
             match_index,
             on_commit: None,
+            transport: None,
         }
+    }
+
+    pub fn with_transport(mut self, transport: Box<dyn RaftTransport>) -> Self {
+        self.transport = Some(transport);
+        self
+    }
+
+    pub fn with_peer_address(mut self, peer_id: u32, address: &str) -> Self {
+        self.peer_addresses.insert(peer_id, address.to_string());
+        self
     }
 
     pub fn with_commit_callback<F>(mut self, callback: F) -> Self
@@ -121,7 +138,32 @@ impl RaftNode {
     }
 
     pub fn replicate_to_peers(&self) -> Result<usize, DistributedError> {
-        Ok(self.peers.len())
+        if let Some(ref transport) = self.transport {
+            let mut success_count = 0usize;
+            for &peer in &self.peers {
+                if let Some(addr) = self.peer_addresses.get(&peer) {
+                    let heartbeat = RaftMessage {
+                        from: self.id,
+                        to: peer,
+                        term: self.current_term,
+                        payload: crate::RaftPayload::AppendEntries {
+                            leader_id: self.id,
+                            prev_log_index: 0,
+                            prev_log_term: 0,
+                            entries: vec![],
+                            leader_commit: self.commit_index,
+                        },
+                    };
+                    match transport.send_message(addr, &heartbeat) {
+                        Ok(_) => success_count += 1,
+                        Err(_) => {}
+                    }
+                }
+            }
+            Ok(success_count)
+        } else {
+            Ok(self.peers.len())
+        }
     }
 
     pub fn commit_up_to(&mut self, index: u64) {

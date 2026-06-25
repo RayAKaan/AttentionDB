@@ -95,18 +95,23 @@ impl Collection {
         top_k: usize,
     ) -> Result<Vec<(u64, f32)>, CoreError> {
         let heads_read = self.head_manager.read();
+        let num_heads = heads.len().max(1);
+        let per_head_k = top_k * num_heads;
         let head_results: Vec<(String, Vec<(u64, f32)>)> = heads
             .iter()
             .filter_map(|h| {
                 let idx = heads_read.get_head(h).ok()?;
-                let results = idx.read().search(query, top_k, None).ok()?;
+                let results = idx.read().search(query, per_head_k, None).ok()?;
                 Some((h.clone(), results))
             })
             .collect();
 
-        let weights: Vec<(String, f32)> = heads.iter().map(|h| (h.clone(), 1.0)).collect();
         let mh = self.multihead_manager.read();
-        let fused = mh.fuse_weighted(&head_results, &weights);
+        let fused = mh.fuse(query, &head_results)?;
+        let mut fused = fused;
+        if fused.len() > top_k {
+            fused.truncate(top_k);
+        }
         Ok(fused)
     }
 
@@ -117,17 +122,22 @@ impl Collection {
         top_k: usize,
     ) -> Result<Vec<(u64, f32)>, CoreError> {
         let heads_read = self.head_manager.read();
+        let num_heads = heads.len().max(1);
+        let per_head_k = top_k * num_heads;
         let head_results: Vec<(String, Vec<(u64, f32)>)> = heads
             .iter()
             .filter_map(|(h, _)| {
                 let idx = heads_read.get_head(h).ok()?;
-                let results = idx.read().search(query, top_k, None).ok()?;
+                let results = idx.read().search(query, per_head_k, None).ok()?;
                 Some((h.clone(), results))
             })
             .collect();
 
         let mh = self.multihead_manager.read();
-        let fused = mh.fuse_weighted(&head_results, heads);
+        let mut fused = mh.fuse_weighted(&head_results, heads);
+        if fused.len() > top_k {
+            fused.truncate(top_k);
+        }
         Ok(fused)
     }
 
@@ -138,8 +148,10 @@ impl Collection {
         query_text: &str,
         top_k: usize,
     ) -> Result<Vec<(u64, f32)>, CoreError> {
-        let dense_results = self.attend(heads, query_vector, top_k * 2)?;
-        let sparse_results = self.bm25.search(query_text, top_k * 2);
+        let num_heads = heads.len().max(1);
+        let per_head_k = top_k * num_heads;
+        let dense_results = self.attend(heads, query_vector, per_head_k)?;
+        let sparse_results = self.bm25.search(query_text, per_head_k);
 
         let hybrid_fused = crate::bm25::reciprocal_rank_fusion(&dense_results, &sparse_results, top_k);
         Ok(hybrid_fused)

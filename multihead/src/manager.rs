@@ -17,12 +17,27 @@ pub struct MultiHeadManager {
 
 impl MultiHeadManager {
     pub fn new(dim: usize, num_heads: usize) -> Self {
+        #[cfg(feature = "gpu")]
+        let gpu_backend: Box<dyn GpuBackend> = match CudaBackend::new() {
+            Ok(cuda) => {
+                eprintln!("[MultiHeadManager] CUDA backend initialized successfully");
+                Box::new(cuda)
+            }
+            Err(e) => {
+                eprintln!("[MultiHeadManager] CUDA init failed (falling back to CPU): {:?}", e);
+                Box::new(CpuBackend)
+            }
+        };
+
+        #[cfg(not(feature = "gpu"))]
+        let _gpu_backend: () = ();
+
         Self {
             heads: HashMap::new(),
             gating: GatingNetwork::new(dim, num_heads),
             dim,
             #[cfg(feature = "gpu")]
-            gpu_backend: Box::new(CpuBackend),
+            gpu_backend,
         }
     }
 
@@ -40,10 +55,21 @@ impl MultiHeadManager {
 
     #[cfg(feature = "gpu")]
     pub fn enable_gpu_fusion(&mut self) -> Result<(), MultiHeadError> {
-        // On systems without CUDA, CpuBackend is used as a safe fallback.
-        // A production implementation would attempt CudaBackend::new() here.
-        eprintln!("[MultiHeadManager] GPU fusion enabled (using CPU backend as placeholder)");
-        Ok(())
+        if self.gpu_backend.is_available() {
+            return Ok(());
+        }
+        match CudaBackend::new() {
+            Ok(cuda) => {
+                eprintln!("[MultiHeadManager] GPU fusion enabled with CUDA");
+                self.gpu_backend = Box::new(cuda);
+                Ok(())
+            }
+            Err(e) => {
+                eprintln!("[MultiHeadManager] GPU fusion requested but CUDA unavailable: {:?}", e);
+                self.gpu_backend = Box::new(CpuBackend);
+                Ok(())
+            }
+        }
     }
 
     /// Fuse results from multiple heads using learned gating

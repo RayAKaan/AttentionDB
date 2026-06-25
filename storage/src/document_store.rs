@@ -40,6 +40,11 @@ impl BlockCache {
         if let Some(entry) = self.cache.get_mut(id) {
             entry.last_accessed = std::time::Instant::now();
             self.hits += 1;
+            // Promote to back (most recently used) for LRU
+            if let Some(pos) = self.access_queue.iter().position(|x| x == id) {
+                self.access_queue.remove(pos);
+                self.access_queue.push_back(*id);
+            }
             Some(entry.record.clone())
         } else {
             self.misses += 1;
@@ -48,6 +53,18 @@ impl BlockCache {
     }
 
     pub fn insert(&mut self, id: Uuid, record: Record) {
+        if self.cache.contains_key(&id) {
+            // Update existing entry and promote
+            if let Some(entry) = self.cache.get_mut(&id) {
+                entry.record = record;
+                entry.last_accessed = std::time::Instant::now();
+            }
+            if let Some(pos) = self.access_queue.iter().position(|x| *x == id) {
+                self.access_queue.remove(pos);
+                self.access_queue.push_back(id);
+            }
+            return;
+        }
         if self.cache.len() >= self.capacity {
             if let Some(evicted_id) = self.access_queue.pop_front() {
                 self.cache.remove(&evicted_id);

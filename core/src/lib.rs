@@ -1,3 +1,4 @@
+pub mod constants;
 pub mod error;
 pub mod bm25;
 pub mod collection;
