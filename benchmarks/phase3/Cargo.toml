@@ -1,0 +1,13 @@
+[package]
+name = "phase3-bench"
+version = "0.1.0"
+edition = "2021"
+description = "Phase 3: real-world validation benchmarks for the frozen Phase 2 architecture"
+publish = false
+
+[dependencies]
+attentiondb-core = { path = "../../core" }
+attentiondb-storage = { path = "../../storage" }
+attentiondb-learned = { path = "../../learned" }
+phase2b-bench = { path = "../phase2b" }
+serde_json = "1"

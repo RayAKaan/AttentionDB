@@ -1,0 +1,89 @@
+{
+ "format": "attentiondb-experiment-index",
+ "version": 1,
+ "updated": "2026-09-05",
+ "code_commit": "86de099",
+ "experiments": [
+  {
+   "experiment_id": "PH3-QUAL-FM-S",
+   "date": "2026-09-05",
+   "git_commit": "86de099783a99face7b65ffdf9ed1d7eddf8bebd",
+   "corpus": "PH3-DS-FM-S (Fashion-MNIST 10K docs, 5 heads {full,q0..q3}, dim 196)",
+   "seed": "42,7,1",
+   "model": "frozen architecture: per-head HNSW(M16/efc400/efs64) -> union(100/head) -> GatingMlp grid-val-select -> weighted fusion -> top10",
+   "objective": "Phase 2B protocol (3 objectives x lr x hidden, val-select + val temperature)",
+   "metrics": {
+    "single_head_ann": {
+     "R@1": "0.1000",
+     "R@5": "0.5000",
+     "R@10": "0.9860",
+     "NDCG@10": "0.9911",
+     "MRR": "1.0000"
+    },
+    "uniform_multihead": {
+     "R@1": "0.0927",
+     "R@5": "0.3927",
+     "R@10": "0.6293",
+     "NDCG@10": "0.6991",
+     "MRR": "0.9622"
+    },
+    "trained_gating": {
+     "R@1": "0.1000",
+     "R@5": "0.4998",
+     "R@10": "0.9853",
+     "NDCG@10": "0.9906",
+     "MRR": "1.0000"
+    },
+    "exact_reference": {
+     "R@1": "0.1000",
+     "R@5": "0.5000",
+     "R@10": "1.0000",
+     "NDCG@10": "1.0000",
+     "MRR": "1.0000"
+    }
+   },
+   "output_files": [
+    "config.json",
+    "gating_weights.csv",
+    "latency.csv",
+    "metrics.json",
+    "models",
+    "results.csv",
+    "val_grid_gating.csv"
+   ],
+   "hardware": "sandbox 2 CPUs / 1984 MB RAM; peak RSS 571 MB (build)",
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3-QUAL-FM-M",
+   "date": "2026-09-05",
+   "git_commit": "86de099783a99face7b65ffdf9ed1d7eddf8bebd",
+   "corpus": "PH3-DS-FM-M (60K docs)",
+   "seed": "42,7,1",
+   "model": "n/a \u2014 OOM during build",
+   "objective": "n/a",
+   "metrics": {},
+   "output_files": [
+    "run_info.txt",
+    "stdout.log"
+   ],
+   "hardware": "sandbox 2 CPUs / 1984 MB RAM",
+   "status": "FAILED \u2014 OOM_RESOURCE_LIMIT (\u00a719 memory-scaling finding; wall bracketed [10K, 30K))"
+  },
+  {
+   "experiment_id": "PH3-QUAL-FM-T30",
+   "date": "2026-09-05",
+   "git_commit": "86de099783a99face7b65ffdf9ed1d7eddf8bebd",
+   "corpus": "PH3-DS-FM-T30 (30K docs)",
+   "seed": "42",
+   "model": "n/a \u2014 OOM during build (~82 s)",
+   "objective": "n/a",
+   "metrics": {},
+   "output_files": [
+    "stdout.log"
+   ],
+   "hardware": "sandbox 2 CPUs / 1984 MB RAM",
+   "status": "FAILED \u2014 OOM_RESOURCE_LIMIT (brackets the \u00a719 wall below 30K docs)"
+  }
+ ]
+}

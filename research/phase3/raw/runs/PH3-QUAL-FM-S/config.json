@@ -1,0 +1,59 @@
+{
+  "build_seconds": 57.817289046,
+  "candidate_gen_seconds": 2.164407615,
+  "candidate_recall_union": 0.9991999999999999,
+  "dataset": {
+    "dir": "/tmp/phase3/fashion-S",
+    "engine_dim": 196,
+    "gt": "exact full-view cosine top-10",
+    "heads": [
+      "full",
+      "q0",
+      "q1",
+      "q2",
+      "q3"
+    ],
+    "n_docs": 10000,
+    "n_queries": 1000,
+    "tier": "S"
+  },
+  "dataset_hash": "0x68da2ea28951c1f9",
+  "engine": {
+    "durability": "Async (in-session tempdir; persistence scenarios are separate PH3 runs)",
+    "hnsw": {
+      "M": 16,
+      "ef_construction": 400,
+      "ef_search": 64
+    },
+    "pool": 100,
+    "top_k": 10
+  },
+  "exact_eval_seconds": 0.41377775,
+  "experiment": "PH3-QUAL-FM-S",
+  "gating": {
+    "frozen": {
+      "T": 0.25,
+      "hidden": 32,
+      "lr": 0.009999999776482582,
+      "objective": "Pairwise",
+      "val_r10": 0.9860000000000002
+    },
+    "grid": "3 objectives x lr{0.01,0.003} x hidden{32,64}, val-select + val temperature"
+  },
+  "peak_rss_mb": 571.12890625,
+  "pool_candidate_recall_gt_frac": 0.9992,
+  "pool_queries_full_coverage": 993,
+  "pool_verify_seconds": 0.00036901200000016843,
+  "rss_after_build_mb": 475.93359375,
+  "seeds": [
+    42,
+    7,
+    1
+  ],
+  "splits": {
+    "split_seed": 42,
+    "test": 150,
+    "train": 700,
+    "val": 150
+  }
+}

@@ -1,0 +1,11 @@
+{
+ "format": "attentiondb-run-manifest",
+ "version": 1,
+ "updated": "2026-09-05",
+ "code_commit": "86de099",
+ "experiments": [
+  "PH3-QUAL-FM-S",
+  "PH3-QUAL-FM-M",
+  "PH3-QUAL-FM-T30"
+ ]
+}

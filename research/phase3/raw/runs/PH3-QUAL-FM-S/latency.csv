@@ -1,0 +1,5 @@
+component,p50_us,p95_us,p99_us,qps
+ann_single_head,766.40,965.80,1062.67,1305
+ann_5head_plus_fusion,2544.15,3046.01,3315.01,393
+gating_mlp_forward,36.06,42.97,60.41,27732
+exact_bruteforce_196d,3566.65,3733.10,3948.50,280

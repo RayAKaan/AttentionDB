@@ -1,0 +1,10 @@
+run_id=PH3-QUAL-FM-S
+experiment=PH3-QUAL-FM tier S — frozen architecture vs baselines on real Fashion-MNIST (10K docs, 5 heads, dim 196)
+date=2026-09-05
+git_commit=86de099 lineage (benchmarks/phase3 harness; see registry entry)
+command=target/release/phase3-bench quality --tier S --data /tmp/phase3/fashion-S --out research/phase3/raw/runs/PH3-QUAL-FM-S --seeds 42,7,1
+dataset=PH3-DS-FM-S (sha256 3ab26f31... corpus; builder research/phase3/datasets/build_fashion.py)
+splits=700/150/150 queries (seeded shuffle, seed 42)
+status=COMPLETED
+notes=exact-reference anchor R@10=1.0000 passed (HC-P3-1/HC-P3-2 caught pre-recording);
+gating collapse to w(full)=1.0 is a headline finding (F-P3-1), weight diagnostics in gating_weights.csv

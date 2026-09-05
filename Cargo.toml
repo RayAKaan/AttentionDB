@@ -10,6 +10,7 @@ members = [
     "core",
     "benchmarks/phase2",
     "benchmarks/phase2b",
+    "benchmarks/phase3",
 ]
 
 resolver = "2"

@@ -1,0 +1,14 @@
+run_id=PH3-QUAL-FM-M
+experiment=PH3-QUAL-FM tier M (60K docs x 5 heads x 196-dim, real Fashion-MNIST)
+date=2026-09-05
+status=FAILED — OOM_RESOURCE_LIMIT (exit 137, SIGKILL at ~111 s during collection build)
+environment=sandbox 2 CPUs, 1984 MB RAM total (~1.4 GB available)
+config=identical to PH3-QUAL-FM-S (POOL=100, HNSW M=16/efc=400/efs=64, dim 196)
+observation=Tier S (10K docs) peaks at 571 MB RSS with ~66 MB raw vector data
+(memory multiplier ~8.6x). Tier M exceeds the available memory during
+build. Tier T30 (30K docs) also OOM-killed (~82 s into build) — the wall
+on this hardware sits between 10K and 30K docs in this configuration.
+Largest reproducible scale: 10K docs (PH3-QUAL-FM-S). Section §4/§19
+limitation recorded; finer bracketing deferred.
+dataset=PH3-DS-FM-M (hashes in research/phase3/datasets/ + run meta.json at build time)
+notes=no metrics produced; run preserved per §0 (failed runs remain recorded)

@@ -1,0 +1,4 @@
+tier,n_docs,status,peak_rss_mb,note
+S,10000,OK,571,PH3-QUAL-FM-S (config.json peak_rss_mb)
+T30,30000,OOM_KILLED,,PH3-QUAL-FM-T30 exit 137 ~82s into build
+M,60000,OOM_KILLED,,PH3-QUAL-FM-M exit 137 ~111s into build

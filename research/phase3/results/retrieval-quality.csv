@@ -1,0 +1,5 @@
+dataset,arm,R@1,R@5,R@10,NDCG@10,MRR
+PH3-DS-FM-S,single_head_ann,0.1000,0.5000,0.9860,0.9911,1.0000
+PH3-DS-FM-S,uniform_multihead,0.0927,0.3927,0.6293,0.6991,0.9622
+PH3-DS-FM-S,trained_gating,0.1000,0.4998,0.9853,0.9906,1.0000
+PH3-DS-FM-S,exact_reference,0.1000,0.5000,1.0000,1.0000,1.0000
