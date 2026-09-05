@@ -2,6 +2,7 @@ use attentiondb_hnsw::{HNSWConfig, HNSWIndex};
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use rand::Rng;
 
+#[allow(dead_code)] // reserved for dataset-parameterized benchmark variants
 fn generate_vector(dim: usize) -> Vec<f32> {
     let mut rng = rand::thread_rng();
     (0..dim).map(|_| rng.gen::<f32>() - 0.5).collect()

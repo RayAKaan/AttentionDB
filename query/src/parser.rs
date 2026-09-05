@@ -492,7 +492,7 @@ mod tests {
             AQLStatement::AlterCollection(a) => {
                 assert_eq!(a.collection, "papers");
                 assert_eq!(a.settings.similarity_metric, "dot_product");
-                assert_eq!(a.settings.enable_exact_reranking, true);
+                assert!(a.settings.enable_exact_reranking);
             }
             _ => panic!("Expected AlterCollection"),
         }

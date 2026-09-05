@@ -1,0 +1,4 @@
+split,trained_R10,uniform_R10
+train,0.8745,0.2089
+val,0.5783,0.2028
+test,0.5322,0.2128

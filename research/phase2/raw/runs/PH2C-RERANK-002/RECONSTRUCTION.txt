@@ -1,0 +1,1 @@
+RECONSTRUCTED from canonical aggregates (results/*.csv + registry) after workspace reset lost per-run files; numbers byte-equal to registry entries.

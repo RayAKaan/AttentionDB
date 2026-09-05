@@ -1,0 +1,29 @@
+{
+  "metrics": [
+    {
+      "method": "norm_fusion_uniform",
+      "R@10": "0.2128",
+      "NDCG@10": "0.2803",
+      "MRR": "0.6435"
+    },
+    {
+      "method": "exact_fusion_uniform",
+      "R@10": "0.2406",
+      "NDCG@10": "0.3445",
+      "MRR": "0.8303"
+    },
+    {
+      "method": "exact_fusion_best_head",
+      "R@10": "0.3428",
+      "NDCG@10": "0.3521",
+      "MRR": "0.4706"
+    },
+    {
+      "method": "exact_fusion_oracle_head",
+      "R@10": "0.9933",
+      "NDCG@10": "0.9957",
+      "MRR": "1.0000"
+    }
+  ],
+  "note": "RECONSTRUCTED from canonical aggregates (results/*.csv + registry) after workspace reset lost per-run files; numbers byte-equal to registry entries."
+}

@@ -170,3 +170,31 @@ impl Drop for LatencyTimer {
         );
     }
 }
+
+/// Phase 2 §56 — the query-plane metric contract. Names are fixed:
+/// `attentiondb_queries_total`, `attentiondb_query_errors_total`,
+/// `attentiondb_query_latency_seconds`. Labels are LOW-cardinality by
+/// construction: mode/collection name only — never doc ids or query text.
+pub fn record_query(collection: &str, mode: &'static str, result_count: usize, latency_secs: f64) {
+    counter!("attentiondb_queries_total", "mode" => mode.to_string()).increment(1);
+    histogram!("attentiondb_query_latency_seconds", "mode" => mode.to_string())
+        .record(latency_secs);
+    tracing::info!(
+        collection = collection,
+        mode = mode,
+        result_count = result_count,
+        latency_ms = format!("{:.2}", latency_secs * 1000.0),
+        "query completed"
+    );
+}
+
+pub fn record_query_error(operation: &'static str) {
+    counter!("attentiondb_query_errors_total", "operation" => operation).increment(1);
+}
+
+/// Filter selectivity (§56): matched/considered, recorded by the engine;
+/// this helper exists so REST-visible scans log the same shape.
+pub fn record_filter_scan(matched: usize, considered: usize, latency_secs: f64) {
+    histogram!("attentiondb_filter_selectivity").record(matched as f64 / considered.max(1) as f64);
+    histogram!("attentiondb_stage_latency_seconds", "stage" => "filter_scan").record(latency_secs);
+}

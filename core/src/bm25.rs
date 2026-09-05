@@ -314,6 +314,11 @@ impl Default for Bm25Index {
 
 impl Bm25Index {
     pub fn insert(&self, doc_id: u64, text: &str) {
+        // Idempotent: re-inserting a doc id (update path) must not keep stale
+        // terms from the previous version nor double-count the document.
+        if self.document_lengths.read().contains_key(&doc_id) {
+            self.remove(doc_id);
+        }
         let tokens = tokenize_with_positions(text);
         let len = tokens.len();
         let mut freq: HashMap<String, (usize, Vec<usize>)> = HashMap::new();
@@ -349,6 +354,52 @@ impl Bm25Index {
             *self.average_doc_length.write() = avg;
             self.idf_cache.write().clear();
         }
+    }
+
+    /// Remove a document from the index (INV-3: deletes must reach BM25).
+    /// Returns true if the document was present.
+    pub fn remove(&self, doc_id: u64) -> bool {
+        let had_len = self.document_lengths.write().remove(&doc_id).is_some();
+        let mut removed_any = false;
+        {
+            let mut idx = self.index.write();
+            for postings in idx.values_mut() {
+                let before = postings.len();
+                postings.retain(|p| p.doc_id != doc_id);
+                if postings.len() != before {
+                    removed_any = true;
+                }
+            }
+            idx.retain(|_, ps| !ps.is_empty());
+        }
+        if had_len || removed_any {
+            self.recompute_stats();
+        }
+        had_len || removed_any
+    }
+
+    /// Reset to empty (used by deterministic rebuilds at recovery).
+    pub fn clear(&self) {
+        self.index.write().clear();
+        self.document_lengths.write().clear();
+        *self.total_documents.write() = 0;
+        *self.average_doc_length.write() = 0.0;
+        self.idf_cache.write().clear();
+    }
+
+    fn recompute_stats(&self) {
+        let dl = self.document_lengths.read();
+        let total = dl.len();
+        let sum: usize = dl.values().copied().sum();
+        drop(dl);
+        *self.total_documents.write() = total;
+        let avg = if total > 0 {
+            sum as f32 / total as f32
+        } else {
+            0.0
+        };
+        *self.average_doc_length.write() = avg;
+        self.idf_cache.write().clear();
     }
 
     pub fn search(&self, query: &str, top_k: usize) -> Vec<(u64, f32)> {

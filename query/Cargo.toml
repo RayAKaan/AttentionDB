@@ -6,6 +6,7 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
+serde_json.workspace = true
 pest = "2.7"
 pest_derive = "2.7"
 serde = { workspace = true }

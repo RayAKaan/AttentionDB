@@ -1,0 +1,3 @@
+arm,mean_w0,mean_w1,mean_entropy
+gating_qualityreg,0.3655,0.6345,0.6511
+gating_infnce,0.0000,1.0000,0.0000

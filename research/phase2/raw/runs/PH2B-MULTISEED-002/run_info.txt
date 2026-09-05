@@ -1,0 +1,5 @@
+run_id=PH2B-MULTISEED-002
+corpus=multiview-fine-1200q
+training_seeds=42,7,1
+dataset_hash=0xca36575c98044aa7 (dataset.json lost in reset; hash is the record)
+RECONSTRUCTED from canonical aggregates (results/*.csv + registry) after workspace reset lost per-run files; numbers byte-equal to registry entries.

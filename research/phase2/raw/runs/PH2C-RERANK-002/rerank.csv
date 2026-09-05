@@ -1,0 +1,5 @@
+method,R@10,NDCG@10,MRR
+norm_fusion_uniform,0.7378,0.8028,0.9889
+exact_fusion_uniform,0.7133,0.7843,1.0000
+exact_fusion_best_head,0.8378,0.8845,1.0000
+exact_fusion_oracle_head,0.8400,0.8858,1.0000

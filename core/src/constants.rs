@@ -4,3 +4,4 @@ pub const MAX_TOP_K: u32 = 10_000;
 pub const MAX_DIMENSION: usize = 4096;
 pub const MAX_FIELDS: usize = 256;
 pub const MAX_FIELD_VALUE_BYTES: usize = 1_048_576;
+pub const MAX_HEADS_PER_DOCUMENT: usize = MAX_HEADS;

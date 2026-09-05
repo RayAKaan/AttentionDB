@@ -1,0 +1,13 @@
+corpus=noise
+dataset_hash=0x4fab7b9fd8487f74
+seed=42
+calibration_temperature=0.5
+splits=train=210,val=45,test=45
+objective_selected=pairwise
+best_val_loss=0.138273
+global_best_head=0 (train_recall=0.8276)
+model_params=2632
+model_bytes=31002
+timestamp_unix=1788448587
+commit=unknown
+hardware=cpus=2

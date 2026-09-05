@@ -1,0 +1,9 @@
+run_timestamp_utc=unix_epoch_seconds:1788437235
+corpus={docs:10000, dim:32, clusters:100, heads:8, head_sigmas:[0.02,0.04,0.07,0.12,0.05,0.08,0.11,0.14]}
+queries=100
+top_k=10
+seed=12648430
+corpus_build_seconds=129.1
+insert_throughput_docs_per_s=77
+peak_rss_mb=367
+note=single process, release build, in-run measurement; no numbers invented

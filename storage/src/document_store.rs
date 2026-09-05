@@ -156,10 +156,16 @@ fn estimate_record_size(r: &Record) -> usize {
     std::mem::size_of::<Record>() + r.fields.len() * 64 + r.k_vecs.len() * 128 + r.tags.len() * 32
 }
 
+fn tombstone_record(id: Uuid) -> Record {
+    let mut t = Record::new(HashMap::new());
+    t.id = id;
+    t.tags.push("__TOMBSTONE__".into());
+    t
+}
+
 pub struct DocumentStore {
     memtable: HashMap<Uuid, Record>,
     flushed_records: HashMap<Uuid, Record>,
-    wal: Option<crate::wal::Wal>,
     storage_dir: Option<PathBuf>,
     memtable_threshold: usize,
     sstables: Vec<SSTableReader>,
@@ -177,7 +183,6 @@ impl DocumentStore {
         Self {
             memtable: HashMap::new(),
             flushed_records: HashMap::new(),
-            wal: None,
             storage_dir: None,
             memtable_threshold: 1000,
             sstables: Vec::new(),
@@ -185,8 +190,10 @@ impl DocumentStore {
         }
     }
 
-    pub fn with_wal(mut self, wal: crate::wal::Wal) -> Self {
-        self.wal = Some(wal);
+    /// Compatibility shim: the per-store WAL was removed in Phase 1 — the engine's
+    /// authoritative WAL is the only mutation log (docs/wal.md). Durability for
+    /// standalone use is provided by `flush_memtable`.
+    pub fn with_wal(self, _wal: crate::wal::Wal) -> Self {
         self
     }
     pub fn with_storage_dir(mut self, dir: PathBuf) -> Result<Self, StorageError> {
@@ -200,53 +207,85 @@ impl DocumentStore {
     }
 
     pub fn open(dir: PathBuf) -> Result<Self, StorageError> {
+        Self::open_inner(dir)
+    }
+
+    /// Alias of `open`. Since Phase 1 there is no per-store WAL: the engine's
+    /// authoritative WAL is the only mutation log (docs/wal.md).
+    pub fn open_without_wal(dir: PathBuf) -> Result<Self, StorageError> {
+        Self::open_inner(dir)
+    }
+
+    fn open_inner(dir: PathBuf) -> Result<Self, StorageError> {
         std::fs::create_dir_all(&dir)?;
         let mut sstables = Vec::new();
-        let mut flushed = HashMap::new();
-        if let Ok(entries) = std::fs::read_dir(&dir) {
-            let mut paths: Vec<_> = entries
-                .filter_map(|e| e.ok())
-                .map(|e| e.path())
-                .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("sst"))
-                .collect();
-            paths.sort();
-            for p in paths {
-                if let Ok(r) = SSTableReader::open(&p) {
-                    for e in r.iter() {
-                        if let Ok(rec) = Record::from_msgpack(&e.value) {
-                            if rec.tags.contains(&"__TOMBSTONE__".into()) {
-                                flushed.remove(&rec.id);
-                            } else {
-                                flushed.insert(rec.id, rec);
-                            }
-                        }
-                    }
-                    sstables.push(r);
-                }
-            }
-        }
-        let wal_path = dir.join("store.wal");
-        let mut wal = crate::wal::Wal::new(&wal_path)?;
-        let entries = wal.replay()?;
-        let mut memtable = HashMap::new();
+        // Timestamp-aware merge: for each key, the entry with the highest
+        // (timestamp, file order) wins. This is generation-safe — unlike filename
+        // ordering, `compacted_*` vs `sstable_*` naming cannot resurrect stale
+        // versions or undo deletes (INV-12).
+        // Value: (record, timestamp, file_index); tombstones keep their record.
+        let mut merged: HashMap<uuid::Uuid, (Record, i64, u64)> = HashMap::new();
+        let mut paths: Vec<std::path::PathBuf> = Vec::new();
+        let mut skipped_tmp = 0usize;
+        let entries = std::fs::read_dir(&dir)
+            .map_err(|e| StorageError::RecoveryFailed(format!("read {}: {e}", dir.display())))?;
         for e in entries {
-            match e.op {
-                crate::wal::OpType::Insert => {
-                    if let Ok(rec) = Record::from_msgpack(&e.data) {
-                        memtable.insert(rec.id, rec);
-                    }
-                }
-                crate::wal::OpType::Delete => {
-                    memtable.remove(&e.record_id);
-                    flushed.remove(&e.record_id);
+            let p = e?.path();
+            let ext = p.extension().and_then(|s| s.to_str());
+            match ext {
+                Some("sst") => paths.push(p),
+                Some("tmp") => {
+                    // Incomplete SSTable from an interrupted flush: not valid state.
+                    // Safe to remove (the original is either intact or never existed).
+                    let _ = std::fs::remove_file(&p);
+                    skipped_tmp += 1;
                 }
                 _ => {}
             }
         }
+        if skipped_tmp > 0 {
+            tracing::info!(removed = skipped_tmp, "discarded incomplete .tmp SSTables");
+        }
+        paths.sort();
+        for (file_idx, p) in paths.into_iter().enumerate() {
+            let file_name = p.display().to_string();
+            // Corruption is never silently skipped: recovery must fail loudly.
+            let reader = SSTableReader::open(&p).map_err(|e| {
+                StorageError::RecoveryFailed(format!("SSTable {file_name} unusable: {e}"))
+            })?;
+            for e in reader.iter() {
+                if let Ok(rec) = Record::from_msgpack(&e.value) {
+                    let entry = merged.entry(rec.id);
+                    match entry {
+                        std::collections::hash_map::Entry::Vacant(v) => {
+                            v.insert((rec, e.timestamp, file_idx as u64));
+                        }
+                        std::collections::hash_map::Entry::Occupied(mut occ) => {
+                            let (_, cur_ts, cur_ord) = occ.get();
+                            let newer = e.timestamp > *cur_ts
+                                || (e.timestamp == *cur_ts && (file_idx as u64) > *cur_ord);
+                            if newer {
+                                occ.insert((rec, e.timestamp, file_idx as u64));
+                            }
+                        }
+                    }
+                } else {
+                    return Err(StorageError::RecoveryFailed(format!(
+                        "SSTable {file_name} contains an undecodable record (key {:02x?})",
+                        e.key.iter().take(8).collect::<Vec<_>>()
+                    )));
+                }
+            }
+            sstables.push(reader);
+        }
+        let flushed: HashMap<uuid::Uuid, Record> = merged
+            .into_iter()
+            .map(|(id, (rec, _, _))| (id, rec))
+            .collect();
+
         Ok(Self {
-            memtable,
+            memtable: HashMap::new(),
             flushed_records: flushed,
-            wal: Some(wal),
             storage_dir: Some(dir),
             memtable_threshold: 1000,
             sstables,
@@ -254,22 +293,29 @@ impl DocumentStore {
         })
     }
 
+    /// Insert (materialize) a record. NOT logged: since Phase 1 the engine's
+    /// authoritative WAL is the only mutation log; this method only applies state.
     pub fn insert(&mut self, record: Record) -> Result<Uuid, StorageError> {
         let id = record.id;
-        if let Some(ref mut w) = self.wal {
-            w.append(
-                crate::wal::OpType::Insert,
-                "default",
-                id,
-                record.to_msgpack()?,
-            )?;
-        }
+        self.apply_insert(record);
+        Ok(id)
+    }
+
+    /// Explicit "apply without logging" form used by engine replay paths.
+    pub fn insert_nolog(&mut self, record: Record) -> Result<(), StorageError> {
+        self.apply_insert(record);
+        Ok(())
+    }
+
+    fn apply_insert(&mut self, record: Record) {
+        let id = record.id;
         self.memtable.insert(id, record.clone());
         self.block_cache.write().insert(id, record);
         if self.memtable.len() >= self.memtable_threshold && self.storage_dir.is_some() {
-            self.flush_memtable()?;
+            if let Err(e) = self.flush_memtable() {
+                tracing::error!(error = %e, "memtable flush failed during insert");
+            }
         }
-        Ok(id)
     }
 
     pub fn flush_memtable(&mut self) -> Result<(), StorageError> {
@@ -287,21 +333,17 @@ impl DocumentStore {
             w.flush()?;
             self.sstables.push(SSTableReader::open(&p)?);
             let config = crate::compaction::CompactionConfig::default();
-            if let Ok(Some(result)) = crate::compaction::compact(dir, &config) {
-                let _ = crate::compaction::cleanup_merged_files(&result);
-                self.sstables.clear();
-                if let Ok(entries) = std::fs::read_dir(dir) {
-                    let mut paths: Vec<_> = entries
-                        .filter_map(|e| e.ok())
-                        .map(|e| e.path())
-                        .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("sst"))
-                        .collect();
-                    paths.sort();
-                    for p in paths {
-                        if let Ok(r) = SSTableReader::open(&p) {
-                            self.sstables.push(r);
-                        }
+            match crate::compaction::compact(dir, &config) {
+                Ok(Some(result)) => {
+                    if let Err(e) = crate::compaction::cleanup_merged_files(&result) {
+                        tracing::warn!(error = %e, "compaction cleanup failed (harmless: extra files remain)");
                     }
+                    self.sstables.clear();
+                    self.sstables = Self::load_sstables(dir)?;
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    tracing::warn!(error = %e, "post-flush compaction failed (data remains safe in SSTables)")
                 }
             }
         }
@@ -313,6 +355,31 @@ impl DocumentStore {
             }
         }
         Ok(())
+    }
+
+    /// Reload the SSTable reader list from disk (after compaction/restore).
+    fn load_sstables(dir: &PathBuf) -> Result<Vec<SSTableReader>, StorageError> {
+        let mut paths: Vec<std::path::PathBuf> = std::fs::read_dir(dir)?
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("sst"))
+            .collect();
+        paths.sort();
+        let mut out = Vec::with_capacity(paths.len());
+        for p in paths {
+            out.push(SSTableReader::open(&p)?);
+        }
+        Ok(out)
+    }
+
+    /// Public flush: make all memtable state durable in SSTables (checkpoint path).
+    pub fn flush(&mut self) -> Result<(), StorageError> {
+        self.flush_memtable()
+    }
+
+    /// Number of records waiting in the memtable (checkpoint/observability).
+    pub fn memtable_len(&self) -> usize {
+        self.memtable.len()
     }
 
     pub fn get(&self, id: &Uuid) -> Option<&Record> {
@@ -364,25 +431,33 @@ impl DocumentStore {
         None
     }
 
+    /// Delete (tombstone) a record. NOT logged: the engine's WAL is authoritative.
     pub fn delete(&mut self, id: &Uuid) -> Result<(), StorageError> {
-        if let Some(ref mut w) = self.wal {
-            w.append(crate::wal::OpType::Delete, "default", *id, vec![])?;
-        }
+        self.apply_delete(id);
+        Ok(())
+    }
+
+    /// Apply a delete without logging (engine WAL is authoritative).
+    pub fn delete_nolog(&mut self, id: &Uuid) -> Result<(), StorageError> {
+        self.apply_delete(id);
+        Ok(())
+    }
+
+    fn apply_delete(&mut self, id: &Uuid) {
         if self.storage_dir.is_some() {
-            let mut tombstone = Record::new(HashMap::new());
-            tombstone.id = *id;
-            tombstone.tags.push("__TOMBSTONE__".into());
+            let tombstone = tombstone_record(*id);
             self.memtable.insert(*id, tombstone.clone());
             self.block_cache.write().insert(*id, tombstone);
             if self.memtable.len() >= self.memtable_threshold {
-                self.flush_memtable()?;
+                if let Err(e) = self.flush_memtable() {
+                    tracing::error!(error = %e, "memtable flush failed during delete");
+                }
             }
         } else {
             self.memtable.remove(id);
             self.flushed_records.remove(id);
             self.block_cache.write().remove(id);
         }
-        Ok(())
     }
 
     pub fn len(&self) -> usize {

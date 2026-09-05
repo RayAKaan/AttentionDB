@@ -88,7 +88,7 @@ mod tests {
     #[test]
     fn test_weighted_fuse() {
         let results = make_results();
-        let weights = vec![("semantic".to_string(), 1.0), ("temporal".to_string(), 0.5)];
+        let weights = [("semantic".to_string(), 1.0), ("temporal".to_string(), 0.5)];
         // Need different type signature
         let weight_refs: Vec<(&str, f32)> = weights.iter().map(|(n, w)| (n.as_str(), *w)).collect();
         let _fused = weighted_fuse(&results, &weight_refs);

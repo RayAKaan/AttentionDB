@@ -1,0 +1,13 @@
+corpus=controlled
+dataset_hash=0xf2ac7948b567421c
+seed=42
+calibration_temperature=0.5
+splits=train=210,val=45,test=45
+objective_selected=soft_target
+best_val_loss=0.157017
+global_best_head=0 (train_recall=0.5367)
+model_params=1188
+model_bytes=14206
+timestamp_unix=1788448453
+commit=unknown
+hardware=cpus=2

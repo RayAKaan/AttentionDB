@@ -7,6 +7,9 @@ use tonic::{Request, Response, Status};
 use tracing::{debug, warn};
 
 pub mod attentiondb {
+    // Generated tonic code returns Result<_, tonic::Status>; Status is large by
+    // design. Silence result_large_err for the generated module only.
+    #![allow(clippy::result_large_err)]
     tonic::include_proto!("attentiondb");
 }
 

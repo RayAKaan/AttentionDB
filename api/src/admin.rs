@@ -3,9 +3,9 @@
 //! Provides administrative API endpoints for backup and restore operations.
 
 use crate::rest::AppState;
+use axum::extract::State;
 use axum::{http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
@@ -59,106 +59,41 @@ pub async fn backup_handler(
     Json(payload): Json<BackupRequest>,
 ) -> Result<Json<BackupResponse>, (StatusCode, String)> {
     let engine = &state.service.engine;
-    let collections = engine.list_collections();
-
+    if !engine.is_persistent() {
+        return Err((
+            StatusCode::PRECONDITION_FAILED,
+            "engine is not persistent (no data directory); nothing to back up".to_string(),
+        ));
+    }
     let timestamp = format_timestamp(SystemTime::now());
-    let backup_id = format!("backup_{}", timestamp);
-
+    let backup_id = format!("backup_{timestamp}");
     let dest = payload
         .destination
         .map(PathBuf::from)
         .unwrap_or_else(|| backups_dir().join(&backup_id));
-    std::fs::create_dir_all(&dest)
+
+    // Phase 1 backup: checkpoint (quiesce + durable state) then copy the
+    // authoritative state set (catalog + SST + idmap + WAL tail). Internally
+    // consistent by construction — see core/src/backup.rs.
+    let checkpoint = tokio::task::block_in_place(|| engine.backup_to(&dest))
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let mut total_bytes = 0u64;
-    let mut backed_up_collections = Vec::new();
+    let collections = engine.list_collections();
+    let size_bytes = dir_size(&dest);
 
-    for coll_name in &collections {
-        let coll = engine
-            .get_collection(coll_name)
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-        let heads = coll.list_heads();
-        let coll_dir = dest.join(coll_name);
-        std::fs::create_dir_all(&coll_dir)
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-        for head_name in &heads {
-            let head_dir = coll_dir.join(head_name);
-            std::fs::create_dir_all(&head_dir)
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-            match coll.head_manager.read().get_head(head_name) {
-                Ok(idx) => {
-                    let idx_guard = idx.read();
-                    if let Err(e) = attentiondb_hnsw::persistence::save_index(&idx_guard, &head_dir)
-                    {
-                        return Err((
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            format!(
-                                "Failed to save index for {}/{}: {}",
-                                coll_name, head_name, e
-                            ),
-                        ));
-                    }
-                    total_bytes += dir_size(&head_dir);
-                }
-                Err(e) => {
-                    return Err((
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        format!("Head '{}' not found in '{}': {}", head_name, coll_name, e),
-                    ));
-                }
-            }
-        }
-
-        backed_up_collections.push(coll_name.clone());
-    }
-
-    // Save manifest
-    let manifest = serde_json::json!({
-        "backup_id": backup_id,
-        "timestamp": timestamp,
-        "collections": backed_up_collections,
-        "heads_per_collection": collections.iter().map(|c| {
-            let coll = engine.get_collection(c).ok();
-            let heads = coll.map(|c| c.list_heads()).unwrap_or_default();
-            (c.clone(), heads)
-        }).collect::<HashMap<_, _>>(),
-    });
-    let manifest_path = dest.join("manifest.json");
-    let manifest_json = serde_json::to_string_pretty(&manifest)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    total_bytes += manifest_json.len() as u64;
-    std::fs::write(&manifest_path, &manifest_json)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    // Copy WAL if persistent
-    if engine.is_persistent() {
-        let wal_path = data_dir().join("engine.wal");
-        if wal_path.exists() {
-            let wal_backup = dest.join("engine.wal");
-            if let Err(e) = std::fs::copy(&wal_path, &wal_backup) {
-                return Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Failed to copy WAL: {}", e),
-                ));
-            }
-            if let Ok(meta) = std::fs::metadata(&wal_path) {
-                total_bytes += meta.len();
-            }
-        }
-    }
-
-    tracing::info!(backup_id = %backup_id, collections = ?backed_up_collections, size = total_bytes, "Backup created");
+    tracing::info!(
+        backup_id = %backup_id,
+        checkpoint_seq = checkpoint.checkpoint_seq,
+        size = size_bytes,
+        "backup created (checkpoint-consistent)"
+    );
 
     Ok(Json(BackupResponse {
         backup_id,
         timestamp,
-        collections: backed_up_collections,
+        collections,
         path: dest.to_string_lossy().to_string(),
-        size_bytes: total_bytes,
+        size_bytes,
     }))
 }
 
@@ -224,11 +159,18 @@ pub async fn list_backups_handler() -> Result<Json<BackupsListResponse>, (Status
     Ok(Json(BackupsListResponse { backups }))
 }
 
+#[derive(Deserialize)]
+pub struct RestoreRequestBody {
+    pub backup_id: String,
+    /// Where to restore. If omitted, restores into `<data_dir>.restored-<ts>`
+    /// (a running server cannot overwrite its own live data directory).
+    pub destination: Option<String>,
+}
+
 pub async fn restore_handler(
-    Json(payload): Json<RestoreRequest>,
+    Json(payload): Json<RestoreRequestBody>,
 ) -> Result<Json<RestoreResponse>, (StatusCode, String)> {
     let backup_dir = backups_dir().join(&payload.backup_id);
-
     if !backup_dir.exists() {
         return Err((
             StatusCode::NOT_FOUND,
@@ -236,47 +178,72 @@ pub async fn restore_handler(
         ));
     }
 
-    let manifest_path = backup_dir.join("manifest.json");
-    if !manifest_path.exists() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            format!(
-                "Backup '{}' is corrupted — manifest missing",
-                payload.backup_id
-            ),
-        ));
-    }
+    let dest = payload.destination.map(PathBuf::from).unwrap_or_else(|| {
+        let dd = data_dir();
+        let ts = format_timestamp(SystemTime::now());
+        dd.with_file_name(format!(
+            "{}.restored-{ts}",
+            dd.file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("attentiondb-data")
+        ))
+    });
 
-    let manifest_content = std::fs::read_to_string(&manifest_path)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    let manifest: serde_json::Value = serde_json::from_str(&manifest_content)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    // Restores and *validates* by opening the restored directory; fails loudly
+    // on any corruption instead of half-restoring.
+    let meta = tokio::task::block_in_place(|| {
+        attentiondb_core::backup::restore_backup(&backup_dir, &dest)
+    })
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let collections = manifest["collections"]
-        .as_array()
-        .map(|a| a.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>())
-        .unwrap_or_default();
-
-    // Verify all collection directories exist
-    for coll in &collections {
-        let coll_dir = backup_dir.join(coll);
-        if !coll_dir.exists() {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                format!(
-                    "Backup is incomplete — collection '{}' directory missing",
-                    coll
-                ),
-            ));
-        }
-    }
-
-    tracing::info!(backup_id = %payload.backup_id, collections = ?collections, "Backup validated successfully");
+    tracing::info!(
+        backup_id = %payload.backup_id,
+        dest = %dest.display(),
+        checkpoint_seq = meta.checkpoint_seq,
+        "backup restored and validated"
+    );
 
     Ok(Json(RestoreResponse {
         success: true,
-        message: format!("Backup '{}' validated. Contains {} collections. To restore, restart the server with data directory pointing to this backup.", payload.backup_id, collections.len()),
+        message: format!(
+            "Restored '{}' to {} (checkpoint_seq={}, collections={}). Restart the server with ATTENTIONDB_DATA_DIR pointing there.",
+            payload.backup_id,
+            dest.display(),
+            meta.checkpoint_seq,
+            meta.collections.len()
+        ),
     }))
+}
+
+/// Run the consistency checker against the live engine.
+pub async fn check_admin_handler(
+    State(_state): State<AppState>,
+) -> Result<axum::Json<serde_json::Value>, (StatusCode, String)> {
+    let issues = attentiondb_core::checker::check_engine(&_state.service.engine);
+    let errors = issues.iter().filter(|i| i.severity.is_error()).count();
+    Ok(axum::Json(serde_json::json!({
+        "ok": errors == 0,
+        "errors": errors,
+        "warnings": issues.len() - errors,
+        "issues": issues,
+    })))
+}
+
+/// Force a checkpoint.
+pub async fn checkpoint_admin_handler(
+    State(state): State<AppState>,
+) -> Result<axum::Json<serde_json::Value>, (StatusCode, String)> {
+    let info = state
+        .service
+        .engine
+        .checkpoint()
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(axum::Json(serde_json::json!({
+        "success": true,
+        "checkpoint_seq": info.checkpoint_seq,
+        "manifest_generation": info.manifest_generation,
+        "duration_ms": info.duration_ms,
+    })))
 }
 
 fn dir_size(path: &Path) -> u64 {

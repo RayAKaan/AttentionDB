@@ -1,0 +1,6 @@
+approach,R@10,NDCG@10,MRR
+uniform_multihead,0.2106,0.2767,0.6345
+global_best_single_head,0.3422,0.3518,0.4706
+trained_gating,0.4933,0.5290,0.7258
+rrf_k60,0.2589,0.3067,0.6691
+oracle_per_query_head,0.9933,0.9958,1.0000

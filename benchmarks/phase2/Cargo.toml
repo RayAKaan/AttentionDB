@@ -1,0 +1,12 @@
+[package]
+name = "phase2-bench"
+version = "0.1.0"
+edition = "2021"
+description = "Phase 2 retrieval ablation + head-scaling benchmarks (§23-28, §40-41)"
+publish = false
+
+[dependencies]
+attentiondb-core = { path = "../../core" }
+attentiondb-storage = { path = "../../storage" }
+serde_json = "1"
+

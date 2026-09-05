@@ -141,10 +141,7 @@ fn main() {
                 "   {:>4}  {:>6}  {:>8}  {:>8}  {:>8}",
                 "Rank", "ID", "Fused", "Sem", "Tmp"
             );
-            println!(
-                "   {}  {}  {}  {}  {}",
-                "----", "------", "--------", "--------", "--------"
-            );
+            println!("   ----  ------  --------  --------  --------");
             for (rank, (id, score)) in results.iter().enumerate() {
                 let ss = sem_map.get(id).copied().unwrap_or(0.0);
                 let ts = tmp_map.get(id).copied().unwrap_or(0.0);

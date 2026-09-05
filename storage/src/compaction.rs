@@ -43,29 +43,14 @@ pub struct CompactionResult {
     pub merged_paths: Vec<PathBuf>,
 }
 
-/// Compact multiple SST files into one, removing tombstones.
-///
-/// This is a simple size-tiered compaction strategy:
-/// 1. Collect all SST files in the directory
-/// 2. If count >= min_files_to_compact, merge the oldest N files
-/// 3. Write merged output, deduplicating by key (latest timestamp wins)
-/// 4. Remove tombstone entries from the output
+/// Incremental size-tiered compaction: merge the oldest N SST files into one,
+/// deduplicating by key (latest timestamp wins). Tombstones are retained unless
+/// the merge happens to cover every file (see `compact_all`).
 pub fn compact(
     dir: &Path,
     config: &CompactionConfig,
 ) -> Result<Option<CompactionResult>, StorageError> {
-    let mut sst_paths: Vec<PathBuf> = Vec::new();
-
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) == Some("sst") {
-                sst_paths.push(path);
-            }
-        }
-    }
-
-    sst_paths.sort();
+    let sst_paths = list_sst_files(dir)?;
 
     if sst_paths.len() < config.min_files_to_compact {
         debug!(
@@ -76,12 +61,53 @@ pub fn compact(
         return Ok(None);
     }
 
+    // Incremental (partial) merge: take the oldest `max_files_per_run` files.
+    // Tombstones are RETAINED — an old unmerged file may still hold a pre-delete
+    // version of the key, and dropping the tombstone here could resurrect it
+    // (INV-12). Tombstones are only reclaimed by `compact_all` (full compaction).
+    let total_files = sst_paths.len();
     let files_to_merge: Vec<PathBuf> = sst_paths
         .into_iter()
         .take(config.max_files_per_run)
         .collect();
+    let gc_tombstones = files_to_merge.len() == total_files;
 
-    info!(files = files_to_merge.len(), dir = %dir.display(), "Starting SSTable compaction");
+    do_compact(dir, files_to_merge, gc_tombstones)
+}
+
+/// Full compaction: merge EVERY SSTable in the directory and reclaim tombstones.
+/// Safe because no unmerged file can hold an older version of any key.
+pub fn compact_all(dir: &Path) -> Result<Option<CompactionResult>, StorageError> {
+    let sst_paths = list_sst_files(dir)?;
+    if sst_paths.len() < 2 {
+        return Ok(None);
+    }
+    do_compact(dir, sst_paths, true)
+}
+
+fn list_sst_files(dir: &Path) -> Result<Vec<PathBuf>, StorageError> {
+    let mut paths = Vec::new();
+    for entry in std::fs::read_dir(dir)? {
+        let path = entry?.path();
+        if path.extension().and_then(|s| s.to_str()) == Some("sst") {
+            paths.push(path);
+        }
+    }
+    paths.sort();
+    Ok(paths)
+}
+
+fn do_compact(
+    dir: &Path,
+    files_to_merge: Vec<PathBuf>,
+    gc_tombstones: bool,
+) -> Result<Option<CompactionResult>, StorageError> {
+    info!(
+        files = files_to_merge.len(),
+        dir = %dir.display(),
+        gc_tombstones,
+        "Starting SSTable compaction"
+    );
 
     let mut merged: BTreeMap<Vec<u8>, (Vec<u8>, i64, bool)> = BTreeMap::new();
 
@@ -109,15 +135,20 @@ pub fn compact(
     }
 
     let before_gc = merged.len();
-    merged.retain(|_, (_, _, is_tombstone)| !*is_tombstone);
+    if gc_tombstones {
+        merged.retain(|_, (_, _, is_tombstone)| !*is_tombstone);
+    }
     let total_tombstones = before_gc - merged.len();
 
     let timestamp = chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0);
-    let output_path = dir.join(format!("compacted_{}.sst", timestamp));
+    let output_path = dir.join(format!("compacted_{timestamp}.sst"));
     let mut writer = SSTableWriter::new(&output_path)?;
 
-    for (key, (value, _, _)) in &merged {
-        writer.append(key.clone(), value.clone())?;
+    // Preserve each entry's ORIGINAL logical timestamp: the output must compete
+    // fairly with files outside the merge set (a re-stamped old record could
+    // otherwise shadow a newer tombstone/update and resurrect deleted data).
+    for (key, (value, ts, _)) in &merged {
+        writer.append_with_timestamp(key.clone(), value.clone(), *ts)?;
     }
     writer.flush()?;
 

@@ -1,0 +1,3 @@
+run_id=PH2C-RERANK-002
+commit=recorded in registry
+RECONSTRUCTED from canonical aggregates (results/*.csv + registry) after workspace reset lost per-run files; numbers byte-equal to registry entries.

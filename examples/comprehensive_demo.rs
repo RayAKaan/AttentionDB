@@ -189,10 +189,7 @@ fn main() {
         "║   {:<5} {:>8} {:>12} {:>12} {:>12} ║",
         "Rank", "ID", "Fused", "Semantic", "Temporal"
     );
-    println!(
-        "║   {}  {}  {}  {}  {} ║",
-        "-----", "--------", "------------", "------------", "------------"
-    );
+    println!("║   -----  --------  ------------  ------------  ------------ ║");
     for (rank, (id, score)) in final_results.iter().enumerate() {
         let ss = sem_map.get(id).copied().unwrap_or(0.0);
         let ts = tmp_map.get(id).copied().unwrap_or(0.0);

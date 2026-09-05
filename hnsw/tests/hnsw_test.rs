@@ -105,7 +105,7 @@ fn test_insert_and_search_tracking() {
         let vec: Vec<f32> = (0..8).map(|x| ((i + x) as f32) * 0.1).collect();
         index.insert(i, &vec).unwrap();
     }
-    assert!(index.len() > 0);
+    assert!(!index.is_empty());
     let query = vec![0.1; 8];
     let results = index.search(&query, 5, None).unwrap();
     assert!(!results.is_empty());

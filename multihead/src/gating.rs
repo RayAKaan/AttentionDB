@@ -183,7 +183,8 @@ mod tests {
     #[test]
     fn test_forward_produces_softmax() {
         let gate = GatingNetwork::new(8, 3);
-        let output = gate.forward(&vec![0.1; 8]);
+        let input = [0.1; 8];
+        let output = gate.forward(&input);
         assert_eq!(output.len(), 3);
         assert!((output.iter().sum::<f32>() - 1.0).abs() < 1e-5);
     }

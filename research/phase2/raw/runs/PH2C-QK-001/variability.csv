@@ -1,0 +1,10 @@
+arm,metric,mean,std,min,max
+qk_trained,R@1,1.0000,0.0000,1.0000,1.0000
+qk_trained,NDCG@10,1.0000,0.0000,1.0000,1.0000
+qk_trained,MRR,1.0000,0.0000,1.0000,1.0000
+gating_qualityreg,R@1,0.0027,0.0038,0.0000,0.0080
+gating_qualityreg,NDCG@10,0.3183,0.0055,0.3109,0.3242
+gating_qualityreg,MRR,0.1306,0.0065,0.1221,0.1377
+gating_infnce,R@1,0.1000,0.0000,0.1000,0.1000
+gating_infnce,NDCG@10,0.4528,0.0000,0.4528,0.4528
+gating_infnce,MRR,0.2909,0.0000,0.2909,0.2909

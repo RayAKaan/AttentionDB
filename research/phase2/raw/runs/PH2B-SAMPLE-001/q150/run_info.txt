@@ -1,0 +1,4 @@
+run_id=PH2B-SAMPLE-001/q150
+corpus=multiview-fine-150q
+dataset_hash=0xd559bee8e082e6de (dataset.json lost in reset; hash is the record)
+RECONSTRUCTED from canonical aggregates (results/*.csv + registry) after workspace reset lost per-run files; numbers byte-equal to registry entries.

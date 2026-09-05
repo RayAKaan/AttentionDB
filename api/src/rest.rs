@@ -19,6 +19,12 @@ use metrics_exporter_prometheus::PrometheusHandle;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+/// Parsed document payload: (fields, per-head vectors).
+type ParsedDoc = (
+    std::collections::HashMap<String, serde_json::Value>,
+    std::collections::HashMap<String, Vec<f32>>,
+);
+
 #[derive(Clone)]
 pub struct AppState {
     pub service: Arc<AttentionDBService>,
@@ -41,6 +47,13 @@ pub struct AttendRequest {
     pub bm25_weight: Option<f32>,
     pub vector_weight: Option<f32>,
     pub query_text: Option<String>,
+    /// Optional structured metadata filter (Phase 2 §11):
+    /// `{"field":"category","op":"=","value":"book"}`, `{"and":[...]}`,
+    /// `{"or":[...]}`, `{"not":{...}}`, `{"op":"in|not_in|is_null|is_not_null"}`.
+    pub filter: Option<serde_json::Value>,
+    /// Optional query timeout in milliseconds (§19); enforced at pipeline
+    /// stage boundaries. 1..=60000.
+    pub timeout_ms: Option<u64>,
 }
 
 #[derive(Serialize)]
@@ -115,6 +128,46 @@ pub struct AlterCollectionRestResponse {
     pub message: String,
 }
 
+/// Phase 2 §17 — EXPLAIN: plan a query without executing it.
+#[derive(Deserialize)]
+pub struct ExplainRequest {
+    pub collection: String,
+    pub heads: Option<Vec<String>>,
+    pub top_k: Option<u32>,
+    pub filter: Option<serde_json::Value>,
+    pub query_text: Option<String>,
+}
+
+pub async fn explain_handler(
+    State(state): State<AppState>,
+    Json(payload): Json<ExplainRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    validate_collection_name(&payload.collection)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.message().to_string()))?;
+    let top_k = payload.top_k.unwrap_or(10);
+    let filter = match &payload.filter {
+        Some(f) => Some(
+            attentiondb_query::filter::parse_filter_json(f)
+                .map_err(|e| (StatusCode::BAD_REQUEST, format!("invalid filter: {e}")))?,
+        ),
+        None => None,
+    };
+    let has_text = payload.query_text.is_some();
+    let heads = payload.heads.unwrap_or_default();
+    let text = state
+        .service
+        .engine
+        .explain(
+            &payload.collection,
+            &heads,
+            top_k as usize,
+            filter.as_ref(),
+            has_text,
+        )
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+    Ok(Json(serde_json::json!({ "plan": text })))
+}
+
 pub async fn attend_handler(
     State(state): State<AppState>,
     Json(payload): Json<AttendRequest>,
@@ -156,11 +209,85 @@ pub async fn attend_handler(
     });
 
     let use_hybrid = payload.hybrid.unwrap_or(false);
+    let filter_expr = match &payload.filter {
+        Some(f) => Some(
+            attentiondb_query::filter::parse_filter_json(f)
+                .map_err(|e| (StatusCode::BAD_REQUEST, format!("invalid filter: {e}")))?,
+        ),
+        None => None,
+    };
 
     let offset_usize = offset as usize;
     let fetch_count = offset_usize + top_k as usize;
+    let text = payload.query_text.clone().unwrap_or_default();
     let start = std::time::Instant::now();
-    let raw_results = if use_hybrid {
+    let hybrid_filter = filter_expr.as_ref().filter(|_| use_hybrid);
+    let raw_results = if let Some(f) = hybrid_filter {
+        // §13: filter+text runs BOTH hybrid channels through the filter —
+        // never vector-only (the old precedence bug, fixed).
+        state
+            .service
+            .engine
+            .attend_hybrid_filtered_with_deadline(
+                &payload.collection,
+                &heads,
+                &query_vec,
+                text.as_str(),
+                fetch_count,
+                f,
+                None,
+            )
+            .map_err(|e| {
+                observability::record_query_error("attend");
+                observability::record_error("rest_attend", &e.to_string());
+                (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            })?
+    } else if filter_expr.is_some() {
+        // Filtered path: post-filter + bounded candidate expansion. The filter
+        // is applied AFTER pagination math so fetch covers expansion rounds.
+        state
+            .service
+            .engine
+            .attend_filtered(
+                &payload.collection,
+                &heads,
+                &query_vec,
+                fetch_count,
+                filter_expr.as_ref(),
+            )
+            .map_err(|e| {
+                observability::record_query_error("attend");
+                observability::record_error("rest_attend", &e.to_string());
+                (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+            })?
+    } else if let Some(timeout_ms) = payload.timeout_ms {
+        state
+            .service
+            .engine
+            .attend_with_deadline_ms(
+                &payload.collection,
+                &heads,
+                &query_vec,
+                fetch_count,
+                timeout_ms,
+            )
+            .map_err(|e| {
+                let status = if matches!(e, attentiondb_core::CoreError::Timeout(_))
+                    || matches!(e, attentiondb_core::CoreError::InvalidArgument(_))
+                {
+                    if e.to_string().contains("deadline") {
+                        StatusCode::GATEWAY_TIMEOUT
+                    } else {
+                        StatusCode::BAD_REQUEST
+                    }
+                } else {
+                    StatusCode::INTERNAL_SERVER_ERROR
+                };
+                observability::record_query_error("attend");
+                observability::record_error("rest_attend", &e.to_string());
+                (status, e.to_string())
+            })?
+    } else if use_hybrid {
         let query_text = payload.query_text.as_deref().unwrap_or(&payload.query);
         state
             .service
@@ -173,6 +300,7 @@ pub async fn attend_handler(
                 fetch_count,
             )
             .map_err(|e| {
+                observability::record_query_error("attend");
                 observability::record_error("rest_attend", &e.to_string());
                 (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
             })?
@@ -182,6 +310,7 @@ pub async fn attend_handler(
             .engine
             .attend(&payload.collection, &heads, &query_vec, fetch_count)
             .map_err(|e| {
+                observability::record_query_error("attend");
                 observability::record_error("rest_attend", &e.to_string());
                 (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
             })?
@@ -189,6 +318,7 @@ pub async fn attend_handler(
     let latency = start.elapsed().as_secs_f64() * 1000.0;
 
     let total_count = raw_results.len() as u32;
+    let n_results = total_count as usize;
     let paged: Vec<(u64, f32)> = raw_results
         .into_iter()
         .skip(offset_usize)
@@ -208,6 +338,18 @@ pub async fn attend_handler(
         })
         .collect();
 
+    observability::record_query(
+        &payload.collection,
+        if use_hybrid {
+            "hybrid"
+        } else if filter_expr.is_some() {
+            "filtered"
+        } else {
+            "vector"
+        },
+        n_results,
+        start.elapsed().as_secs_f64(),
+    );
     observability::record_attend(
         &payload.collection,
         &heads,
@@ -290,12 +432,229 @@ pub async fn insert_handler(
     Ok(Json(InsertRestResponse { id, success: true }))
 }
 
+// ==================== Phase 1: update / upsert / delete / admin ====================
+
+#[derive(Deserialize)]
+pub struct UpdateRestRequest {
+    pub collection: String,
+    pub id: String,
+    pub fields: std::collections::HashMap<String, String>,
+}
+
+#[derive(Deserialize)]
+pub struct UpsertRestRequest {
+    pub collection: String,
+    /// optional: generated when absent (insert semantics)
+    pub id: Option<String>,
+    pub fields: std::collections::HashMap<String, String>,
+}
+
+#[derive(Deserialize)]
+pub struct DeleteRestRequest {
+    pub collection: String,
+    pub id: String,
+}
+
+#[derive(Serialize)]
+pub struct MutateRestResponse {
+    pub success: bool,
+    pub id: String,
+    pub message: String,
+}
+
+#[derive(Serialize)]
+pub struct CheckpointRestResponse {
+    pub success: bool,
+    pub checkpoint_seq: u64,
+    pub manifest_generation: u64,
+    pub duration_ms: f64,
+}
+
+#[derive(Serialize)]
+pub struct CheckRestResponse {
+    pub ok: bool,
+    pub errors: usize,
+    pub warnings: usize,
+    pub issues: Vec<attentiondb_core::CheckIssue>,
+}
+
+/// Shared field→(json fields, k_vecs) parsing used by insert/update/upsert.
+fn parse_fields(
+    fields: &std::collections::HashMap<String, String>,
+) -> Result<ParsedDoc, (StatusCode, String)> {
+    let mut json_fields = std::collections::HashMap::new();
+    let mut k_vecs = std::collections::HashMap::new();
+    for (k, v) in fields {
+        if let Ok(vec) = crate::server::parse_float_vector(v) {
+            if !vec.is_empty() {
+                let head_name = if k.ends_with("_vector")
+                    || k.ends_with("_embedding")
+                    || k.ends_with("_head")
+                {
+                    k.split('_').next().unwrap_or("default").to_string()
+                } else {
+                    k.clone()
+                };
+                k_vecs.insert(head_name, vec);
+            }
+        }
+        json_fields.insert(k.clone(), serde_json::Value::String(v.clone()));
+    }
+    if k_vecs.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "No vector embeddings found in fields".to_string(),
+        ));
+    }
+    Ok((json_fields, k_vecs))
+}
+
+fn check_mutation(err: attentiondb_core::CoreError, op: &'static str) -> (StatusCode, String) {
+    observability::record_error(op, &err.to_string());
+    let status = match err.category() {
+        "NotFound" => StatusCode::NOT_FOUND,
+        "AlreadyExists" => StatusCode::CONFLICT,
+        "InvalidArgument" | "InvalidOperation" => StatusCode::BAD_REQUEST,
+        "ResourceExhausted" => StatusCode::INSUFFICIENT_STORAGE,
+        "Unavailable" => StatusCode::SERVICE_UNAVAILABLE,
+        "Conflict" => StatusCode::CONFLICT,
+        _ => StatusCode::INTERNAL_SERVER_ERROR,
+    };
+    // (status already derived from the variant name above; message via Display)
+    (status, err.to_string())
+}
+
+pub async fn update_handler(
+    State(state): State<AppState>,
+    Json(payload): Json<UpdateRestRequest>,
+) -> Result<Json<MutateRestResponse>, (StatusCode, String)> {
+    let _permit = state.semaphore.acquire().await.map_err(|_| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Too many concurrent requests".to_string(),
+        )
+    })?;
+    let _timer = observability::LatencyTimer::new("rest_update");
+    validate_collection_name(&payload.collection)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.message().to_string()))?;
+    let (json_fields, k_vecs) = parse_fields(&payload.fields)?;
+    let id = state
+        .service
+        .engine
+        .update_document(&payload.collection, &payload.id, json_fields, k_vecs)
+        .map_err(|e| check_mutation(e, "rest_update"))?;
+    Ok(Json(MutateRestResponse {
+        success: true,
+        id,
+        message: "updated".to_string(),
+    }))
+}
+
+pub async fn upsert_handler(
+    State(state): State<AppState>,
+    Json(payload): Json<UpsertRestRequest>,
+) -> Result<Json<MutateRestResponse>, (StatusCode, String)> {
+    let _permit = state.semaphore.acquire().await.map_err(|_| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Too many concurrent requests".to_string(),
+        )
+    })?;
+    let _timer = observability::LatencyTimer::new("rest_upsert");
+    validate_collection_name(&payload.collection)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.message().to_string()))?;
+    let (json_fields, k_vecs) = parse_fields(&payload.fields)?;
+    let uuid = match &payload.id {
+        Some(id) => uuid::Uuid::parse_str(id).map_err(|_| {
+            (
+                StatusCode::BAD_REQUEST,
+                format!("invalid document id '{id}'"),
+            )
+        })?,
+        None => uuid::Uuid::new_v4(),
+    };
+    let id = state
+        .service
+        .engine
+        .upsert_document(&payload.collection, uuid, json_fields, k_vecs)
+        .map_err(|e| check_mutation(e, "rest_upsert"))?;
+    Ok(Json(MutateRestResponse {
+        success: true,
+        id,
+        message: "upserted".to_string(),
+    }))
+}
+
+pub async fn delete_doc_handler(
+    State(state): State<AppState>,
+    Json(payload): Json<DeleteRestRequest>,
+) -> Result<Json<MutateRestResponse>, (StatusCode, String)> {
+    let _permit = state.semaphore.acquire().await.map_err(|_| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Too many concurrent requests".to_string(),
+        )
+    })?;
+    let _timer = observability::LatencyTimer::new("rest_delete");
+    validate_collection_name(&payload.collection)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.message().to_string()))?;
+    let deleted = state
+        .service
+        .engine
+        .delete_document(&payload.collection, &payload.id)
+        .map_err(|e| check_mutation(e, "rest_delete"))?;
+    if deleted {
+        Ok(Json(MutateRestResponse {
+            success: true,
+            id: payload.id,
+            message: "deleted".to_string(),
+        }))
+    } else {
+        Err((
+            StatusCode::NOT_FOUND,
+            format!("document '{}' not found", payload.id),
+        ))
+    }
+}
+
+pub async fn checkpoint_handler(
+    State(state): State<AppState>,
+) -> Result<Json<CheckpointRestResponse>, (StatusCode, String)> {
+    let _timer = observability::LatencyTimer::new("rest_checkpoint");
+    let info = state
+        .service
+        .engine
+        .checkpoint()
+        .map_err(|e| check_mutation(e, "rest_checkpoint"))?;
+    Ok(Json(CheckpointRestResponse {
+        success: true,
+        checkpoint_seq: info.checkpoint_seq,
+        manifest_generation: info.manifest_generation,
+        duration_ms: info.duration_ms,
+    }))
+}
+
+pub async fn check_handler(
+    State(state): State<AppState>,
+) -> Result<Json<CheckRestResponse>, (StatusCode, String)> {
+    let issues = attentiondb_core::checker::check_engine(&state.service.engine);
+    let errors = issues.iter().filter(|i| i.severity.is_error()).count();
+    let warnings = issues.len() - errors;
+    Ok(Json(CheckRestResponse {
+        ok: errors == 0,
+        errors,
+        warnings,
+        issues,
+    }))
+}
+
 pub async fn liveness_handler() -> (StatusCode, &'static str) {
     (StatusCode::OK, "alive")
 }
 
 pub async fn readiness_handler(State(state): State<AppState>) -> (StatusCode, String) {
-    let is_healthy = state.service.engine.is_persistent();
+    // INV-11: READY only after recovery completed; never expose a half-open DB.
+    let is_healthy = state.service.engine.is_ready();
     if is_healthy {
         let stats = state.service.engine.stats();
         (
@@ -495,7 +854,16 @@ pub fn create_rest_router_with_service(
 
     Router::new()
         .route("/v1/attend", post(attend_handler))
+        .route("/v1/explain", post(explain_handler))
         .route("/v1/insert", post(insert_handler))
+        .route("/v1/update", post(update_handler))
+        .route("/v1/upsert", post(upsert_handler))
+        .route("/v1/delete", post(delete_doc_handler))
+        .route(
+            "/v1/admin/checkpoint",
+            post(crate::admin::checkpoint_admin_handler),
+        )
+        .route("/v1/admin/check", get(crate::admin::check_admin_handler))
         .route("/v1/collections", post(create_collection_handler))
         .route(
             "/v1/collections/{collection}",

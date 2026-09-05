@@ -1,0 +1,3 @@
+run_id=PH2B-LATENCY-001
+commit=recorded in registry
+RECONSTRUCTED from canonical aggregates (results/*.csv + registry) after workspace reset lost per-run files; numbers byte-equal to registry entries.

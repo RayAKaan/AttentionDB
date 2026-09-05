@@ -1,0 +1,4 @@
+component,heads,input_dim,value,unit
+model_inference,4,32,0.87,us_per_query
+model_params,4,1188,count
+model_serialized_bytes,4,20288,bytes

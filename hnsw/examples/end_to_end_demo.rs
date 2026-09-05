@@ -63,8 +63,8 @@ fn main() {
 
         // Base embedding: topic-grounded vector
         let mut base = vec![0.0f32; dim];
-        for x in 0..dim {
-            base[x] = ((phase + x as f32 * 0.05) * (topic_idx + 1) as f32).sin()
+        for (x, b) in base.iter_mut().enumerate() {
+            *b = ((phase + x as f32 * 0.05) * (topic_idx + 1) as f32).sin()
                 + ((phase + x as f32 * 0.03) * (topic_idx + 1) as f32 * 0.5).cos() * 0.5;
             rng = rng
                 .wrapping_mul(6364136223846793005)
@@ -98,8 +98,8 @@ fn main() {
 
     let q_phase = 0.0f32;
     let mut q = vec![0.0f32; dim];
-    for x in 0..dim {
-        q[x] = ((q_phase + x as f32 * 0.05) * 1.0).sin()
+    for (x, v) in q.iter_mut().enumerate() {
+        *v = ((q_phase + x as f32 * 0.05) * 1.0).sin()
             + ((q_phase + x as f32 * 0.03) * 1.0 * 0.5).cos() * 0.5;
     }
     let q = normalize(&q);

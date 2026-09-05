@@ -1,5 +1,6 @@
 pub mod error;
 pub mod executor;
+pub mod filter;
 pub mod parser;
 pub mod planner;
 

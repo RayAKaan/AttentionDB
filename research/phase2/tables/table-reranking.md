@@ -1,0 +1,19 @@
+# Table: exact-vs-normalized fusion weighting study (offline, cached test candidates)
+
+Caption draft: *Exact-score fusion under uniform / best-head / oracle head weighting vs normalized uniform fusion, R@10 on held-out test queries. Oracle-weighted exact fusion attains the oracle bound on all corpora: head weighting, not score exactness, explains the Phase 2 mode-E regression.* [PH2C-RERANK-001/002/003]
+
+
+| corpus | method | R@10 | NDCG@10 | MRR |
+|---|---|---|---|---|
+| controlled | norm_fusion_uniform | 0.6244 | 0.6881 | 0.9352 |
+| controlled | exact_fusion_uniform | 0.6511 | 0.7129 | 0.9481 |
+| controlled | exact_fusion_best_head | 0.5356 | 0.5664 | 0.7896 |
+| controlled | exact_fusion_oracle_head | 0.9533 | 0.9700 | 1.0000 |
+| noise | norm_fusion_uniform | 0.7378 | 0.8028 | 0.9889 |
+| noise | exact_fusion_uniform | 0.7133 | 0.7843 | 1.0000 |
+| noise | exact_fusion_best_head | 0.8378 | 0.8845 | 1.0000 |
+| noise | exact_fusion_oracle_head | 0.8400 | 0.8858 | 1.0000 |
+| multiview | norm_fusion_uniform | 0.2128 | 0.2803 | 0.6435 |
+| multiview | exact_fusion_uniform | 0.2406 | 0.3445 | 0.8303 |
+| multiview | exact_fusion_best_head | 0.3428 | 0.3521 | 0.4706 |
+| multiview | exact_fusion_oracle_head | 0.9933 | 0.9957 | 1.0000 |

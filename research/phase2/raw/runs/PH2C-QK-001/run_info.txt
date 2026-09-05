@@ -1,0 +1,10 @@
+run_id=PH2C-QK-001
+experiment=QK-attention sanity dataset (Phase 2C §6)
+date=2026-09-04
+git_commit=c037b639e78720630fee1d3a4e466cc0b61a70b7 (benchmarks/phase2b/src/qk_sanity.rs, subcommand qk-sanity)
+command=target/release/phase2b-bench qk-sanity --out research/phase2/raw/runs/PH2C-QK-001 --seeds 42,7,1
+seeds=42,7,1 (dataset seed 0x5A17 fixed)
+dataset=qk-sanity anti-cosine paired-family (synthetic; generated deterministically in-code)
+reproduction=byte-identical eval/variability/val_grid/gating_weights verified via rerun after clippy-only code fix
+notes=qk_untrained cross-checked against independent Python RNG replication (chance-level) before recording; see HC-5
+naming=config.json+results.csv (Phase 2C §2 contract); config.txt is the human-readable dump of the same keys

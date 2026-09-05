@@ -8,6 +8,8 @@ members = [
     "learned",
     "distributed",
     "core",
+    "benchmarks/phase2",
+    "benchmarks/phase2b",
 ]
 
 resolver = "2"

@@ -39,23 +39,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tls_mode = tls::resolve_tls().await;
     let grpc_tls_config = tls::resolve_grpc_tls().await;
 
-    // ── Initialize Engine ────────────────────────────────────────────────
-    let wal_dir = std::env::var("ATTENTIONDB_DATA_DIR").unwrap_or_else(|_| "/data".into());
-    let wal_path = format!("{}/engine.wal", wal_dir);
+    // ── Initialize Engine (durable recovery; NO in-memory fallback — INV-11) ──
+    let db_dir = std::path::PathBuf::from(
+        std::env::var("ATTENTIONDB_DATA_DIR").unwrap_or_else(|_| "/data".into()),
+    );
+    let durability = match std::env::var("ATTENTIONDB_DURABILITY")
+        .unwrap_or_else(|_| "group_commit".into())
+        .to_lowercase()
+        .as_str()
+    {
+        "sync" => attentiondb_storage::Durability::Sync,
+        "async" => attentiondb_storage::Durability::Async,
+        _ => attentiondb_storage::Durability::GroupCommit,
+    };
+    info!(data_dir = %db_dir.display(), durability = ?durability, "Opening database (recovery runs before the server accepts traffic)");
 
-    let engine = match attentiondb_core::AttentionEngine::open(
-        &wal_path,
-        attentiondb_storage::Durability::GroupCommit,
-    ) {
-        Ok(e) => {
-            info!(wal_path = %wal_path, "Engine opened with persistent WAL");
-            Arc::new(e)
-        }
+    let engine = match attentiondb_core::AttentionEngine::open_dir(&db_dir, durability) {
+        Ok(e) => Arc::new(e),
         Err(e) => {
-            info!(error = %e, "WAL open failed, starting with in-memory engine");
-            Arc::new(attentiondb_core::AttentionEngine::new())
+            // A database that fails to recover must NEVER come up empty and
+            // start serving — that is silent data loss. Fail loudly instead.
+            error!(
+                error = %e,
+                data_dir = %db_dir.display(),
+                "RECOVERY FAILED — refusing to start (no in-memory fallback).                  Fix the data directory or point ATTENTIONDB_DATA_DIR elsewhere."
+            );
+            eprintln!("attentiondb: recovery failed: {e}");
+            std::process::exit(1);
         }
     };
+    info!(
+        collections = engine.stats().collection_count,
+        documents = engine.stats().total_vectors,
+        state = ?engine.state(),
+        "Recovery complete — database READY"
+    );
 
     // ── Shared Shutdown Notify ───────────────────────────────────────────
     let shutdown = Arc::new(tokio::sync::Notify::new());
@@ -155,13 +173,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ),
     }
 
-    // ── Flush WAL ──────────────────────────────────────────────────────────
-    info!("Flushing WAL before exit");
-    if let Err(e) = engine_for_wal.flush_wal() {
-        warn!(error = %e, "WAL flush failed");
+    // ── Graceful durability: checkpoint + close (§22) ─────────────────────
+    info!("Checkpointing before exit");
+    if let Err(e) = engine_for_wal.close() {
+        // Never report a clean shutdown if durability failed.
+        error!(error = %e, "CHECKPOINT FAILED DURING SHUTDOWN — the database will recover from the WAL on next start, but this shutdown was NOT clean");
+        std::process::exit(2);
     }
 
-    info!("Server shutdown complete");
+    info!("Server shutdown complete (clean)");
     Ok(())
 }
 

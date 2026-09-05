@@ -1,0 +1,13 @@
+[package]
+name = "phase2b-bench"
+version = "0.1.0"
+edition = "2021"
+description = "Phase 2B: learned gating benchmarks — controlled, noise-collapse, multi-view (§8-10, §23-29, §34-37)"
+publish = false
+
+[dependencies]
+attentiondb-core = { path = "../../core" }
+attentiondb-storage = { path = "../../storage" }
+attentiondb-learned = { path = "../../learned" }
+serde_json = "1"
+

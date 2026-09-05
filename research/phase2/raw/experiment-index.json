@@ -1,0 +1,989 @@
+{
+ "format": "attentiondb-experiment-index",
+ "version": 1,
+ "updated": "2026-09-04",
+ "experiments": [
+  {
+   "experiment_id": "PH2-ABLATION-001",
+   "date": "2026-09-03",
+   "git_commit": "43b48db (pre-reset; tree preserved)",
+   "corpus": "phase2-noise-ladder-8heads",
+   "dataset_hash": "see dataset.json in current benchmark dirs; historical runs predate hash-discipline for some",
+   "seed": "0xC0FFEE",
+   "train_size": null,
+   "validation_size": null,
+   "test_size": null,
+   "model": "n/a",
+   "objective": "grid-selected on validation",
+   "hyperparameters": "hidden 32/64, lr 0.01/0.003, batch 32/16, Adam, L2 1e-4, patience 15",
+   "candidate_configuration": "per-head POOL=100 (SingleHead mode)",
+   "hnsw_configuration": "ef_search 64 / efc 400 / M 16 / cosine",
+   "normalization": "per-head MinMax",
+   "top_k": 10,
+   "metrics": null,
+   "output_files": [
+    "benchmarks/phase2/"
+   ],
+   "hardware": "sandbox CI-class VM, cpu-count=2",
+   "runtime": null,
+   "status": "COMPLETED (accepted baseline, frozen)",
+   "notes": "Accepted Phase 2 ablation A-E + head scaling. Results in results/ablation.csv; DO NOT ALTER."
+  },
+  {
+   "experiment_id": "PH2B-GATING-001",
+   "date": "2026-09-03",
+   "git_commit": "c2c6242-era",
+   "corpus": "controlled-4x12-300q",
+   "dataset_hash": "see dataset.json in current benchmark dirs; historical runs predate hash-discipline for some",
+   "seed": "0xC0B",
+   "train_size": null,
+   "validation_size": null,
+   "test_size": null,
+   "model": "GatingMlp input->ReLU(hidden)->softmax(heads)",
+   "objective": "grid-selected on validation",
+   "hyperparameters": "hidden 32/64, lr 0.01/0.003, batch 32/16, Adam, L2 1e-4, patience 15",
+   "candidate_configuration": "per-head POOL=100 (SingleHead mode)",
+   "hnsw_configuration": "ef_search 64 / efc 400 / M 16 / cosine",
+   "normalization": "per-head MinMax",
+   "top_k": 10,
+   "metrics": {
+    "uniform_R10": 0.5178,
+    "gated_R10": 0.5333,
+    "oracle_R10": 0.6933
+   },
+   "output_files": [],
+   "hardware": "sandbox CI-class VM, cpu-count=2",
+   "runtime": null,
+   "status": "INVALIDATED (harness bug: GT in hint-ids)",
+   "notes": "GT expressed in corpus hint-ids while candidates carry ENGINE ids (IdMapper starts at 1) -> recall mis-scored. Superseded by PH2B-GATING-003+. See findings/harness-corrections.md."
+  },
+  {
+   "experiment_id": "PH2B-GATING-002",
+   "date": "2026-09-03",
+   "git_commit": "c2c6242-era",
+   "corpus": "controlled-4x12-300q",
+   "dataset_hash": "see dataset.json in current benchmark dirs; historical runs predate hash-discipline for some",
+   "seed": "0xC0B",
+   "train_size": null,
+   "validation_size": null,
+   "test_size": null,
+   "model": "GatingMlp input->ReLU(hidden)->softmax(heads)",
+   "objective": "grid-selected on validation",
+   "hyperparameters": "hidden 32/64, lr 0.01/0.003, batch 32/16, Adam, L2 1e-4, patience 15",
+   "candidate_configuration": "per-head POOL=100 (SingleHead mode)",
+   "hnsw_configuration": "ef_search 64 / efc 400 / M 16 / cosine",
+   "normalization": "per-head MinMax",
+   "top_k": 10,
+   "metrics": {
+    "uniform_R10": 0.5178,
+    "gated_calibrated_R10": 0.6378,
+    "oracle_R10": 0.6933
+   },
+   "output_files": [],
+   "hardware": "sandbox CI-class VM, cpu-count=2",
+   "runtime": null,
+   "status": "INVALIDATED (same GT bug; first calibration attempt)",
+   "notes": "Calibration mechanism worked (val-fitted T=0.25 doubled the gap recovery) but GT was still shifted."
+  },
+  {
+   "experiment_id": "PH2B-GATING-003",
+   "date": "2026-09-03",
+   "git_commit": "8ce4f66-era",
+   "corpus": "controlled-4x12-300q",
+   "dataset_hash": "recorded in run_info.txt",
+   "seed": "0xC0B",
+   "train_size": null,
+   "validation_size": null,
+   "test_size": null,
+   "model": "GatingMlp input->ReLU(hidden)->softmax(heads)",
+   "objective": "grid-selected on validation",
+   "hyperparameters": "hidden 32/64, lr 0.01/0.003, batch 32/16, Adam, L2 1e-4, patience 15",
+   "candidate_configuration": "per-head POOL=100 (SingleHead mode)",
+   "hnsw_configuration": "ef_search 64 / efc 400 / M 16 / cosine",
+   "normalization": "per-head MinMax",
+   "top_k": 10,
+   "metrics": {
+    "uniform_R10": 0.6178,
+    "gated_R10": 0.8822,
+    "rrf_R10": 0.6667,
+    "oracle_R10": 0.9489,
+    "corr": 0.922
+   },
+   "output_files": [],
+   "hardware": "sandbox CI-class VM, cpu-count=2",
+   "runtime": null,
+   "status": "COMPLETED (superseded by grid protocol)",
+   "notes": "First valid run after engine-id GT fix."
+  },
+  {
+   "experiment_id": "PH2B-GATING-004",
+   "date": "2026-09-03",
+   "git_commit": "8ce4f66",
+   "corpus": "controlled-4x12-300q",
+   "dataset_hash": "recorded in run_info.txt",
+   "seed": "0xC0B",
+   "train_size": null,
+   "validation_size": null,
+   "test_size": null,
+   "model": "GatingMlp input->ReLU(hidden)->softmax(heads)",
+   "objective": "grid-selected on validation",
+   "hyperparameters": "hidden 32/64, lr 0.01/0.003, batch 32/16, Adam, L2 1e-4, patience 15",
+   "candidate_configuration": "per-head POOL=100 (SingleHead mode)",
+   "hnsw_configuration": "ef_search 64 / efc 400 / M 16 / cosine",
+   "normalization": "per-head MinMax",
+   "top_k": 10,
+   "metrics": {
+    "uniform_R10": 0.6244,
+    "gated_R10": 0.9533,
+    "rrf_R10": 0.6689,
+    "oracle_R10": 0.9533,
+    "gated_NDCG": 0.97,
+    "entropy": 0.003,
+    "corr": 0.903
+   },
+   "output_files": [],
+   "hardware": "sandbox CI-class VM, cpu-count=2",
+   "runtime": null,
+   "status": "COMPLETED (CURRENT controlled gating result)",
+   "notes": "Grid + val temperature calibration. Gating == oracle on test."
+  },
+  {
+   "experiment_id": "PH2B-NOISE-001",
+   "date": "2026-09-03",
+   "git_commit": "8ce4f66-era",
+   "corpus": "noise-8heads-10kdocs-300q",
+   "dataset_hash": "see dataset.json in current benchmark dirs; historical runs predate hash-discipline for some",
+   "seed": "0xC0FFEE",
+   "train_size": null,
+   "validation_size": null,
+   "test_size": null,
+   "model": "GatingMlp input->ReLU(hidden)->softmax(heads)",
+   "objective": "grid-selected on validation",
+   "hyperparameters": "hidden 32/64, lr 0.01/0.003, batch 32/16, Adam, L2 1e-4, patience 15",
+   "candidate_configuration": "per-head POOL=100 (SingleHead mode)",
+   "hnsw_configuration": "ef_search 64 / efc 400 / M 16 / cosine",
+   "normalization": "per-head MinMax",
+   "top_k": 10,
+   "metrics": {
+    "note": "all approaches R@10=0.000; overlap of GT set and candidate pool was 2329/3000 GT ids but off-by-one alignment destroyed ranking"
+   },
+   "output_files": [],
+   "hardware": "sandbox CI-class VM, cpu-count=2",
+   "runtime": null,
+   "status": "INVALIDATED (GT bug; produced all-zero recalls incl. oracle \u2014 diagnostic artifact)",
+   "notes": "Preserved as the failure that exposed the GT bug."
+  },
+  {
+   "experiment_id": "PH2B-NOISE-002",
+   "date": "2026-09-03",
+   "git_commit": "8ce4f66-era",
+   "corpus": "noise-8heads-10kdocs-300q",
+   "dataset_hash": "recorded in run_info.txt",
+   "seed": "0xC0FFEE",
+   "train_size": null,
+   "validation_size": null,
+   "test_size": null,
+   "model": "GatingMlp input->ReLU(hidden)->softmax(heads)",
+   "objective": "grid-selected on validation",
+   "hyperparameters": "hidden 32/64, lr 0.01/0.003, batch 32/16, Adam, L2 1e-4, patience 15",
+   "candidate_configuration": "per-head POOL=100 (SingleHead mode)",
+   "hnsw_configuration": "ef_search 64 / efc 400 / M 16 / cosine",
+   "normalization": "per-head MinMax",
+   "top_k": 10,
+   "metrics": {
+    "uniform_R10": 0.7333,
+    "gated_R10": 0.8044,
+    "gbest_R10": 0.8378,
+    "oracle_R10": 0.8422,
+    "sel_freq_head0": 0.978,
+    "avg_w_head0": 0.324
+   },
+   "output_files": [],
+   "hardware": "sandbox CI-class VM, cpu-count=2",
+   "runtime": null,
+   "status": "COMPLETED (superseded by grid protocol)",
+   "notes": "Collapse toward head 0 = correct behavior on a globally-dominant corpus."
+  },
+  {
+   "experiment_id": "PH2B-NOISE-003",
+   "date": "2026-09-03",
+   "git_commit": "8ce4f66",
+   "corpus": "noise-8heads-10kdocs-300q",
+   "dataset_hash": "recorded in run_info.txt",
+   "seed": "0xC0FFEE",
+   "train_size": null,
+   "validation_size": null,
+   "test_size": null,
+   "model": "GatingMlp input->ReLU(hidden)->softmax(heads)",
+   "objective": "grid-selected on validation",
+   "hyperparameters": "hidden 32/64, lr 0.01/0.003, batch 32/16, Adam, L2 1e-4, patience 15",
+   "candidate_configuration": "per-head POOL=100 (SingleHead mode)",
+   "hnsw_configuration": "ef_search 64 / efc 400 / M 16 / cosine",
+   "normalization": "per-head MinMax",
+   "top_k": 10,
+   "metrics": {
+    "uniform_R10": 0.7378,
+    "gated_R10": 0.8489,
+    "gbest_R10": 0.8378,
+    "rrf_R10": 0.78,
+    "oracle_R10": 0.84,
+    "gated_NDCG": 0.8942,
+    "avg_w_head0": 0.894,
+    "sel_freq_head0": 1.0
+   },
+   "output_files": [],
+   "hardware": "sandbox CI-class VM, cpu-count=2",
+   "runtime": null,
+   "status": "COMPLETED (CURRENT noise result)",
+   "notes": "Trained model = pick head 0; equals-or-exceeds global best; oracle offers nothing extra (0.840)."
+  },
+  {
+   "experiment_id": "PH2B-MULTIVIEW-001",
+   "date": "2026-09-03",
+   "git_commit": "c2c6242-era",
+   "corpus": "multiview-3000docs-300q-TIE-LOTTERY-GT",
+   "dataset_hash": "see dataset.json in current benchmark dirs; historical runs predate hash-discipline for some",
+   "seed": "0x1D3A",
+   "train_size": null,
+   "validation_size": null,
+   "test_size": null,
+   "model": "GatingMlp input->ReLU(hidden)->softmax(heads)",
+   "objective": "grid-selected on validation",
+   "hyperparameters": "hidden 32/64, lr 0.01/0.003, batch 32/16, Adam, L2 1e-4, patience 15",
+   "candidate_configuration": "per-head POOL=100 (SingleHead mode)",
+   "hnsw_configuration": "ef_search 64 / efc 400 / M 16 / cosine",
+   "normalization": "per-head MinMax",
+   "top_k": 10,
+   "metrics": {
+    "uniform_R10": 0.1156,
+    "gated_R10": 0.1156,
+    "corr": 0.356,
+    "oracle_R10": 0.26
+   },
+   "output_files": [],
+   "hardware": "sandbox CI-class VM, cpu-count=2",
+   "runtime": null,
+   "status": "INVALID DESIGN (GT tie lottery: 75 same-topic docs tie exactly; top-10 arbitrary)",
+   "notes": "Design flaw #2 precursor: GT not well-defined. See findings/harness-corrections.md."
+  },
+  {
+   "experiment_id": "PH2B-MULTIVIEW-002",
+   "date": "2026-09-03",
+   "git_commit": "8ce4f66-era",
+   "corpus": "multiview-fine-300q-FULL-FIDELITY-ALL-VIEWS",
+   "dataset_hash": "see dataset.json in current benchmark dirs; historical runs predate hash-discipline for some",
+   "seed": "0x1D3A",
+   "train_size": null,
+   "validation_size": null,
+   "test_size": null,
+   "model": "GatingMlp input->ReLU(hidden)->softmax(heads)",
+   "objective": "grid-selected on validation",
+   "hyperparameters": "hidden 32/64, lr 0.01/0.003, batch 32/16, Adam, L2 1e-4, patience 15",
+   "candidate_configuration": "per-head POOL=100 (SingleHead mode)",
+   "hnsw_configuration": "ef_search 64 / efc 400 / M 16 / cosine",
+   "normalization": "per-head MinMax",
+   "top_k": 10,
+   "metrics": {
+    "uniform_R10": 0.2778,
+    "gated_R10": 0.2778,
+    "corr": -0.34,
+    "oracle_R10": 0.9867
+   },
+   "output_files": [],
+   "hardware": "sandbox CI-class VM, cpu-count=2",
+   "runtime": null,
+   "status": "INVALID DESIGN (query carries fine structure in EVERY view -> best view statistically undetectable)",
+   "notes": "Metrics correctly refused to learn: negative corr with uniform weights. Harness flaw #2."
+  },
+  {
+   "experiment_id": "PH2B-MULTIVIEW-003",
+   "date": "2026-09-03",
+   "git_commit": "8ce4f66-era",
+   "corpus": "multiview-fine-300q-ONE-MODALITY",
+   "dataset_hash": "recorded in run_info.txt",
+   "seed": "0x1D3A",
+   "train_size": null,
+   "validation_size": null,
+   "test_size": null,
+   "model": "GatingMlp input->ReLU(hidden)->softmax(heads)",
+   "objective": "grid-selected on validation",
+   "hyperparameters": "hidden 32/64, lr 0.01/0.003, batch 32/16, Adam, L2 1e-4, patience 15",
+   "candidate_configuration": "per-head POOL=100 (SingleHead mode)",
+   "hnsw_configuration": "ef_search 64 / efc 400 / M 16 / cosine",
+   "normalization": "per-head MinMax",
+   "top_k": 10,
+   "metrics": {
+    "uniform_R10": 0.2022,
+    "gated_R10": 0.2022,
+    "gbest_R10": 0.2978,
+    "corr": -0.343,
+    "oracle_R10": 0.9889
+   },
+   "output_files": [],
+   "hardware": "sandbox CI-class VM, cpu-count=2",
+   "runtime": null,
+   "status": "COMPLETED (valid; NEGATIVE result: gating learned nothing at 210 train queries)",
+   "notes": "Negative result preserved per spec \u00a723."
+  },
+  {
+   "experiment_id": "PH2B-MULTIVIEW-004",
+   "date": "2026-09-03",
+   "git_commit": "8ce4f66",
+   "corpus": "multiview-fine-300q-ONE-MODALITY-GRID",
+   "dataset_hash": "recorded in run_info.txt",
+   "seed": "0x1D3A",
+   "train_size": null,
+   "validation_size": null,
+   "test_size": null,
+   "model": "GatingMlp input->ReLU(hidden)->softmax(heads)",
+   "objective": "grid-selected on validation",
+   "hyperparameters": "hidden 32/64, lr 0.01/0.003, batch 32/16, Adam, L2 1e-4, patience 15",
+   "candidate_configuration": "per-head POOL=100 (SingleHead mode)",
+   "hnsw_configuration": "ef_search 64 / efc 400 / M 16 / cosine",
+   "normalization": "per-head MinMax",
+   "top_k": 10,
+   "metrics": {
+    "uniform_R10": 0.1978,
+    "gated_R10": 0.2356,
+    "gbest_R10": 0.3022,
+    "rrf_R10": 0.2467,
+    "corr": -0.18,
+    "oracle_R10": 0.9911
+   },
+   "output_files": [],
+   "hardware": "sandbox CI-class VM, cpu-count=2",
+   "runtime": null,
+   "status": "COMPLETED (valid; marginal: grid moved val R@10 <2pp)",
+   "notes": "Led to the data-quantity hypothesis (\u00a731 investigation, not more layers)."
+  },
+  {
+   "experiment_id": "PH2B-MULTIVIEW-005",
+   "date": "2026-09-03",
+   "git_commit": "8ce4f66",
+   "corpus": "multiview-fine-1200q-ONE-MODALITY-GRID",
+   "dataset_hash": "recorded in run_info.txt",
+   "seed": "0x1D3A",
+   "train_size": null,
+   "validation_size": null,
+   "test_size": null,
+   "model": "GatingMlp input->ReLU(hidden)->softmax(heads)",
+   "objective": "grid-selected on validation",
+   "hyperparameters": "hidden 32/64, lr 0.01/0.003, batch 32/16, Adam, L2 1e-4, patience 15",
+   "candidate_configuration": "per-head POOL=100 (SingleHead mode)",
+   "hnsw_configuration": "ef_search 64 / efc 400 / M 16 / cosine",
+   "normalization": "per-head MinMax",
+   "top_k": 10,
+   "metrics": {
+    "uniform_R10": 0.2128,
+    "gated_R10": 0.5322,
+    "gbest_R10": 0.3428,
+    "rrf_R10": 0.2622,
+    "gated_NDCG": 0.5742,
+    "corr": 0.269,
+    "oracle_R10": 0.9933
+   },
+   "output_files": [],
+   "hardware": "sandbox CI-class VM, cpu-count=2",
+   "runtime": null,
+   "status": "COMPLETED (CURRENT multiview result)",
+   "notes": "x4 training data unlocked learning: +32pp. 41% of uniform->oracle gap."
+  },
+  {
+   "experiment_id": "PH2B-MULTISEED-001",
+   "date": "2026-09-04",
+   "git_commit": "c9066ca",
+   "corpus": "controlled-4x12-300q",
+   "dataset_hash": "0x5c6b59d0cfd18cba",
+   "seed": "training seeds 42,7,1 (split fixed 42)",
+   "train_size": 210,
+   "validation_size": 45,
+   "test_size": 45,
+   "model": "GatingMlp input->ReLU(hidden)->softmax(heads)",
+   "objective": "grid-selected on validation",
+   "hyperparameters": "hidden 32/64, lr 0.01/0.003, batch 32/16, Adam, L2 1e-4, patience 15",
+   "candidate_configuration": "per-head POOL=100 (SingleHead mode)",
+   "hnsw_configuration": "ef_search 64 / efc 400 / M 16 / cosine",
+   "normalization": "per-head MinMax",
+   "top_k": 10,
+   "metrics": {
+    "uniform_multihead": {
+     "R@10": "0.6244",
+     "NDCG@10": "0.6892",
+     "MRR": "0.9463"
+    },
+    "global_best_single_head": {
+     "R@10": "0.5378",
+     "NDCG@10": "0.5678",
+     "MRR": "0.7896"
+    },
+    "trained_gating": {
+     "R@10": "0.9556",
+     "NDCG@10": "0.9714",
+     "MRR": "1.0000"
+    },
+    "rrf_k60": {
+     "R@10": "0.6644",
+     "NDCG@10": "0.7256",
+     "MRR": "0.9667"
+    },
+    "oracle_per_query_head": {
+     "R@10": "0.9556",
+     "NDCG@10": "0.9714",
+     "MRR": "1.0000"
+    }
+   },
+   "output_files": [
+    "by_group.csv",
+    "dataset.json",
+    "diagnostics.json",
+    "diversity.csv",
+    "eval_test.csv",
+    "models",
+    "multiseed.csv",
+    "multiseed_summary_controlled.csv",
+    "overfit_chain.csv",
+    "run_info.txt",
+    "training",
+    "utility.csv"
+   ],
+   "hardware": "sandbox CI-class VM, cpu-count=2",
+   "runtime": null,
+   "status": "COMPLETED",
+   "multiseed_summary": {
+    "R10_mean": 0.9556,
+    "R10_std": 0.0,
+    "note": "identical across seeds: controlled task converges to oracle from any init"
+   }
+  },
+  {
+   "experiment_id": "PH2B-MULTISEED-002",
+   "date": "2026-09-04",
+   "git_commit": "c9066ca",
+   "corpus": "multiview-fine-1200q",
+   "dataset_hash": "0xca36575c98044aa7",
+   "seed": "training seeds 42,7,1 (split fixed 42)",
+   "train_size": 840,
+   "validation_size": 180,
+   "test_size": 180,
+   "model": "GatingMlp input->ReLU(hidden)->softmax(heads)",
+   "objective": "grid-selected on validation",
+   "hyperparameters": "hidden 32/64, lr 0.01/0.003, batch 32/16, Adam, L2 1e-4, patience 15",
+   "candidate_configuration": "per-head POOL=100 (SingleHead mode)",
+   "hnsw_configuration": "ef_search 64 / efc 400 / M 16 / cosine",
+   "normalization": "per-head MinMax",
+   "top_k": 10,
+   "metrics": {
+    "uniform_multihead": {
+     "R@10": "0.2106",
+     "NDCG@10": "0.2767",
+     "MRR": "0.6345"
+    },
+    "global_best_single_head": {
+     "R@10": "0.3422",
+     "NDCG@10": "0.3518",
+     "MRR": "0.4706"
+    },
+    "trained_gating": {
+     "R@10": "0.4933",
+     "NDCG@10": "0.5290",
+     "MRR": "0.7258"
+    },
+    "rrf_k60": {
+     "R@10": "0.2589",
+     "NDCG@10": "0.3067",
+     "MRR": "0.6691"
+    },
+    "oracle_per_query_head": {
+     "R@10": "0.9933",
+     "NDCG@10": "0.9958",
+     "MRR": "1.0000"
+    }
+   },
+   "output_files": [
+    "by_group.csv",
+    "dataset.json",
+    "diagnostics.json",
+    "diversity.csv",
+    "eval_test.csv",
+    "models",
+    "multiseed.csv",
+    "multiseed_summary_multiview.csv",
+    "overfit_chain.csv",
+    "run_info.txt",
+    "training",
+    "utility.csv"
+   ],
+   "hardware": "sandbox CI-class VM, cpu-count=2",
+   "runtime": null,
+   "status": "COMPLETED",
+   "multiseed_summary": {
+    "R10_mean": 0.4365,
+    "R10_std": 0.0361,
+    "per_seed": {
+     "42": 0.4333,
+     "7": 0.3939,
+     "1": 0.4822
+    },
+    "note": "material seed sensitivity; single-run 0.5322 (PH2B-MULTIVIEW-005) is near the upper end"
+   }
+  },
+  {
+   "experiment_id": "PH2B-SAMPLE-001/q150",
+   "date": "2026-09-04",
+   "git_commit": "c9066ca",
+   "corpus": "multiview-fine-150q",
+   "dataset_hash": "0xd559bee8e082e6de",
+   "seed": 42,
+   "train_size": 105,
+   "validation_size": 22,
+   "test_size": 23,
+   "model": "GatingMlp input->ReLU(hidden)->softmax(heads)",
+   "objective": "grid-selected on validation",
+   "hyperparameters": "hidden 32/64, lr 0.01/0.003, batch 32/16, Adam, L2 1e-4, patience 15",
+   "candidate_configuration": "per-head POOL=100 (SingleHead mode)",
+   "hnsw_configuration": "ef_search 64 / efc 400 / M 16 / cosine",
+   "normalization": "per-head MinMax",
+   "top_k": 10,
+   "metrics": {
+    "uniform_multihead": {
+     "R@10": "0.2391",
+     "NDCG@10": "0.3067",
+     "MRR": "0.6729"
+    },
+    "global_best_single_head": {
+     "R@10": "0.3087",
+     "NDCG@10": "0.3061",
+     "MRR": "0.3856"
+    },
+    "trained_gating": {
+     "R@10": "0.2565",
+     "NDCG@10": "0.3134",
+     "MRR": "0.7211"
+    },
+    "rrf_k60": {
+     "R@10": "0.3043",
+     "NDCG@10": "0.3543",
+     "MRR": "0.7222"
+    },
+    "oracle_per_query_head": {
+     "R@10": "0.9957",
+     "NDCG@10": "0.9972",
+     "MRR": "1.0000"
+    }
+   },
+   "output_files": [
+    "by_group.csv",
+    "dataset.json",
+    "diagnostics.json",
+    "diversity.csv",
+    "eval_test.csv",
+    "models",
+    "overfit_chain.csv",
+    "run_info.txt",
+    "training",
+    "utility.csv"
+   ],
+   "hardware": "sandbox CI-class VM, cpu-count=2",
+   "runtime": null,
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH2B-SAMPLE-001/q300",
+   "date": "2026-09-04",
+   "git_commit": "c9066ca",
+   "corpus": "multiview-fine-300q",
+   "dataset_hash": "0x40b63afb5fdbcb88",
+   "seed": 42,
+   "train_size": 210,
+   "validation_size": 45,
+   "test_size": 45,
+   "model": "GatingMlp input->ReLU(hidden)->softmax(heads)",
+   "objective": "grid-selected on validation",
+   "hyperparameters": "hidden 32/64, lr 0.01/0.003, batch 32/16, Adam, L2 1e-4, patience 15",
+   "candidate_configuration": "per-head POOL=100 (SingleHead mode)",
+   "hnsw_configuration": "ef_search 64 / efc 400 / M 16 / cosine",
+   "normalization": "per-head MinMax",
+   "top_k": 10,
+   "metrics": {
+    "uniform_multihead": {
+     "R@10": "0.1978",
+     "NDCG@10": "0.2569",
+     "MRR": "0.6110"
+    },
+    "global_best_single_head": {
+     "R@10": "0.3044",
+     "NDCG@10": "0.3041",
+     "MRR": "0.3897"
+    },
+    "trained_gating": {
+     "R@10": "0.2422",
+     "NDCG@10": "0.2993",
+     "MRR": "0.7086"
+    },
+    "rrf_k60": {
+     "R@10": "0.2600",
+     "NDCG@10": "0.3107",
+     "MRR": "0.7147"
+    },
+    "oracle_per_query_head": {
+     "R@10": "0.9933",
+     "NDCG@10": "0.9958",
+     "MRR": "1.0000"
+    }
+   },
+   "output_files": [
+    "by_group.csv",
+    "dataset.json",
+    "diagnostics.json",
+    "diversity.csv",
+    "eval_test.csv",
+    "models",
+    "overfit_chain.csv",
+    "run_info.txt",
+    "training",
+    "utility.csv"
+   ],
+   "hardware": "sandbox CI-class VM, cpu-count=2",
+   "runtime": null,
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH2B-SAMPLE-001/q600",
+   "date": "2026-09-04",
+   "git_commit": "c9066ca",
+   "corpus": "multiview-fine-600q",
+   "dataset_hash": "0xf8f6e69e04587349",
+   "seed": 42,
+   "train_size": 420,
+   "validation_size": 90,
+   "test_size": 90,
+   "model": "GatingMlp input->ReLU(hidden)->softmax(heads)",
+   "objective": "grid-selected on validation",
+   "hyperparameters": "hidden 32/64, lr 0.01/0.003, batch 32/16, Adam, L2 1e-4, patience 15",
+   "candidate_configuration": "per-head POOL=100 (SingleHead mode)",
+   "hnsw_configuration": "ef_search 64 / efc 400 / M 16 / cosine",
+   "normalization": "per-head MinMax",
+   "top_k": 10,
+   "metrics": {
+    "uniform_multihead": {
+     "R@10": "0.1944",
+     "NDCG@10": "0.2518",
+     "MRR": "0.5956"
+    },
+    "global_best_single_head": {
+     "R@10": "0.4244",
+     "NDCG@10": "0.4218",
+     "MRR": "0.4796"
+    },
+    "trained_gating": {
+     "R@10": "0.2533",
+     "NDCG@10": "0.3002",
+     "MRR": "0.6309"
+    },
+    "rrf_k60": {
+     "R@10": "0.2678",
+     "NDCG@10": "0.3125",
+     "MRR": "0.6604"
+    },
+    "oracle_per_query_head": {
+     "R@10": "0.9944",
+     "NDCG@10": "0.9964",
+     "MRR": "1.0000"
+    }
+   },
+   "output_files": [
+    "by_group.csv",
+    "dataset.json",
+    "diagnostics.json",
+    "diversity.csv",
+    "eval_test.csv",
+    "models",
+    "overfit_chain.csv",
+    "run_info.txt",
+    "training",
+    "utility.csv"
+   ],
+   "hardware": "sandbox CI-class VM, cpu-count=2",
+   "runtime": null,
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH2B-SAMPLE-001/q1200",
+   "date": "2026-09-04",
+   "git_commit": "c9066ca",
+   "corpus": "multiview-fine-1200q",
+   "dataset_hash": "0xe98396f0d8855539",
+   "seed": 42,
+   "train_size": 840,
+   "validation_size": 180,
+   "test_size": 180,
+   "model": "GatingMlp input->ReLU(hidden)->softmax(heads)",
+   "objective": "grid-selected on validation",
+   "hyperparameters": "hidden 32/64, lr 0.01/0.003, batch 32/16, Adam, L2 1e-4, patience 15",
+   "candidate_configuration": "per-head POOL=100 (SingleHead mode)",
+   "hnsw_configuration": "ef_search 64 / efc 400 / M 16 / cosine",
+   "normalization": "per-head MinMax",
+   "top_k": 10,
+   "metrics": {
+    "uniform_multihead": {
+     "R@10": "0.2106",
+     "NDCG@10": "0.2769",
+     "MRR": "0.6389"
+    },
+    "global_best_single_head": {
+     "R@10": "0.3417",
+     "NDCG@10": "0.3511",
+     "MRR": "0.4705"
+    },
+    "trained_gating": {
+     "R@10": "0.4928",
+     "NDCG@10": "0.5223",
+     "MRR": "0.7028"
+    },
+    "rrf_k60": {
+     "R@10": "0.2578",
+     "NDCG@10": "0.3055",
+     "MRR": "0.6705"
+    },
+    "oracle_per_query_head": {
+     "R@10": "0.9861",
+     "NDCG@10": "0.9912",
+     "MRR": "1.0000"
+    }
+   },
+   "output_files": [
+    "by_group.csv",
+    "dataset.json",
+    "diagnostics.json",
+    "diversity.csv",
+    "eval_test.csv",
+    "models",
+    "overfit_chain.csv",
+    "run_info.txt",
+    "training",
+    "utility.csv"
+   ],
+   "hardware": "sandbox CI-class VM, cpu-count=2",
+   "runtime": null,
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH2C-RERANK-001",
+   "date": "2026-09-04",
+   "git_commit": "c9066ca",
+   "corpus": "controlled cached dataset (from controlled current run)",
+   "dataset_hash": "inherited from source run",
+   "seed": 42,
+   "model": "none (offline scoring of cached candidates)",
+   "objective": "exact-score fusion weighting study (\u00a732)",
+   "metrics": {
+    "norm_fusion_uniform": {
+     "R@10": "0.6244",
+     "NDCG@10": "0.6881",
+     "MRR": "0.9352"
+    },
+    "exact_fusion_uniform": {
+     "R@10": "0.6511",
+     "NDCG@10": "0.7129",
+     "MRR": "0.9481"
+    },
+    "exact_fusion_best_head": {
+     "R@10": "0.5356",
+     "NDCG@10": "0.5664",
+     "MRR": "0.7896"
+    },
+    "exact_fusion_oracle_head": {
+     "R@10": "0.9533",
+     "NDCG@10": "0.9700",
+     "MRR": "1.0000"
+    }
+   },
+   "output_files": [
+    "rerank.csv"
+   ],
+   "hardware": "sandbox CI-class VM, cpu-count=2",
+   "status": "COMPLETED",
+   "candidate_configuration": "cached POOL=100 per head",
+   "top_k": 10,
+   "normalization": "exact scores raw; normalized via per-head MinMax for norm arm",
+   "hnsw_configuration": "n/a (cached)"
+  },
+  {
+   "experiment_id": "PH2C-RERANK-002",
+   "date": "2026-09-04",
+   "git_commit": "c9066ca",
+   "corpus": "noise cached dataset (from noise current run)",
+   "dataset_hash": "inherited from source run",
+   "seed": 42,
+   "model": "none (offline scoring of cached candidates)",
+   "objective": "exact-score fusion weighting study (\u00a732)",
+   "metrics": {
+    "norm_fusion_uniform": {
+     "R@10": "0.7378",
+     "NDCG@10": "0.8028",
+     "MRR": "0.9889"
+    },
+    "exact_fusion_uniform": {
+     "R@10": "0.7133",
+     "NDCG@10": "0.7843",
+     "MRR": "1.0000"
+    },
+    "exact_fusion_best_head": {
+     "R@10": "0.8378",
+     "NDCG@10": "0.8845",
+     "MRR": "1.0000"
+    },
+    "exact_fusion_oracle_head": {
+     "R@10": "0.8400",
+     "NDCG@10": "0.8858",
+     "MRR": "1.0000"
+    }
+   },
+   "output_files": [
+    "rerank.csv"
+   ],
+   "hardware": "sandbox CI-class VM, cpu-count=2",
+   "status": "COMPLETED",
+   "candidate_configuration": "cached POOL=100 per head",
+   "top_k": 10,
+   "normalization": "exact scores raw; normalized via per-head MinMax for norm arm",
+   "hnsw_configuration": "n/a (cached)"
+  },
+  {
+   "experiment_id": "PH2C-RERANK-003",
+   "date": "2026-09-04",
+   "git_commit": "c9066ca",
+   "corpus": "multiview cached dataset (from multiview current run)",
+   "dataset_hash": "inherited from source run",
+   "seed": 42,
+   "model": "none (offline scoring of cached candidates)",
+   "objective": "exact-score fusion weighting study (\u00a732)",
+   "metrics": {
+    "norm_fusion_uniform": {
+     "R@10": "0.2128",
+     "NDCG@10": "0.2803",
+     "MRR": "0.6435"
+    },
+    "exact_fusion_uniform": {
+     "R@10": "0.2406",
+     "NDCG@10": "0.3445",
+     "MRR": "0.8303"
+    },
+    "exact_fusion_best_head": {
+     "R@10": "0.3428",
+     "NDCG@10": "0.3521",
+     "MRR": "0.4706"
+    },
+    "exact_fusion_oracle_head": {
+     "R@10": "0.9933",
+     "NDCG@10": "0.9957",
+     "MRR": "1.0000"
+    }
+   },
+   "output_files": [
+    "rerank.csv"
+   ],
+   "hardware": "sandbox CI-class VM, cpu-count=2",
+   "status": "COMPLETED",
+   "candidate_configuration": "cached POOL=100 per head",
+   "top_k": 10,
+   "normalization": "exact scores raw; normalized via per-head MinMax for norm arm",
+   "hnsw_configuration": "n/a (cached)"
+  },
+  {
+   "experiment_id": "PH2B-LATENCY-001",
+   "date": "2026-09-04",
+   "git_commit": "c9066ca",
+   "corpus": "n/a (model micro-bench on controlled card)",
+   "seed": 7,
+   "model": "GatingMlp 32->1188 params",
+   "metrics": {
+    "inference_us_per_query": 0.87,
+    "params": 1188,
+    "serialized_bytes": 20288
+   },
+   "output_files": [
+    "latency.csv"
+   ],
+   "hardware": "sandbox CI-class VM, cpu-count=2",
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH2C-QK-001",
+   "date": "2026-09-04",
+   "git_commit": "c037b639e78720630fee1d3a4e466cc0b61a70b7",
+   "corpus": "qk-sanity anti-cosine paired-family (synthetic; 2 heads, dim 8, pool 10, 600/150/250)",
+   "seed": "42,7,1",
+   "model": "linear QK (W_Q,W_K 8x16, no hidden) vs GatingMlp 16-16-2",
+   "objective": "InfoNCE (QK + gating-infnce); SoftTarget-recall (shipped gating)",
+   "metrics": {
+    "uniform": {
+     "R@1": "0.0000",
+     "R@5": "0.0000",
+     "R@10": "1.0000",
+     "NDCG@10": "0.2914",
+     "MRR": "0.1022"
+    },
+    "global_best_head0": {
+     "R@1": "0.0000",
+     "R@5": "0.0000",
+     "R@10": "1.0000",
+     "NDCG@10": "0.2891",
+     "MRR": "0.1000"
+    },
+    "oracle": {
+     "R@1": "1.0000",
+     "R@5": "1.0000",
+     "R@10": "1.0000",
+     "NDCG@10": "1.0000",
+     "MRR": "1.0000"
+    },
+    "gating_qualityreg": {
+     "R@1": "0.0027",
+     "R@5": "0.1107",
+     "R@10": "1.0000",
+     "NDCG@10": "0.3183",
+     "MRR": "0.1306"
+    },
+    "gating_infnce": {
+     "R@1": "0.1000",
+     "R@5": "0.4920",
+     "R@10": "1.0000",
+     "NDCG@10": "0.4528",
+     "MRR": "0.2909"
+    },
+    "qk_untrained": {
+     "R@1": "0.1160",
+     "R@5": "0.4640",
+     "R@10": "1.0000",
+     "NDCG@10": "0.4497",
+     "MRR": "0.2890"
+    },
+    "qk_trained": {
+     "R@1": "1.0000",
+     "R@5": "1.0000",
+     "R@10": "1.0000",
+     "NDCG@10": "1.0000",
+     "MRR": "1.0000"
+    }
+   },
+   "output_files": [
+    "config.txt",
+    "dataset.json",
+    "eval_test.csv",
+    "gating_weights_test.csv",
+    "metrics.json",
+    "models",
+    "qk_content.json",
+    "run_info.txt",
+    "trainlog_qk.csv",
+    "val_grid.csv",
+    "variability.csv"
+   ],
+   "hardware": "sandbox CI-class VM, cpu-count=2",
+   "status": "COMPLETED",
+   "protocol": "val-only lr\u00d7T selection (seed 42, frozen), test evaluated once per seed; gate: QK>=0.9 AND gating<=0.25",
+   "gate_result": "PASSED"
+  }
+ ]
+}

@@ -64,6 +64,41 @@ impl HNSWConfig {
     }
 }
 
+/// Canonical similarity for a metric name, used consistently by exact
+/// reranking and retrieval scoring (Phase 2 §10/§39):
+/// - "cosine": dot/(|a||b|), zero-norm → 0.0 (never NaN — §25)
+/// - "dot_product": plain dot
+/// - "l2": negative squared distance (higher = closer, comparable as similarity)
+pub fn similarity(metric: &str, a: &[f32], b: &[f32]) -> f32 {
+    let mut dot = 0.0f32;
+    let mut na = 0.0f32;
+    let mut nb = 0.0f32;
+    let mut sq = 0.0f32;
+    for (x, y) in a.iter().zip(b.iter()) {
+        if !x.is_finite() || !y.is_finite() {
+            return 0.0; // non-finite input → neutral score, never NaN
+        }
+        dot += x * y;
+        na += x * x;
+        nb += y * y;
+        let d = x - y;
+        sq += d * d;
+    }
+    match metric {
+        "dot_product" => dot,
+        "l2" => -sq,
+        // "cosine" and default
+        _ => {
+            let norm = na.sqrt() * nb.sqrt();
+            if norm < f32::EPSILON {
+                0.0
+            } else {
+                (dot / norm).clamp(-1.0, 1.0)
+            }
+        }
+    }
+}
+
 impl From<CollectionSettings> for HNSWConfig {
     fn from(settings: CollectionSettings) -> Self {
         HNSWConfig {
@@ -227,14 +262,16 @@ impl HNSWIndex {
             .gpu_backend
             .rerank_exact(query, &candidate_vectors, k)
             .unwrap_or_else(|_| {
+                let metric = self.settings.similarity_metric.clone();
                 let mut scored: Vec<(u64, f32)> = candidate_vectors
                     .iter()
-                    .map(|(id, vec)| {
-                        let score: f32 = query.iter().zip(vec.iter()).map(|(a, b)| a * b).sum();
-                        (*id, score)
-                    })
+                    .map(|(id, vec)| (*id, similarity(&metric, query, vec)))
                     .collect();
-                scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+                scored.sort_by(|a, b| {
+                    b.1.partial_cmp(&a.1)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                        .then(a.0.cmp(&b.0))
+                });
                 scored.truncate(k);
                 scored
             });
@@ -251,6 +288,34 @@ impl HNSWIndex {
         let candidates = self.search(query, k * 3, ef)?;
         let candidate_ids: Vec<u64> = candidates.into_iter().map(|(id, _)| id).collect();
         self.rerank_exact(query, &candidate_ids, k)
+    }
+
+    /// Remove ids from the exact-rerank vector store (delete/update hygiene).
+    /// The hnsw_rs graph cannot drop nodes; callers MUST filter retired ids from
+    /// search results. Returns how many store entries were removed.
+    pub fn purge_ids(&mut self, ids: &std::collections::HashSet<u64>) -> usize {
+        if ids.is_empty() {
+            return 0;
+        }
+        let before = self.vectors.len();
+        self.vectors.retain(|(id, _)| !ids.contains(id));
+        let removed = before - self.vectors.len();
+        if removed > 0 {
+            self.id_to_idx.clear();
+            for (idx, (id, _)) in self.vectors.iter().enumerate() {
+                self.id_to_idx.insert(*id, idx);
+            }
+        }
+        removed
+    }
+
+    pub fn contains_id(&self, id: u64) -> bool {
+        self.id_to_idx.contains_key(&id)
+    }
+
+    /// Iterator over (id, vector) pairs of the exact-rerank store (checker/audit).
+    pub fn vector_pairs(&self) -> impl Iterator<Item = &(u64, Vec<f32>)> {
+        self.vectors.iter()
     }
 
     pub fn len(&self) -> usize {

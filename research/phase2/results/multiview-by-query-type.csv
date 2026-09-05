@@ -1,0 +1,4 @@
+group,uniform_R10,trained_R10,oracle_R10,best_head_for_group
+0,0.2038,0.6904,0.9942,head0
+1,0.1340,0.4830,0.9906,head1
+2,0.2747,0.4573,0.9947,head2

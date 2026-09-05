@@ -1,0 +1,53 @@
+{
+  "split_seed": 42,
+  "candidate_pool_per_head": 100,
+  "gt_k": 10,
+  "normalization": "per-head MinMax",
+  "hnsw": {
+    "ef_search": 64,
+    "ef_construction": 400,
+    "M": 16,
+    "metric": "cosine"
+  },
+  "training": {
+    "hidden": [
+      32,
+      64
+    ],
+    "lr": [
+      0.01,
+      0.003
+    ],
+    "batch": [
+      32,
+      16
+    ],
+    "optimizer": "Adam",
+    "l2": 0.0001,
+    "patience": 15,
+    "objectives": [
+      "quality_regression",
+      "soft_target",
+      "pairwise"
+    ],
+    "selection": "validation R@10 of temperature-calibrated model"
+  },
+  "calibration": {
+    "temperatures": [
+      4.0,
+      2.0,
+      1.0,
+      0.75,
+      0.5,
+      0.35,
+      0.25
+    ],
+    "fitted_on": "validation"
+  },
+  "corpus": "controlled-4x12-300q",
+  "training_seeds": [
+    42,
+    7,
+    1
+  ]
+}

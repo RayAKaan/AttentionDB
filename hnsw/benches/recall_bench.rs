@@ -124,10 +124,10 @@ fn random_vector(dim: usize) -> Vec<f32> {
     (0..dim).map(|_| rng.gen::<f32>() - 0.5).collect()
 }
 
-fn load_fvecs(
-    path: &str,
-    max_vectors: usize,
-) -> Result<Vec<(u64, Vec<f32>)>, Box<dyn std::error::Error>> {
+/// A loaded vector dataset: (external id, vector) pairs.
+type VectorDataset = Vec<(u64, Vec<f32>)>;
+
+fn load_fvecs(path: &str, max_vectors: usize) -> Result<VectorDataset, Box<dyn std::error::Error>> {
     let mut file = File::open(path)?;
     let mut data = Vec::new();
     let mut id = 0u64;
@@ -143,6 +143,7 @@ fn load_fvecs(
         let mut bytes = vec![0u8; dim * 4];
         file.read_exact(&mut bytes)?;
 
+        #[allow(clippy::chunks_exact_to_as_chunks)] // keep the simple loop
         for (i, chunk) in bytes.chunks_exact(4).enumerate() {
             vec[i] = f32::from_le_bytes(chunk.try_into().unwrap());
         }
@@ -229,7 +230,7 @@ struct BenchmarkResult {
 }
 
 fn recall_benchmark(c: &mut Criterion, args: &Args) {
-    let config = BenchmarkConfig::from_args(&args);
+    let config = BenchmarkConfig::from_args(args);
 
     println!("\n╔════════════════════════════════════════════════════════════╗");
     println!("║     AttentionDB HNSW Recall Benchmark (Research Grade)     ║");

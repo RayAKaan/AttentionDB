@@ -1,0 +1,20 @@
+component,heads,input_dim,value,unit
+model_inference,4,32,0.87,us_per_query
+model_params,4,1188,count
+model_serialized_bytes,4,20288,bytes
+
+# End-to-end pipeline latency from the accepted Phase 2 ablation (same corpus/queries; frozen baseline)
+mode,p50_us,p95_us,p99_us,qps
+A_single_head,239,323,336,4121
+A0_head_default,186,250,277,5198
+A1_head_semantic,268,364,377,3654
+A2_head_lexical,295,406,423,3282
+A3_head_graph,350,497,531,2760
+A4_head_h4,276,376,421,3555
+A5_head_h5,315,427,463,3148
+A6_head_h6,341,475,550,2810
+A7_head_h7,370,512,584,2616
+B_multi_head_fixed,1734,2002,2198,573
+C_learned_gating,1744,1907,2014,574
+D_qk_attention,1764,1911,2013,572
+E_full_exact_rerank,2075,2277,3509,476

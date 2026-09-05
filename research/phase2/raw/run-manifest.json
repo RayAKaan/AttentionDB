@@ -1,0 +1,83 @@
+{
+ "format": "attentiondb-run-manifest",
+ "version": 1,
+ "updated": "2026-09-04",
+ "code_commit": "c9066ca",
+ "datasets": {
+  "controlled": {
+   "path": "benchmarks/phase2b/controlled/dataset.json",
+   "docs": 384,
+   "heads": 4,
+   "queries": 300
+  },
+  "noise": {
+   "path": "benchmarks/phase2b/noise/dataset.json",
+   "docs": 10000,
+   "heads": 8,
+   "queries": 300
+  },
+  "multiview": {
+   "path": "benchmarks/phase2b/multiview/dataset.json",
+   "docs": 3000,
+   "heads": 3,
+   "queries": 1200
+  }
+ },
+ "experiments": [
+  "PH2-ABLATION-001",
+  "PH2B-GATING-001",
+  "PH2B-GATING-002",
+  "PH2B-GATING-003",
+  "PH2B-GATING-004",
+  "PH2B-NOISE-001",
+  "PH2B-NOISE-002",
+  "PH2B-NOISE-003",
+  "PH2B-MULTIVIEW-001",
+  "PH2B-MULTIVIEW-002",
+  "PH2B-MULTIVIEW-003",
+  "PH2B-MULTIVIEW-004",
+  "PH2B-MULTIVIEW-005",
+  "PH2B-MULTISEED-001",
+  "PH2B-MULTISEED-002",
+  "PH2B-SAMPLE-001/q150",
+  "PH2B-SAMPLE-001/q300",
+  "PH2B-SAMPLE-001/q600",
+  "PH2B-SAMPLE-001/q1200",
+  "PH2C-RERANK-001",
+  "PH2C-RERANK-002",
+  "PH2C-RERANK-003",
+  "PH2B-LATENCY-001",
+  "PH2C-QK-001"
+ ],
+ "figures": {
+  "script": "research/phase2/figures/generate_figures.py",
+  "sources": "research/phase2/results/*.csv + dataset/model JSONs"
+ },
+ "tables": {
+  "script": "research/phase2/tables/generate_tables.py",
+  "sources": "research/phase2/results/*.csv"
+ },
+ "consistency_check": {
+  "script": "research/phase2/verify_consistency.py",
+  "scope": "tables vs raw CSVs vs registry metrics vs summary claims"
+ },
+ "models": {
+  "controlled_gating_v1": "benchmarks/phase2b/controlled/training/model-v1.json",
+  "registry": "research/phase2/raw/runs/PH2B-GATING-004-era via benchmarks/phase2b/controlled/models/"
+ },
+ "reconstruction": "Given dataset.json + code commit: training (train_gating, seeded) and evaluation (eval module) are deterministic; HNSW candidate generation is NOT bit-reproducible across processes (hnsw_rs OS-seeded layer RNG) \u2014 the cached dataset is the reproducibility unit.",
+ "storage_policy": {
+  "note": "Large cached dataset.json files are stored gzip-compressed (.json.gz) to fit the workspace snapshot budget. Compression is LOSSLESS; pre-compression sha256 for every compressed file is recorded in datasets-manifest.sha256 and was verified byte-equal after compression (2026-09-05). Restore with: gunzip -k <path>.json.gz",
+  "stored_as_gz": [
+   "benchmarks/phase2b/controlled/dataset.json.gz",
+   "benchmarks/phase2b/noise/dataset.json.gz",
+   "benchmarks/phase2b/multiview/dataset.json.gz",
+   "research/phase2/raw/runs/PH2B-SAMPLE-001/q150/dataset.json.gz",
+   "research/phase2/raw/runs/PH2B-SAMPLE-001/q300/dataset.json.gz",
+   "research/phase2/raw/runs/PH2B-SAMPLE-001/q600/dataset.json.gz",
+   "research/phase2/raw/runs/PH2B-MULTISEED-001/dataset.json.gz",
+   "research/phase2/raw/runs/PH2C-QK-001/dataset.json.gz",
+   "research/phase2/raw/runs/PH2C-QK-001/qk_content.json.gz"
+  ]
+ }
+}

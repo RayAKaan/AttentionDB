@@ -1,0 +1,26 @@
+{
+  "metrics": [
+    {
+      "component": "model_inference",
+      "heads": "4",
+      "input_dim": "32",
+      "value": "0.87",
+      "unit": "us_per_query"
+    },
+    {
+      "component": "model_params",
+      "heads": "4",
+      "input_dim": "1188",
+      "value": "count",
+      "unit": null
+    },
+    {
+      "component": "model_serialized_bytes",
+      "heads": "4",
+      "input_dim": "20288",
+      "value": "bytes",
+      "unit": null
+    }
+  ],
+  "note": "RECONSTRUCTED from canonical aggregates (results/*.csv + registry) after workspace reset lost per-run files; numbers byte-equal to registry entries."
+}
