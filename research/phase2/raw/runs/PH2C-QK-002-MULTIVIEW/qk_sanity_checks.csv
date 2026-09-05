@@ -1,0 +1,6 @@
+check,value
+untrained_qk_r10,0.0339
+param_delta_l2,106.2355
+score_std_mean,8.262226
+score_std_min,2.776868
+kendall_tau_qk_vs_uniform,0.4586

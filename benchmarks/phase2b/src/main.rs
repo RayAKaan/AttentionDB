@@ -19,6 +19,8 @@ use attentiondb_learned::gating_v2::{
     QueryExample, Split, TrainingConfig, TrainingMeta,
 };
 use phase2b_bench::corpora::{self, Corpus};
+mod qk_cache;
+mod qk_main;
 mod qk_sanity;
 use std::collections::HashMap;
 
@@ -115,6 +117,19 @@ fn main() {
         "qk-sanity" => {
             // PH2C-QK-001: candidate-level QK sanity dataset (Phase 2C §6).
             let msg = qk_sanity::run(&out, &seeds);
+            println!("{msg}");
+        }
+        "qk-cache" => {
+            // PH2C-QK-002 §3/§4: candidate-content sidecar on CACHED pools.
+            // Sidecar is written next to the dataset (qk_content.json).
+            let content = dataset_path.replace("dataset.json", "qk_content.json");
+            let msg = qk_cache::run(corpus, &dataset_path, &content);
+            println!("{msg}");
+        }
+        "qk-main" => {
+            // PH2C-QK-002: real-corpus QK vs gating main evaluation.
+            let content = dataset_path.replace("dataset.json", "qk_content.json");
+            let msg = qk_main::run(corpus, &dataset_path, &content, &out, &seeds);
             println!("{msg}");
         }
         other => {

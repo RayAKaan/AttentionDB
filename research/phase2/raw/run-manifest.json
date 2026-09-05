@@ -1,7 +1,7 @@
 {
  "format": "attentiondb-run-manifest",
  "version": 1,
- "updated": "2026-09-04",
+ "updated": "2026-09-05",
  "code_commit": "c9066ca",
  "datasets": {
   "controlled": {
@@ -47,7 +47,10 @@
   "PH2C-RERANK-002",
   "PH2C-RERANK-003",
   "PH2B-LATENCY-001",
-  "PH2C-QK-001"
+  "PH2C-QK-001",
+  "PH2C-QK-002-MULTIVIEW",
+  "PH2C-QK-002-CONTROLLED",
+  "PH2C-QK-002-NOISE"
  ],
  "figures": {
   "script": "research/phase2/figures/generate_figures.py",

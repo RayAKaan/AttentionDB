@@ -1,7 +1,7 @@
 {
  "format": "attentiondb-experiment-index",
  "version": 1,
- "updated": "2026-09-04",
+ "updated": "2026-09-05",
  "experiments": [
   {
    "experiment_id": "PH2-ABLATION-001",
@@ -984,6 +984,121 @@
    "status": "COMPLETED",
    "protocol": "val-only lr\u00d7T selection (seed 42, frozen), test evaluated once per seed; gate: QK>=0.9 AND gating<=0.25",
    "gate_result": "PASSED"
+  },
+  {
+   "experiment_id": "PH2C-QK-002-MULTIVIEW",
+   "date": "2026-09-05",
+   "git_commit": "bac714d5a12d38a8bdaded8aed8dd39a8a0755df",
+   "corpus": "multiview (canonical Phase 2B cache, 1200q 840/180/180, 3 heads)",
+   "seed": "42,7,1",
+   "model": "linear QK (Wq,Wk 8x192) vs GatingMlp grid(3obj x lr x hidden)",
+   "objective": "multi-positive InfoNCE (QK); 2B protocol grid (gating)",
+   "metrics": {
+    "uniform": {
+     "R@1": "0.0544",
+     "R@5": "0.1589",
+     "R@10": "0.2128",
+     "NDCG@10": "0.2803",
+     "MRR": "0.6435"
+    },
+    "global_best": {
+     "R@1": "0.0383",
+     "R@5": "0.1817",
+     "R@10": "0.3428",
+     "NDCG@10": "0.3521",
+     "MRR": "0.4706"
+    },
+    "rrf_k60": {
+     "R@1": "0.0528",
+     "R@5": "0.1733",
+     "R@10": "0.2622",
+     "NDCG@10": "0.3114",
+     "MRR": "0.6805"
+    },
+    "oracle": {
+     "R@1": "0.1000",
+     "R@5": "0.5000",
+     "R@10": "0.9933",
+     "NDCG@10": "0.9957",
+     "MRR": "1.0000"
+    },
+    "gating": {
+     "R@1": "0.0635",
+     "R@5": "0.2793",
+     "R@10": "0.4983",
+     "NDCG@10": "0.5289",
+     "MRR": "0.7009"
+    },
+    "qk": {
+     "R@1": "0.0137",
+     "R@5": "0.0591",
+     "R@10": "0.1113",
+     "NDCG@10": "0.1151",
+     "MRR": "0.2944"
+    },
+    "gating_qk": {
+     "R@1": "0.0491",
+     "R@5": "0.1746",
+     "R@10": "0.2769",
+     "NDCG@10": "0.3187",
+     "MRR": "0.6153"
+    }
+   },
+   "output_files": [
+    "budgets.csv",
+    "by_query_type.csv",
+    "candidate_recall.csv",
+    "config.json",
+    "latency.csv",
+    "metrics.json",
+    "models",
+    "params.csv",
+    "qk_sanity_checks.csv",
+    "report.txt",
+    "rerank_diagnostics.csv",
+    "results.csv",
+    "run_info.txt",
+    "trainlog_qk.csv",
+    "val_grid_qk.csv",
+    "variability.csv"
+   ],
+   "hardware": "sandbox CI-class VM, cpu-count=2",
+   "status": "COMPLETED",
+   "paired": true,
+   "primary_comparison": "qk vs gating (agg): 0.1113 vs 0.4983 R@10",
+   "verdict": "QK LOSES \u2014 NO SIGNIFICANT WIN (Rule Zero); STOP condition engaged"
+  },
+  {
+   "experiment_id": "PH2C-QK-002-CONTROLLED",
+   "date": "2026-09-05",
+   "git_commit": "bac714d5a12d38a8bdaded8aed8dd39a8a0755df",
+   "corpus": "controlled (canonical Phase 2B cache)",
+   "seed": "n/a",
+   "model": "n/a - QK arm blocked pre-training",
+   "objective": "n/a",
+   "metrics": {},
+   "output_files": [
+    "run_info.txt",
+    "metrics.json"
+   ],
+   "hardware": "sandbox CI-class VM, cpu-count=2",
+   "status": "NOT_EXECUTABLE (HC-6: candidate-content linkage lost; see run_info.txt)"
+  },
+  {
+   "experiment_id": "PH2C-QK-002-NOISE",
+   "date": "2026-09-05",
+   "git_commit": "bac714d5a12d38a8bdaded8aed8dd39a8a0755df",
+   "corpus": "noise (canonical Phase 2B cache)",
+   "seed": "n/a",
+   "model": "n/a - QK arm blocked pre-training",
+   "objective": "n/a",
+   "metrics": {},
+   "output_files": [
+    "run_info.txt",
+    "metrics.json"
+   ],
+   "hardware": "sandbox CI-class VM, cpu-count=2",
+   "status": "NOT_EXECUTABLE (HC-6: candidate-content linkage lost; see run_info.txt)"
   }
  ]
 }

@@ -93,3 +93,19 @@ the registry (status INVALIDATED), never deleted.
   before PH2C-QK-001 entered the registry (first recording used the fixed
   evaluator; reproduction verified byte-identical after a subsequent
   clippy-only change).
+
+## HC-6: controlled/noise corpus builders are not content-reproducible (PH2C-QK-002)
+
+- **Original assumption**: re-running `corpora::controlled`/`noise_ladder`
+  with the recorded seeds rebuilds the same doc content (only HNSW graph
+  construction was known OS-seeded — see dataset-as-unit doctrine).
+- **Detection**: PH2C-QK-002 §4 gate (`qk-cache`). GT/doc-id mapping and
+  doc-id picks DO reproduce (gt_verified 300/300), but doc/query VECTOR
+  content does not: recomputed exact cosines differ from cached exact
+  scores (e.g. 0.9900 vs 0.9468). `corpora::multiview` reproduces exactly.
+- **Why it matters**: attaching rebuilt content to frozen pools would have
+  scored QK against vectors unrelated to the pools — silently invalid.
+- **Correction**: content attached only where the exact-score linkage check
+  passes (multiview). controlled/noise QK arms recorded NOT_EXECUTABLE;
+  the cached dataset.json remains the sole canonical record for those
+  corpora. No numbers were invalidated (the check ran BEFORE training).

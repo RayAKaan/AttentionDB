@@ -1,0 +1,5 @@
+{
+ "experiment": "PH2C-QK-002-CONTROLLED",
+ "status": "NOT_EXECUTABLE_HC6",
+ "reason": "content linkage lost (see run_info.txt + HC-6)"
+}

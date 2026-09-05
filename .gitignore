@@ -19,3 +19,7 @@ hnsw_graphs/
 results*.json
 hnsw/data/
 hnsw/recall_results.json
+
+# restored-from-.gz working copies (canonical storage is .json.gz)
+benchmarks/phase2b/*/dataset.json
+benchmarks/phase2b/*/qk_content.json

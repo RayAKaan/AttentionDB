@@ -1,0 +1,38 @@
+{
+  "batch": 32,
+  "budgets": [
+    10,
+    25,
+    50,
+    100
+  ],
+  "content_path": "benchmarks/phase2b/multiview/qk_content.json",
+  "corpus": "multiview",
+  "dataset_hash": "0x70d0db95d02a5d76",
+  "dataset_path": "benchmarks/phase2b/multiview/dataset.json",
+  "experiment": "PH2C-QK-002-MULTIVIEW",
+  "gating": {
+    "frozen_T": 0.25,
+    "frozen_objective": "SoftTarget",
+    "protocol": "3 objectives val-select + val temperature (shipped Phase 2B)"
+  },
+  "gating_qk": {
+    "fusion": "RRF k=60 of gating and QK rankings"
+  },
+  "max_epochs": 200,
+  "patience": 20,
+  "qk": {
+    "dq": 8,
+    "frozen_T": 0.5,
+    "frozen_lr": 0.05000000074505806,
+    "grid": "lr×T val-only (seed 42)",
+    "kind": "linear Wq/Wk",
+    "objective": "multi_positive_infonce"
+  },
+  "rerank_top_m": 50,
+  "seeds": [
+    42,
+    7,
+    1
+  ]
+}

@@ -89,3 +89,12 @@ for real corpora: no trained-QK result on controlled/noise/multiview
 exists yet, so "candidate-level QK improves retrieval (on the real
 corpora)" remains NOT SUPPORTED until PH2C-QK-002+ measures it (Rule
 Zero: outcome open).
+
+**Addendum 2 (2026-09-05, PH2C-QK-002-MULTIVIEW).** N1 RESOLVED for the
+frozen-pool protocol: trained candidate-level QK LOSES to trained gating on
+multiview (0.1113 vs 0.4983 R@10, seeds 42/7/1; candidate recall 0.9975 —
+ranking failure, not generation failure). "Candidate-level QK attention
+improves retrieval" = NOT SUPPORTED (multiview; controlled/noise
+untestable on frozen caches per HC-6). §29 STOP condition engaged: no
+deeper/cross-attention architectures. Gating retained as the architecture;
+QK optional (no measured benefit anywhere).

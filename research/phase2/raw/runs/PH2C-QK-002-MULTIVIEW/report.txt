@@ -1,0 +1,6 @@
+frozen QK: lr=0.05 T=0.5 (best val R@10=0.1344)
+frozen gating: objective=SoftTarget T=0.25 lr=0.003 hidden=64 (val-selected)
+candidate recall (full pool): gt-frac=0.9975, queries≥1=100.0%
+QK sanity: untrained R@10=0.0339, ‖ΔW‖=106.235, score-std mean=8.2622 min=2.7769, τ(qk,uniform)=0.4586
+TEST aggregates: gating R@10=0.4983 | qk R@10=0.1113 (Δ=-0.3870) | gating+qk R@10=0.2769 | uniform R@10=0.2128 | oracle R@10=0.9933
+latency p50 µs: gating=13.125 qk=315.616 (elapsed total 351.719174203s)

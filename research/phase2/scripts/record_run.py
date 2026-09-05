@@ -47,7 +47,8 @@ def load_metrics(run_dir: str, agg_seed: str):
         out = {}
         for row in csv.DictReader(open(et)):
             if row.get("seed") == agg_seed:
-                out[row["arm"]] = {
+                arm = row.get("arm", row.get("approach"))
+                out[arm] = {
                     k: row[k] for k in ("R@1", "R@5", "R@10", "NDCG@10", "MRR") if k in row
                 }
         return out, "eval_test.csv(agg rows)"

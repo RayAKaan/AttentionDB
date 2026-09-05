@@ -1,0 +1,16 @@
+run_id=PH2C-QK-002-MULTIVIEW
+experiment=PH2C-QK-002 real-corpus trained candidate-level QK vs trained gating (main evaluation)
+date=2026-09-05
+git_commit=bac714d5a12d38a8bdaded8aed8dd39a8a0755df (benchmarks/phase2b/src/qk_main.rs, subcommand qk-main)
+command=target/release/phase2b-bench qk-main --corpus multiview --dataset benchmarks/phase2b/multiview/dataset.json --out research/phase2/raw/runs/PH2C-QK-002-MULTIVIEW --seeds 42,7,1
+dataset=benchmarks/phase2b/multiview/dataset.json (sha256 6f41ab7b..., canonical Phase 2B cache; splits/queries/GT unchanged)
+content=benchmarks/phase2b/multiview/qk_content.json.gz (qk-cache sidecar; ALL binding checks passed: GT mapping 1200/1200, exact scores 14400, query vectors identical — see HC-6 for controlled/noise refusal)
+paired=true (identical pools/splits/GT for every arm, §6)
+status=COMPLETED
+notes=reference arms reproduce registered 2B values exactly (uniform .2128 gbest .3428 rrf .2622 oracle .9933) — pipeline cross-validated
+reproduction_note=Post-clippy-only rebuild (semantically neutral refactors) reproduces
+seed-42 qk R@10 within +-0.0005 (0.1089 vs recorded 0.1094; one test-query
+flip from float op-order jitter); gating/gating_qk deltas <= 0.0006. All
+verdict-level conclusions unchanged (QK loses by ~39pp). Recorded registry
+numbers are canonical for the original binary; current committed source is
+the maintained implementation.

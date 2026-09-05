@@ -1,0 +1,9 @@
+config,R@10,NDCG@10,MRR,p50_us
+exact_unif,0.2406,0.3445,0.8303,0.00
+exact_gbest,0.3428,0.3521,0.4706,0.00
+exact_gating,0.4750,0.5115,0.7083,0.00
+exact_top1,0.5161,0.5195,0.5982,0.00
+exact_top2,0.4833,0.5165,0.6949,0.00
+qk_no_exact,0.1113,0.1151,0.2944,0.00
+qk_then_exact_gating,0.0883,0.0834,0.1972,0.00
+gatingqk_then_exact_gating,0.4756,0.5119,0.7083,0.00

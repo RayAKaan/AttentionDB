@@ -1,0 +1,8 @@
+component,p50_us,p95_us,p99_us,qps
+gating_forward,13.125,14.100,31.716,76190
+qk_forward_union,315.616,343.342,358.746,3168
+fuse_weighted_pools,18.494,21.496,39.255,54072
+fuse_rrf_pools,18.069,19.484,37.712,55343
+exact_sum_pools,0.043,0.048,0.049,23255814
+pipeline_gating_fwd+fuse,31.651,37.838,54.339,31595
+pipeline_qk_fwd+rankfuse,334.235,362.549,380.165,2992

@@ -1,0 +1,12 @@
+run_id=PH2C-QK-002-CONTROLLED
+experiment=PH2C-QK-002 real-corpus QK vs gating (controlled leg)
+date=2026-09-05
+git_commit=bac714d5a12d38a8bdaded8aed8dd39a8a0755df
+status=NOT_EXECUTABLE (HC-6): candidate-content linkage lost.
+The cached dataset.json (pools/scores/GT) is intact, but qk-cache REFUSED
+to attach content: rebuilt corpus doc vectors do not correspond to the
+pools (exact-score check failed: cosine 0.9900 vs cached exact 0.9468 at
+q0/h0/j0). Only multiview's builder is content-reproducible. Per spec §4
+(verify before training) the QK arm was NOT run on these caches.
+Reference arms remain the canonical Phase 2B registered results:
+research/phase2/results/controlled-eval-test.csv

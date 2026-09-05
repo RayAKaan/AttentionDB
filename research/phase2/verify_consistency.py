@@ -80,6 +80,10 @@ def main():
                 ev = os.path.join(d, 'eval_test.csv')
             if os.path.exists(ev) and exp.get('metrics'):
                 for row in rd(ev):
+                    # registry agg metrics may only be compared to agg rows
+                    # (per-seed rows legitimately differ)
+                    if 'seed' in row and row['seed'] not in ('agg', ''):
+                        continue
                     arm = row.get('approach', row.get('arm'))
                     if arm in exp['metrics']:
                         a = row.get('R@10', row.get('R@1'))
@@ -139,6 +143,27 @@ def main():
                 ERR.append(f"qk-sanity {arm} R@1 > 0.25 ({agg[arm]['R@1']}) — anti-cosine isolation violated (gating class must be ≤ chance-ish)")
         if 'qk_trained' in agg and float(agg['qk_trained']['R@1']) < 0.9:
             ERR.append(f"qk-sanity qk_trained R@1 < 0.9 ({agg['qk_trained']['R@1']}) — gate FAILED; Phase 2C main track must not proceed without revisiting §41")
+
+    # ---- 8c. PH2C-QK-002 main comparison ----
+    qk2 = os.path.join(RES, 'qk-attention-multiview.csv')
+    if os.path.exists(qk2):
+        qk2tab = open(os.path.join(TAB, 'table-qk-main.md')).read()
+        for row in rd(qk2):
+            if row['seed'] != 'agg':
+                continue
+            for metric in ['R@10', 'NDCG@10', 'MRR']:
+                check_number_in_text(row[metric], qk2tab, f"qk-main/{row['arm']}/{metric}")
+        agg = {r['arm']: r for r in rd(qk2) if r['seed'] == 'agg'}
+        # registered cross-checks: reference arms MUST equal Phase 2B canonical values
+        canon = {'uniform': '0.2128', 'global_best': '0.3428', 'rrf_k60': '0.2622', 'oracle': '0.9933'}
+        for arm, val in canon.items():
+            if arm in agg and agg[arm]['R@10'] != val:
+                ERR.append(f"qk-main reference drift {arm}: {agg[arm]['R@10']} != registered {val}")
+        # Rule Zero verdict consistency: recorded outcome must stay a loss
+        if float(agg['qk']['R@10']) >= float(agg['gating']['R@10']):
+            ERR.append("qk-main: qk >= gating contradicts recorded verdict — update findings if data changed")
+        if float(agg['oracle']['R@10']) < 0.9:
+            ERR.append(f"qk-main oracle < 0.9 ({agg['oracle']['R@10']}) — GT/pool linkage broken")
 
     if ERR:
         print("CONSISTENCY CHECK FAILED:")

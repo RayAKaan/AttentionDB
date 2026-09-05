@@ -78,3 +78,15 @@ gunzip -k benchmarks/phase2b/<corpus>/dataset.json.gz
 
 See `research/phase2/raw/DATASET-STORAGE.md`.
 
+
+## PH2C-QK-002 (main evaluation) — reproduction
+
+```
+cargo build --release -p phase2b-bench
+# content sidecar (binding §4 checks; refuses on linkage loss — HC-6)
+./target/release/phase2b-bench qk-cache --corpus multiview --dataset benchmarks/phase2b/multiview/dataset.json
+./target/release/phase2b-bench qk-main --corpus multiview --dataset benchmarks/phase2b/multiview/dataset.json   --out research/phase2/raw/runs/PH2C-QK-002-MULTIVIEW --seeds 42,7,1
+python3 research/phase2/scripts/record_run.py ...
+python3 research/phase2/tables/generate_tables.py && python3 research/phase2/verify_consistency.py
+```
+controlled/noise: NOT_EXECUTABLE (HC-6) — do not force; see run_info.txt.

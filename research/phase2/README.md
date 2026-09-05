@@ -52,7 +52,8 @@ references (`[CITE: ...]` placeholders only); no fabricated data
 | 2026-09-04 | PH2C-RERANK-001/002/003 | exact-vs-normalized weighting study (§32) |
 | 2026-09-04 | PH2B-LATENCY-001 | gating model micro-bench (0.87 µs, 1188 params) |
 | 2026-09-04 | PH2C-QK-001 | QK sanity dataset: linear QK 1.0000 vs gating ≤ chance (class impossibility) — gate PASSED |
-| pending | PH2C-QK-002+ | trained candidate-level QK on real corpora (gating verdict positive → unlocked) |
+| 2026-09-05 | PH2C-QK-002-MULTIVIEW | **QK LOSES to gating (0.1113 vs 0.4983 R@10; Rule Zero: NO SIGNIFICANT WIN → STOP)** |
+| 2026-09-05 | PH2C-QK-002-CONTROLLED/-NOISE | NOT_EXECUTABLE: content linkage lost (HC-6), refused pre-training |
 | pending | PH2C-RERANK-004+ | pipeline-level rerank re-weighting (ledger N3/Q3) |
 
 Environment note: two workspace resets lost git history (tree preserved);

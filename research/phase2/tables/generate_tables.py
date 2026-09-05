@@ -156,4 +156,33 @@ t.append("")
 t.append("R@5/R@10 are 1.0 for every arm by construction (single relevant candidate per 10-candidate pool): the dataset isolates ORDERING. Source: results/qk-sanity.csv.")
 w("table-qk-sanity.md", "\n".join(t) + "\n")
 
+
+# ---------------------------------------------------------------- qk main
+import csv as _csv
+RUN = os.path.join(RUNS, "PH2C-QK-002-MULTIVIEW")
+if os.path.isdir(RUN):
+    rows = list(_csv.DictReader(open(os.path.join(RUN, "results.csv"))))
+    t = ["# Table: PH2C-QK-002 — trained candidate-level QK vs trained gating (multiview, TEST)",
+         "",
+         "Caption draft: *Paired comparison on identical candidate pools (candidate recall 0.9975): trained linear QK loses to trained gating and to uniform fusion; gating+QK (RRF-60 blend) is below gating. Controlled/noise QK arms not executable on frozen caches (HC-6). Mean over seeds 42/7/1.* [PH2C-QK-002-MULTIVIEW]",
+         "",
+         "| arm | R@10 | NDCG@10 | MRR |",
+         "|---|---|---|---|"]
+    label = {"uniform": "Uniform multi-head", "global_best": "Global best head",
+             "rrf_k60": "RRF (k=60)", "gating": "Trained gating",
+             "qk": "Trained QK", "gating_qk": "Gating + QK (RRF-60)",
+             "oracle": "Oracle head selection"}
+    for r in rows:
+        if r["seed"] == "agg" and r["arm"] in label:
+            t.append(f"| {label[r['arm']]} | {r['R@10']} | {r['NDCG@10']} | {r['MRR']} |")
+    t += ["", "Deltas (agg): QK−gating = {:+.4f}, gating+QK−gating = {:+.4f}, gating+QK−QK = {:+.4f} (R@10).".format(
+        float(next(r['R@10'] for r in rows if r['arm']=='qk' and r['seed']=='agg'))
+        - float(next(r['R@10'] for r in rows if r['arm']=='gating' and r['seed']=='agg')),
+        float(next(r['R@10'] for r in rows if r['arm']=='gating_qk' and r['seed']=='agg'))
+        - float(next(r['R@10'] for r in rows if r['arm']=='gating' and r['seed']=='agg')),
+        float(next(r['R@10'] for r in rows if r['arm']=='gating_qk' and r['seed']=='agg'))
+        - float(next(r['R@10'] for r in rows if r['arm']=='qk' and r['seed']=='agg'))),
+        "", "Per-seed, budgets, diagnostics, latency: raw/runs/PH2C-QK-002-MULTIVIEW/{results,budgets,by_query_type,rerank_diagnostics,latency,variability,qk_sanity_checks}.csv. Source: results/qk-attention-multiview.csv."]
+    w("table-qk-main.md", "\n".join(t) + "\n")
+
 print("tables written:", sorted(f for f in os.listdir(TAB) if f.endswith('.md')))
