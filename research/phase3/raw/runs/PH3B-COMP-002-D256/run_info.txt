@@ -1,0 +1,13 @@
+run_id=PH3B-COMP-002-D256
+experiment=PH3B medium corpus (memory-constrained probe) — 20K docs, dim 256, disk-backed engine dir
+date=2026-09-06
+command=target/release/phase3-bench textquality --tier M20D256 --data /var/tmp/phase3b/agnews-M20D256 --out research/phase3/raw/runs/PH3B-COMP-002-D256 --seeds 42,7,1
+dataset=PH3B-DS-AG-M20D256 (same protocol as S at dim 256; utility verification passed: defining heads 1.0)
+status=COMPLETED (anchor 1.0000)
+environment=sandbox 2 CPUs / 1984 MB RAM; peak RSS 967 MB; engine dir on DISK
+headlines=TEST R@10 gating 0.6021±0.0161 (seeds 42/7/1) vs uniform 0.3580 vs gbest 0.4333
+vs bm25 0.1716 vs hybrid-RRF 0.2802 vs oracle 0.9x; gap recovered ≈0.47;
+candidate recall 0.9580 (harder at 20K/256). Scaling conclusion: the
+gating advantage REPLICATES at 5x corpus scale. Comparability caveat:
+dim 256 has a different hash-collision regime than the 512-dim S tier —
+cross-tier metric comparison is directional, not exact.

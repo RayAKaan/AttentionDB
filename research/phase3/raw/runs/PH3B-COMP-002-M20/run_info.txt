@@ -1,0 +1,9 @@
+run_id=PH3B-COMP-002-M20
+experiment=PH3B medium corpus attempt — tier M20 (20K docs, dim 512)
+date=2026-09-06
+status=FAILED — OOM_RESOURCE_LIMIT (exit 137, SIGKILL ~253 s into engine build)
+environment=sandbox 2 CPUs / 1984 MB RAM; engine dir was tmpfs (/tmp)
+analysis=projected peak RSS ≈ 1.8 GB > ~1.4 GB available at dim 512.
+Preserved per §14. The dim-256 medium probe (PH3B-COMP-002-D256)
+succeeded with disk-backed engine dirs at 967 MB peak.
+notes=no metrics produced

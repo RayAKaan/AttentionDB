@@ -1,0 +1,11 @@
+run_id=PH3B-COMP-002-D256-FAILED-TMPFS
+experiment=PH3B medium probe attempt — 20K docs dim 256, killed by tmpfs pressure
+date=2026-09-06
+status=FAILED — OOM_RESOURCE_LIMIT (exit 137). Root cause at kill time: 632 MB of
+tmpfs engine dirs leaked by the earlier SIGKILLed M30/M20 runs (tempdir
+Drop never ran) + tmpfs engine dir for this run. Environment hygiene
+fix: engine dir moved to disk (/var/tmp), leaks purged; the clean rerun
+is PH3B-COMP-002-D256. Preserved per §14 as an operational finding:
+SIGKILLed runs leak tmpfs engine state and must be reaped before
+attributing OOM to RSS.
+notes=no metrics produced

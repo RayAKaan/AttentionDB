@@ -65,13 +65,52 @@ def main():
                 ERR.append(f"memory table missing {row['peak_rss_mb']}")
 
     # 5. every COMPLETED experiment has config + dataset hash + commit
+    #    (analysis runs PH3B-BM25-001 / PH3B-HYBRID-001 carry run_info +
+    #     copied analysis artifacts instead of config.json)
+    ANALYSIS = {"PH3B-BM25-001", "PH3B-HYBRID-001"}
     for e in idx["experiments"]:
         if e.get("status", "").startswith("COMPLETED"):
             d = os.path.join(run, e["experiment_id"])
-            if not os.path.exists(os.path.join(d, "config.json")):
+            if e["experiment_id"] not in ANALYSIS and not os.path.exists(os.path.join(d, "config.json")):
                 ERR.append(f"{e['experiment_id']}: COMPLETED but no config.json")
             if e.get("git_commit") in ("", None):
                 ERR.append(f"{e['experiment_id']}: no code commit")
+
+    # 6. PH3B: canonical CSVs ↔ registry ↔ exact anchor ↔ gating numbers
+    comp = os.path.join(RES, "complementary-retrieval.csv")
+    if os.path.exists(comp):
+        for row in rd(comp):
+            eid = row["experiment"]
+            exp = next((x for x in idx["experiments"] if x["experiment_id"] == eid), None)
+            if exp is None:
+                ERR.append(f"complementary-retrieval.csv row for unregistered {eid}")
+                continue
+            key = row["arm"] + ("@" + row["seed"] if row["seed"] != "agg" else "")
+            m = exp["metrics"].get(key, {})
+            if m and m.get("R@10") != row["R@10"]:
+                ERR.append(f"registry drift {eid}/{key}: {m.get('R@10')} vs results {row['R@10']}")
+            if row["arm"] == "exact_reference" and row["R@10"] != "1.0000":
+                ERR.append(f"{eid}: exact-reference anchor != 1.0 ({row['R@10']}) — run invalid (HC-class)")
+        # raw run dir must exist for every experiment referenced in canonical CSVs
+        for row in rd(comp):
+            if not os.path.isdir(os.path.join(run, row["experiment"])):
+                ERR.append(f"canonical CSV references missing raw run {row['experiment']}")
+        # gating headline must match between canonical + registry (agg row)
+        canon = next((r for r in rd(comp) if r["experiment"] == "PH3B-COMP-001"
+                      and r["arm"] == "trained_gating" and r["seed"] == "agg"), None)
+        tab = os.path.join(TAB, "table-complementary-main.md")
+        if canon and os.path.exists(tab):
+            if canon["R@10"] not in open(tab).read():
+                ERR.append("complementary main table missing gating R@10 " + canon["R@10"])
+
+    # 7. figures exist for the PH3B figure set A-F
+    for f in ("figure-A-comparisons", "figure-B-gating-weights", "figure-C-gating-vs-oracle",
+              "figure-D-sparse-dense-hybrid", "figure-E-quality-vs-latency", "figure-F-candidate-recall"):
+        pth = os.path.join(HERE, "figures", f + ".svg")
+        if not os.path.exists(pth):
+            ERR.append(f"missing PH3B figure {f}.svg")
+        elif "PH3B-COMP-001" not in open(pth).read():
+            ERR.append(f"{f}.svg missing experiment-ID provenance")
 
     if ERR:
         print("PHASE 3 CONSISTENCY CHECK FAILED:")

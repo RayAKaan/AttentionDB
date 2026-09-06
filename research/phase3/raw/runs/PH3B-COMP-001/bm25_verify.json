@@ -1,0 +1,21 @@
+{
+ "experiment": "PH3B-BM25-001",
+ "engine_bm25": {
+  "params": "k1=1.5 b=0.75 (engine defaults, core/src/bm25.rs)",
+  "tokenizer": "whitespace split, punctuation-trim, lowercase, stopword filter, full Porter stemmer (engine-internal)",
+  "index_source": "joined record text fields (title + description)"
+ },
+ "independent_bm25": {
+  "params": "k1=1.5 b=0.75 (same ranking function)",
+  "tokenizer": "lowercase [a-z0-9]+ tokens, NO stopwords, NO stemming (deliberately different \u2014 documented)",
+  "purpose": "cross-implementation sanity, not a metric baseline"
+ },
+ "n_queries_with_top10": 61,
+ "term_containment_top10": 0.9902,
+ "rare_token_known_answer_hit_rate": 0.7556,
+ "rare_token_probes": 45,
+ "overlap_at_10_engine_vs_independent": 0.5852,
+ "verdict_notes": [
+  "verdict: engine channel behaves as BM25 \u2014 rare-token known-answer recovery far above chance; term containment consistent with a stemming tokenizer; rankings correlate with an independent same-parameters BM25 under a different tokenizer"
+ ]
+}

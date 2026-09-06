@@ -1,0 +1,13 @@
+run_id=PH3B-BM25-001
+experiment=independent verification of the engine BM25 sparse channel (§10)
+date=2026-09-06
+method=baselines/bm25_verify.py — rare-token known-answer probes, term
+containment in top-10, and overlap@10 vs a self-contained same-parameters
+Okapi BM25 (deliberately different tokenizer: no stopwords/stemming)
+inputs=PH3B-COMP-001/bm25_top10.csv + ds.json + /var/tmp/phase3b/agnews-S
+status=COMPLETED — channel VERIFIED: containment 0.9902; rare-token
+known-answer recovery 0.7556 (45 probes, chance ≈ 0); overlap@10 0.5852
+notes=HC-P3-6: the diagnostic CSV's id mapping was wrong in the recorded
+COMP-001 dump (fixed in harness for future runs; verifier reconstructs
+the mapping). BM25 ARM metrics never used the diagnostic. See
+results/bm25.csv for the canonical diagnostics row.

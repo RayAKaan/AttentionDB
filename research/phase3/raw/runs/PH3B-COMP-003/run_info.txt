@@ -1,0 +1,10 @@
+run_id=PH3B-COMP-003
+experiment=PH3B multi-seed/reproducibility validation — tier S seed-42 rerun, environment matched to PH3B-COMP-001 (PH3B_ENGINE_TMPFS=1)
+date=2026-09-06
+command=PH3B_ENGINE_TMPFS=1 target/release/phase3-bench textquality --tier S --data /var/tmp/phase3b/agnews-S --out research/phase3/raw/runs/PH3B-COMP-003 --seeds 42
+status=COMPLETED (anchor 1.0000)
+reproduction=gating seed-42 R@10 0.6492 vs COMP-001 0.6426 (+0.0066); uniform 0.4115 vs
+0.3885; gbest 0.4066 vs 0.4033; bm25 0.1787 IDENTICAL (sparse channel is
+deterministic); cand-recall 0.9804 vs 0.9839. Wobble = OS-seeded HNSW
+pool regeneration (Phase 2 doctrine: engine-generated pools are the
+reproducibility unit; ds.json cached per run). All verdicts unchanged.

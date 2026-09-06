@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="560" viewBox="0 0 860 560">
+<rect width="860" height="560" fill="white"/>
+<text x="430.0" y="34" text-anchor="middle" font-size="19" font-weight="bold" fill="#111">Sparse vs dense vs hybrid vs learned (R@10)</text>
+<line x1="90" y1="70.0" x2="840" y2="70.0" stroke="#e5e5e5"/>
+<text x="82" y="74.0" text-anchor="end" font-size="11" fill="#666">0.74</text>
+<line x1="90" y1="138.0" x2="840" y2="138.0" stroke="#e5e5e5"/>
+<text x="82" y="142.0" text-anchor="end" font-size="11" fill="#666">0.59</text>
+<line x1="90" y1="206.0" x2="840" y2="206.0" stroke="#e5e5e5"/>
+<text x="82" y="210.0" text-anchor="end" font-size="11" fill="#666">0.44</text>
+<line x1="90" y1="274.0" x2="840" y2="274.0" stroke="#e5e5e5"/>
+<text x="82" y="278.0" text-anchor="end" font-size="11" fill="#666">0.30</text>
+<line x1="90" y1="342.0" x2="840" y2="342.0" stroke="#e5e5e5"/>
+<text x="82" y="346.0" text-anchor="end" font-size="11" fill="#666">0.15</text>
+<line x1="90" y1="410.0" x2="840" y2="410.0" stroke="#e5e5e5"/>
+<text x="82" y="414.0" text-anchor="end" font-size="11" fill="#666">0.00</text>
+<line x1="90" y1="70" x2="90" y2="410" stroke="#333"/>
+<line x1="90" y1="410" x2="840" y2="410" stroke="#333"/>
+<rect x="133.1" y="328.1" width="63.8" height="81.9" fill="#4056b0"/>
+<text x="165.0" y="324.1" text-anchor="middle" font-size="10" fill="#333">0.179</text>
+<text x="165" y="428" text-anchor="middle" font-size="13" fill="#111">BM25</text>
+<rect x="283.1" y="225.1" width="63.8" height="184.9" fill="#4056b0"/>
+<text x="315.0" y="221.1" text-anchor="middle" font-size="10" fill="#333">0.403</text>
+<text x="315" y="428" text-anchor="middle" font-size="13" fill="#111">Best single view</text>
+<rect x="433.1" y="266.4" width="63.8" height="143.6" fill="#4056b0"/>
+<text x="465.0" y="262.4" text-anchor="middle" font-size="10" fill="#333">0.313</text>
+<text x="465" y="428" text-anchor="middle" font-size="13" fill="#111">Hybrid RRF k=60</text>
+<rect x="583.1" y="263.4" width="63.8" height="146.6" fill="#4056b0"/>
+<text x="615.0" y="259.4" text-anchor="middle" font-size="10" fill="#333">0.320</text>
+<text x="615" y="428" text-anchor="middle" font-size="13" fill="#111">Hybrid (engine)</text>
+<rect x="733.1" y="114.3" width="63.8" height="295.7" fill="#4056b0"/>
+<text x="765.0" y="110.3" text-anchor="middle" font-size="10" fill="#333">0.645</text>
+<text x="765" y="428" text-anchor="middle" font-size="13" fill="#111">Trained gating</text>
+<rect x="90" y="448" width="12" height="12" fill="#4056b0"/>
+<text x="106" y="458" font-size="12" fill="#111">R@10</text>
+<text x="90" y="488" font-size="12" fill="#333">Y: Recall@10 (TEST)</text>
+<text x="90" y="510" font-size="11.5" fill="#555" font-style="italic">Caption (auto): against this benchmark's semantic-space ground truth, BM25 (0.1787) and BM25-hybrid (0.31</text>
+<text x="90" y="527" font-size="11.5" fill="#555" font-style="italic">31) trail the dense views; trained gating (0.6448) outperforms all static combinations. BM25 channel inde</text>
+<text x="90" y="544" font-size="11.5" fill="#555" font-style="italic">pendently verified (bm25_verify.json).</text>
+<text x="90" y="548" font-size="10.5" fill="#888">Source: results/complementary-retrieval.csv | Experiments: PH3B-COMP-001 + PH3B-BM25-001</text>
+</svg>

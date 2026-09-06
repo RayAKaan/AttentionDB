@@ -1,0 +1,2 @@
+experiment,R@10,NDCG@10,MRR,p50_us,p95_us,p99_us,indexing,tokenizer,verified_containment,verified_rare_token_hit_rate,verified_overlap_indep_bm25
+PH3B-COMP-001,0.1787,0.2245,0.4533,413.8,789.0,912.5,embedded in insert_document (172.7 s total build),"engine-internal: lowercase, punctuation-trim, stopwords, porter stem",0.9902,0.7556,0.5852

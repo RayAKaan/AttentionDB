@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="560" viewBox="0 0 860 560">
+<rect width="860" height="560" fill="white"/>
+<text x="430.0" y="34" text-anchor="middle" font-size="19" font-weight="bold" fill="#111">Trained gating vs static baselines (R@10) — AG News multi-field</text>
+<line x1="90" y1="70.0" x2="840" y2="70.0" stroke="#e5e5e5"/>
+<text x="82" y="74.0" text-anchor="end" font-size="11" fill="#666">1.12</text>
+<line x1="90" y1="138.0" x2="840" y2="138.0" stroke="#e5e5e5"/>
+<text x="82" y="142.0" text-anchor="end" font-size="11" fill="#666">0.89</text>
+<line x1="90" y1="206.0" x2="840" y2="206.0" stroke="#e5e5e5"/>
+<text x="82" y="210.0" text-anchor="end" font-size="11" fill="#666">0.67</text>
+<line x1="90" y1="274.0" x2="840" y2="274.0" stroke="#e5e5e5"/>
+<text x="82" y="278.0" text-anchor="end" font-size="11" fill="#666">0.45</text>
+<line x1="90" y1="342.0" x2="840" y2="342.0" stroke="#e5e5e5"/>
+<text x="82" y="346.0" text-anchor="end" font-size="11" fill="#666">0.22</text>
+<line x1="90" y1="410.0" x2="840" y2="410.0" stroke="#e5e5e5"/>
+<text x="82" y="414.0" text-anchor="end" font-size="11" fill="#666">0.00</text>
+<line x1="90" y1="70" x2="90" y2="410" stroke="#333"/>
+<line x1="90" y1="410" x2="840" y2="410" stroke="#333"/>
+<rect x="97.5" y="398.9" width="31.9" height="11.1" fill="#4056b0"/>
+<text x="113.4" y="394.9" text-anchor="middle" font-size="10" fill="#333">0.036</text>
+<rect x="144.4" y="322.9" width="31.9" height="87.1" fill="#b04040"/>
+<text x="160.3" y="318.9" text-anchor="middle" font-size="10" fill="#333">0.286</text>
+<rect x="191.2" y="227.6" width="31.9" height="182.4" fill="#2e8b57"/>
+<text x="207.2" y="223.6" text-anchor="middle" font-size="10" fill="#333">0.600</text>
+<rect x="238.1" y="114.3" width="31.9" height="295.7" fill="#b08840"/>
+<text x="254.1" y="110.3" text-anchor="middle" font-size="10" fill="#333">0.973</text>
+<text x="184" y="428" text-anchor="middle" font-size="13" fill="#111">title</text>
+<rect x="285.0" y="116.2" width="31.9" height="293.8" fill="#4056b0"/>
+<text x="300.9" y="112.2" text-anchor="middle" font-size="10" fill="#333">0.967</text>
+<rect x="331.9" y="288.4" width="31.9" height="121.6" fill="#b04040"/>
+<text x="347.8" y="284.4" text-anchor="middle" font-size="10" fill="#333">0.400</text>
+<rect x="378.8" y="200.6" width="31.9" height="209.4" fill="#2e8b57"/>
+<text x="394.7" y="196.6" text-anchor="middle" font-size="10" fill="#333">0.689</text>
+<rect x="425.6" y="116.2" width="31.9" height="293.8" fill="#b08840"/>
+<text x="441.6" y="112.2" text-anchor="middle" font-size="10" fill="#333">0.967</text>
+<text x="371" y="428" text-anchor="middle" font-size="13" fill="#111">body</text>
+<rect x="472.5" y="317.4" width="31.9" height="92.6" fill="#4056b0"/>
+<text x="488.4" y="313.4" text-anchor="middle" font-size="10" fill="#333">0.305</text>
+<rect x="519.4" y="262.4" width="31.9" height="147.6" fill="#b04040"/>
+<text x="535.3" y="258.4" text-anchor="middle" font-size="10" fill="#333">0.486</text>
+<rect x="566.2" y="211.2" width="31.9" height="198.8" fill="#2e8b57"/>
+<text x="582.2" y="207.2" text-anchor="middle" font-size="10" fill="#333">0.654</text>
+<rect x="613.1" y="117.6" width="31.9" height="292.4" fill="#b08840"/>
+<text x="629.1" y="113.6" text-anchor="middle" font-size="10" fill="#333">0.962</text>
+<text x="559" y="428" text-anchor="middle" font-size="13" fill="#111">mixed</text>
+<rect x="660.0" y="287.4" width="31.9" height="122.6" fill="#4056b0"/>
+<text x="675.9" y="283.4" text-anchor="middle" font-size="10" fill="#333">0.403</text>
+<rect x="706.9" y="291.9" width="31.9" height="118.1" fill="#b04040"/>
+<text x="722.8" y="287.9" text-anchor="middle" font-size="10" fill="#333">0.389</text>
+<rect x="753.8" y="214.0" width="31.9" height="196.0" fill="#2e8b57"/>
+<text x="769.7" y="210.0" text-anchor="middle" font-size="10" fill="#333">0.645</text>
+<rect x="800.6" y="116.0" width="31.9" height="294.0" fill="#b08840"/>
+<text x="816.6" y="112.0" text-anchor="middle" font-size="10" fill="#333">0.967</text>
+<text x="746" y="428" text-anchor="middle" font-size="13" fill="#111">ALL</text>
+<rect x="90" y="448" width="12" height="12" fill="#4056b0"/>
+<text x="106" y="458" font-size="12" fill="#111">Global-best single view</text>
+<rect x="298.6" y="448" width="12" height="12" fill="#b04040"/>
+<text x="314.6" y="458" font-size="12" fill="#111">Uniform multi-view</text>
+<rect x="466.20000000000005" y="448" width="12" height="12" fill="#2e8b57"/>
+<text x="482.20000000000005" y="458" font-size="12" fill="#111">Trained gating</text>
+<rect x="601.0" y="448" width="12" height="12" fill="#b08840"/>
+<text x="617.0" y="458" font-size="12" fill="#111">Oracle head (ceiling)</text>
+<text x="90" y="488" font-size="12" fill="#333">Y: Recall@10 (TEST)</text>
+<text x="90" y="510" font-size="11.5" fill="#555" font-style="italic">Caption (auto): gating reaches 0.6448 R@10 overall — above global-best (0.4033) and uniform (0.3885), rec</text>
+<text x="90" y="527" font-size="11.5" fill="#555" font-style="italic">overing 44% of the oracle-head gap. Uniform fusion fails to beat the best single view.</text>
+<text x="90" y="548" font-size="10.5" fill="#888">Source: results/complementary-retrieval.csv + results/gating-by-query-type.csv | Experiments: PH3B-COMP-001</text>
+</svg>

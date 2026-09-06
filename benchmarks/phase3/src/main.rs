@@ -18,6 +18,8 @@ use attentiondb_learned::gating_v2::{
     QualityTarget, QueryExample, Split, TrainOutcome, TrainingConfig, TrainingMeta,
 };
 use attentiondb_storage::{Durability, Record};
+
+mod textqual;
 use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::io::Read as _;
@@ -452,7 +454,8 @@ fn cmd_quality(tier: &str, data_dir: &str, out_dir: &str, seeds: &[u64]) -> Stri
     std::fs::write(
         format!("{out_dir}/ds.json"),
         serde_json::to_string(&ds).unwrap(),
-    ).unwrap();
+    )
+    .unwrap();
     let (tr, va, te) = ds.split_counts();
     let ds_hash = ds.content_hash();
 
@@ -834,6 +837,10 @@ fn main() {
         "quality" => {
             std::fs::create_dir_all(&out).unwrap();
             println!("{}", cmd_quality(&tier, &data, &out, &seeds));
+        }
+        "textquality" => {
+            std::fs::create_dir_all(&out).unwrap();
+            println!("{}", crate::textqual::run(&tier, &data, &out, &seeds));
         }
         other => {
             eprintln!("unknown command {other}");

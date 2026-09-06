@@ -1,0 +1,4 @@
+experiment,qtype,n,mean_w_title,mean_w_body,mean_w_full,oracle_agreement_rate
+PH3B-COMP-001,body,18,0.0006,0.6377,0.3617,0.6111
+PH3B-COMP-001,mixed,21,0.0491,0.3059,0.645,0.619
+PH3B-COMP-001,title,22,0.5677,0.2444,0.1879,0.5455

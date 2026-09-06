@@ -1,0 +1,84 @@
+{
+  "code_commit": "unknown",
+  "corpus": {
+    "dim": 256,
+    "head_fields": {
+      "body": "description",
+      "full": "title + description",
+      "title": "title"
+    },
+    "heads": [
+      "title",
+      "body",
+      "full"
+    ],
+    "n_docs": 20000
+  },
+  "data_dir": "/var/tmp/phase3b/agnews-M20D256",
+  "dataset_files_sha256": {
+    "corpus_body.f32": "9cce84690bbf52b849b4275c1d302ce9342899e831e0b7d0a3c07c3b880b4d71",
+    "corpus_full.f32": "a623a17849bbab055db12f9c733a5967c1a0d19a638d9483b86b15f088910c04",
+    "corpus_text.jsonl": "72d77f0480dba62f627bcc6b53986089f6c4a3d671a30787f7d8cb2457f816e4",
+    "corpus_title.f32": "f63e9045e32f33d8b8353e2543b974e342c12ff341119020985c7ef4d2fee3e0",
+    "gt_body.i64": "15911d084d83af9c8fdfcb4a80148d7cab40d70f6eb2e0447d320a83685f54cf",
+    "gt_mixed.i64": "418fb98e78439321e060004eb073fd4fd727f38af3325320283df8c89ea28550",
+    "gt_title.i64": "c06181e73fe695eb456de035f15d2489eeabf004bc902f67c9022124d8daa69d",
+    "queries_body_body.f32": "7e56a194a9cdca608ea171a0cddc74f3c1108af17728efda7649d153d10cd92a",
+    "queries_body_full.f32": "788a55b51cc675f4ecc5d07c5f4b91fc736c3280fb0c6f1d83beca6ec2edc044",
+    "queries_body_title.f32": "f7c2b7b202ddf9b16304e3e192ba9c703e03be128a241b0d0dbfcd1a45f339e2",
+    "queries_mixed_body.f32": "2d788201d0108020cd9e85454552ac10ed6ea691bdf1831d372e9230aeac5c19",
+    "queries_mixed_full.f32": "2837215f6e58f60dd444b70afd23a505c7fb024fb9aadad8b9e789d704fa5e24",
+    "queries_mixed_title.f32": "065d1c18234f4d52eab706734db709c691db9d21d0a281fde209f03b596ff1c2",
+    "queries_title_body.f32": "80c36d58258e977d72a944ca3407d4c1418b43fb8dd6d284f0778e32317ddf87",
+    "queries_title_full.f32": "1373a451776a83f0cbcbf02577fa42710d12be32440c57d87bb3c878e2a859bc",
+    "queries_title_title.f32": "ee82bca199a242559da24692664cdc2e933819ea40b9113357dfa5b1a028b8ea",
+    "query_text.jsonl": "213006627fa6e1b6d6258397ea4654fd4620d7aaf99cae64b47e95083b7b67eb"
+  },
+  "experiment_family": "PH3B textquality (COMP/BM25/HYBRID)",
+  "hardware": {
+    "cpus": 2,
+    "engine_dir_backend": "disk (/var/tmp)",
+    "ram_total_mb": 1984
+  },
+  "harness": {
+    "bm25_channel": "engine Bm25Index over joined record text fields; engine tokenizer: lowercase, trim punctuation, stopword filter, porter stem (engine-internal, documented)",
+    "bm25_limit": 100,
+    "exact_rounding": "1e-4 round-ties-even (numpy parity, HC-P3-4)",
+    "gating_protocol": "2B grid: {QualityRegression,SoftTarget,Pairwise} x lr{0.01,0.003} x hidden{32,64}, val-select + val temperature {0.25,0.5,1,2}",
+    "gt_k": 10,
+    "hnsw": "engine defaults M=16 ef_construction=400 ef_search=64",
+    "hybrid_dense_side": "full view",
+    "normalization": "per-head minmax over pool scores (pipeline stage 3)",
+    "pool": 100,
+    "rrf_k": 60.0,
+    "seeds": [
+      42,
+      7,
+      1
+    ],
+    "splits": {
+      "counts": [
+        371,
+        79,
+        81
+      ],
+      "ratios": "0.70/0.15/0.15",
+      "seed": 42
+    }
+  },
+  "queries": {
+    "n_total": 531,
+    "per_type": [
+      183,
+      176,
+      172
+    ],
+    "protocol": "one field at a time (title/body/mixed); each embedded in all 3 head spaces",
+    "types": [
+      "title",
+      "body",
+      "mixed"
+    ]
+  },
+  "tier": "M20D256"
+}

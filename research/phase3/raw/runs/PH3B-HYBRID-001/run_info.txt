@@ -1,0 +1,10 @@
+run_id=PH3B-HYBRID-001
+experiment=hybrid BM25+vector fusion analysis (§11)
+date=2026-09-06
+method=RRF(BM25 top-100, full-view pool) k=60 pre-registered primary;
+k-sensitivity measured on VALIDATION ONLY (hybrid_k_val.csv:
+k20 0.350 / k60 0.330 / k120 0.325) — k was never tuned on test
+status=COMPLETED — hybrid test R@10 0.3131 (manual RRF) / 0.3197 (engine
+channel) vs trained gating 0.6448: the learned multi-view path adds value
+beyond conventional hybrid search on this workload (C-3)
+artifacts=hybrid_k_val.csv (copied), results/hybrid.csv (canonical)

@@ -1,5 +1,40 @@
 # Phase 3 final report (IN PROGRESS — updated as experiment families complete)
 
+## Phase 3B addendum (2026-09-06): complementary multi-view + text/hybrid — central question
+
+**Does trained query-dependent gating help when views are genuinely
+complementary and query-dependent? YES on this workload.**
+
+- PH3B-COMP-001 (AG News multi-field, 10K docs, seeds 42/7/1):
+  gating **0.6448 ± 0.0025** vs uniform 0.3885 vs global-best single view
+  0.4033 vs oracle head 0.9672 → **gap recovered 0.443** (2B-comparable).
+  Gating beats both static baselines on EVERY query type (title/body/
+  mixed); mean gate weight concentrates on each type's defining head
+  (0.568/0.638/0.645) with per-query oracle agreement 0.55–0.62.
+- PH3B-COMP-002-D256 (20K docs, dim 256): gating 0.6021 ± 0.0161 vs
+  uniform 0.3580 / gbest 0.4333 — advantage replicates at 5× scale.
+- PH3B-COMP-002-M30/-M20: 512-dim medium corpora OOM on the 2 GB sandbox
+  (preserved; one additional tmpfs-hygiene failure preserved and labeled).
+- PH3B-BM25-001: engine BM25 independently verified correct
+  (containment 0.9902, rare-token known-answer 0.7556, overlap 0.5852 vs
+  independent BM25) — yet scores 0.1787 vs the semantic-space GT;
+  hybrid RRF k=60 0.3131 < gating 0.6448. Learned multi-view retrieval
+  adds value beyond conventional hybrid search on this workload.
+- Harness corrections HC-P3-4 (argpartition tie nondeterminism),
+  HC-P3-5 (ALL-row aggregation), HC-P3-6 (diagnostic id mapping) — all
+  caught pre-recording or in diagnostics; no canonical number invalidated.
+- Verdict vs §20 outcome menu: **Outcome 1** (gating significantly
+  improves over uniform AND global-best) + honest Outcome-4/5 context
+  (BM25/hybrid trail on this semantic GT; lexical-relevance workloads
+  untested).
+- Decision gate (§22): trained gating demonstrates a reproducible gain on
+  complementary real-world data at two scales. This supports treating
+  trained gating as the validated contribution — contingent on the
+  remaining systems/reliability families (§12–§26) and the §40
+  classification, which stay open.
+
+See findings/complementary-analysis.md for the full provisional analysis.
+
 ## Answered so far
 
 **Retrieval (§6, PH3-DS-FM-S)**

@@ -1,0 +1,11 @@
+stage,n,p50_us,p95_us,p99_us,qps
+ann_head_body,243,2518.9,2924.4,2994.6,
+ann_head_full,243,2584.0,2945.5,3114.7,
+ann_head_title,243,2523.9,2926.3,3061.8,
+bm25_query,243,803.1,1671.1,1793.7,
+exact_bruteforce,243,7283.7,7522.4,7647.0,
+fusion_rank,243,54.0,61.3,82.5,
+gating_forward,243,125.1,137.1,150.3,
+gating_path_total,243,7805.8,8747.9,8898.7,129
+hybrid_path_total,243,3303.1,4379.1,4642.4,299
+rrf_combine,243,25.6,29.9,53.3,

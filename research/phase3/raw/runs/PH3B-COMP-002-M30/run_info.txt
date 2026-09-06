@@ -1,0 +1,10 @@
+run_id=PH3B-COMP-002-M30
+experiment=PH3B medium corpus attempt — tier M (30K docs, dim 512)
+date=2026-09-06
+status=FAILED — OOM_RESOURCE_LIMIT (exit 137, SIGKILL ~343 s into engine build)
+environment=sandbox 2 CPUs / 1984 MB RAM (~1.4 GB available); engine dir was tmpfs (/tmp)
+analysis=projected peak RSS ≈ 2.6 GB (76 MB base + ~14x raw vector bytes
+[184 MB] measured from S-tier fits). Not buildable on this sandbox at
+dim 512. Preserved per §14; superseded by PH3B-COMP-002-D256 (dim-256
+probe, disk-backed engine dir) after tmpfs-leak hygiene was fixed.
+notes=no metrics produced; partial dir retained (models/ empty, no config.json)

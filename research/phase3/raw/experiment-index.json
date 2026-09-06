@@ -84,6 +84,452 @@
    ],
    "hardware": "sandbox 2 CPUs / 1984 MB RAM",
    "status": "FAILED \u2014 OOM_RESOURCE_LIMIT (brackets the \u00a719 wall below 30K docs)"
+  },
+  {
+   "experiment_id": "PH3B-COMP-001",
+   "date": "2026-09-06",
+   "git_commit": "8638a022ed543385aa27d9bc1872edf70c8bc093",
+   "corpus": "PH3B-DS-AG-S (AG News multi-field text; 10K docs; 401 leakage-filtered queries; dim 512; sha256 in config.json)",
+   "seed": "42,7,1",
+   "model": "frozen architecture + baselines: global-best single / uniform / trained gating (2B protocol, seeds 42,7,1) / BM25 / hybrid RRF k=60 / engine hybrid / oracle head / exact anchor",
+   "objective": "Phase 3B: complementary multi-view + text/hybrid validation",
+   "metrics": {
+    "global_best_single": {
+     "R@1": "0.0557",
+     "R@5": "0.2344",
+     "R@10": "0.4033",
+     "NDCG@10": "0.4397",
+     "MRR": "0.6080",
+     "R@10_std": "0.0000"
+    },
+    "uniform_multihead": {
+     "R@1": "0.0721",
+     "R@5": "0.2525",
+     "R@10": "0.3885",
+     "NDCG@10": "0.4569",
+     "MRR": "0.8025",
+     "R@10_std": "0.0000"
+    },
+    "trained_gating@42": {
+     "R@1": "0.0754",
+     "R@5": "0.3443",
+     "R@10": "0.6426",
+     "NDCG@10": "0.6674",
+     "MRR": "0.7965",
+     "R@10_std": "0.0000"
+    },
+    "trained_gating@7": {
+     "R@1": "0.0836",
+     "R@5": "0.3672",
+     "R@10": "0.6443",
+     "NDCG@10": "0.6861",
+     "MRR": "0.8581",
+     "R@10_std": "0.0000"
+    },
+    "trained_gating@1": {
+     "R@1": "0.0754",
+     "R@5": "0.3459",
+     "R@10": "0.6475",
+     "NDCG@10": "0.6722",
+     "MRR": "0.8020",
+     "R@10_std": "0.0000"
+    },
+    "trained_gating": {
+     "R@1": "0.0781",
+     "R@5": "0.3525",
+     "R@10": "0.6448",
+     "NDCG@10": "0.6752",
+     "MRR": "0.8189",
+     "R@10_std": "0.0025"
+    },
+    "bm25": {
+     "R@1": "0.0393",
+     "R@5": "0.1328",
+     "R@10": "0.1787",
+     "NDCG@10": "0.2245",
+     "MRR": "0.4533",
+     "R@10_std": "0.0000"
+    },
+    "hybrid_rrf_k60": {
+     "R@1": "0.0525",
+     "R@5": "0.1984",
+     "R@10": "0.3131",
+     "NDCG@10": "0.3590",
+     "MRR": "0.6088",
+     "R@10_std": "0.0000"
+    },
+    "hybrid_engine": {
+     "R@1": "0.0541",
+     "R@5": "0.2148",
+     "R@10": "0.3197",
+     "NDCG@10": "0.3706",
+     "MRR": "0.6220",
+     "R@10_std": "0.0000"
+    },
+    "oracle_head_empirical": {
+     "R@1": "0.1000",
+     "R@5": "0.5000",
+     "R@10": "0.9672",
+     "NDCG@10": "0.9790",
+     "MRR": "1.0000",
+     "R@10_std": "0.0000"
+    },
+    "oracle_head_group": {
+     "R@1": "0.1000",
+     "R@5": "0.5000",
+     "R@10": "0.9672",
+     "NDCG@10": "0.9790",
+     "MRR": "1.0000",
+     "R@10_std": "0.0000"
+    },
+    "exact_reference": {
+     "R@1": "0.1000",
+     "R@5": "0.5000",
+     "R@10": "1.0000",
+     "NDCG@10": "1.0000",
+     "MRR": "1.0000",
+     "R@10_std": "0.0000"
+    }
+   },
+   "output_files": [
+    "bm25_top10.csv",
+    "bm25_verify.json",
+    "candidate_recall.csv",
+    "config.json",
+    "ds.json",
+    "gating_weights_test.csv",
+    "hybrid_k_val.csv",
+    "latency.csv",
+    "memory.csv",
+    "metrics.json",
+    "models",
+    "query_groups.csv",
+    "results.csv",
+    "run_info.txt",
+    "stdout.log",
+    "val_grid_gating.csv"
+   ],
+   "hardware": "sandbox 2 CPUs / 1984 MB RAM; peak RSS 842 MB; engine dir tmpfs",
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3B-COMP-002-M30",
+   "date": "2026-09-06",
+   "git_commit": "8638a022ed543385aa27d9bc1872edf70c8bc093",
+   "corpus": "PH3B-DS-AG-M (30K docs, dim 512)",
+   "seed": "42,7,1",
+   "model": "n/a \u2014 OOM during engine build",
+   "objective": "Phase 3B: complementary multi-view + text/hybrid validation",
+   "metrics": {},
+   "output_files": [
+    "models",
+    "run_info.txt",
+    "stdout.log"
+   ],
+   "hardware": "sandbox 2 CPUs / 1984 MB RAM; projected peak \u22482.6 GB",
+   "status": "FAILED \u2014 OOM_RESOURCE_LIMIT (exit 137 ~343s; \u00a714 preserved)"
+  },
+  {
+   "experiment_id": "PH3B-COMP-002-M20",
+   "date": "2026-09-06",
+   "git_commit": "8638a022ed543385aa27d9bc1872edf70c8bc093",
+   "corpus": "PH3B-DS-AG-M20 (20K docs, dim 512)",
+   "seed": "42,7,1",
+   "model": "n/a \u2014 OOM during engine build",
+   "objective": "Phase 3B: complementary multi-view + text/hybrid validation",
+   "metrics": {},
+   "output_files": [
+    "models",
+    "run_info.txt",
+    "stdout.log"
+   ],
+   "hardware": "sandbox 2 CPUs / 1984 MB RAM; projected peak \u22481.8 GB",
+   "status": "FAILED \u2014 OOM_RESOURCE_LIMIT (exit 137 ~253s; \u00a714 preserved)"
+  },
+  {
+   "experiment_id": "PH3B-COMP-002-D256-FAILED-TMPFS",
+   "date": "2026-09-06",
+   "git_commit": "8638a022ed543385aa27d9bc1872edf70c8bc093",
+   "corpus": "PH3B-DS-AG-M20D256",
+   "seed": "42,7,1",
+   "model": "n/a",
+   "objective": "Phase 3B: complementary multi-view + text/hybrid validation",
+   "metrics": {},
+   "output_files": [
+    "models",
+    "run_info.txt",
+    "stdout.log"
+   ],
+   "hardware": "sandbox 2 CPUs / 1984 MB RAM",
+   "status": "FAILED \u2014 OOM_RESOURCE_LIMIT (tmpfs pressure from leaked engine dirs of killed runs)"
+  },
+  {
+   "experiment_id": "PH3B-COMP-002-D256",
+   "date": "2026-09-06",
+   "git_commit": "8638a022ed543385aa27d9bc1872edf70c8bc093",
+   "corpus": "PH3B-DS-AG-M20D256 (20K docs, dim 256 memory-constrained probe; utility verification passed)",
+   "seed": "42,7,1",
+   "model": "same arms as COMP-001, seeds 42,7,1; engine dir disk-backed",
+   "objective": "Phase 3B: complementary multi-view + text/hybrid validation",
+   "metrics": {
+    "global_best_single": {
+     "R@1": "0.0556",
+     "R@5": "0.2395",
+     "R@10": "0.4333",
+     "NDCG@10": "0.4587",
+     "MRR": "0.5797",
+     "R@10_std": "0.0000"
+    },
+    "uniform_multihead": {
+     "R@1": "0.0605",
+     "R@5": "0.2284",
+     "R@10": "0.3580",
+     "NDCG@10": "0.4069",
+     "MRR": "0.7373",
+     "R@10_std": "0.0000"
+    },
+    "trained_gating@42": {
+     "R@1": "0.0753",
+     "R@5": "0.3370",
+     "R@10": "0.6148",
+     "NDCG@10": "0.6460",
+     "MRR": "0.7876",
+     "R@10_std": "0.0000"
+    },
+    "trained_gating@7": {
+     "R@1": "0.0741",
+     "R@5": "0.3235",
+     "R@10": "0.5840",
+     "NDCG@10": "0.6149",
+     "MRR": "0.7655",
+     "R@10_std": "0.0000"
+    },
+    "trained_gating@1": {
+     "R@1": "0.0753",
+     "R@5": "0.3370",
+     "R@10": "0.6074",
+     "NDCG@10": "0.6390",
+     "MRR": "0.7890",
+     "R@10_std": "0.0000"
+    },
+    "trained_gating": {
+     "R@1": "0.0749",
+     "R@5": "0.3325",
+     "R@10": "0.6021",
+     "NDCG@10": "0.6333",
+     "MRR": "0.7807",
+     "R@10_std": "0.0161"
+    },
+    "bm25": {
+     "R@1": "0.0432",
+     "R@5": "0.1235",
+     "R@10": "0.1716",
+     "NDCG@10": "0.2200",
+     "MRR": "0.4887",
+     "R@10_std": "0.0000"
+    },
+    "hybrid_rrf_k60": {
+     "R@1": "0.0506",
+     "R@5": "0.1778",
+     "R@10": "0.2802",
+     "NDCG@10": "0.3256",
+     "MRR": "0.5800",
+     "R@10_std": "0.0000"
+    },
+    "hybrid_engine": {
+     "R@1": "0.0494",
+     "R@5": "0.1802",
+     "R@10": "0.3000",
+     "NDCG@10": "0.3370",
+     "MRR": "0.5554",
+     "R@10_std": "0.0000"
+    },
+    "oracle_head_empirical": {
+     "R@1": "0.1000",
+     "R@5": "0.5000",
+     "R@10": "0.9481",
+     "NDCG@10": "0.9667",
+     "MRR": "1.0000",
+     "R@10_std": "0.0000"
+    },
+    "oracle_head_group": {
+     "R@1": "0.1000",
+     "R@5": "0.5000",
+     "R@10": "0.9481",
+     "NDCG@10": "0.9667",
+     "MRR": "1.0000",
+     "R@10_std": "0.0000"
+    },
+    "exact_reference": {
+     "R@1": "0.1000",
+     "R@5": "0.5000",
+     "R@10": "1.0000",
+     "NDCG@10": "1.0000",
+     "MRR": "1.0000",
+     "R@10_std": "0.0000"
+    }
+   },
+   "output_files": [
+    "bm25_top10.csv",
+    "candidate_recall.csv",
+    "config.json",
+    "ds.json",
+    "gating_weights_test.csv",
+    "hybrid_k_val.csv",
+    "latency.csv",
+    "memory.csv",
+    "metrics.json",
+    "models",
+    "query_groups.csv",
+    "results.csv",
+    "run_info.txt",
+    "stdout.log",
+    "val_grid_gating.csv"
+   ],
+   "hardware": "sandbox 2 CPUs / 1984 MB RAM; peak RSS 967 MB",
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3B-COMP-003",
+   "date": "2026-09-06",
+   "git_commit": "8638a022ed543385aa27d9bc1872edf70c8bc093",
+   "corpus": "PH3B-DS-AG-S (rerun of COMP-001 seed 42, PH3B_ENGINE_TMPFS=1 environment match)",
+   "seed": "42,7,1",
+   "model": "reproducibility run: gating 0.6492 vs 0.6426 (pool wobble); BM25 identical",
+   "objective": "Phase 3B: complementary multi-view + text/hybrid validation",
+   "metrics": {
+    "global_best_single": {
+     "R@1": "0.0557",
+     "R@5": "0.2344",
+     "R@10": "0.4066",
+     "NDCG@10": "0.4421",
+     "MRR": "0.6107",
+     "R@10_std": "0.0000"
+    },
+    "uniform_multihead": {
+     "R@1": "0.0738",
+     "R@5": "0.2525",
+     "R@10": "0.4115",
+     "NDCG@10": "0.4745",
+     "MRR": "0.8215",
+     "R@10_std": "0.0000"
+    },
+    "trained_gating@42": {
+     "R@1": "0.0754",
+     "R@5": "0.3508",
+     "R@10": "0.6492",
+     "NDCG@10": "0.6743",
+     "MRR": "0.7933",
+     "R@10_std": "0.0000"
+    },
+    "trained_gating": {
+     "R@1": "0.0754",
+     "R@5": "0.3508",
+     "R@10": "0.6492",
+     "NDCG@10": "0.6743",
+     "MRR": "0.7933",
+     "R@10_std": "0.0000"
+    },
+    "bm25": {
+     "R@1": "0.0393",
+     "R@5": "0.1328",
+     "R@10": "0.1787",
+     "NDCG@10": "0.2245",
+     "MRR": "0.4533",
+     "R@10_std": "0.0000"
+    },
+    "hybrid_rrf_k60": {
+     "R@1": "0.0541",
+     "R@5": "0.2000",
+     "R@10": "0.3115",
+     "NDCG@10": "0.3599",
+     "MRR": "0.6195",
+     "R@10_std": "0.0000"
+    },
+    "hybrid_engine": {
+     "R@1": "0.0574",
+     "R@5": "0.2115",
+     "R@10": "0.3197",
+     "NDCG@10": "0.3722",
+     "MRR": "0.6376",
+     "R@10_std": "0.0000"
+    },
+    "oracle_head_empirical": {
+     "R@1": "0.1000",
+     "R@5": "0.5000",
+     "R@10": "0.9672",
+     "NDCG@10": "0.9788",
+     "MRR": "1.0000",
+     "R@10_std": "0.0000"
+    },
+    "oracle_head_group": {
+     "R@1": "0.1000",
+     "R@5": "0.5000",
+     "R@10": "0.9672",
+     "NDCG@10": "0.9788",
+     "MRR": "1.0000",
+     "R@10_std": "0.0000"
+    },
+    "exact_reference": {
+     "R@1": "0.1000",
+     "R@5": "0.5000",
+     "R@10": "1.0000",
+     "NDCG@10": "1.0000",
+     "MRR": "1.0000",
+     "R@10_std": "0.0000"
+    }
+   },
+   "output_files": [
+    "bm25_top10.csv",
+    "candidate_recall.csv",
+    "config.json",
+    "ds.json",
+    "gating_weights_test.csv",
+    "hybrid_k_val.csv",
+    "latency.csv",
+    "memory.csv",
+    "metrics.json",
+    "models",
+    "query_groups.csv",
+    "results.csv",
+    "run_info.txt",
+    "stdout.log",
+    "val_grid_gating.csv"
+   ],
+   "hardware": "sandbox 2 CPUs / 1984 MB RAM; peak RSS 841 MB",
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3B-BM25-001",
+   "date": "2026-09-06",
+   "git_commit": "8638a022ed543385aa27d9bc1872edf70c8bc093",
+   "corpus": "PH3B-DS-AG-S",
+   "seed": "n/a",
+   "model": "independent BM25 verification: containment 0.9902; rare-token known-answer 0.7556 (45 probes); overlap@10 vs independent BM25 0.5852",
+   "objective": "Phase 3B: complementary multi-view + text/hybrid validation",
+   "metrics": {},
+   "output_files": [
+    "bm25_verify.json",
+    "run_info.txt"
+   ],
+   "hardware": "python, same sandbox",
+   "status": "COMPLETED (analysis run over PH3B-COMP-001 artifacts)"
+  },
+  {
+   "experiment_id": "PH3B-HYBRID-001",
+   "date": "2026-09-06",
+   "git_commit": "8638a022ed543385aa27d9bc1872edf70c8bc093",
+   "corpus": "PH3B-DS-AG-S",
+   "seed": "n/a",
+   "model": "val-only k-sensitivity: k20 0.350 / k60 0.330 / k120 0.325 \u2014 no test tuning",
+   "objective": "Phase 3B: complementary multi-view + text/hybrid validation",
+   "metrics": {},
+   "output_files": [
+    "hybrid_k_val.csv",
+    "run_info.txt"
+   ],
+   "hardware": "same as COMP-001",
+   "status": "COMPLETED (analysis inside PH3B-COMP-001: hybrid_k_val.csv; k=60 pre-registered primary)"
   }
  ]
 }

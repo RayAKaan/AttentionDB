@@ -1,0 +1,11 @@
+experiment,stage,n,p50_us,p95_us,p99_us,qps
+PH3B-COMP-001,ann_head_body,183,3002.9,3523.5,3825.9,
+PH3B-COMP-001,ann_head_full,183,3067.6,3568.0,3766.3,
+PH3B-COMP-001,ann_head_title,183,3000.1,3492.6,3628.0,
+PH3B-COMP-001,bm25_query,183,413.8,789.0,912.5,
+PH3B-COMP-001,exact_bruteforce,183,6969.8,7165.3,7216.4,
+PH3B-COMP-001,fusion_rank,183,39.2,58.8,73.3,
+PH3B-COMP-001,gating_forward,183,104.8,136.5,148.6,
+PH3B-COMP-001,gating_path_total,183,9231.3,10287.8,11060.8,109
+PH3B-COMP-001,hybrid_path_total,183,3441.9,4075.9,4411.5,290
+PH3B-COMP-001,rrf_combine,183,25.0,48.5,52.3,

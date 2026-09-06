@@ -1,0 +1,6 @@
+experiment,arm,seed,R@10,NDCG@10,MRR,k
+PH3B-COMP-001,hybrid_rrf_k60,agg,0.3131,0.3590,0.6088,60 (pre-registered)
+PH3B-COMP-001,hybrid_engine,agg,0.3197,0.3706,0.6220,60 (pre-registered)
+PH3B-COMP-001,hybrid_rrf_VAL_ONLY,-,0.3400,0.4078,0.7633,20
+PH3B-COMP-001,hybrid_rrf_VAL_ONLY,-,0.3267,0.3974,0.7787,60
+PH3B-COMP-001,hybrid_rrf_VAL_ONLY,-,0.3200,0.3928,0.7786,120

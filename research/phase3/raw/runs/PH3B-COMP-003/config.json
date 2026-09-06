@@ -1,0 +1,82 @@
+{
+  "code_commit": "unknown",
+  "corpus": {
+    "dim": 512,
+    "head_fields": {
+      "body": "description",
+      "full": "title + description",
+      "title": "title"
+    },
+    "heads": [
+      "title",
+      "body",
+      "full"
+    ],
+    "n_docs": 10000
+  },
+  "data_dir": "/var/tmp/phase3b/agnews-S",
+  "dataset_files_sha256": {
+    "corpus_body.f32": "57c3d75071843a12fe31684e195adca5487303064accc8e6097f3061fda3940d",
+    "corpus_full.f32": "a05dca98b7ae7577fda7d56ffcce210425169013227c374d09b02dbcab08cfe2",
+    "corpus_text.jsonl": "8aa5d7463898e3231363f982b0cffb8de53aad8c6eb3086dfac737e50cce39f1",
+    "corpus_title.f32": "b7eaaa466b3551c3dae46ab2fb7fb0dd145d46390553c0fe39acc5b5c86f78a4",
+    "gt_body.i64": "42616a026b3378eb251026965c5a1c65335886e840632191e9cb65730f6c077b",
+    "gt_mixed.i64": "e3b66a2102cb2617d13aa65b77cf9c6a5c20d3bd9cf52b0af0cc677a111bd574",
+    "gt_title.i64": "1df564ee3ffeb02948ca5a7ff51d882ea5ab20841168d57ee846051283c6d160",
+    "queries_body_body.f32": "c3fdbe9b0d83a3e21e60fc3ea238c0f9cac6ff7c413749bb9de8b8001d061525",
+    "queries_body_full.f32": "f7bbfe6f98809079a76bedeb7561bafee3d67ae1f22bbb8afaf8a2b8ec933231",
+    "queries_body_title.f32": "18858d3275514120b01bdcc9e8ce733aecdc518439b982541710454e70008183",
+    "queries_mixed_body.f32": "6c97dfdc401fb703ce277554b65c1bbc78b035a6b86bc59d301490115a9e159b",
+    "queries_mixed_full.f32": "855afeac9d793444ac5932170c77c75affa38233a4ed8019523e85b2938b935d",
+    "queries_mixed_title.f32": "cfac59c6eda2e620fbcdc7b5ee681d616149dd3bed7b9c4c2b2f46e83a3cbbcf",
+    "queries_title_body.f32": "59c78cc44b63b716832633e58a6376ef5eee0247e1528f71f39ae7f14c3c307a",
+    "queries_title_full.f32": "93c15caefae9b29a7b5473bea1ae4ce485e0fe3ec40f9fd3f23f91167d982888",
+    "queries_title_title.f32": "ecc37f27129672ddf188e911746b274451a6fbe083e8c3025fe0cb106f113613",
+    "query_text.jsonl": "f395fb791ed7bdc9ad65bc2b7326598c5c837b8c11ba14c50afe17a7088c69f8"
+  },
+  "experiment_family": "PH3B textquality (COMP/BM25/HYBRID)",
+  "hardware": {
+    "cpus": 2,
+    "engine_dir_backend": "tmpfs (/tmp, RAM-backed)",
+    "ram_total_mb": 1984
+  },
+  "harness": {
+    "bm25_channel": "engine Bm25Index over joined record text fields; engine tokenizer: lowercase, trim punctuation, stopword filter, porter stem (engine-internal, documented)",
+    "bm25_limit": 100,
+    "exact_rounding": "1e-4 round-ties-even (numpy parity, HC-P3-4)",
+    "gating_protocol": "2B grid: {QualityRegression,SoftTarget,Pairwise} x lr{0.01,0.003} x hidden{32,64}, val-select + val temperature {0.25,0.5,1,2}",
+    "gt_k": 10,
+    "hnsw": "engine defaults M=16 ef_construction=400 ef_search=64",
+    "hybrid_dense_side": "full view",
+    "normalization": "per-head minmax over pool scores (pipeline stage 3)",
+    "pool": 100,
+    "rrf_k": 60.0,
+    "seeds": [
+      42
+    ],
+    "splits": {
+      "counts": [
+        280,
+        60,
+        61
+      ],
+      "ratios": "0.70/0.15/0.15",
+      "seed": 42
+    }
+  },
+  "queries": {
+    "n_total": 401,
+    "per_type": [
+      139,
+      133,
+      129
+    ],
+    "protocol": "one field at a time (title/body/mixed); each embedded in all 3 head spaces",
+    "types": [
+      "title",
+      "body",
+      "mixed"
+    ]
+  },
+  "tier": "S"
+}

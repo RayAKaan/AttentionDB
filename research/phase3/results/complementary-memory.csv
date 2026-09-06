@@ -1,0 +1,31 @@
+experiment,tier,metric,value
+PH3B-COMP-001,S-512,n_docs,10000
+PH3B-COMP-001,S-512,peak_rss_mb,841.6
+PH3B-COMP-001,S-512,rss_after_build_mb,713.5
+PH3B-COMP-001,S-512,raw_vector_mb,58.6
+PH3B-COMP-001,S-512,engine_multiplier_peak_over_raw,14.36
+PH3B-COMP-001,S-512,engine_dir_size_mb,160.3
+PH3B-COMP-001,S-512,build_seconds,172.7
+PH3B-COMP-001,S-512,pool_generation_seconds,3.5
+PH3B-COMP-001,S-512,exact_reference_seconds,0.4
+PH3B-COMP-002-D256,M20-256,n_docs,20000
+PH3B-COMP-002-D256,M20-256,peak_rss_mb,966.7
+PH3B-COMP-002-D256,M20-256,rss_after_build_mb,753.5
+PH3B-COMP-002-D256,M20-256,raw_vector_mb,58.6
+PH3B-COMP-002-D256,M20-256,engine_multiplier_peak_over_raw,16.50
+PH3B-COMP-002-D256,M20-256,engine_dir_size_mb,174.1
+PH3B-COMP-002-D256,M20-256,build_seconds,333.0
+PH3B-COMP-002-D256,M20-256,pool_generation_seconds,3.8
+PH3B-COMP-002-D256,M20-256,exact_reference_seconds,0.6
+PH3B-COMP-003,S-512-rerun,n_docs,10000
+PH3B-COMP-003,S-512-rerun,peak_rss_mb,840.5
+PH3B-COMP-003,S-512-rerun,rss_after_build_mb,712.4
+PH3B-COMP-003,S-512-rerun,raw_vector_mb,58.6
+PH3B-COMP-003,S-512-rerun,engine_multiplier_peak_over_raw,14.34
+PH3B-COMP-003,S-512-rerun,engine_dir_size_mb,160.3
+PH3B-COMP-003,S-512-rerun,build_seconds,178.1
+PH3B-COMP-003,S-512-rerun,pool_generation_seconds,3.7
+PH3B-COMP-003,S-512-rerun,exact_reference_seconds,0.4
+PH3B-COMP-002-M30,M-512,status,FAILED (OOM exit 137 ~343s)
+PH3B-COMP-002-M20,M-512,status,FAILED (OOM exit 137 ~253s)
+PH3B-COMP-002-D256-FAILED-TMPFS,M20-256,status,FAILED (OOM exit 137 (tmpfs pressure from leaked engine dirs))

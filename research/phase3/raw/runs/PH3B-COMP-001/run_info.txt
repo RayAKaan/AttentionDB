@@ -1,0 +1,16 @@
+run_id=PH3B-COMP-001
+experiment=PH3B complementary multi-field TEXT retrieval — small corpus (tier S, 10K docs, 5 heads->3 heads, dim 512)
+date=2026-09-06
+command=target/release/phase3-bench textquality --tier S --data /var/tmp/phase3b/agnews-S --out research/phase3/raw/runs/PH3B-COMP-001 --seeds 42,7,1
+dataset=PH3B-DS-AG-S (AG News multi-field; sha256 in config.json dataset_files_sha256; builder research/phase3/datasets/build_agnews.py)
+splits=280/60/61 queries (seed 42 shuffle, 0.70/0.15/0.15; leakage-filtered 401 queries)
+status=COMPLETED (exact-reference anchor R@10=1.0000 passed)
+environment=sandbox 2 CPUs / 1984 MB RAM; engine dir = tmpfs (/tmp) for this run
+headlines=TEST R@10 gating 0.6448±0.0025 (seeds 42/7/1) vs uniform 0.3885 vs
+global-best-single 0.4033 vs bm25 0.1787 vs hybrid-RRF-k60 0.3131 vs
+oracle-head 0.9672; gap recovered 0.443; candidate recall 0.9839;
+anchor exact=1.0000. Engine-dir backend tmpfs for this run (latency
+includes tmpfs WAL); D256 medium run used disk-backed dir — noted in
+cross-run latency comparisons.
+notes=hc-p3-6: bm25_top10.csv qid = test-row position (see baselines/bm25_verify.py);
+BM25 arm independently verified (bm25_verify.json)
