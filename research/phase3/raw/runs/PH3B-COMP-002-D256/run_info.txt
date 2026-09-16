@@ -11,3 +11,5 @@ candidate recall 0.9580 (harder at 20K/256). Scaling conclusion: the
 gating advantage REPLICATES at 5x corpus scale. Comparability caveat:
 dim 256 has a different hash-collision regime than the 512-dim S tier —
 cross-tier metric comparison is directional, not exact.
+
+storage_note=ds.json stored as ds.json.gz (gzip -9) post-commit for snapshot budget; sha256 5a9ac4c267596ef1... verified byte-identical on gunzip round-trip; run 'gunzip -k ds.json.gz' before tooling that reads ds.json (Phase 2 .json.gz precedent)

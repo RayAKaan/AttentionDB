@@ -5,3 +5,5 @@ command=target/release/phase3-bench headsquality --tier H2S5K --data /var/tmp/ph
 dataset=PH3B-DS-AG-H2S5K
 status=COMPLETED
 notes=arms x budgets {10,25,50,100,200}; gate trained at K=100 pools per seed, evaluated at all budgets (documented protocol); serial vs parallel latency; candidate-decomposition; weights/agreement
+
+storage_note=ds.json stored as ds.json.gz (gzip -9) post-commit for snapshot budget; sha256 ea972873a827665e... verified byte-identical on gunzip round-trip; run 'gunzip -k ds.json.gz' before tooling that reads ds.json (Phase 2 .json.gz precedent)

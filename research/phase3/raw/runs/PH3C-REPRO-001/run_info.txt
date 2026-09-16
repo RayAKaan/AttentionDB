@@ -8,3 +8,5 @@ headlines=gating 0.6492±0.0028 (COMP-001: 0.6448±0.0025; COMP-003: 0.6492);
 uniform 0.4082 (0.3885); gbest n/a in this grep (0.4033 in COMP-001); bm25 0.1787 IDENTICAL;
 hybrid 0.3148 (0.3131); oracle 0.9557 (0.9672, pool wobble); BM25 verification identical
 (containment 0.9902 / rare-token 0.7556 / overlap 0.5852). All verdicts unchanged.
+
+storage_note=ds.json stored as ds.json.gz (gzip -9) post-commit for snapshot budget; sha256 e1652069edd4e8c9... verified byte-identical on gunzip round-trip; run 'gunzip -k ds.json.gz' before tooling that reads ds.json (Phase 2 .json.gz precedent)

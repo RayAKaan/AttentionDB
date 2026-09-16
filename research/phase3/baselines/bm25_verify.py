@@ -74,7 +74,13 @@ def bm25_rank(qt, k1=1.5, b=0.75, k=10):
 
 
 TYPES = ["title", "body", "mixed"]
-ds = json.load(open(f"{RUN}/ds.json"))
+import gzip as _gz, os as _os
+_ds_path = f"{RUN}/ds.json"
+if not _os.path.exists(_ds_path) and _os.path.exists(_ds_path + ".gz"):
+    with _gz.open(_ds_path + ".gz", "rt") as _f:
+        ds = json.load(_f)
+else:
+    ds = json.load(open(_ds_path))
 # HC-P3-6 (recorded-run mapping): COMP-001's bm25_top10.csv qid is the TEST-row
 # position while the dumped text was chosen by the GLOBAL per-type index.
 # Recover it: test order -> query_id (ds.json) -> type (query_group) ->

@@ -8,3 +8,5 @@ reproduction=gating seed-42 R@10 0.6492 vs COMP-001 0.6426 (+0.0066); uniform 0.
 deterministic); cand-recall 0.9804 vs 0.9839. Wobble = OS-seeded HNSW
 pool regeneration (Phase 2 doctrine: engine-generated pools are the
 reproducibility unit; ds.json cached per run). All verdicts unchanged.
+
+storage_note=ds.json stored as ds.json.gz (gzip -9) post-commit for snapshot budget; sha256 0bd472ea7b223f66... verified byte-identical on gunzip round-trip; run 'gunzip -k ds.json.gz' before tooling that reads ds.json (Phase 2 .json.gz precedent)

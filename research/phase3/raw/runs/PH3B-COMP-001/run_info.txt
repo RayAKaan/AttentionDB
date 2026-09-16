@@ -14,3 +14,5 @@ includes tmpfs WAL); D256 medium run used disk-backed dir — noted in
 cross-run latency comparisons.
 notes=hc-p3-6: bm25_top10.csv qid = test-row position (see baselines/bm25_verify.py);
 BM25 arm independently verified (bm25_verify.json)
+
+storage_note=ds.json stored as ds.json.gz (gzip -9) post-commit for snapshot budget; sha256 78ee590f3090425a... verified byte-identical on gunzip round-trip; run 'gunzip -k ds.json.gz' before tooling that reads ds.json (Phase 2 .json.gz precedent)

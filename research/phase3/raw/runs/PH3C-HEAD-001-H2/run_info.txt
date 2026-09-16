@@ -5,3 +5,5 @@ command=target/release/phase3-bench headsquality --tier H2 --data /var/tmp/phase
 dataset=PH3B-DS-AG-H2
 status=COMPLETED
 notes=K=100 gating in results.csv; identical GT to the S tier
+
+storage_note=ds.json stored as ds.json.gz (gzip -9) post-commit for snapshot budget; sha256 3778beb20e5c2b9b... verified byte-identical on gunzip round-trip; run 'gunzip -k ds.json.gz' before tooling that reads ds.json (Phase 2 .json.gz precedent)
