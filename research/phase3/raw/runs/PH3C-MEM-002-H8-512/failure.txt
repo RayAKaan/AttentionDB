@@ -1,0 +1,8 @@
+exit_code=137 (SIGKILL by cgroup memory controller)
+failure_stage=E_insert_curve (document insertion / inline HNSW construction)
+last_successful_checkpoint=final row of memory-checkpoints.csv (E_insert_curve)
+last_measured_rss_mb=1360.6
+last_peak_rss_mb=1512.7
+engine_dir_bytes_at_death=382472444
+config=8 heads x dim 512 x 10000 docs, memprobe, disk-backed engine dir
+reason=head-count extrapolation (245-260 MB/head at dim 512) predicts ~2.1 GB peak; 5K docs completes at 960 MB (PH3C-MEM-002-H8-512-5K)

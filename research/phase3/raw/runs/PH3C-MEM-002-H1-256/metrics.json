@@ -1,0 +1,12 @@
+{
+  "build_seconds": 27.279098296,
+  "disk_classes": {
+    "manifest/catalog": 614,
+    "other": 20232449,
+    "wal": 0
+  },
+  "multiplier": 24.8064,
+  "peak_rss_mb": 242.25,
+  "raw_vector_mb": 9.765625,
+  "steady_rss_mb": 210.734375
+}

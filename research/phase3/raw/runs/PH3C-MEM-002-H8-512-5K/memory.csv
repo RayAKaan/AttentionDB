@@ -1,0 +1,15 @@
+metric,value
+tier,H8
+n_docs,5000
+n_heads,8
+dim,512
+raw_vector_mb,78.1
+peak_rss_mb,960.1
+steady_rss_mb,828.9
+engine_multiplier_peak_over_raw,12.29
+build_seconds,134.6
+engine_dir_backend,disk
+disk_manifest/catalog,900
+disk_other,85200080
+disk_sstable/data,21230847
+disk_wal,0

@@ -52,3 +52,21 @@ python3 research/phase3/tables/generate_tables_ph3b.py
 python3 research/phase3/figures/generate_figures_ph3b.py
 python3 research/phase3/verify_consistency.py
 ```
+
+---
+
+## Phase 3C claims (memory forensics / head scaling / candidate budgets)
+
+| claim | table/figure | result file | experiment | raw run | commit |
+|---|---|---|---|---|---|
+| wall is build-time (insertion loop), ~10.9x raw rate; bracket 15K OK / 20K OOM | figures/figure-1, figure-9 | results/memory-components.csv, memory-scaling.csv | PH3C-MEM-001, -002-C* | raw/runs/PH3C-MEM-* | see registry |
+| memory ~linear in heads (245-260 MB/head @512) | figure-2 | results/memory-scaling.csv | PH3C-MEM-002-H* | " | " |
+| memory ~linear in dim over fixed base | figure-3 | results/memory-scaling.csv | PH3C-MEM-002-D* | " | " |
+| max reproduced: 1h/30K, 2h/20K, 4h/10K, 8h/5K @512 | paper/memory.md | results/memory-scaling.csv | PH3C-MEM-002-BUDGET-*, -H8-512-5K | " | " |
+| duplication ≥2x raw + ~128MB retained build transient; exact split open | paper/memory.md | results/memory-components.csv | PH3C-MEM-001 | " | " |
+| tmpfs/leak mechanism verified (SIGKILL/exit leak; Drop cleans) | paper/memory.md | (leaktest transcript in run_info) | PH3C-MEM-003 | " | " |
+| head ladder: 0.519/0.658/0.715/0.709 (1/2/4/8, 5K) — saturation at 8 | figures/figure-4, -5, -6 | results/head-scaling-quality.csv | PH3C-HEAD-001-*-S5K | " | " |
+| parallel-2 halves p50 at >=2 heads; hurts at 1 | figure-5 | results/head-scaling-latency.csv | PH3C-HEAD-001-*-S5K | " | " |
+| budget plateau: gating flat K=10..200; CR 0.787->0.877 | figure-7 | results/candidate-budget.csv | PH3C-HEAD-001-H4(-S5K) | " | " |
+| miss decomposition 34% absent / 66% ranked-out / 19% view-selection | figure-8 | results/candidate-decomposition.csv | PH3C-HEAD-001-* | " | " |
+| reproduction: gating 0.6492 vs 0.6448 (+0.0044); BM25 identical; dataset hashes identical | — | results/reproduction.csv | PH3C-REPRO-001 | " | " |

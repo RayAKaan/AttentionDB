@@ -1,0 +1,17 @@
+run_id=PH3C-HEAD-002
+experiment=serial vs parallel head scaling (§1/§14) — analysis run over PH3C-HEAD-001-* latency artifacts
+date=2026-09-06
+method=each PH3C-HEAD-001-*-S5K run contains latency.csv with a SERIAL
+(single-threaded per-head loop) and a PARALLEL2 (2 scoped threads,
+round-robin heads) measurement over the identical test workload, plus
+cpu_s_total (utime+stime from /proc/self/stat) — CPU utilization record.
+status=COMPLETED (analysis; primary data in raw/runs/PH3C-HEAD-001-*/latency.csv)
+results=
+  1 head: serial 1712.7 us p50 (575 QPS, 0.33 cpu-s) | parallel2 2125.3 (471 QPS, 0.41) -> parallel HURTS 24%
+  2 heads: serial 4156.7 (240) | parallel2 2008.2 (489) -> 2.07x speedup
+  4 heads: serial 6692.1 (148) | parallel2 4383.3 (223) -> 1.53x speedup
+  8 heads: serial 22084.0 (45, 4.28 cpu-s) | parallel2 10926.1 (91, 3.82) -> 2.02x speedup
+verdict=parallelism beneficial at >=2 heads on the 2-CPU sandbox;
+counterproductive at 1 head (thread hand-off overhead); CPU totals
+confirm real redistribution (serial 1.65 vs parallel 1.57 cpu-s at 4h).
+canonical=results/head-scaling-latency.csv (mode column), figure-5

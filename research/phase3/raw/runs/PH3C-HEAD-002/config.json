@@ -1,0 +1,16 @@
+{
+ "experiment_family": "PH3C-HEAD-002 (analysis of PH3C-HEAD-001 serial/parallel latency)",
+ "sources": [
+  "PH3C-HEAD-001-H1-S5K",
+  "PH3C-HEAD-001-H2-S5K",
+  "PH3C-HEAD-001-H4-S5K",
+  "PH3C-HEAD-001-H8-S5K"
+ ],
+ "parallel_workers": 2,
+ "cpu_record": "utime+stime /proc/self/stat",
+ "code_commit": "see registry entry",
+ "hardware": {
+  "cpus": 2,
+  "ram_total_mb": 1984
+ }
+}

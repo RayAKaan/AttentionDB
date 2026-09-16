@@ -1,0 +1,8 @@
+{
+  "analysis_of": ["PH3C-HEAD-001-H1-S5K", "PH3C-HEAD-001-H2-S5K", "PH3C-HEAD-001-H4-S5K", "PH3C-HEAD-001-H8-S5K"],
+  "serial_p50_us": {"1": 1712.7, "2": 4156.7, "4": 6692.1, "8": 22084.0},
+  "parallel2_p50_us": {"1": 2125.3, "2": 2008.2, "4": 4383.3, "8": 10926.1},
+  "speedup_p50": {"2": 2.07, "4": 1.53, "8": 2.02},
+  "cpu_s": {"serial_4h": 1.65, "parallel_4h": 1.57, "serial_8h": 4.28, "parallel_8h": 3.82},
+  "environment": "2-CPU sandbox; 2 scoped workers; identical test workload"
+}

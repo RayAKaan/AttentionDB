@@ -1,0 +1,10 @@
+metric,value
+n_docs,10000
+peak_rss_mb,841.6
+rss_after_build_mb,630.4
+raw_vector_mb,58.6
+engine_multiplier_peak_over_raw,14.36
+engine_dir_size_mb,160.3
+build_seconds,185.8
+pool_generation_seconds,3.8
+exact_reference_seconds,0.3

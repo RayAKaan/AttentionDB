@@ -1,0 +1,7 @@
+run_id=PH3C-MEM-001
+experiment=memory component attribution — reference config (3 heads x dim 512 x 10K docs), lifecycle checkpoints A-K + per-1000-doc build curve
+date=2026-09-06
+command=target/release/phase3-bench memprobe --tier S --data /var/tmp/phase3b/agnews-S --out /home/user/AttentionDB/research/phase3/raw/runs/PH3C-MEM-001 --docs 10000
+dataset=PH3B-DS-AG-S
+status=COMPLETED
+headline=peak 860MB (14.7x raw 59MB); steady 650MB; build-transient ~128MB; WAL-on-disk 84MB during build -> 0 after checkpoint; disk footprint 84MB (1.4x raw); RSS drop after engine drop only 731->650 (allocator retention); dataset-load RSS jump 98MB attributed outside engine

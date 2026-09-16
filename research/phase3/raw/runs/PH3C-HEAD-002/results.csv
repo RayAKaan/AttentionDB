@@ -1,0 +1,9 @@
+mode,heads,p50_us,qps,speedup
+serial,1,1712.7,575,1.00
+parallel2,1,2125.3,471,0.81
+serial,2,4156.7,240,1.00
+parallel2,2,2008.2,489,2.07
+serial,4,6692.1,148,1.00
+parallel2,4,4383.3,223,1.53
+serial,8,22084.0,45,1.00
+parallel2,8,10926.1,91,2.02

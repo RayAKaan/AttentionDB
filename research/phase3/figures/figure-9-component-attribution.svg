@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="560">
+<rect width="880" height="560" fill="white"/>
+<text x="440.0" y="30" text-anchor="middle" font-size="18" font-weight="bold">Lifecycle RSS checkpoints — 3 heads x 512 x 10K (PH3C-MEM-001)</text>
+<line x1="90" y1="70" x2="90" y2="400" stroke="#333"/>
+<line x1="90" y1="400" x2="790" y2="400" stroke="#333"/>
+<line x1="90" y1="70.0" x2="790" y2="70.0" stroke="#eee"/>
+<text x="84" y="74.0" text-anchor="end" font-size="11" fill="#666">900</text>
+<line x1="90" y1="136.0" x2="790" y2="136.0" stroke="#eee"/>
+<text x="84" y="140.0" text-anchor="end" font-size="11" fill="#666">720</text>
+<line x1="90" y1="202.0" x2="790" y2="202.0" stroke="#eee"/>
+<text x="84" y="206.0" text-anchor="end" font-size="11" fill="#666">540</text>
+<line x1="90" y1="268.0" x2="790" y2="268.0" stroke="#eee"/>
+<text x="84" y="272.0" text-anchor="end" font-size="11" fill="#666">360</text>
+<line x1="90" y1="334.0" x2="790" y2="334.0" stroke="#eee"/>
+<text x="84" y="338.0" text-anchor="end" font-size="11" fill="#666">180</text>
+<line x1="90" y1="400.0" x2="790" y2="400.0" stroke="#eee"/>
+<text x="84" y="404.0" text-anchor="end" font-size="11" fill="#666">0</text>
+<text x="56" y="235.0" font-size="12" fill="#333" transform="rotate(-90 56 235.0)">RSS MB</text>
+<text x="134" y="418" text-anchor="middle" font-size="12">process_start</text>
+<text x="221" y="418" text-anchor="middle" font-size="12">dataset_loaded</text>
+<text x="309" y="418" text-anchor="middle" font-size="12">engine_init</text>
+<text x="396" y="418" text-anchor="middle" font-size="12">collection_cre</text>
+<text x="484" y="418" text-anchor="middle" font-size="12">inserts_done_h</text>
+<text x="571" y="418" text-anchor="middle" font-size="12">after_checkpoi</text>
+<text x="659" y="418" text-anchor="middle" font-size="12">steady_state</text>
+<text x="746" y="418" text-anchor="middle" font-size="12">after_engine_d</text>
+<rect x="112" y="397.7" width="52" height="2.3" fill="#4056b0"/>
+<text x="138" y="394" text-anchor="middle" font-size="9.5">6</text>
+<rect x="199" y="361.9" width="52" height="38.1" fill="#4056b0"/>
+<text x="226" y="358" text-anchor="middle" font-size="9.5">104</text>
+<rect x="287" y="361.9" width="52" height="38.1" fill="#4056b0"/>
+<text x="313" y="358" text-anchor="middle" font-size="9.5">104</text>
+<rect x="374" y="361.9" width="52" height="38.1" fill="#4056b0"/>
+<text x="401" y="358" text-anchor="middle" font-size="9.5">104</text>
+<rect x="462" y="131.8" width="52" height="268.2" fill="#4056b0"/>
+<text x="488" y="128" text-anchor="middle" font-size="9.5">731</text>
+<rect x="549" y="131.8" width="52" height="268.2" fill="#4056b0"/>
+<text x="576" y="128" text-anchor="middle" font-size="9.5">731</text>
+<rect x="637" y="131.8" width="52" height="268.2" fill="#4056b0"/>
+<text x="663" y="128" text-anchor="middle" font-size="9.5">731</text>
+<rect x="724" y="161.8" width="52" height="238.2" fill="#4056b0"/>
+<text x="751" y="158" text-anchor="middle" font-size="9.5">650</text>
+<text x="440" y="438" text-anchor="middle" font-size="12" fill="#b04040">+98 MB dataset | insert curve ~+64 MB/1K docs | peak 860 at inserts-done | drop releases only ~82 MB</text>
+<text x="60" y="496" font-size="11.5" fill="#555" font-style="italic">Caption (auto): the jump is the INSERTION loop (inline HNSW build): ~10.9x raw rate in RSS; engine init, col</text>
+<text x="60" y="2224" font-size="11.5" fill="#555" font-style="italic">lection creation, flush, BM25 and the gating model are negligible; post-drop RSS stays elevated (allocator r</text>
+<text x="60" y="3952" font-size="11.5" fill="#555" font-style="italic">etention) — duplication + retained workspace dominate (§10).</text>
+<text x="60" y="546" font-size="10.5" fill="#888">Source: results/memory-components.csv | Experiments: PH3C-MEM-001</text></svg>

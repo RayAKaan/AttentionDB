@@ -1,0 +1,16 @@
+arm,seed,qtype,n,R@1,R@5,R@10,NDCG@10,MRR
+global_best_single,agg,title,18,0.0278,0.1056,0.1500,0.1803,0.3843
+global_best_single,agg,body,21,0.0714,0.1952,0.2905,0.3685,0.7673
+global_best_single,agg,mixed,25,0.1000,0.5000,0.9760,0.9846,1.0000
+uniform_multihead,agg,title,18,0.0278,0.1056,0.1500,0.1803,0.3843
+uniform_multihead,agg,body,21,0.0714,0.1952,0.2905,0.3685,0.7673
+uniform_multihead,agg,mixed,25,0.1000,0.5000,0.9760,0.9846,1.0000
+trained_gating,42,title,18,0.0278,0.1056,0.1500,0.1803,0.3838
+trained_gating,42,body,21,0.0714,0.1952,0.2905,0.3685,0.7673
+trained_gating,42,mixed,25,0.1000,0.5000,0.9760,0.9846,1.0000
+trained_gating,7,title,18,0.0278,0.1056,0.1500,0.1803,0.3838
+trained_gating,7,body,21,0.0714,0.1952,0.2905,0.3685,0.7673
+trained_gating,7,mixed,25,0.1000,0.5000,0.9760,0.9846,1.0000
+trained_gating,1,title,18,0.0278,0.1056,0.1500,0.1803,0.3838
+trained_gating,1,body,21,0.0714,0.1952,0.2905,0.3685,0.7673
+trained_gating,1,mixed,25,0.1000,0.5000,0.9760,0.9846,1.0000

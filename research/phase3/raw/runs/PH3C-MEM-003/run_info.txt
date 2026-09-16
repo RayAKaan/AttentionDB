@@ -1,0 +1,29 @@
+run_id=PH3C-MEM-003
+experiment=allocator/tmpfs/storage verification — leak mechanism + engine-dir backend behavior (§11)
+date=2026-09-06
+method=phase3-bench leaktest (20 docs, flush) under three termination modes:
+  clean drop / std::process::exit(137) (no destructors) / external SIGKILL;
+  disk-backed (/var/tmp) and tmpfs-backed (/tmp) engine dirs; dir bytes
+  measured before/after.
+results=
+  clean drop: dir removed (owner cleanup; 0 files remain)
+  exit_no_destructors: 10547 B leaked on disk
+  SIGKILL on tmpfs: 10547 B leaked ON TMPFS (= RAM)
+mechanism=engine dir removal relies on Rust Drop guards; SIGKILL/exit()
+  never run destructors -> leak proportional to corpus (Phase 3B: 632 MB
+  found from two killed 20/30K builds). Mitigation recorded: harness
+  defaults to DISK-backed engine dirs (/var/tmp) since commit d750d72
+  lineage; leaks cost disk, not RAM; manual rm reclaims.
+contamination_rule=leaked temp files are NEVER included in database-size
+  measurements (§11); reaped before subsequent runs.
+artifacts=this file; stdout transcript in session log; leaktest source
+  benchmarks/phase3/src/memprobe.rs
+
+--- audit addendum (2026-09-06, §11 completeness) ---
+sigterm_test=NEW: leaktest child sent SIGTERM (exit 143, no handlers
+installed) -> engine dir LEAKED on tmpfs (/tmp, 10547 B), identical to
+SIGKILL behavior; clean drop still removes the dir. §11 matrix now
+complete: {clean drop, exit(137), SIGTERM, SIGKILL} x {disk, tmpfs}.
+conclusion=ANY unhandled fatal termination leaks; only cooperative Drop
+cleanup removes state. Disk-backed dirs (harness default) keep the leak
+on disk where it is inert and manually reclaimable.

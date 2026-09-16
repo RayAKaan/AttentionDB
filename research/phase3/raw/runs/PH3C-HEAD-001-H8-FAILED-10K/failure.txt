@@ -1,0 +1,5 @@
+exit_code=137 (SIGKILL by cgroup memory controller)
+failure_stage=engine build / insertion (8 heads x 10K docs x dim 512)
+last_successful_checkpoint=n/a (quality harness; cf. memprobe curve PH3C-MEM-002-H8-512)
+reason=8x10Kx512 engine alone needs ~2.1 GB (memprobe); quality harness adds dataset+query memory
+resolution=size-matched head ladder rerun at 5K docs (PH3C-HEAD-001-{H1,H2,H4,H8}-S5K); the 10K runs for H1/H2 remain valid scale points

@@ -1,0 +1,5 @@
+disposition,count,frac_of_gt_misses
+absent_from_all_pools,53,0.3011
+in_pool_ranked_outside_top10,123,0.6989
+ranked_out_defining_head_had_it_top10 (view-selection error),22,0.1250
+gt_misses_total,176,1.0

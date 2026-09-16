@@ -1,0 +1,5 @@
+subset,gt_covered_frac,queries_full_coverage,avg_pool_candidates
+title,0.9591,16,273.7
+body,0.9778,14,259.9
+mixed,0.9667,16,259.5
+ALL,0.9672,,

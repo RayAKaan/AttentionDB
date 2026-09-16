@@ -67,7 +67,7 @@ def main():
     # 5. every COMPLETED experiment has config + dataset hash + commit
     #    (analysis runs PH3B-BM25-001 / PH3B-HYBRID-001 carry run_info +
     #     copied analysis artifacts instead of config.json)
-    ANALYSIS = {"PH3B-BM25-001", "PH3B-HYBRID-001"}
+    ANALYSIS = {"PH3B-BM25-001", "PH3B-HYBRID-001", "PH3C-MEM-003", "PH3C-HEAD-002"}
     for e in idx["experiments"]:
         if e.get("status", "").startswith("COMPLETED"):
             d = os.path.join(run, e["experiment_id"])
@@ -103,7 +103,7 @@ def main():
             if canon["R@10"] not in open(tab).read():
                 ERR.append("complementary main table missing gating R@10 " + canon["R@10"])
 
-    # 7. figures exist for the PH3B figure set A-F
+    # 7. figures exist for the PH3B (A-F) and PH3C (1-9) sets, with provenance
     for f in ("figure-A-comparisons", "figure-B-gating-weights", "figure-C-gating-vs-oracle",
               "figure-D-sparse-dense-hybrid", "figure-E-quality-vs-latency", "figure-F-candidate-recall"):
         pth = os.path.join(HERE, "figures", f + ".svg")
@@ -111,7 +111,53 @@ def main():
             ERR.append(f"missing PH3B figure {f}.svg")
         elif "PH3B-COMP-001" not in open(pth).read():
             ERR.append(f"{f}.svg missing experiment-ID provenance")
+    for i, f in enumerate(("figure-1-memory-vs-corpus", "figure-2-memory-vs-heads",
+                           "figure-3-memory-vs-dim", "figure-4-quality-vs-heads",
+                           "figure-5-latency-vs-heads", "figure-6-quality-vs-latency",
+                           "figure-7-candidate-budget", "figure-8-candrecall-vs-final",
+                           "figure-9-component-attribution"), 1):
+        pth = os.path.join(HERE, "figures", f + ".svg")
+        if not os.path.exists(pth):
+            ERR.append(f"missing PH3C figure {f}.svg")
+        elif "PH3C-" not in open(pth).read():
+            ERR.append(f"{f}.svg missing PH3C experiment-ID provenance")
 
+    # 8. PH3C: memory-scaling ↔ registry (OOM rows preserved w/ failure.txt)
+    mpath2 = os.path.join(RES, "memory-scaling.csv")
+    if os.path.exists(mpath2):
+        for row in rd(mpath2):
+            eid = row["experiment"]
+            if eid not in ids:
+                ERR.append(f"memory-scaling.csv references unregistered {eid}")
+            if row["status"] == "FAILED-OOM":
+                if not os.path.exists(os.path.join(run, eid, "failure.txt")):
+                    ERR.append(f"{eid}: FAILED-OOM without failure.txt")
+            elif row["peak_rss_mb"]:
+                exp = next((x for x in idx["experiments"] if x["experiment_id"] == eid), None)
+                if exp and exp["metrics"].get("peak_rss_mb") and \
+                        abs(float(exp["metrics"]["peak_rss_mb"]) - float(row["peak_rss_mb"])) > 0.05:
+                    ERR.append(f"registry drift {eid} peak_rss_mb")
+            if row["status"] == "COMPLETED" and (not row["peak_rss_mb"] or not row["build_seconds"]):
+                ERR.append(f"{eid}: COMPLETED memory row missing metrics")
+
+    # 9. head ladder K=100 ↔ registry drift (gating agg rows)
+    hp = os.path.join(RES, "head-scaling-quality.csv")
+    if os.path.exists(hp):
+        for row in rd(hp):
+            if row["arm"] == "trained_gating" and row["seed"] == "agg":
+                exp = next((x for x in idx["experiments"] if x["experiment_id"] == row["experiment"]), None)
+                key = f"K100/trained_gating"
+                m = (exp or {}).get("metrics", {}).get(key, {})
+                if m and m.get("R@10") != row["R@10"]:
+                    ERR.append(f"registry drift {row['experiment']} gating {m.get('R@10')} vs {row['R@10']}")
+
+    # 10. Phase 3B headline preserved (gating 0.6448 agg row present + anchor)
+    comp2 = os.path.join(RES, "complementary-retrieval.csv")
+    if os.path.exists(comp2):
+        g = [r for r in rd(comp2) if r["experiment"] == "PH3B-COMP-001"
+             and r["arm"] == "trained_gating" and r["seed"] == "agg"]
+        if not g or g[0]["R@10"] != "0.6448":
+            ERR.append("PH3B-COMP-001 gating headline row altered or missing (Phase 3B must remain unchanged)")
     if ERR:
         print("PHASE 3 CONSISTENCY CHECK FAILED:")
         for e in ERR:

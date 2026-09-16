@@ -19,6 +19,8 @@ use attentiondb_learned::gating_v2::{
 };
 use attentiondb_storage::{Durability, Record};
 
+mod headsqual;
+mod memprobe;
 mod textqual;
 use std::collections::HashMap;
 use std::fmt::Write as _;
@@ -827,6 +829,9 @@ fn main() {
                     .collect();
                 i += 2;
             }
+            "--docs" | "--path" | "--mode" => {
+                i += 2; // consumed by subcommand handlers
+            }
             other => {
                 eprintln!("unknown arg {other}");
                 std::process::exit(2);
@@ -841,6 +846,32 @@ fn main() {
         "textquality" => {
             std::fs::create_dir_all(&out).unwrap();
             println!("{}", crate::textqual::run(&tier, &data, &out, &seeds));
+        }
+        "headsquality" => {
+            std::fs::create_dir_all(&out).unwrap();
+            println!("{}", crate::headsqual::run(&tier, &data, &out, &seeds));
+        }
+        "memprobe" => {
+            let docs: usize = args
+                .iter()
+                .position(|a| a == "--docs")
+                .and_then(|i| args.get(i + 1).and_then(|v| v.parse().ok()))
+                .unwrap_or(10_000);
+            std::fs::create_dir_all(&out).unwrap();
+            println!("{}", crate::memprobe::run(&tier, &data, &out, docs));
+        }
+        "leaktest" => {
+            let path = args
+                .iter()
+                .position(|a| a == "--path")
+                .and_then(|i| args.get(i + 1).cloned())
+                .unwrap_or_else(|| "/var/tmp/leaktest-dir".to_string());
+            let mode = args
+                .iter()
+                .position(|a| a == "--mode")
+                .and_then(|i| args.get(i + 1).cloned())
+                .unwrap_or_else(|| "clean".to_string());
+            println!("{}", crate::memprobe::leaktest(&path, &mode));
         }
         other => {
             eprintln!("unknown command {other}");

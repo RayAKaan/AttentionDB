@@ -89,13 +89,13 @@ fn peak_rss_mb() -> f64 {
     0.0
 }
 
-fn percentile(v: &[f64], p: f64) -> f64 {
+pub fn percentile(v: &[f64], p: f64) -> f64 {
     let mut s = v.to_vec();
     s.sort_by(|a, b| a.partial_cmp(b).unwrap());
     s[((p / 100.0) * (s.len() as f64 - 1.0)).round() as usize % s.len()]
 }
 
-fn avg(rs: &[RankMetrics]) -> RankMetrics {
+pub fn avg(rs: &[RankMetrics]) -> RankMetrics {
     let n = rs.len().max(1) as f64;
     RankMetrics {
         recall_at_1: rs.iter().map(|r| r.recall_at_1).sum::<f64>() / n,
@@ -124,17 +124,21 @@ fn std_of(rs: &[RankMetrics], pick: fn(&RankMetrics) -> f64) -> f64 {
 }
 
 /// rank_metrics consumes slice ORDER as the ranking (HC-5): sort first.
-fn rank_sorted(ranked: &[(u64, f32)], gt: &[u64], k: usize) -> RankMetrics {
+pub fn rank_sorted(ranked: &[(u64, f32)], gt: &[u64], k: usize) -> RankMetrics {
     let mut v = ranked.to_vec();
     v.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap().then(a.0.cmp(&b.0)));
     rank_metrics(&v, gt, k)
 }
 
-fn softmax(v: &[f32]) -> Vec<f32> {
+pub fn softmax(v: &[f32]) -> Vec<f32> {
     let m = v.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
     let e: Vec<f32> = v.iter().map(|x| (x - m).exp()).collect();
     let z: f32 = e.iter().sum();
     e.iter().map(|x| x / z).collect()
+}
+
+pub fn read_f32_vec_pub(path: &str) -> Vec<f32> {
+    read_f32_vec(path)
 }
 
 fn read_f32_vec(path: &str) -> Vec<f32> {
@@ -233,7 +237,9 @@ fn open_engine() -> (guard::TempDir, AttentionEngine) {
     // Default: disk-backed /var/tmp. Set PH3B_ENGINE_TMPFS=1 to reproduce
     // the tmpfs environment of the original COMP-001 run (recorded in
     // config.json either way).
-    let tmpfs = std::env::var("PH3B_ENGINE_TMPFS").map(|v| v == "1").unwrap_or(false);
+    let tmpfs = std::env::var("PH3B_ENGINE_TMPFS")
+        .map(|v| v == "1")
+        .unwrap_or(false);
     let base = if tmpfs {
         std::env::temp_dir()
     } else {
@@ -308,7 +314,7 @@ fn generate_pools(e: &AttentionEngine, loaded: &LoadedT) -> (PoolsT, f64) {
     )
 }
 
-fn minmax(v: &mut [f32]) {
+pub fn minmax(v: &mut [f32]) {
     let lo = v.iter().cloned().fold(f32::INFINITY, f32::min);
     let hi = v.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
     let span = (hi - lo).max(1e-12);

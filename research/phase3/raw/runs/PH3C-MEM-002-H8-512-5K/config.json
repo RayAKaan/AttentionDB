@@ -1,0 +1,25 @@
+{
+  "code_commit": "unknown",
+  "data_dir": "/var/tmp/phase3b/agnews-H8",
+  "dim": 512,
+  "durability": "Async",
+  "engine_dir_backend": "disk",
+  "experiment_family": "PH3C memprobe",
+  "hardware": {
+    "cpus": 2,
+    "ram_total_mb": 1984
+  },
+  "heads": [
+    "title",
+    "body1",
+    "body2",
+    "body3",
+    "body4",
+    "full",
+    "xb1",
+    "xb2"
+  ],
+  "hnsw": "engine defaults M=16 ef_construction=400 ef_search=64 store_vectors=true",
+  "n_docs": 5000,
+  "tier": "H8"
+}

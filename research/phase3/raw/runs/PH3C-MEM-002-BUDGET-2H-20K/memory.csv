@@ -1,0 +1,15 @@
+metric,value
+tier,MH2
+n_docs,20000
+n_heads,2
+dim,512
+raw_vector_mb,78.1
+peak_rss_mb,1151.9
+steady_rss_mb,859.8
+engine_multiplier_peak_over_raw,14.74
+build_seconds,226.6
+engine_dir_backend,disk
+disk_manifest/catalog,656
+disk_other,111597457
+disk_sstable/data,5813441
+disk_wal,0

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="560">
+<rect width="880" height="560" fill="white"/>
+<text x="440.0" y="30" text-anchor="middle" font-size="18" font-weight="bold">Candidate recall vs final gating recall (K=100)</text>
+<line x1="90" y1="70" x2="90" y2="400" stroke="#333"/>
+<line x1="90" y1="400" x2="790" y2="400" stroke="#333"/>
+<line x1="90" y1="70.0" x2="790" y2="70.0" stroke="#eee"/>
+<text x="84" y="74.0" text-anchor="end" font-size="11" fill="#666">1</text>
+<line x1="90" y1="136.0" x2="790" y2="136.0" stroke="#eee"/>
+<text x="84" y="140.0" text-anchor="end" font-size="11" fill="#666">1</text>
+<line x1="90" y1="202.0" x2="790" y2="202.0" stroke="#eee"/>
+<text x="84" y="206.0" text-anchor="end" font-size="11" fill="#666">1</text>
+<line x1="90" y1="268.0" x2="790" y2="268.0" stroke="#eee"/>
+<text x="84" y="272.0" text-anchor="end" font-size="11" fill="#666">0</text>
+<line x1="90" y1="334.0" x2="790" y2="334.0" stroke="#eee"/>
+<text x="84" y="338.0" text-anchor="end" font-size="11" fill="#666">0</text>
+<line x1="90" y1="400.0" x2="790" y2="400.0" stroke="#eee"/>
+<text x="84" y="404.0" text-anchor="end" font-size="11" fill="#666">0</text>
+<text x="56" y="235.0" font-size="12" fill="#333" transform="rotate(-90 56 235.0)">fraction</text>
+<text x="178" y="418" text-anchor="middle" font-size="12">1h@5K</text>
+<text x="352" y="418" text-anchor="middle" font-size="12">2h@5K</text>
+<text x="528" y="418" text-anchor="middle" font-size="12">4h@5K</text>
+<text x="702" y="418" text-anchor="middle" font-size="12">8h@5K</text>
+<rect x="110.4" y="178.3" width="46.7" height="221.7" fill="#4056b0"/>
+<text x="133.8" y="174.3" text-anchor="middle" font-size="9.5" fill="#333">0.672</text>
+<rect x="197.9" y="228.8" width="46.7" height="171.2" fill="#b04040"/>
+<text x="221.2" y="224.8" text-anchor="middle" font-size="9.5" fill="#333">0.519</text>
+<rect x="285.4" y="116.4" width="46.7" height="283.6" fill="#4056b0"/>
+<text x="308.8" y="112.4" text-anchor="middle" font-size="9.5" fill="#333">0.859</text>
+<rect x="372.9" y="182.9" width="46.7" height="217.1" fill="#b04040"/>
+<text x="396.2" y="178.9" text-anchor="middle" font-size="9.5" fill="#333">0.658</text>
+<rect x="460.4" y="110.7" width="46.7" height="289.3" fill="#4056b0"/>
+<text x="483.8" y="106.7" text-anchor="middle" font-size="9.5" fill="#333">0.877</text>
+<rect x="547.9" y="164.2" width="46.7" height="235.8" fill="#b04040"/>
+<text x="571.2" y="160.2" text-anchor="middle" font-size="9.5" fill="#333">0.715</text>
+<rect x="635.4" y="107.7" width="46.7" height="292.3" fill="#4056b0"/>
+<text x="658.8" y="103.7" text-anchor="middle" font-size="9.5" fill="#333">0.886</text>
+<rect x="722.9" y="165.9" width="46.7" height="234.1" fill="#b04040"/>
+<text x="746.2" y="161.9" text-anchor="middle" font-size="9.5" fill="#333">0.709</text>
+<rect x="650" y="80" width="12" height="12" fill="#4056b0"/>
+<text x="667" y="90" font-size="12">candidate recall</text>
+<rect x="650" y="97" width="12" height="12" fill="#b04040"/>
+<text x="667" y="107" font-size="12">gating R@10</text>
+<text x="60" y="496" font-size="11.5" fill="#555" font-style="italic">Caption (auto): the gap between pool coverage and final recall (0.09-0.23) is ranking/view-selection, not ge</text>
+<text x="60" y="2224" font-size="11.5" fill="#555" font-style="italic">neration — consistent with the decomposition (34% of misses absent from pools at H4/10K).</text>
+<text x="60" y="546" font-size="10.5" fill="#888">Source: results/head-scaling-quality.csv + results/candidate-decomposition.csv | Experiments: PH3C-HEAD-001-*</text></svg>

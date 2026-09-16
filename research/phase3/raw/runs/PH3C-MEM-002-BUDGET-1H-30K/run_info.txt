@@ -1,0 +1,7 @@
+run_id=PH3C-MEM-002-BUDGET-1H-30K
+experiment=memory budget — 1 head x 30K docs x dim 512 (largest reproduced at 1 head)
+date=2026-09-06
+command=target/release/phase3-bench memprobe --tier MH1 --data /var/tmp/phase3b/agnews-MH1 --docs 30000
+dataset=PH3B-DS-AG-MH1
+status=COMPLETED
+headline=peak 941MB (16.1x raw) build 186s

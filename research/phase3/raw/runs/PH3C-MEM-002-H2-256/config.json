@@ -1,0 +1,19 @@
+{
+  "code_commit": "unknown",
+  "data_dir": "/var/tmp/phase3b/agnews-H2D256",
+  "dim": 256,
+  "durability": "Async",
+  "engine_dir_backend": "disk",
+  "experiment_family": "PH3C memprobe",
+  "hardware": {
+    "cpus": 2,
+    "ram_total_mb": 1984
+  },
+  "heads": [
+    "title",
+    "body"
+  ],
+  "hnsw": "engine defaults M=16 ef_construction=400 ef_search=64 store_vectors=true",
+  "n_docs": 10000,
+  "tier": "H2D256"
+}

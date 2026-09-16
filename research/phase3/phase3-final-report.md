@@ -69,3 +69,22 @@ Evidence so far covers one real corpus at 10K scale plus the memory wall.
 Provisional reading: **B — research prototype** (retrieval works and is
 harness-anchored; systems limits — memory scaling — are unresolved). The
 classification will be finalized only after the reliability families run.
+
+---
+
+## Phase 3C addendum (2026-09-06): memory forensics, head scaling, candidate budgets
+
+Full report: phase3c-final-report.md. Headlines:
+- Memory wall explained (build-time insertion loop; ~10.9x raw rate;
+  duplication ≥2x + retained workspace; disk only 1.4x). Linear in
+  docs/heads/dims at tested envelope; max reproduced 1h/30K, 2h/20K,
+  4h/10K, 8h/5K @ dim 512.
+- Head ladder (5K, seeds 42/7/1): gating 0.519 → 0.658 → 0.715 → 0.709
+  (1/2/4/8 heads) — gains to 4 heads, saturation at 8; serial p50
+  1.7/4.2/6.7/22.1 ms; parallel-2 halves p50 at ≥2 heads, hurts at 1.
+- Candidate budgets: gating flat across K=10..200 (view-selection-bound);
+  miss decomposition 34% absent / 66% ranked-out / 19% view-selection.
+- PH3C-REPRO-001: gating 0.6492±0.0028 vs 0.6448±0.0025 (+0.0044, within
+  wobble); BM25 identical to 4 decimals; dataset hashes identical.
+- Verdicts: Phase 3B conclusion UNCHANGED and reproduced; systems phase
+  (correctness/reliability families) is the mandated next step.

@@ -1,0 +1,7 @@
+run_id=PH3C-HEAD-001-H4-S5K
+experiment=head-count quality/latency ladder, size-matched 5K docs dim 512 — H4 heads (seeds 42,7,1)
+date=2026-09-06
+command=target/release/phase3-bench headsquality --tier H4S5K --data /var/tmp/phase3b/agnews-H4S5K --seeds 42,7,1
+dataset=PH3B-DS-AG-H4S5K
+status=COMPLETED
+notes=arms x budgets {10,25,50,100,200}; gate trained at K=100 pools per seed, evaluated at all budgets (documented protocol); serial vs parallel latency; candidate-decomposition; weights/agreement

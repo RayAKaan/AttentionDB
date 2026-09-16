@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="560">
+<rect width="880" height="560" fill="white"/>
+<text x="440.0" y="30" text-anchor="middle" font-size="18" font-weight="bold">Gating quality vs serial query latency (head ladder)</text>
+<line x1="90" y1="70" x2="90" y2="400" stroke="#333"/>
+<line x1="90" y1="400" x2="790" y2="400" stroke="#333"/>
+<circle cx="139" cy="229" r="7" fill="#4056b0"/>
+<text x="149" y="221" font-size="12">1 head(s): 0.519 @ 1.7 ms</text>
+<circle cx="210" cy="183" r="7" fill="#b04040"/>
+<text x="220" y="175" font-size="12">2 head(s): 0.658 @ 4.2 ms</text>
+<circle cx="283" cy="164" r="7" fill="#2e8b57"/>
+<text x="293" y="156" font-size="12">4 head(s): 0.715 @ 6.7 ms</text>
+<circle cx="726" cy="166" r="7" fill="#b08840"/>
+<text x="736" y="158" font-size="12">8 head(s): 0.709 @ 22.1 ms</text>
+<text x="82" y="74.0" text-anchor="end" font-size="11" fill="#666">1.0</text>
+<text x="82" y="140.0" text-anchor="end" font-size="11" fill="#666">0.8</text>
+<text x="82" y="206.0" text-anchor="end" font-size="11" fill="#666">0.6</text>
+<text x="82" y="272.0" text-anchor="end" font-size="11" fill="#666">0.4</text>
+<text x="82" y="338.0" text-anchor="end" font-size="11" fill="#666">0.2</text>
+<text x="82" y="404.0" text-anchor="end" font-size="11" fill="#666">0.0</text>
+<text x="60" y="496" font-size="11.5" fill="#555" font-style="italic">Caption (auto): the practical frontier on this sandbox: 4 heads buys +0.20 R@10 over 1 head for ~3.9x latenc</text>
+<text x="60" y="2224" font-size="11.5" fill="#555" font-style="italic">y; 8 heads adds no quality and ~2.4x more latency (super-linear pool fusion).</text>
+<text x="60" y="546" font-size="10.5" fill="#888">Source: results/head-scaling-quality.csv + results/head-scaling-latency.csv | Experiments: PH3C-HEAD-001-*-S5K</text></svg>

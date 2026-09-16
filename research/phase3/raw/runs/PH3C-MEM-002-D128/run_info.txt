@@ -1,0 +1,7 @@
+run_id=PH3C-MEM-002-D128
+experiment=dimension ladder @10K docs 3 heads — dim 128
+date=2026-09-06
+command=target/release/phase3-bench memprobe --tier D128 --data /var/tmp/phase3b/agnews-SD128 --docs 10000
+dataset=PH3B-DS-AG-SD128
+status=COMPLETED
+headline=peak 361MB (24.7x raw) build 56s

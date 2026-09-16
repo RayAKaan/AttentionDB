@@ -1,0 +1,6 @@
+run_id=PH3C-HEAD-001-H8-FAILED-10K
+experiment=head-count quality @10K — 8 heads (attempt)
+date=2026-09-06
+command=target/release/phase3-bench headsquality --tier H8 --data /var/tmp/phase3b/agnews-H8 --seeds 42,7,1
+dataset=PH3B-DS-AG-H8
+status=FAILED — OOM (see failure.txt)

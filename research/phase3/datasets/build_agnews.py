@@ -64,7 +64,61 @@ TIERS = {
     # PH3B-COMP-002-M30 / -M20). NOT comparable to the 512-dim tiers;
     # hash-collision regime differs (documented in the run + findings).
     "M20D256": {"docs": 20_000, "q_per_type": 200, "dim": 256},
+    # ---- PH3C head-count ladder (same corpus/queries/GT as S tier;
+    # only the ENGINE HEAD SET varies). Sub-field views make head count
+    # and view granularity co-vary at 4/8 heads (documented limitation):
+    #   H1 : full only (single coarse view)
+    #   H2 : title, body
+    #   H4 : title, body1, body2, full          (body = description halves)
+    #   H8 : title, body1..4, full, xb1, xb2    (quarters + cross views)
+    # title/body/full vectors are ALWAYS computed+written (GT definition);
+    # "heads" in meta.json lists the engine head set.
+    "H1": {"docs": 10_000, "q_per_type": 150, "heads": ["full"]},
+    "H2": {"docs": 10_000, "q_per_type": 150, "heads": ["title", "body"]},
+    "H4": {"docs": 10_000, "q_per_type": 150, "heads": ["title", "body1", "body2", "full"]},
+    "H8": {"docs": 10_000, "q_per_type": 150,
+           "heads": ["title", "body1", "body2", "body3", "body4", "full", "xb1", "xb2"]},
+    # ---- PH3C dim/factorial datasets (3-head standard set at other dims;
+    #      256-dim head ladder for the §8 factorial) ----
+    "SD128": {"docs": 10_000, "q_per_type": 150, "dim": 128},
+    "SD256": {"docs": 10_000, "q_per_type": 150, "dim": 256},
+    "H1D256": {"docs": 10_000, "q_per_type": 150, "dim": 256, "heads": ["full"]},
+    "H2D256": {"docs": 10_000, "q_per_type": 150, "dim": 256, "heads": ["title", "body"]},
+    "H4D256": {"docs": 10_000, "q_per_type": 150, "dim": 256, "heads": ["title", "body1", "body2", "full"]},
+    "H8D256": {"docs": 10_000, "q_per_type": 150, "dim": 256,
+               "heads": ["title", "body1", "body2", "body3", "body4", "full", "xb1", "xb2"]},
+    # ---- PH3C head ladder, size-matched 5K variants (head count isolated
+    #      from corpus size after the 8x10Kx512 OOM) ----
+    "H1S5K": {"docs": 5_000, "q_per_type": 150, "heads": ["full"]},
+    "H2S5K": {"docs": 5_000, "q_per_type": 150, "heads": ["title", "body"]},
+    "H4S5K": {"docs": 5_000, "q_per_type": 150, "heads": ["title", "body1", "body2", "full"]},
+    "H8S5K": {"docs": 5_000, "q_per_type": 150,
+              "heads": ["title", "body1", "body2", "body3", "body4", "full", "xb1", "xb2"]},
+    # ---- PH3C memory-budget probes (30K corpus at low head counts) ----
+    "MH1": {"docs": 30_000, "q_per_type": 150, "heads": ["full"]},
+    "MH2": {"docs": 30_000, "q_per_type": 150, "heads": ["title", "body"]},
 }
+
+def head_text(head, title, desc):
+    """Deterministic field text per head name (sub-field views split the
+    description on word boundaries; cross views concatenate)."""
+    if head == "full":
+        return f"{title} {desc}"
+    if head == "title":
+        return title
+    if head == "body":
+        return desc
+    if head in ("body1", "body2", "body3", "body4"):
+        w = desc.split()
+        q = max(1, len(w) // 4)
+        seg = {"body1": w[:q], "body2": w[q:2*q], "body3": w[2*q:3*q], "body4": w[3*q:]}[head]
+        return " ".join(seg) if seg else title  # degenerate short descs fall back to title
+    if head == "xb1":
+        return f"{title} {head_text('body1', title, desc)}"
+    if head == "xb2":
+        return " ".join([head_text("body2", title, desc), head_text("body3", title, desc),
+                         head_text("body4", title, desc)])
+    raise ValueError(head)
 # query-type -> defining head (the space in which GT is exact cosine)
 DEFINING = {"title": "title", "body": "body", "mixed": "full"}
 TOKEN_RE = re.compile(r"[a-z0-9]+")
@@ -207,15 +261,16 @@ def build_tier(tier, src, out_dir):
     need = {"title": qpt, "body": qpt, "mixed": 2 * qpt}
     assert len(train) == n_docs and len(test) >= sum(need.values()), "source too small"
 
-    print(f"[{tier}] corpus={len(train)} embed 3 heads ...", flush=True)
-    hashers = {h: Hasher(h) for h in HEADS}
-    corpus = {h: np.zeros((n_docs, DIM), dtype=np.float32) for h in HEADS}
+    engine_heads = cfg.get("heads", list(HEADS))
+    all_heads = sorted(set(engine_heads) | set(HEADS))  # + defining spaces for GT
+    print(f"[{tier}] corpus={len(train)} embed {len(all_heads)} heads (engine={engine_heads}) ...", flush=True)
+    hashers = {h: Hasher(h) for h in all_heads}
+    corpus = {h: np.zeros((n_docs, DIM), dtype=np.float32) for h in all_heads}
     for i, (_, title, desc) in enumerate(train):
         if i % 5000 == 0:
             print(f"  doc {i}", flush=True)
-        corpus["title"][i] = hashers["title"].embed(title)
-        corpus["body"][i] = hashers["body"].embed(desc)
-        corpus["full"][i] = hashers["full"].embed(f"{title} {desc}")
+        for h in all_heads:
+            corpus[h][i] = hashers[h].embed(head_text(h, title, desc))
     corpus_norm = {h: corpus[h] / np.maximum(np.linalg.norm(corpus[h], axis=1, keepdims=True), 1e-12) for h in HEADS}
 
     # queries: disjoint test blocks per type; LEAKAGE FILTER — AG News
@@ -249,7 +304,7 @@ def build_tier(tier, src, out_dir):
             qtext.setdefault(t, []).append(title if t == "title" else desc if t == "body" else f"{title} {desc}")
 
     queries = {
-        t: {h: np.zeros((qpt_eff[t], DIM), dtype=np.float32) for h in HEADS}
+        t: {h: np.zeros((qpt_eff[t], DIM), dtype=np.float32) for h in all_heads}
         for t in blocks
     }
     for t, texts in qtext.items():
@@ -303,6 +358,9 @@ def build_tier(tier, src, out_dir):
     meta = {
         "dataset_id": f"PH3B-DS-AG-{tier}",
         "dim": DIM,
+        "heads": engine_heads,
+        "defining": {"title": "title", "body": "body", "mixed": "full"},
+        "ladder_note": "sub-field views split the description; head count and view granularity co-vary at 4/8 heads (documented)",
         "family": "AG News multi-field text retrieval",
         "source": {
             "urls": [u.format(f=f) for u in SRC_URLS for f in ("train", "test")],
@@ -338,12 +396,13 @@ def build_tier(tier, src, out_dir):
         "differentiated_utility_exact_R@10": utility,
         "files": {},
     }
-    for h in HEADS:
+    write_heads = sorted(set(engine_heads) | set(HEADS))
+    for h in write_heads:
         p = os.path.join(out_dir, f"corpus_{h}.f32")
         corpus[h].tofile(p)
         meta["files"][f"corpus_{h}.f32"] = sha256_file(p)
     for t in blocks:
-        for h in HEADS:
+        for h in write_heads:
             p = os.path.join(out_dir, f"queries_{t}_{h}.f32")
             queries[t][h].tofile(p)
             meta["files"][f"queries_{t}_{h}.f32"] = sha256_file(p)

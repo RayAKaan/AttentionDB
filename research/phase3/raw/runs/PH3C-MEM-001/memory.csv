@@ -1,0 +1,14 @@
+metric,value
+tier,S
+n_docs,10000
+n_heads,3
+dim,512
+raw_vector_mb,58.6
+peak_rss_mb,859.5
+steady_rss_mb,649.7
+engine_multiplier_peak_over_raw,14.67
+build_seconds,133.1
+engine_dir_backend,disk
+disk_manifest/catalog,696
+disk_other,84402449
+disk_wal,0

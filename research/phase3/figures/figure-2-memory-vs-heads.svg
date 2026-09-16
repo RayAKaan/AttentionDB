@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="560">
+<rect width="880" height="560" fill="white"/>
+<text x="440.0" y="30" text-anchor="middle" font-size="18" font-weight="bold">Peak memory vs head count (10K docs)</text>
+<line x1="90" y1="70" x2="90" y2="400" stroke="#333"/>
+<line x1="90" y1="400" x2="790" y2="400" stroke="#333"/>
+<line x1="90" y1="70.0" x2="790" y2="70.0" stroke="#eee"/>
+<text x="84" y="74.0" text-anchor="end" font-size="11" fill="#666">1400</text>
+<line x1="90" y1="136.0" x2="790" y2="136.0" stroke="#eee"/>
+<text x="84" y="140.0" text-anchor="end" font-size="11" fill="#666">1120</text>
+<line x1="90" y1="202.0" x2="790" y2="202.0" stroke="#eee"/>
+<text x="84" y="206.0" text-anchor="end" font-size="11" fill="#666">840</text>
+<line x1="90" y1="268.0" x2="790" y2="268.0" stroke="#eee"/>
+<text x="84" y="272.0" text-anchor="end" font-size="11" fill="#666">560</text>
+<line x1="90" y1="334.0" x2="790" y2="334.0" stroke="#eee"/>
+<text x="84" y="338.0" text-anchor="end" font-size="11" fill="#666">280</text>
+<line x1="90" y1="400.0" x2="790" y2="400.0" stroke="#eee"/>
+<text x="84" y="404.0" text-anchor="end" font-size="11" fill="#666">0</text>
+<text x="56" y="235.0" font-size="12" fill="#333" transform="rotate(-90 56 235.0)">peak RSS MB</text>
+<text x="160" y="418" text-anchor="middle" font-size="12">1 head</text>
+<text x="300" y="418" text-anchor="middle" font-size="12">2</text>
+<text x="440" y="418" text-anchor="middle" font-size="12">3</text>
+<text x="580" y="418" text-anchor="middle" font-size="12">4</text>
+<text x="720" y="418" text-anchor="middle" font-size="12">8</text>
+<rect x="106.3" y="317.3" width="37.3" height="82.7" fill="#4056b0"/>
+<text x="125.0" y="313.3" text-anchor="middle" font-size="9.5" fill="#333">350.700</text>
+<rect x="176.3" y="342.9" width="37.3" height="57.1" fill="#b04040"/>
+<text x="195.0" y="338.9" text-anchor="middle" font-size="9.5" fill="#333">242.200</text>
+<rect x="246.3" y="259.4" width="37.3" height="140.6" fill="#4056b0"/>
+<text x="265.0" y="255.4" text-anchor="middle" font-size="9.5" fill="#333">596.400</text>
+<rect x="316.3" y="309.3" width="37.3" height="90.7" fill="#b04040"/>
+<text x="335.0" y="305.3" text-anchor="middle" font-size="9.5" fill="#333">384.600</text>
+<rect x="386.3" y="197.4" width="37.3" height="202.6" fill="#4056b0"/>
+<text x="405.0" y="193.4" text-anchor="middle" font-size="9.5" fill="#333">859.500</text>
+<rect x="456.3" y="274.7" width="37.3" height="125.3" fill="#b04040"/>
+<text x="475.0" y="270.7" text-anchor="middle" font-size="9.5" fill="#333">531.600</text>
+<rect x="526.3" y="142.6" width="37.3" height="257.4" fill="#4056b0"/>
+<text x="545.0" y="138.6" text-anchor="middle" font-size="9.5" fill="#333">1091.800</text>
+<rect x="596.3" y="245.4" width="37.3" height="154.6" fill="#b04040"/>
+<text x="615.0" y="241.4" text-anchor="middle" font-size="9.5" fill="#333">655.800</text>
+<rect x="736.3" y="114.6" width="37.3" height="285.4" fill="#b04040"/>
+<text x="755.0" y="110.6" text-anchor="middle" font-size="9.5" fill="#333">1210.800</text>
+<rect x="590" y="80" width="12" height="12" fill="#4056b0"/>
+<text x="607" y="90" font-size="12">dim 512</text>
+<rect x="590" y="97" width="12" height="12" fill="#b04040"/>
+<text x="607" y="107" font-size="12">dim 256</text>
+<text x="60" y="496" font-size="11.5" fill="#555" font-style="italic">Caption (auto): memory is approximately LINEAR in head count (~245-260 MB/head at dim 512, ~125-155 MB/head </text>
+<text x="60" y="2224" font-size="11.5" fill="#555" font-style="italic">at dim 256); 8x10Kx512 OOMs (preserved run) while 8x5K completes at 960 MB.</text>
+<text x="60" y="546" font-size="10.5" fill="#888">Source: results/memory-scaling.csv | Experiments: PH3C-MEM-002-H*</text></svg>

@@ -1,0 +1,7 @@
+run_id=PH3C-MEM-002-C15K
+experiment=controlled corpus scaling 15K (3 heads x dim 512)
+date=2026-09-06
+command=target/release/phase3-bench memprobe --tier M --data /var/tmp/phase3b/agnews-M --docs 15000
+dataset=PH3B-DS-AG-M
+status=COMPLETED
+headline=peak 1182MB (13.5x raw 88MB) build 237s

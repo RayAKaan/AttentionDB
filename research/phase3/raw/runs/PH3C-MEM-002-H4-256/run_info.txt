@@ -1,0 +1,7 @@
+run_id=PH3C-MEM-002-H4-256
+experiment=head-count factorial @10K docs dim 256 — H4 heads
+date=2026-09-06
+command=target/release/phase3-bench memprobe --tier H4D256 --data /var/tmp/phase3b/agnews-H4D256 --docs 10000
+dataset=PH3B-DS-AG-H4D256
+status=COMPLETED
+headline=peak 656MB (16.8x raw) build 82s

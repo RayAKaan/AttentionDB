@@ -1,0 +1,17 @@
+experiment,disposition,count,frac_of_gt_misses
+PH3C-HEAD-001-H1-S5K,absent_from_all_pools,175,0.5682
+PH3C-HEAD-001-H1-S5K,in_pool_ranked_outside_top10,133,0.4318
+PH3C-HEAD-001-H1-S5K,ranked_out_defining_head_had_it_top10 (view-selection error),0,0.0000
+PH3C-HEAD-001-H1-S5K,gt_misses_total,308,1.0
+PH3C-HEAD-001-H2-S5K,absent_from_all_pools,58,0.2829
+PH3C-HEAD-001-H2-S5K,in_pool_ranked_outside_top10,147,0.7171
+PH3C-HEAD-001-H2-S5K,ranked_out_defining_head_had_it_top10 (view-selection error),5,0.0244
+PH3C-HEAD-001-H2-S5K,gt_misses_total,205,1.0
+PH3C-HEAD-001-H4-S5K,absent_from_all_pools,53,0.3011
+PH3C-HEAD-001-H4-S5K,in_pool_ranked_outside_top10,123,0.6989
+PH3C-HEAD-001-H4-S5K,ranked_out_defining_head_had_it_top10 (view-selection error),22,0.1250
+PH3C-HEAD-001-H4-S5K,gt_misses_total,176,1.0
+PH3C-HEAD-001-H8-S5K,absent_from_all_pools,49,0.2390
+PH3C-HEAD-001-H8-S5K,in_pool_ranked_outside_top10,156,0.7610
+PH3C-HEAD-001-H8-S5K,ranked_out_defining_head_had_it_top10 (view-selection error),47,0.2293
+PH3C-HEAD-001-H8-S5K,gt_misses_total,205,1.0

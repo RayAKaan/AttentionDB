@@ -1,0 +1,7 @@
+run_id=PH3C-MEM-002-H2-512
+experiment=head-count factorial @10K docs dim 512 — H2 heads
+date=2026-09-06
+command=target/release/phase3-bench memprobe --tier H2 --data /var/tmp/phase3b/agnews-H2 --docs 10000
+dataset=PH3B-DS-AG-H2
+status=COMPLETED
+headline=peak 596MB (15.3x raw) build 77s

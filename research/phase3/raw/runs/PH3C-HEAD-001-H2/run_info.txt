@@ -1,0 +1,7 @@
+run_id=PH3C-HEAD-001-H2
+experiment=head-count quality @10K docs dim 512 — H2 heads (extra scale point; size-matched ladder is at 5K)
+date=2026-09-06
+command=target/release/phase3-bench headsquality --tier H2 --data /var/tmp/phase3b/agnews-H2 --seeds 42,7,1
+dataset=PH3B-DS-AG-H2
+status=COMPLETED
+notes=K=100 gating in results.csv; identical GT to the S tier

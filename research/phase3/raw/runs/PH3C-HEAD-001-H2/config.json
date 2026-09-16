@@ -1,0 +1,44 @@
+{
+  "budgets": [
+    10,
+    25,
+    50,
+    100,
+    200
+  ],
+  "code_commit": "unknown",
+  "data_dir": "/var/tmp/phase3b/agnews-H2",
+  "defining": {
+    "body": "body",
+    "mixed": "full",
+    "title": "title"
+  },
+  "dim": 512,
+  "experiment_family": "PH3C headsqual",
+  "gating_protocol": "2B grid per seed; val-select at TRAIN_K; evaluated at all budgets",
+  "hardware": {
+    "cpus": 2,
+    "ram_total_mb": 1984
+  },
+  "heads": [
+    "title",
+    "body"
+  ],
+  "parallel_workers": 2,
+  "pool_max": 200,
+  "seeds": [
+    42,
+    7,
+    1
+  ],
+  "splits": {
+    "counts": [
+      280,
+      60,
+      61
+    ],
+    "seed": 42
+  },
+  "tier": "H2",
+  "train_k": 100
+}

@@ -1,0 +1,8 @@
+exit_code=137 (SIGKILL by cgroup memory controller)
+failure_stage=E_insert_curve (document insertion / inline HNSW construction)
+last_successful_checkpoint=23 rows; last row: E_insert_curve
+last_measured_rss_mb=1134.7
+last_peak_rss_mb=1409.8
+engine_dir_bytes_at_death=302571867
+config=3 heads (title/body/full) x dim 512 x 20000 docs, memprobe, disk-backed engine dir
+reason=projected peak ~1.6 GB > ~1.4 GB available; wall located between 15K (1182 MB OK) and 20K docs
