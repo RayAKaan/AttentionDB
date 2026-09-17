@@ -749,9 +749,14 @@ impl AttentionEngine {
         rec.doc_id = *uuid.as_bytes();
         rec.numeric_id = numeric_id;
         rec.payload = record.to_msgpack()?;
+        use attentiondb_storage::crashgate;
+        crashgate::GATE_BEFORE_WAL_APPEND.hit();
         self.wal_append(rec)?;
+        crashgate::GATE_AFTER_WAL_APPEND.hit();
 
         self.apply_insert(&collection, uuid, numeric_id, record)?;
+        crashgate::GATE_AFTER_APPLY.hit();
+        crashgate::GATE_BEFORE_ACK.hit();
         Ok(uuid.to_string())
     }
 
@@ -863,12 +868,17 @@ impl AttentionEngine {
         rec.collection = collection.to_string();
         rec.doc_id = *uuid.as_bytes();
         rec.numeric_id = numeric;
+        use attentiondb_storage::crashgate;
+        crashgate::GATE_BEFORE_WAL_APPEND.hit();
         self.wal_append(rec)?;
+        crashgate::GATE_AFTER_WAL_APPEND.hit();
 
         coll.retire_id(numeric);
         coll.bm25.remove(numeric);
         self.id_mapper.write().retire(&uuid);
         self.document_store.write().delete_nolog(&uuid)?;
+        crashgate::GATE_AFTER_APPLY.hit();
+        crashgate::GATE_BEFORE_ACK.hit();
         Ok(true)
     }
 
@@ -916,6 +926,8 @@ impl AttentionEngine {
         let mut begin = WalRecord::new(0, RecordKind::BeginTxn);
         begin.txn_id = txn_id;
         begin.collection = collection.clone();
+        use attentiondb_storage::crashgate;
+        crashgate::GATE_BEFORE_WAL_APPEND.hit();
         self.wal_append(begin)?;
 
         // 2) Ops (ids are assigned now, deterministically, in order)
@@ -955,6 +967,7 @@ impl AttentionEngine {
         let mut commit = WalRecord::new(0, RecordKind::CommitTxn);
         commit.txn_id = txn_id;
         self.wal_append(commit)?;
+        crashgate::GATE_AFTER_WAL_APPEND.hit();
 
         // 4) Apply (idempotent primitives). Iterate ALL ops — never zip with the
         // id list (deletes have no staged id; zipping silently drops them).
@@ -980,6 +993,8 @@ impl AttentionEngine {
                 }
             }
         }
+        crashgate::GATE_AFTER_APPLY.hit();
+        crashgate::GATE_BEFORE_ACK.hit();
         Ok(true)
     }
 

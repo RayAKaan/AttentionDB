@@ -1,0 +1,7 @@
+run_id=PH3E-DUR-003
+experiment=E2 structural durability points: checkpoint / checkpoint+trim / WAL rotation (2KB segments), then acked target insert, abort; multi-restart stability x2
+date=2026-09-17
+method=phase3-bench dbtest durability --suite checkpoint-interaction (self-aborting gatechild via storage crashgate; parent reopens + full checker per cell)
+config=see config.json
+status=COMPLETED
+notes=baseline=30 acked inserts; rotate via ATTENTIONDB_WAL_SEGMENT_BYTES=2048; restarts_equal must hold

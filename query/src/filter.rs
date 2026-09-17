@@ -568,7 +568,7 @@ mod tests {
             0 => FilterValue::Str("sport".into()),
             1 => FilterValue::Int((n % 200) as i64),
             2 => FilterValue::Float((n % 97) as f64),
-            3 => FilterValue::Bool(n % 2 == 0),
+            3 => FilterValue::Bool(n.is_multiple_of(2)),
             _ => FilterValue::Null,
         };
         for _ in 0..256u32 {
@@ -625,7 +625,7 @@ mod tests {
             ),
             2 => FilterExpr::IsNull {
                 field: leaf_fields[(n % leaf_fields.len() as u64) as usize].to_string(),
-                negated: n % 2 == 0,
+                negated: n.is_multiple_of(2),
             },
             3 => FilterExpr::In {
                 field: leaf_fields[(n % leaf_fields.len() as u64) as usize].to_string(),

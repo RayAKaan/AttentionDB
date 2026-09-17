@@ -499,15 +499,22 @@ impl Wal {
         writer
             .write_all(&frame)
             .map_err(|e| crate::error::StorageError::Wal(format!("WAL append failed: {e}")))?;
+        // E2 crash gate: frame bytes are in the userspace buffer; no flush yet.
+        crate::crashgate::GATE_AFTER_WRITE.hit();
 
         match self.durability {
             Durability::Sync => {
                 writer.flush()?;
                 writer.get_ref().sync_all()?;
                 self.last_synced_seq = record.seq;
+                // E2 crash gate: frame is fsynced (machine-durable boundary).
+                crate::crashgate::GATE_AFTER_FSYNC.hit();
             }
             Durability::GroupCommit => {
                 writer.flush()?;
+                // E2 crash gate: frame is in the OS page cache (process-crash
+                // durable boundary); not fsynced.
+                crate::crashgate::GATE_AFTER_FLUSH.hit();
             }
             Durability::Async => {}
         }
@@ -867,12 +874,9 @@ mod tests {
             let bytes: Vec<u8> = (0..len).map(|_| next() as u8).collect();
             let seg = dir.path().join("00000000000000000001.wal");
             std::fs::write(&seg, &bytes).unwrap();
-            match Wal::open(dir.path(), Durability::Async, u64::MAX) {
-                Ok(mut wal) => {
-                    // Ok or Err are both acceptable; a panic is the failure.
-                    let _ = wal.replay(0);
-                }
-                Err(_) => {}
+            // Ok or Err are both acceptable; a panic is the failure.
+            if let Ok(mut wal) = Wal::open(dir.path(), Durability::Async, u64::MAX) {
+                let _ = wal.replay(0);
             }
         }
     }
@@ -900,16 +904,14 @@ mod tests {
             let cut = 1 + (x as usize) % valid.len();
             let seg = dir.path().join("00000000000000000001.wal");
             std::fs::write(&seg, &valid[..cut]).unwrap();
-            match Wal::open(dir.path(), Durability::Async, u64::MAX) {
-                Ok(mut wal) => {
-                    if let Ok(outcome) = wal.replay(0) {
-                        // recovered records must form a strict prefix of the seq space
-                        for (k, r) in outcome.records.iter().enumerate() {
-                            assert_eq!(r.seq, (k + 1) as u64, "seed {seed}: non-prefix replay");
-                        }
+            // Ok or Err are both acceptable; a panic is the failure.
+            if let Ok(mut wal) = Wal::open(dir.path(), Durability::Async, u64::MAX) {
+                if let Ok(outcome) = wal.replay(0) {
+                    // recovered records must form a strict prefix of the seq space
+                    for (k, r) in outcome.records.iter().enumerate() {
+                        assert_eq!(r.seq, (k + 1) as u64, "seed {seed}: non-prefix replay");
                     }
                 }
-                Err(_) => {}
             }
         }
     }

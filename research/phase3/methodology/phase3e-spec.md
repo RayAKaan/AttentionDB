@@ -17,7 +17,7 @@ commit. No uncontrolled batches.
 |---|---|---|
 | E0 | production-contract.md + phase3e-spec.md freeze | DONE (this batch) |
 | E1 | WAL integrity invariant + refusal semantics + matrix | DONE (this batch) |
-| E2 | Durability semantics: Committed vs Durable API distinction | PENDING (next batch, gate = E1 evidence report) |
+| E2 | Durability semantics & acknowledgment contract (audit + PH3E-DUR-001..005; contract A2; no API change — documented distinction) | COMPLETE (phase3e-e2-final-report.md) |
 | E3 | Machine-crash harness (levels honestly classified SUPPORTED/BLOCKED/NOT TESTED) | PENDING |
 | E4 | Online backup: coordinated snapshot protocol | PENDING |
 | E5 | Online compaction — only if storage architecture supports it safely; else document + stop | PENDING |

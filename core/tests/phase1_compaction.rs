@@ -70,7 +70,9 @@ fn t11_compaction_no_resurrect() {
     drop(store);
 
     // Full compaction merges EVERY file → tombstones reclaimed exactly once.
-    let result = attentiondb_storage::compact_all(&sst).unwrap();
+    // compact_all takes the DATABASE ROOT (dir-level contract since the
+    // sst-subdir resolution fix); passing the sst dir itself now errors.
+    let result = attentiondb_storage::compact_all(dir.path()).unwrap();
     assert!(
         result.is_some(),
         "full compaction should run (4 input files)"

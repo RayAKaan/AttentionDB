@@ -1,0 +1,4 @@
+mode,ack_implies,process_crash,machine_crash,acked_loss_observed,txn_atomicity,mean_ack_us
+sync,DURABLE_MACHINE (fsync before ack),VERIFIED (after_fsync gate; acked never lost),NOT VERIFIED (E3),0,COMPLETE-or-ABSENT (verified),263
+group,DURABLE_PROCESS (page-cache flush before ack),VERIFIED (after_flush gate; acked never lost),NOT VERIFIED (E3; page cache lost on power loss),0,COMPLETE-or-ABSENT (verified),259
+async,COMMITTED_NOT_DURABLE (userspace buffer),VERIFIED LOSS: acked writes/txns CAN disappear; loss bounded by flush points (rotation/checkpoint/close/flush_wal),NOT VERIFIED (E3),3 single-insert cells + 0 of 75 multi-writer acks,COMPLETE-or-ABSENT (verified; whole acked txn may vanish),256

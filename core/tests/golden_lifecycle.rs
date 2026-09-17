@@ -98,8 +98,12 @@ fn build_database(dir: &std::path::Path, crash: bool) {
 
     // 9. checkpoint  10. compact
     e.checkpoint().unwrap();
-    let sst = attentiondb_storage::Catalog::sst_dir(dir);
-    let _ = attentiondb_storage::compact_all(&sst);
+    // compact_all takes the DATABASE ROOT; the old `let _ =` on the sst dir
+    // silently no-op'd (NotFound dropped). Post-checkpoint there is a single
+    // live SST, so a MERGE is not required (compact_all returns None) — the
+    // verified property is that the step SUCCEEDS on a real engine dir.
+    let compacted = attentiondb_storage::compact_all(dir).unwrap();
+    let _ = compacted;
 
     if crash {
         // 11. UNCLEAN termination: no drop handlers, no flush, no checkpoint.

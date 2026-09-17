@@ -386,6 +386,59 @@ def main():
                 continue
             if "ALL_ACKED" not in ln and "prefix" not in ln:
                 ERR.append(f"PH3E-REG-001 crash leg: unexpected verdict ({ln[:80]})")
+    # 19. Phase 3E (E2): durability semantics — runs registered with artifacts,
+    #     generated durability CSVs match raw facts, expectation gate holds
+    #     (MISMATCH anywhere -> FAIL), E1 regression identical, report present
+    PH3E_DUR_RUNS = ["PH3E-DUR-001", "PH3E-DUR-002", "PH3E-DUR-003",
+                     "PH3E-DUR-004", "PH3E-DUR-005", "PH3E-DUR-006",
+                     "PH3E-WAL-002", "PH3E-REG-002"]
+    for eid in PH3E_DUR_RUNS:
+        if eid not in ids:
+            ERR.append(f"PH3E E2 run {eid} missing from registry")
+        d = os.path.join(run, eid)
+        if not os.path.isdir(d):
+            ERR.append(f"PH3E E2 run {eid} registered but raw dir missing")
+        elif not os.path.exists(os.path.join(d, "run_info.txt")) or \
+                not os.path.exists(os.path.join(d, "config.json")):
+            ERR.append(f"PH3E E2 run {eid}: missing run_info.txt/config.json")
+    DUR_CSVS = {
+        "PH3E-DUR-001": ("ack-boundary.csv", "durability-ack-boundary.csv"),
+        "PH3E-DUR-002": ("txn-ack.csv", "durability-transactions.csv"),
+        "PH3E-DUR-006": ("checkpoint-interaction.csv", "durability-checkpoint.csv"),
+        "PH3E-DUR-004": ("group-boundary.csv", "durability-group.csv"),
+        "PH3E-DUR-005": ("mode-latency.csv", None),
+    }
+    for eid, (raw_name, res_name) in DUR_CSVS.items():
+        raw_p = os.path.join(run, eid, raw_name)
+        if not os.path.exists(raw_p):
+            ERR.append(f"{eid}: raw {raw_name} missing")
+            continue
+        if res_name:
+            res_p = os.path.join(RES, res_name)
+            if not os.path.exists(res_p):
+                ERR.append(f"results/{res_name} missing (run generate_results_ph3e.py)")
+                continue
+            raw_rows = list(rd(raw_p))
+            res_rows = list(rd(res_p))
+            if len(raw_rows) != len(res_rows):
+                ERR.append(f"{res_name}: row count drift raw {len(raw_rows)} vs results {len(res_rows)}")
+            for sr in res_rows:
+                if sr.get("match") == "MISMATCH":
+                    ERR.append(f"{res_name}: expectation MISMATCH ({dict(list(sr.items())[:4])})")
+    # E1 regression must be byte-identical (facts) to the original matrix
+    w1 = os.path.join(run, "PH3E-WAL-001", "wal-integrity.csv")
+    w2 = os.path.join(run, "PH3E-WAL-002", "wal-integrity.csv")
+    if os.path.exists(w1) and os.path.exists(w2):
+        a = open(w1).read().splitlines()[1:]
+        b = open(w2).read().splitlines()[1:]
+        if sorted(a) != sorted(b):
+            ERR.append("PH3E-WAL-002 (E1 regression) differs from PH3E-WAL-001")
+    if not os.path.exists(os.path.join(RES, "durability-modes.csv")):
+        ERR.append("results/durability-modes.csv missing (mode contract summary)")
+    if not os.path.exists(os.path.join(HERE, "phase3e-e2-final-report.md")):
+        ERR.append("phase3e-e2-final-report.md missing (E2 final report)")
+    if not os.path.exists(os.path.join(HERE, "methodology", "ph3e-spec-deviations.md")):
+        ERR.append("methodology/ph3e-spec-deviations.md missing (E2 deviations)")
     if not os.path.exists(os.path.join(HERE, "phase3e-evidence-e0-e1.md")):
         ERR.append("phase3e-evidence-e0-e1.md missing (E0+E1 evidence gate)")
     if not os.path.exists(os.path.join(HERE, "methodology", "production-contract.md")):

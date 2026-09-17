@@ -207,7 +207,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn compact_all_resolves_sst_subdir_from_db_root() {
         // regression: compact_all(db_root) must find sstables in db_root/sst/
         let base = tempdir().unwrap();

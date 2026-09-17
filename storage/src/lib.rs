@@ -5,6 +5,7 @@ pub mod error;
 pub mod projection_store;
 pub mod record;
 pub mod sstable;
+pub mod crashgate;
 pub mod wal;
 
 pub use wal::{read_wal_state, write_wal_state, WalState};

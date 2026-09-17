@@ -2,7 +2,7 @@
  "format": "attentiondb-experiment-index",
  "version": 1,
  "updated": "2026-09-17",
- "code_commit": "1204e354946f0c622b499b2e9b959a34d42450a2",
+ "code_commit": "615407cb5977696d0c75f258c9ecd8b94a9b2701",
  "experiments": [
   {
    "experiment_id": "PH3-QUAL-FM-S",
@@ -3701,6 +3701,170 @@
     "integration_passed": "16/16",
     "crash_group_legs": "7/7 verify clean",
     "unacked_docs": 0
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3E-DUR-001",
+   "date": "2026-09-17",
+   "git_commit": "615407cb5977696d0c75f258c9ecd8b94a9b2701",
+   "corpus": "synthetic: deterministic doc records (DIM=32, head 'h')",
+   "seed": "deterministic",
+   "model": "no learned model",
+   "objective": "E2 ACK-boundary crash matrix: 9 injection points x 3 modes x 3 reps; SIGABRT at exact commit-path gates",
+   "metrics": {
+    "cells": 81,
+    "modes": [
+     "sync",
+     "group",
+     "async"
+    ],
+    "gates": [
+     "before_wal_append",
+     "after_write",
+     "after_flush",
+     "after_fsync",
+     "after_wal_append",
+     "after_apply",
+     "before_ack",
+     "after_ack",
+     "explicit_flush"
+    ],
+    "key_results": {
+     "sync_acked_lost": 0,
+     "group_acked_lost": 0,
+     "async_acked_lost": "after_ack cells: acked write lost (documented)",
+     "not_reached_cells": 6,
+     "no_resurrection": true,
+     "checker_clean": "81/81"
+    }
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3E-DUR-002",
+   "date": "2026-09-17",
+   "git_commit": "615407cb5977696d0c75f258c9ecd8b94a9b2701",
+   "corpus": "synthetic: deterministic doc records (DIM=32, head 'h')",
+   "seed": "deterministic",
+   "model": "no learned model",
+   "objective": "E2 transaction acknowledgment: 10-op txn x 7 crash points x 3 modes; all-or-nothing verified",
+   "metrics": {
+    "cells": 63,
+    "txn_ops": 10,
+    "key_results": {
+     "PARTIAL_observed": 0,
+     "sync_group": "COMPLETE once COMMIT fsynced/flushed; ABSENT before (incl. commit_written: COMMIT in userspace buffer discarded)",
+     "async": "whole acked txn ABSENT (documented); checkpoint makes it COMPLETE"
+    }
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3E-DUR-003",
+   "date": "2026-09-17",
+   "git_commit": "615407cb5977696d0c75f258c9ecd8b94a9b2701",
+   "corpus": "synthetic: deterministic doc records (DIM=32, head 'h')",
+   "seed": "deterministic",
+   "model": "no learned model",
+   "objective": "E2 structural durability points: checkpoint/checkpoint+trim/WAL-rotation then acked insert, abort, multi-restart x2",
+   "metrics": {
+    "cells": 27,
+    "key_results": {
+     "baseline_preserved": "30/30 all modes after checkpoint/trim (structural fsync)",
+     "rotate_only_async": "27/30 (3 active-segment records lost; completed segments durable \u2014 matches E1 watermark boundary)",
+     "restarts_equal": "27/27",
+     "restart_checker_clean": "27/27"
+    }
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3E-DUR-004",
+   "date": "2026-09-17",
+   "git_commit": "615407cb5977696d0c75f258c9ecd8b94a9b2701",
+   "corpus": "synthetic: deterministic doc records (DIM=32, head 'h')",
+   "seed": "deterministic",
+   "model": "no learned model",
+   "objective": "E2 concurrent writers: 3 threads x 25 acked inserts; parent SIGKILL; group flush-before-ack verified",
+   "metrics": {
+    "cells": 18,
+    "key_results": {
+     "sync_group_acked_lost": "0/75",
+     "async_acked_lost": "4/75 (userspace buffer tail; documented)",
+     "unacked_survived": 0,
+     "checker_clean": "18/18"
+    }
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3E-DUR-005",
+   "date": "2026-09-17",
+   "git_commit": "615407cb5977696d0c75f258c9ecd8b94a9b2701",
+   "corpus": "synthetic: deterministic doc records (DIM=32, head 'h')",
+   "seed": "deterministic",
+   "model": "no learned model",
+   "objective": "E2 acknowledgment latency per mode (2000 acked inserts; sandbox FS \u2014 not production-comparable)",
+   "metrics": {
+    "mean_us": {
+     "sync": 264,
+     "group": 262,
+     "async": 259
+    },
+    "note": "fsync cheap on sandbox FS; throughput ~3800 ops/s all modes"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3E-WAL-002",
+   "date": "2026-09-17",
+   "git_commit": "615407cb5977696d0c75f258c9ecd8b94a9b2701",
+   "corpus": "synthetic: deterministic doc records (DIM=32, head 'h')",
+   "seed": "deterministic",
+   "model": "no learned model",
+   "objective": "E2 regression: E1 WAL-integrity matrix re-run after E2 instrumentation",
+   "metrics": {
+    "cases": 11,
+    "refused": 6,
+    "opened": 5,
+    "identical_to": "PH3E-WAL-001"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3E-REG-002",
+   "date": "2026-09-17",
+   "git_commit": "615407cb5977696d0c75f258c9ecd8b94a9b2701",
+   "corpus": "synthetic: deterministic doc records (DIM=32, head 'h')",
+   "seed": "42",
+   "model": "no learned model",
+   "objective": "E2 regression: 3D workload families (model/filterx/integration/crash-group legs) after E2 instrumentation",
+   "metrics": {
+    "model": "6/6",
+    "filterx": "14/14",
+    "integration": "16/16",
+    "crash_group_legs": "7/7 clean"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3E-DUR-006",
+   "date": "2026-09-17",
+   "git_commit": "615407cb5977696d0c75f258c9ecd8b94a9b2701",
+   "corpus": "synthetic: deterministic doc records (DIM=32, head 'h')",
+   "seed": "deterministic",
+   "model": "no learned model",
+   "objective": "E2 structural durability points + multi-restart x2 (supersedes PH3E-DUR-003 restart evidence: harness loop defect found by clippy all-targets limited 003 to one restart cycle)",
+   "metrics": {
+    "cells": 27,
+    "restarts": 2,
+    "key_results": {
+     "baseline_preserved": "30/30 all modes after checkpoint/trim",
+     "rotate_only_async": "27/30 (active-segment loss = E1 watermark boundary)",
+     "restarts_equal": "27/27 across 2 cycles",
+     "restart_checker_clean": "27/27"
+    }
    },
    "status": "COMPLETED"
   }

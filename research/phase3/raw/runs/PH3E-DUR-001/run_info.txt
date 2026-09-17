@@ -1,0 +1,7 @@
+run_id=PH3E-DUR-001
+experiment=E2 ACK-boundary crash matrix: 9 injection points x 3 modes x 3 reps; child aborts at the exact commit-path gate (PH3E_CRASH_AT/HIT); parent records recovered facts only
+date=2026-09-17
+method=phase3-bench dbtest durability --suite ack-boundary (self-aborting gatechild via storage crashgate; parent reopens + full checker per cell)
+config=see config.json
+status=COMPLETED
+notes=gates=before_wal_append,after_write,after_flush,after_fsync,after_wal_append,after_apply,before_ack,after_ack,explicit_flush; baseline=10 acked inserts; target=idx 2000; gate hits: engine=11, WAL=12 (incl. CreateCollection record)

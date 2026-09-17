@@ -1,0 +1,1 @@
+{"suite": "mode-latency", "durability_modes": ["sync", "group", "async"], "reps": 3, "commit": "615407cb5977696d0c75f258c9ecd8b94a9b2701", "crash_model": "SIGABRT in-process at instrumented gate (no destructors, no flush); SIGKILL for group-boundary", "notes": "ops=2000 per mode"}

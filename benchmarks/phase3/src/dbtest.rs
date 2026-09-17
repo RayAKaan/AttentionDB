@@ -1780,6 +1780,611 @@ fn wal_files(db_dir: &std::path::Path) -> Vec<std::path::PathBuf> {
         .collect()
 }
 
+
+// ================================================================
+// Phase 3E E2 — durability semantics & acknowledgment contract
+// ================================================================
+//
+// Method: a child process (subcommand `gatechild`) performs deterministic
+// work (baseline acked inserts, then a target op) and dies SUDDENLY at an
+// exactly-instrumented point of the commit path — either via the storage
+// crash gates (PH3E_CRASH_AT/HIT, see storage/src/crashgate.rs) or via an
+// explicit abort() at a harness-level point (after_ack / explicit_flush /
+// post-structural-point). The parent (subcommand `durability`) spawns the
+// child per matrix cell, reopens the database, and records FACTS ONLY:
+// what was acked, what recovered, checker status, how the child died.
+// Judgement (expected vs actual) is applied later by
+// research/phase3/generate_results_ph3e.py from the raw facts.
+//
+// Gate-hit arithmetic (deterministic; WAL-level gates also fire on the
+// CreateCollection record, engine-level gates only on insert/delete/txn
+// call sites):
+//   ack suite : engine gates hit 11 (10 baseline + target);
+//               WAL gates hit 12 (collection + 10 baseline + target)
+//   txn suite : engine gates hit 6 (5 baseline + the commit call);
+//               WAL gates: 1 collection + 5 baseline + 1 BEGIN + 8 insert
+//               ops + 2 delete ops = 17 records before COMMIT →
+//               after_write@12 = mid-ops (BEGIN + 4 inserts written),
+//               after_write@18 = COMMIT frame written
+
+#[derive(Clone, Copy, PartialEq)]
+enum E2Exit {
+    Abort,
+    Kill,
+    Exit0,
+    Other,
+}
+
+fn e2_classify(status: std::process::ExitStatus) -> E2Exit {
+    use std::os::unix::process::ExitStatusExt;
+    if let Some(sig) = status.signal() {
+        match sig {
+            6 => E2Exit::Abort,
+            9 => E2Exit::Kill,
+            _ => E2Exit::Other,
+        }
+    } else if status.success() {
+        E2Exit::Exit0
+    } else {
+        E2Exit::Other
+    }
+}
+
+fn e2_exit_name(x: E2Exit) -> &'static str {
+    match x {
+        E2Exit::Abort => "SIGABRT",
+        E2Exit::Kill => "SIGKILL",
+        E2Exit::Exit0 => "EXIT0",
+        E2Exit::Other => "OTHER",
+    }
+}
+
+fn e2_sidecar_path(dir: &std::path::Path) -> String {
+    format!("{}.e2sidecar", dir.display())
+}
+
+fn e2_spawn_child_live(
+    dir: &std::path::Path,
+    scenario: &str,
+    mode: &str,
+) -> std::process::Child {
+    let _ = std::fs::remove_dir_all(dir);
+    let _ = std::fs::remove_file(e2_sidecar_path(dir));
+    std::process::Command::new(std::env::current_exe().unwrap())
+        .args([
+            "dbtest",
+            "gatechild",
+            "--dir",
+            dir.to_str().unwrap(),
+            "--scenario",
+            scenario,
+            "--gate",
+            "",
+        ])
+        .env("PH3D_DURABILITY", mode)
+        .spawn()
+        .unwrap()
+}
+
+fn e2_spawn_child(
+    dir: &std::path::Path,
+    scenario: &str,
+    gate: &str,
+    gathit: usize,
+    mode: &str,
+    seg_bytes: Option<u64>,
+) -> E2Exit {
+    let _ = std::fs::remove_dir_all(dir);
+    let _ = std::fs::remove_file(e2_sidecar_path(dir));
+    let mut cmd = std::process::Command::new(std::env::current_exe().unwrap());
+    cmd.args([
+        "dbtest",
+        "gatechild",
+        "--dir",
+        dir.to_str().unwrap(),
+        "--scenario",
+        scenario,
+        "--gate",
+        gate,
+    ])
+    .env("PH3D_DURABILITY", mode)
+    .env("PH3E_CRASH_AT", gate)
+    .env("PH3E_CRASH_HIT", gathit.to_string());
+    if let Some(b) = seg_bytes {
+        cmd.env("ATTENTIONDB_WAL_SEGMENT_BYTES", b.to_string());
+    }
+    e2_classify(cmd.status().unwrap())
+}
+
+/// Reopen after the crash and record the recovered facts for one cell.
+struct E2Recovery {
+    baseline_preserved: usize,
+    baseline_total: usize,
+    target_present: bool,
+    extra_idx: Vec<u32>,       // anything outside the expected idx universe
+    #[allow(dead_code)] // derivable from preserved/total; kept for debugging
+    missing_baseline: Vec<u32>, // acked-but-absent baseline idxs
+    checker_clean: bool,
+    wal_high_watermark: String,
+    restart_states_equal: bool,
+    restart_checker_clean: bool,
+}
+
+fn e2_recover(
+    dir: &std::path::Path,
+    mode: &str,
+    baseline_idx: &[u32],
+    target_idx: Option<u32>,
+    check_restarts: bool,
+) -> E2Recovery {
+    std::env::set_var("PH3D_DURABILITY", mode);
+    let e = open_db(dir);
+    let (obs, _) = export_state(&e);
+    let mut missing_baseline = Vec::new();
+    let mut baseline_preserved = 0usize;
+    for i in baseline_idx {
+        if obs.contains_key(i) {
+            baseline_preserved += 1;
+        } else {
+            missing_baseline.push(*i);
+        }
+    }
+    let universe: std::collections::HashSet<u32> = baseline_idx
+        .iter()
+        .copied()
+        .chain(target_idx)
+        .collect();
+    let extra_idx: Vec<u32> = obs.keys().filter(|k| !universe.contains(k)).copied().collect();
+    let target_present = target_idx.map(|t| obs.contains_key(&t)).unwrap_or(false);
+    let rep = checker_report(&e, dir);
+    let clean = rep["clean"].as_bool().unwrap_or(false);
+    let wsm = attentiondb_storage::read_wal_state(&dir.join("WAL"))
+        .ok()
+        .flatten()
+        .map(|w| w.high_watermark.to_string())
+        .unwrap_or_else(|| "-".to_string());
+    // Multiple-restart stability (§15): the recovered state must be a fixed
+    // point across TWO further close/open cycles, checker clean each time.
+    let (restart_states_equal, restart_checker_clean) = if check_restarts {
+        let mut eq = true;
+        let mut all_clean = true;
+        let mut keys_prev: Vec<u32> = obs.keys().copied().collect();
+        let mut handle = e;
+        for _ in 0..2 {
+            handle.close().unwrap();
+            let e2 = open_db(dir);
+            let (obs2, _) = export_state(&e2);
+            let keys2: Vec<u32> = obs2.keys().copied().collect();
+            if keys2 != keys_prev {
+                eq = false;
+            }
+            if !checker_report(&e2, dir)["clean"].as_bool().unwrap_or(false) {
+                all_clean = false;
+            }
+            keys_prev = keys2;
+            handle = e2;
+        }
+        handle.close().unwrap();
+        (eq, all_clean)
+    } else {
+        (true, clean)
+    };
+    E2Recovery {
+        baseline_preserved,
+        baseline_total: baseline_idx.len(),
+        target_present,
+        extra_idx,
+        missing_baseline,
+        checker_clean: clean,
+        wal_high_watermark: wsm,
+        restart_states_equal,
+        restart_checker_clean,
+    }
+}
+
+/// Child process for every E2 crash cell. Dies by abort() at the configured
+/// point; never flushes on the way out.
+fn run_gatechild(dir: &std::path::Path, scenario: &str, gate: &str) -> ! {
+    let e = open_db(dir);
+    e.create_collection("bench", DIM, &[HEAD]).unwrap();
+    let mut sc = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(e2_sidecar_path(dir))
+        .unwrap();
+    let mut ack = |line: String| {
+        use std::io::Write;
+        let _ = writeln!(sc, "{line}");
+        let _ = sc.flush();
+        let _ = sc.sync_all();
+    };
+    match scenario {
+        "ack" => {
+            for i in 0..10u32 {
+                e.insert_document("bench", doc_record(1000 + i, 1, "c", i as i64)).unwrap();
+                ack(format!("ACK {}", 1000 + i));
+            }
+            match gate {
+                "after_ack" => {
+                    e.insert_document("bench", doc_record(2000, 1, "t", 0)).unwrap();
+                    ack(String::from("ACK 2000"));
+                    std::process::abort();
+                }
+                "explicit_flush" => {
+                    e.insert_document("bench", doc_record(2000, 1, "t", 0)).unwrap();
+                    ack(String::from("ACK 2000"));
+                    e.flush_wal().unwrap();
+                    std::process::abort();
+                }
+                _ => {
+                    // env-gated abort fires inside this call
+                    e.insert_document("bench", doc_record(2000, 1, "t", 0)).unwrap();
+                    ack(String::from("ACK 2000")); // only reached if the gate did not fire
+                    std::process::abort();
+                }
+            }
+        }
+        "txn" => {
+            for i in 0..5u32 {
+                e.insert_document("bench", doc_record(1000 + i, 1, "c", i as i64)).unwrap();
+                ack(format!("ACK {}", 1000 + i));
+            }
+            use attentiondb_core::transaction::TxnOp;
+            let t = e.txn_manager.begin_transaction("bench");
+            for i in 2000..2008u32 {
+                e.txn_manager
+                    .record_operation(t, TxnOp::Insert(doc_record(i, 1, "txn", i as i64)))
+                    .unwrap();
+            }
+            e.txn_manager.record_operation(t, TxnOp::Delete(uuid_for(1001, 1))).unwrap();
+            e.txn_manager.record_operation(t, TxnOp::Delete(uuid_for(1003, 1))).unwrap();
+            match gate {
+                "after_ack" => {
+                    e.commit_transaction(t).unwrap();
+                    ack(String::from("TXNACK"));
+                    std::process::abort();
+                }
+                "ack_ckpt" => {
+                    e.commit_transaction(t).unwrap();
+                    ack(String::from("TXNACK"));
+                    e.checkpoint().unwrap();
+                    std::process::abort();
+                }
+                _ => {
+                    // env-gated abort fires inside commit (BEGIN/ops/COMMIT appends)
+                    e.commit_transaction(t).unwrap();
+                    ack(String::from("TXNACK"));
+                    std::process::abort();
+                }
+            }
+        }
+        "group" => {
+            // 3 writers × 25 acked inserts on ONE engine handle (serialized by
+            // the mutation gate; GroupCommit = flush inside every append).
+            let e = std::sync::Arc::new(e);
+            let side = std::sync::Arc::new(std::sync::Mutex::new(sc));
+            let mut handles = Vec::new();
+            for t in 0..3u32 {
+                let e = e.clone();
+                let side = side.clone();
+                handles.push(std::thread::spawn(move || {
+                    for j in 0..25u32 {
+                        let idx = 3000 + t * 100 + j;
+                        e.insert_document("bench", doc_record(idx, 1, "g", idx as i64)).unwrap();
+                        let mut f = side.lock().unwrap();
+                        use std::io::Write;
+                        let _ = writeln!(*f, "ACK {idx}");
+                        let _ = f.flush();
+                    }
+                }));
+            }
+            for h in handles {
+                h.join().unwrap();
+            }
+            loop {
+                std::thread::sleep(std::time::Duration::from_secs(3600));
+            }
+        }
+        "ckpt" => {
+            // 30 baseline acked inserts (guarantees ≥1 rotation when
+            // ATTENTIONDB_WAL_SEGMENT_BYTES is small), then the structural
+            // durability point named by `gate`, then an acked target insert.
+            for i in 0..30u32 {
+                e.insert_document("bench", doc_record(1000 + i, 1, "c", i as i64)).unwrap();
+                ack(format!("ACK {}", 1000 + i));
+            }
+            match gate {
+                "checkpoint" | "checkpoint_trim" => {
+                    e.checkpoint().unwrap();
+                }
+                "rotate_only" => {}
+                _ => panic!("unknown structural point {gate}"),
+            }
+            e.insert_document("bench", doc_record(2000, 1, "t", 0)).unwrap();
+            ack(String::from("ACK 2000"));
+            std::process::abort();
+        }
+        _ => panic!("unknown scenario {scenario}"),
+    }
+}
+
+fn e2_row(cols: &[String]) -> String {
+    cols.join(",")
+}
+
+/// Parent driver. Records raw facts; judgement happens in the generator.
+fn run_durability(suite: &str, out: &str) -> String {
+    let modes = ["sync", "group", "async"];
+    std::fs::create_dir_all(out).unwrap();
+    let mut rows: Vec<String> = Vec::new();
+    let mut cells = 0usize;
+    match suite {
+        "ack-boundary" => {
+            rows.push("mode,gate,rep,exit_kind,baseline_preserved,baseline_total,target_acked,target_present,extra_count,checker_clean,high_watermark".into());
+            let baseline: Vec<u32> = (1000..1010).collect();
+            for mode in modes {
+                for gate in [
+                    "before_wal_append",
+                    "after_write",
+                    "after_flush",
+                    "after_fsync",
+                    "after_wal_append",
+                    "after_apply",
+                    "before_ack",
+                    "after_ack",
+                    "explicit_flush",
+                ] {
+                    // hit number: engine gates count insert calls (10 baseline
+                    // + target = 11); WAL gates also count the collection
+                    // record (12)
+                    let (hit, target_acked) = match gate {
+                        "after_ack" | "explicit_flush" => (0usize, true),
+                        "before_wal_append" | "after_wal_append" | "after_apply"
+                        | "before_ack" => (11, false),
+                        _ => (12, false),
+                    };
+                    // after_flush fires only inside the GroupCommit branch of
+                    // Wal::append; after_fsync only inside the Sync branch. In
+                    // other modes the gate is UNREACHABLE — record the cell as
+                    // NOT_REACHED instead of spawning (the child's fallback
+                    // abort would fabricate an after_ack-like observation).
+                    let reachable = match gate {
+                        "after_flush" => mode == "group",
+                        "after_fsync" => mode == "sync",
+                        _ => true,
+                    };
+                    if !reachable {
+                        for rep in 0..3usize {
+                            rows.push(e2_row(&[
+                                mode.into(), gate.into(), rep.to_string(), "NOT_REACHED".into(),
+                                "-".into(), "0".into(), "-".into(), "-".into(),
+                                "-".into(), "-".into(), "-".into(),
+                            ]));
+                        }
+                        cells += 3;
+                        continue;
+                    }
+                    for rep in 0..3usize {
+                        let dir = std::path::PathBuf::from(format!(
+                            "/tmp/ph3e-dur/ack-{mode}-{gate}-{rep}"
+                        ));
+                        let exit = e2_spawn_child(&dir, "ack", gate, hit, mode, None);
+                        let r = e2_recover(&dir, mode, &baseline, Some(2000), false);
+                        rows.push(e2_row(&[
+                            mode.into(), gate.into(), rep.to_string(), e2_exit_name(exit).into(),
+                            r.baseline_preserved.to_string(), r.baseline_total.to_string(),
+                            target_acked.to_string(), r.target_present.to_string(),
+                            r.extra_idx.len().to_string(), r.checker_clean.to_string(),
+                            r.wal_high_watermark.clone(),
+                        ]));
+                        cells += 1;
+                        let _ = std::fs::remove_dir_all(&dir);
+                        let _ = std::fs::remove_file(e2_sidecar_path(&dir));
+                    }
+                }
+            }
+        }
+        "txn-ack" => {
+            rows.push("mode,gate,rep,exit_kind,baseline_preserved,baseline_total,txn_acked,txn_insert_state,txn_deletes_applied,extra_count,checker_clean,high_watermark".into());
+            let baseline: Vec<u32> = (1000..1005).collect();
+            for mode in modes {
+                for gate in [
+                    "mid_ops",
+                    "commit_written",
+                    "after_wal_append",
+                    "after_apply",
+                    "before_ack",
+                    "after_ack",
+                    "ack_ckpt",
+                ] {
+                    let (scenario, g, hit) = match gate {
+                        "mid_ops" => ("txn", "after_write", 12usize),
+                        "commit_written" => ("txn", "after_write", 18usize),
+                        "after_ack" | "ack_ckpt" => ("txn", gate, 0usize),
+                        other => ("txn", other, 6usize),
+                    };
+                    for rep in 0..3usize {
+                        let dir = std::path::PathBuf::from(format!(
+                            "/tmp/ph3e-dur/txn-{mode}-{gate}-{rep}"
+                        ));
+                        let exit = e2_spawn_child(&dir, scenario, g, hit, mode, None);
+                        std::env::set_var("PH3D_DURABILITY", mode);
+                        let txn_acked = gate == "after_ack" || gate == "ack_ckpt";
+                        // txn state from recovered facts
+                        let e = open_db(&dir);
+                        let (obs, _) = export_state(&e);
+                        // All-or-nothing is judged on the txn INSERTS: an
+                        // ABSENT txn whose deleted baseline docs were THEMSELVES
+                        // lost (Async buffering) leaves "deletes applied"
+                        // vacuously true — never call that PARTIAL.
+                        let inserts_present =
+                            (2000..2008u32).filter(|i| obs.contains_key(i)).count();
+                        let deletes_applied = !obs.contains_key(&1001) && !obs.contains_key(&1003);
+                        let txn_state = match inserts_present {
+                            8 => "COMPLETE",
+                            0 => "ABSENT",
+                            _ => "PARTIAL",
+                        };
+                        let mut missing_baseline = Vec::new();
+                        let mut baseline_preserved = 0usize;
+                        for i in &baseline {
+                            if obs.contains_key(i) {
+                                baseline_preserved += 1;
+                            } else {
+                                missing_baseline.push(*i);
+                            }
+                        }
+                        let universe: std::collections::HashSet<u32> = baseline
+                            .iter()
+                            .copied()
+                            .chain(2000..2008)
+                            .collect();
+                        let extra = obs.keys().filter(|k| !universe.contains(k)).count();
+                        let rep_json = checker_report(&e, &dir);
+                        let clean = rep_json["clean"].as_bool().unwrap_or(false);
+                        let wm = attentiondb_storage::read_wal_state(&dir.join("WAL"))
+                            .ok()
+                            .flatten()
+                            .map(|w| w.high_watermark.to_string())
+                            .unwrap_or_else(|| "-".into());
+                        drop(e);
+                        rows.push(e2_row(&[
+                            mode.into(), gate.into(), rep.to_string(), e2_exit_name(exit).into(),
+                            baseline_preserved.to_string(), baseline.len().to_string(),
+                            txn_acked.to_string(), txn_state.into(), deletes_applied.to_string(),
+                            extra.to_string(), clean.to_string(), wm,
+                        ]));
+                        cells += 1;
+                        let _ = std::fs::remove_dir_all(&dir);
+                        let _ = std::fs::remove_file(e2_sidecar_path(&dir));
+                    }
+                }
+            }
+        }
+        "checkpoint-interaction" => {
+            rows.push("mode,structural,rep,exit_kind,baseline_preserved,baseline_total,target_acked,target_present,extra_count,checker_clean,high_watermark,restarts_equal,restart_checker_clean".into());
+            let baseline: Vec<u32> = (1000..1030).collect();
+            for mode in modes {
+                for structural in ["checkpoint", "checkpoint_trim", "rotate_only"] {
+                    for rep in 0..3usize {
+                        let dir = std::path::PathBuf::from(format!(
+                            "/tmp/ph3e-dur/ckpt-{mode}-{structural}-{rep}"
+                        ));
+                        let seg = if structural == "rotate_only" { Some(2048u64) } else { None };
+                        let exit = e2_spawn_child(&dir, "ckpt", structural, 0, mode, seg);
+                        let r = e2_recover(&dir, mode, &baseline, Some(2000), true);
+                        rows.push(e2_row(&[
+                            mode.into(), structural.into(), rep.to_string(), e2_exit_name(exit).into(),
+                            r.baseline_preserved.to_string(), r.baseline_total.to_string(),
+                            "true".into(), r.target_present.to_string(),
+                            r.extra_idx.len().to_string(), r.checker_clean.to_string(),
+                            r.wal_high_watermark.clone(),
+                            r.restart_states_equal.to_string(),
+                            r.restart_checker_clean.to_string(),
+                        ]));
+                        cells += 1;
+                        let _ = std::fs::remove_dir_all(&dir);
+                        let _ = std::fs::remove_file(e2_sidecar_path(&dir));
+                    }
+                }
+            }
+        }
+        "group-boundary" => {
+            rows.push("mode,variant,rep,exit_kind,acked_total,recovered_acked,acked_lost,unacked_survived,extra_count,checker_clean".into());
+            for mode in modes {
+                for variant in ["self", "mid"] {
+                    for rep in 0..3usize {
+                        let dir = std::path::PathBuf::from(format!(
+                            "/tmp/ph3e-dur/group-{mode}-{variant}-{rep}"
+                        ));
+                        // The child parks forever after its writers finish, so
+                        // the parent owns its lifecycle: spawn live, poll the
+                        // ack sidecar, SIGKILL via the child handle.
+                        let mut child = e2_spawn_child_live(&dir, "group", mode);
+                        // parent kill for both variants: self waits for all 75,
+                        // mid kills at >= 40 acks
+                        let target = if variant == "self" { 75usize } else { 40usize };
+                        let mut acked: Vec<u32> = Vec::new();
+                        for _poll in 0..600 {
+                            if let Ok(s) = std::fs::read_to_string(e2_sidecar_path(&dir)) {
+                                acked = s
+                                    .lines()
+                                    .filter_map(|l| l.strip_prefix("ACK ")?.parse().ok())
+                                    .collect();
+                                if acked.len() >= target {
+                                    break;
+                                }
+                            }
+                            std::thread::sleep(std::time::Duration::from_millis(20));
+                        }
+                        let _ = child.kill();
+                        let exit = e2_classify(child.wait().unwrap());
+                        std::env::set_var("PH3D_DURABILITY", mode);
+                        let e = open_db(&dir);
+                        let (obs, _) = export_state(&e);
+                        let recovered_acked = acked.iter().filter(|i| obs.contains_key(i)).count();
+                        let acked_lost = acked.len() - recovered_acked;
+                        let acked_set: std::collections::HashSet<u32> = acked.iter().copied().collect();
+                        let unacked_survived = obs
+                            .keys()
+                            .filter(|k| (3000..3999).contains(*k) && !acked_set.contains(k))
+                            .count();
+                        let extra = obs.keys().filter(|k| !(3000..3999).contains(*k)).count();
+                        let clean = checker_report(&e, &dir)["clean"].as_bool().unwrap_or(false);
+                        rows.push(e2_row(&[
+                            mode.into(), variant.into(), rep.to_string(), e2_exit_name(exit).into(),
+                            acked.len().to_string(), recovered_acked.to_string(),
+                            acked_lost.to_string(), unacked_survived.to_string(),
+                            extra.to_string(), clean.to_string(),
+                        ]));
+                        cells += 1;
+                        let _ = std::fs::remove_dir_all(&dir);
+                        let _ = std::fs::remove_file(e2_sidecar_path(&dir));
+                    }
+                }
+            }
+        }
+        "mode-latency" => {
+            rows.push("mode,ops,mean_us,p50_us,p90_us,p99_us,max_us,throughput_ops_s".into());
+            for mode in modes {
+                let dir = std::path::PathBuf::from(format!("/tmp/ph3e-dur/lat-{mode}"));
+                let _ = std::fs::remove_dir_all(&dir);
+                std::env::set_var("PH3D_DURABILITY", mode);
+                let e = open_db(&dir);
+                e.create_collection("bench", DIM, &[HEAD]).unwrap();
+                let mut samples: Vec<u128> = Vec::with_capacity(2000);
+                for i in 0..2000u32 {
+                    let t0 = std::time::Instant::now();
+                    e.insert_document("bench", doc_record(5000 + i, 1, "l", i as i64)).unwrap();
+                    samples.push(t0.elapsed().as_micros());
+                }
+                let n = samples.len();
+                let mean = samples.iter().sum::<u128>() / n as u128;
+                samples.sort();
+                let pct = |p: f64| samples[((n as f64) * p) as usize % n];
+                let total_s = samples.iter().sum::<u128>() as f64 / 1e6;
+                rows.push(e2_row(&[
+                    mode.into(), n.to_string(), mean.to_string(),
+                    pct(0.50).to_string(), pct(0.90).to_string(), pct(0.99).to_string(),
+                    samples[n - 1].to_string(),
+                    format!("{:.0}", n as f64 / total_s),
+                ]));
+                cells += 1;
+                e.close().unwrap();
+                let _ = std::fs::remove_dir_all(&dir);
+            }
+        }
+        _ => panic!("unknown durability suite {suite}"),
+    }
+    let csv = format!("{out}/{suite}.csv");
+    std::fs::write(&csv, rows.join("\n") + "\n").unwrap();
+    write_json(
+        &format!("{out}/metrics.json"),
+        &serde_json::json!({"suite": suite, "cells": cells}),
+    );
+    format!("durability[{suite}]: {cells} cells -> {csv}")
+}
+
 // ---------------------------------------------------------------- dispatch
 
 pub fn run(args: &[String]) -> String {
@@ -1812,6 +2417,8 @@ pub fn run(args: &[String]) -> String {
         "concurreplay" => run_concur_replay(&dir, &out),
         "compact" => run_compact(&dir, &out),
         "walintegrity" => run_walintegrity(&out),
+        "durability" => run_durability(&get("--suite", "ack-boundary"), &out),
+        "gatechild" => run_gatechild(&dir, &get("--scenario", "ack"), &get("--gate", "")),
         "compactlive" => run_compact_live(&dir),
         other => format!("unknown dbtest subcommand {other}"),
     }

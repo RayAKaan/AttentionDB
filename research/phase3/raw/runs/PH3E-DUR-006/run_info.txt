@@ -1,0 +1,7 @@
+run_id=PH3E-DUR-006
+experiment=E2 structural durability points + MULTI-RESTART x2 (supersedes PH3E-DUR-003's restart evidence, which covered one restart cycle due to a harness loop defect found by clippy all-targets)
+date=2026-09-17
+method=phase3-bench dbtest durability --suite checkpoint-interaction (corrected harness: two close/open cycles per cell, state equality + checker each cycle)
+config=see config.json
+status=COMPLETED — 27 cells; restarts_equal and restart_checker_clean across 2 cycles
+notes=PH3E-DUR-003 preserved unchanged (immutable raw); its single-cycle restart facts remain valid

@@ -47,12 +47,17 @@ fn t14_corrupt_wal_tail() {
     // the classic crash signature on journaled filesystems. Non-zero garbage
     // tails are treated as corruption (fatal) by policy; see docs/wal.md.
     let wal_dir = dir.path().join("WAL");
-    let seg = std::fs::read_dir(&wal_dir)
+    // Pick the SEGMENT (sorted .wal files) — unsorted read_dir can return
+    // wal-state.json, and appending torn-frame bytes to the E1 integrity
+    // sidecar is a DIFFERENT (refusal) scenario covered elsewhere.
+    let mut segs: Vec<_> = std::fs::read_dir(&wal_dir)
         .unwrap()
         .filter_map(|x| x.ok())
         .map(|x| x.path())
-        .find(|p| std::fs::metadata(p).map(|m| m.len() > 0).unwrap_or(false))
-        .unwrap();
+        .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("wal"))
+        .collect();
+    segs.sort();
+    let seg = segs.last().unwrap().clone();
     {
         use std::io::Write;
         let mut f = std::fs::OpenOptions::new().append(true).open(&seg).unwrap();
@@ -157,12 +162,49 @@ fn t13_crash_during_checkpoint() {
     let newest = gens.last().unwrap().clone();
     std::fs::write(&newest, b"corrupted manifest bytes").unwrap();
     // CURRENT points at the newest — the loader must fall back.
-    let e2 = open_sync(db_dir);
-    assert_eq!(
-        e2.document_store.read().len(),
-        25,
-        "state via fallback + WAL"
+    //
+    // Phase 3E E1 update: destroying the CURRENT generation here leaves only
+    // gen 1 (checkpoint_seq=0) as fallback, while the seqs 1..11 that would
+    // reconnect the surviving WAL (12..26) to a valid base live ONLY in the
+    // SSTables the lost manifest described. Pre-E1 this opened and replayed
+    // onto an unprovable base; under the E1 invariant (production-contract A1)
+    // the open must REFUSE rather than silently mis-recover. The two-generation
+    // policy still covers the designed crash (CURRENT write torn, gen N valid).
+    let refused = try_open_sync(db_dir)
+        .err()
+        .expect("stale-fallback + trimmed WAL must refuse to open under E1");
+    let msg = format!("{refused}");
+    assert!(
+        msg.contains("WAL_SEQ_GAP"),
+        "expected WAL_SEQ_GAP refusal, got: {msg}"
     );
+    // The legitimate fallback path (CURRENT write torn, manifest generations
+    // intact) must keep opening: fallback gen (cp=6) connects to the surviving
+    // WAL (7..9). Mirrors PH3E-WAL-001 corrupt_current_manifest_fallback.
+    {
+        let d2 = temp_db();
+        {
+            let e = open_sync(d2.path());
+            e.create_collection("c", 8, &["default"]).unwrap();
+            for i in 0..5 {
+                e.insert_document("c", doc(i, &one_hot(i as usize, 8), "safe")).unwrap();
+            }
+            e.checkpoint().unwrap(); // gen 2 (cp=6); WAL trimmed, active @7
+            for i in 5..8 {
+                e.insert_document("c", doc(i, &one_hot(i as usize, 8), "tail")).unwrap();
+            }
+            std::mem::forget(e);
+        }
+        std::fs::write(d2.path().join("CURRENT"), b"manifest-999999999\n").unwrap();
+        let e = open_sync(d2.path());
+        assert_eq!(
+            e.document_store.read().len(),
+            8,
+            "CURRENT-torn fallback with connected generation still opens"
+        );
+    }
+    // The corrupted original dir now refuses (above) — nothing further to
+    // open there; the connected-fallback sub-case passed in the block above.
 }
 
 /// Extra: checkpoint trims old WAL segments, and the trimmed database still

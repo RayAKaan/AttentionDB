@@ -1,0 +1,7 @@
+run_id=PH3E-DUR-002
+experiment=E2 transaction acknowledgment: 10-op txn (8 inserts + 2 deletes) x 7 crash points x 3 modes; all-or-nothing judged on txn inserts, deletes recorded as separate fact
+date=2026-09-17
+method=phase3-bench dbtest durability --suite txn-ack (self-aborting gatechild via storage crashgate; parent reopens + full checker per cell)
+config=see config.json
+status=COMPLETED
+notes=gates=mid_ops(after_write@12),commit_written(after_write@18),after_wal_append(6),after_apply(6),before_ack(6),after_ack,ack_ckpt; baseline=5 acked inserts

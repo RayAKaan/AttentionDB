@@ -1,0 +1,7 @@
+run_id=PH3E-DUR-005
+experiment=E2 acknowledgment latency per mode: 2000 acked single inserts, p50/p90/p99/max + throughput (sandbox FS - not comparable to production hardware)
+date=2026-09-17
+method=phase3-bench dbtest durability --suite mode-latency (self-aborting gatechild via storage crashgate; parent reopens + full checker per cell)
+config=see config.json
+status=COMPLETED
+notes=ops=2000 per mode

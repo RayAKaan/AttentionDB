@@ -1,0 +1,1 @@
+{"suite": "checkpoint-interaction", "restarts": 2, "baseline": 30, "rotate_segment_bytes": 2048, "commit": "615407cb5977696d0c75f258c9ecd8b94a9b2701"}

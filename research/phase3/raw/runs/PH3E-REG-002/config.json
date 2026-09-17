@@ -1,0 +1,1 @@
+{"model": {"seed": 42, "ops": 300}, "suites": ["filterx", "integration"], "crash_legs": 7, "crash_durability": "group", "commit": "615407cb5977696d0c75f258c9ecd8b94a9b2701"}

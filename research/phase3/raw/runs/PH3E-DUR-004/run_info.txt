@@ -1,0 +1,7 @@
+run_id=PH3E-DUR-004
+experiment=E2 concurrent writers: 3 threads x 25 acked inserts on one engine; parent SIGKILLs at >=40 acks (mid) or after all 75 (self)
+date=2026-09-17
+method=phase3-bench dbtest durability --suite group-boundary (self-aborting gatechild via storage crashgate; parent reopens + full checker per cell)
+config=see config.json
+status=COMPLETED
+notes=variant=self waits 75 acks, mid kills at 40; acked-subset-of-recovered is the invariant; async loss documented

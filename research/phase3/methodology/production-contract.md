@@ -143,3 +143,72 @@ build, mutations, restart, replay, crash-recovery, compaction, concurrency, and 
   semantics and adopts the invariant at its next segment creation/rotation. The
   catalog gains NO watermark field (bincode v1 positional — durable sidecar files
   only). Details in `phase3e-spec.md` §E1 and the E1 evidence report.
+
+- **A2 (2026-09-17, E2) — Durability/Acknowledgment semantics.**
+  - *Old wording:* G3 (mode table) plus Q10: "commit()/mutation results do not
+    distinguish Committed from Durable ... scheduled for E2 ... will be an API-visible
+    contract change recorded as Amendment A2. Until then, the mode table in G3 IS the
+    ack contract."
+  - *New wording:* the E2 audit + experiments ESTABLISH the relationship and adopt the
+    following vocabulary as THE acknowledgment contract. **No API surface change** (see
+    decision below).
+    - **Committed** — the database accepted the operation/transaction through its
+      logical commit path (mutation applied to in-memory state; WAL record(s) appended;
+      for transactions: the COMMIT record appended).
+    - **Durable** — the durability mechanism required by the selected mode has
+      completed: Sync = frame fsynced (`sync_all`); GroupCommit = frame flushed to the
+      OS page cache; Async = nothing beyond the userspace `BufWriter` write.
+    - **Acknowledged** — the API returned `Ok` to the caller (always AFTER both the WAL
+      append and the in-memory apply; never before).
+    - Established relationships (evidence PH3E-DUR-001..004):
+      - `Sync`: **Acknowledged ⇒ Durable(machine boundary) ⇒ survives process crash.**
+        Crash gate `after_fsync` (frame fsynced, not yet acked): record always
+        recovered; acked records never lost in any of 27 cells.
+      - `GroupCommit`: **Acknowledged ⇒ Durable(process boundary) ⇒ survives process
+        crash, NOT machine crash.** Gate `after_flush` (page cache, not fsynced):
+        record recovered after SIGABRT. Despite the name there is NO coalescing/group
+        formation: the engine-wide mutation gate serializes all mutations; every append
+        flushes before it returns (before the ack). The name is retained for
+        compatibility; the semantics are "flush-to-OS before ack".
+      - `Async`: **Acknowledged ⇒ Committed only; NOT durable.** Acked single writes
+        LOST at the `after_ack` gate (all reps); an acked 10-op transaction LOST whole
+        (documented); concurrent acked writes: 4/75 lost (userspace buffer tail).
+        Loss is bounded ONLY by structural durability points: WAL rotation (completed
+        segments), `checkpoint()` and `close()` (everything), `flush_wal()` (page
+        cache). Survival of any particular acked Async write is an implementation
+        artifact of the 8 KiB `BufWriter` boundary and MUST NOT be relied upon.
+    - **Structural durability points (mode-independent, verified PH3E-DUR-003):**
+      rotation (flush+fsync of completed segments), checkpoint (WAL fsync → SSTables →
+      idmap → manifest → rotate → trim), graceful close (= checkpoint). After any of
+      these, everything appended so far is machine-boundary durable in ALL modes.
+      Rotation covers completed segments only: in Async the active-segment records
+      remain loss-exposed until the next structural point (observed 27/30 preserved at
+      2 KiB segments — exactly the E1 watermark boundary).
+    - **Transactions:** atomicity boundary = presence of the COMMIT record in the WAL;
+      durability boundary = the mode's action on that append. An acknowledged
+      transaction NEVER recovers partially (0 PARTIAL in 63 cells): crash before the
+      COMMIT flush discards the whole transaction even in Sync (gate `commit_written`:
+      ops already fsynced, COMMIT still userspace-buffered → whole txn ABSENT).
+    - **Multiple restarts:** the recovered state is a fixed point — restart/restart
+      state equality + clean checker in 27/27 cells (PH3E-DUR-003).
+    - *API decision:* the existing single-ack API is kept. Making Committed-vs-Durable
+      API-visible would touch the api crate (unbuildable in this environment — protoc
+      unavailable) for no semantic gain: the ack contract is fully determined by the
+      selected mode per the table above. Q10 is answered by this amendment; the
+      distinction is documented, not an API return-value change.
+    - *Production default recommendation:* **GroupCommit** for production-oriented use
+      (acknowledged writes survive process crash at measured cost parity with Async on
+      the test filesystem — PH3E-DUR-005: mean ack 262 µs vs 259 µs; Sync for
+      loss-of-no-acked-write-until-machine-failure requirements). The engine keeps NO
+      implicit default: `open_dir` requires the caller to choose. Machine/power-loss
+      durability remains NOT VERIFIED for every mode until E3 (N6 unchanged).
+    - *Limitations:* process-crash axis only (SIGABRT/SIGKILL); machine-crash and
+      power-loss claims are NOT VERIFIED (E3 scope); latency figures are
+      sandbox-filesystem-specific and not production-comparable; unacknowledged
+      in-flight writes MAY survive recovery (allowed, observed 0 times in 189 cells).
+    - *Experiments:* PH3E-DUR-001 (81 cells), PH3E-DUR-002 (63), PH3E-DUR-003 (27),
+      PH3E-DUR-004 (18), PH3E-DUR-005 (3), regressions PH3E-WAL-002 (identical to
+      PH3E-WAL-001) and PH3E-REG-002 (all families clean).
+    - N5 is superseded by this amendment: Async acknowledged loss is no longer merely
+      "unsupported by design" — it is OBSERVED and characterized (single writes, whole
+      transactions, buffer-tail batches). The guidance stands: use GroupCommit/Sync.
