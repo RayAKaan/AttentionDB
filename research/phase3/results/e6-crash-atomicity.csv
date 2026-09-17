@@ -1,0 +1,20 @@
+boundary,mode,txn_state,expected,atomicity,checker,model,match
+pre-commit staging,sync,ABSENT,"committed unit or never-happened, per boundary",ATOMIC,clean,MATCH,MATCH
+pre-commit staging,sync,ABSENT,"committed unit or never-happened, per boundary",ATOMIC,clean,MATCH,MATCH
+pre-commit staging,group,ABSENT,"committed unit or never-happened, per boundary",ATOMIC,clean,MATCH,MATCH
+gate: tx_before_commit_wal,sync,ABSENT_ATOMIC,"committed unit or never-happened, per boundary",ATOMIC,clean,MATCH,MATCH
+gate: tx_before_commit_wal,group,ABSENT_ATOMIC,"committed unit or never-happened, per boundary",ATOMIC,clean,MATCH,MATCH
+gate: tx_before_commit_wal,async,ABSENT_ATOMIC,"committed unit or never-happened, per boundary",ATOMIC,clean,MATCH,MATCH
+gate: tx_after_commit_wal,sync,PRESENT_ATOMIC,"committed unit or never-happened, per boundary",ATOMIC,clean,MATCH,MATCH
+gate: tx_after_commit_wal,group,PRESENT_ATOMIC,"committed unit or never-happened, per boundary",ATOMIC,clean,MATCH,MATCH
+gate: tx_after_commit_wal,async,ABSENT_ATOMIC,"committed unit or never-happened, per boundary",ATOMIC,clean,MATCH,MATCH
+gate: after_apply,sync,PRESENT_ATOMIC,"committed unit or never-happened, per boundary",ATOMIC,clean,MATCH,MATCH
+gate: after_apply,group,PRESENT_ATOMIC,"committed unit or never-happened, per boundary",ATOMIC,clean,MATCH,MATCH
+gate: after_apply,async,ABSENT_ATOMIC,"committed unit or never-happened, per boundary",ATOMIC,clean,MATCH,MATCH
+gate: before_ack,sync,PRESENT_ATOMIC,"committed unit or never-happened, per boundary",ATOMIC,clean,MATCH,MATCH
+gate: before_ack,group,PRESENT_ATOMIC,"committed unit or never-happened, per boundary",ATOMIC,clean,MATCH,MATCH
+gate: before_ack,async,ABSENT_ATOMIC,"committed unit or never-happened, per boundary",ATOMIC,clean,MATCH,MATCH
+abort after ACK,sync,PRESENT_ATOMIC,"committed unit or never-happened, per boundary",ATOMIC,clean,MATCH,MATCH
+abort after ACK,group,PRESENT_ATOMIC,"committed unit or never-happened, per boundary",ATOMIC,clean,MATCH,MATCH
+abort after ACK,async,ABSENT_ATOMIC,"committed unit or never-happened, per boundary",ATOMIC,clean,MATCH,MATCH
+T1 committed; T3 staged only,sync,T1_PRESENT_T3_ABSENT,"committed unit or never-happened, per boundary",ATOMIC,clean,MATCH,MATCH

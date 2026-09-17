@@ -1,0 +1,31 @@
+family,case,mode,expected_state,observed_state,commit_status,checker_clean,restart_ok,model_match,notes
+E6a-basic,t1-single-insert,sync,11,11,COMMITTED,"true/true",ok,"true/true",commit-marker boundary; restart equality
+E6a-basic,t2-multi-insert,sync,13,13,COMMITTED,"true/true",ok,"true/true",commit-marker boundary; restart equality
+E6a-basic,t3-insert-delete,sync,10,10,COMMITTED,"true/true",ok,"true/true",commit-marker boundary; restart equality
+E6a-basic,t4-multi-delete,sync,7,7,COMMITTED,"true/true",ok,"true/true",commit-marker boundary; restart equality
+E6a-basic,t5-empty-txn,sync,10,10,COMMITTED,"true/true",ok,"true/true",zero-op txn is a legal no-op
+E6b-rollback,rollback-invisible,sync,10,10,ROLLED_BACK,"true/true",ok,"true/true",staged ops never left memory
+E6b-rollback,illegal-transitions,sync,11,11,c1=true,c2=false,r=false,c3=false,"true/true",ok,"true/true",double-commit/rollback-after-commit/commit-after-rollback all no-ops
+E6c-multiop,n-ops-5,sync,10,10,COMMITTED,"true/true",ok,"true/true",mixed insert+delete txn recovers as one unit
+E6c-multiop,n-ops-10,sync,10,10,COMMITTED,"true/true",ok,"true/true",mixed insert+delete txn recovers as one unit
+E6c-multiop,n-ops-50,sync,50,50,COMMITTED,"true/true",ok,"true/true",mixed insert+delete txn recovers as one unit
+E6c-multiop,n-ops-100,sync,100,100,COMMITTED,"true/true",ok,"true/true",mixed insert+delete txn recovers as one unit
+E6d-multi-txn,commit-rollback-commit,sync,11,11,T1+T3 COMMITTED T2 ROLLED_BACK,"true/true",ok,"true/true",independent outcomes per txn
+E6i-ordering,commit-order-wins,sync,11,11,T2-after-T1=T3-after-T2,"true/true",ok,"true/true",insert->delete absent; same-uuid reinsert = last commit wins (999)
+E6i-ordering,delete-missing-noop,sync,10,10,COMMITTED,"true","ok/-","true/-",delete of absent uuid is a no-op; txn still commits
+E6j-concurrency,3-staged-txns,group,12,12,all committed (out of stage order),"true/true",ok,"true/true",staging is concurrent; commits serialize on the mutation gate; WAL order = commit order
+E6k-update-upsert,update-upsert-semantics,sync,10 docs,10,OK,"true/true",ok,"true/true",upd=true missing=true upd-del=true up1=true up2=true v13=(0, "t", 4321) has150=true absent14=true iss=0 flags=[]; update: exists-only/uuid-preserved/version+1/old-id-retired; upsert=exists?update:insert; in-txn update UNSUPPORTED (TxnOp type)
+E6l-same-key,ins-ins-del-ins-txn,sync,1 uuids,160,COMMITTED,"true/true",ok,"true/true",same-uuid double insert + delete in ONE txn then reinsert: final = reinserted value, uuid unique
+E6m-tombstones,txn-ins-txn-del-compact,sync,absent,false,2 tombs reclaimed,"true",ok,"true",txn-tombstone GC sound after compaction+restart (E5 tie-break regression included in suite)
+E6m-tombstones,staged-delete-rollback,sync,present,true,ROLLED_BACK,"true",ok,"true/true",rolled-back delete leaves doc present; no resurrection risk
+E6n-compaction,commit-then-compact,sync,10,10,COMMITTED,"true/true",ok,"true/true",gate serializes txn vs compaction; both orders consistent
+E6n-compaction,compact-then-commit,sync,10,10,COMMITTED,"true/true",ok,"true/true",gate serializes txn vs compaction; both orders consistent
+E6o-checkpoint,txn-then-ckpt,sync,txn applied,true,COMMITTED,"true",ok,"true/true",checkpoint never makes an uncommitted txn committed
+E6o-checkpoint,ckpt-then-txn,sync,txn applied,true,COMMITTED,"true",ok,"true/true",checkpoint never makes an uncommitted txn committed
+E6o-checkpoint,staged-then-ckpt,sync,txn absent,false,NEVER-COMMITTED,"true",ok,"false/false",checkpoint never makes an uncommitted txn committed
+E6o-checkpoint,commit-ckpt-restart,sync,txn applied,true,COMMITTED,"true",ok,"true/true",checkpoint never makes an uncommitted txn committed
+E6p-rotation,100-op-txn-2KiB-segments,group,105,105,COMMITTED,"true/true",ok,"true/true",txn crosses multiple WAL rotations; no seq gap/dup replay
+E6q-backup,before-during-after,sync,see notes,see notes,3 backups,"true/true/true",ok,"true/true",before=baseline; during-staged=baseline (no partial txn in snapshot); after=committed state
+E6r-idempotence,restart-x3,sync,10,10,COMMITTED,"true/true/true",ok,"true",recovery(recovery(state))==recovery(state)
+E6s-corruption,garbled-committed-group,sync,refuse,REFUSED,-,-,-,corruption never silently converted to a valid txn (E1 policy)
+E6s-corruption,torn-tail-partial-group,sync,txn-absent,absent,DISCARDED,"true",ok,"true",incomplete group torn in half -> discarded atomically

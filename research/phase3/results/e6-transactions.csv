@@ -1,0 +1,31 @@
+family,case,mode,expected,classification,commit_status,checker,restart,model,match
+E6a-basic,t1-single-insert,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,COMMITTED,true/true,ok,true/true,MATCH
+E6a-basic,t2-multi-insert,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,COMMITTED,true/true,ok,true/true,MATCH
+E6a-basic,t3-insert-delete,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,COMMITTED,true/true,ok,true/true,MATCH
+E6a-basic,t4-multi-delete,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,COMMITTED,true/true,ok,true/true,MATCH
+E6a-basic,t5-empty-txn,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,COMMITTED,true/true,ok,true/true,MATCH
+E6b-rollback,rollback-invisible,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,ROLLED_BACK,true/true,ok,true/true,MATCH
+E6b-rollback,illegal-transitions,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,c1=true,c2=false,r=false,c3=false,MATCH
+E6c-multiop,n-ops-5,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,COMMITTED,true/true,ok,true/true,MATCH
+E6c-multiop,n-ops-10,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,COMMITTED,true/true,ok,true/true,MATCH
+E6c-multiop,n-ops-50,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,COMMITTED,true/true,ok,true/true,MATCH
+E6c-multiop,n-ops-100,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,COMMITTED,true/true,ok,true/true,MATCH
+E6d-multi-txn,commit-rollback-commit,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,T1+T3 COMMITTED T2 ROLLED_BACK,true/true,ok,true/true,MATCH
+E6i-ordering,commit-order-wins,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,T2-after-T1=T3-after-T2,true/true,ok,true/true,MATCH
+E6i-ordering,delete-missing-noop,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,COMMITTED,true,ok/-,true/-,MATCH
+E6j-concurrency,3-staged-txns,group,registered E6 cell expectation,TXN_PROPERTIES_HOLD,all committed (out of stage order),true/true,ok,true/true,MATCH
+E6k-update-upsert,update-upsert-semantics,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,OK,true/true,ok,true/true,MATCH
+E6l-same-key,ins-ins-del-ins-txn,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,COMMITTED,true/true,ok,true/true,MATCH
+E6m-tombstones,txn-ins-txn-del-compact,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,2 tombs reclaimed,true,ok,true,MATCH
+E6m-tombstones,staged-delete-rollback,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,ROLLED_BACK,true,ok,true/true,MATCH
+E6n-compaction,commit-then-compact,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,COMMITTED,true/true,ok,true/true,MATCH
+E6n-compaction,compact-then-commit,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,COMMITTED,true/true,ok,true/true,MATCH
+E6o-checkpoint,txn-then-ckpt,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,COMMITTED,true,ok,true/true,MATCH
+E6o-checkpoint,ckpt-then-txn,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,COMMITTED,true,ok,true/true,MATCH
+E6o-checkpoint,staged-then-ckpt,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,NEVER-COMMITTED,true,ok,false/false,MATCH
+E6o-checkpoint,commit-ckpt-restart,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,COMMITTED,true,ok,true/true,MATCH
+E6p-rotation,100-op-txn-2KiB-segments,group,registered E6 cell expectation,TXN_PROPERTIES_HOLD,COMMITTED,true/true,ok,true/true,MATCH
+E6q-backup,before-during-after,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,3 backups,true/true/true,ok,true/true,MATCH
+E6r-idempotence,restart-x3,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,COMMITTED,true/true/true,ok,true,MATCH
+E6s-corruption,garbled-committed-group,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,-,-,-,corruption never silently converted to a valid txn (E1 policy),MATCH
+E6s-corruption,torn-tail-partial-group,sync,registered E6 cell expectation,TXN_PROPERTIES_HOLD,DISCARDED,true,ok,true,MATCH

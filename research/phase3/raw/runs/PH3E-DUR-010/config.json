@@ -1,0 +1,13 @@
+{
+ "suite": "ack-boundary",
+ "durability_modes": [
+  "sync",
+  "group",
+  "async"
+ ],
+ "reps": 3,
+ "commit": "cdfd2823570636145b53de951bded357ca087349 (E5 final; tree dirty with E6 harness: crashgate E6 windows, e6 harness, filter/test fixes; 320 tests pass, clippy -D warnings clean)",
+ "crash_model": "SIGABRT in-process at instrumented gate (no destructors, no flush); SIGKILL for group-boundary",
+ "notes": "gates=before_wal_append,after_write,after_flush,after_fsync,after_wal_append,after_apply,before_ack,after_ack,explicit_flush; baseline=10 acked inserts; target=idx 2000; gate hits: engine=11, WAL=12 (incl. CreateCollection record)",
+ "regression_of": "PH3E-DUR-009"
+}

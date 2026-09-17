@@ -1,0 +1,20 @@
+{
+ "cases": [
+  "delete_required_segment_pre_checkpoint",
+  "delete_all_segments_post_checkpoint",
+  "rename_segment_gap",
+  "corrupt_wal_state_record",
+  "delete_wal_state_record_legacy",
+  "truncate_torn_tail",
+  "corrupt_frame",
+  "corrupt_current_manifest_fallback",
+  "corrupt_all_manifests",
+  "fresh_no_documents",
+  "trimmed_reopen"
+ ],
+ "docs_per_db": 20,
+ "durability": "Sync",
+ "surgery": "driver-side file surgery; engine behavior reported only (no repair)",
+ "commit": "cdfd2823570636145b53de951bded357ca087349 (E5 final; tree dirty with E6 harness: crashgate E6 windows, e6 harness, filter/test fixes; 320 tests pass, clippy -D warnings clean)",
+ "regression_of": "PH3E-WAL-001"
+}

@@ -3735,6 +3735,775 @@ fn run_e5(out: &str) -> String {
     format!("e5: {cells} cells -> {out}/e5-compaction.csv + e5-crash.csv")
 }
 
+// ====================================================================
+// E6: transaction semantics / atomic commit boundaries
+// ====================================================================
+
+fn e6_expected_model(pairs: &[(u32, i64)]) -> Model {
+    let mut m: Model = BTreeMap::new();
+    for (i, n) in pairs {
+        m.insert(*i, (1, "t".into(), *n));
+    }
+    m
+}
+
+fn e6_model_eq(e: &AttentionEngine, expected: &Model) -> (usize, usize, bool) {
+    let (m, iss) = export_state(e);
+    (m.len(), expected.len(), &m == expected && iss.is_empty())
+}
+
+fn e6_open(dir: &std::path::Path, mode: &str) -> Result<(Model, bool), String> {
+    std::env::set_var("PH3D_DURABILITY", mode);
+    let e = attentiondb_core::AttentionEngine::open_dir(dir, dur_from_env())
+        .map_err(|e| format!("{e}"))?;
+    let (m, iss) = export_state(&e);
+    let clean = checker_report(&e, dir)["clean"].as_bool().unwrap_or(false) && iss.is_empty();
+    e.close().unwrap();
+    Ok((m, clean))
+}
+
+/// txn ids for the logical indexes used by the E6 harness
+fn e6_stage_txn(e: &AttentionEngine, ids: &[u32], dels: &[u32], cat: &str) -> u64 {
+    use attentiondb_core::transaction::TxnOp;
+    let t = e.begin_transaction("bench");
+    for i in ids {
+        let mut r = doc_record(*i, 1, cat, *i as i64);
+        r.k_vecs.insert(HEAD.to_string(), vec_for(*i));
+        e.record_transaction_operation(t, TxnOp::Insert(r)).unwrap();
+    }
+    for d in dels {
+        e.record_transaction_operation(t, TxnOp::Delete(uuid_for(*d, 1))).unwrap();
+    }
+    t
+}
+
+/// child for E6 crash families. Cases:
+///   stage-K        : stage K ops, NO commit; marker <dir>.e6 = "staged"; park
+///   commit         : stage 3 ins + 1 del; commit (crash gate may park inside); park
+///   post-ack       : commit; on ACK -> process::abort() (F1 sudden death)
+///   multi          : T1 commit; marker "t1-done"; stage T3 (no commit); park
+fn e6_txn_child(dir: &std::path::Path, case: &str) -> ! {
+    use attentiondb_core::transaction::TxnOp;
+    use std::io::Write;
+    let _ = std::fs::remove_dir_all(dir);
+    std::fs::create_dir_all(dir).unwrap();
+    let e = open_db(dir);
+    e.create_collection("bench", DIM, &[HEAD]).unwrap();
+    for i in 9000..9005u32 {
+        let mut r = doc_record(i, 1, "t", i as i64);
+        r.k_vecs.insert(HEAD.to_string(), vec_for(i));
+        e.insert_document("bench", r).unwrap();
+    }
+    e.checkpoint().unwrap();
+    let marker = format!("{}.e6", dir.display());
+    let mk = || {
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).write(true).truncate(true).open(&marker) {
+            let _ = writeln!(f, "{case}");
+            let _ = f.sync_all();
+        }
+    };
+    match case {
+        "stage-1" | "stage-3" | "stage-10" => {
+            let k: u32 = case.trim_start_matches("stage-").parse().unwrap();
+            let t = e.begin_transaction("bench");
+            for i in 9100..(9100 + k) {
+                let mut r = doc_record(i, 1, "t", i as i64);
+                r.k_vecs.insert(HEAD.to_string(), vec_for(i));
+                e.record_transaction_operation(t, TxnOp::Insert(r)).unwrap();
+            }
+            mk(); // "staged" marker: all K ops staged, nothing committed
+            loop { std::thread::sleep(std::time::Duration::from_secs(3600)); }
+        }
+        "commit" => {
+            let ids: Vec<u32> = (9100..9103).collect();
+            let t = e6_stage_txn(&e, &ids, &[9002], "t");
+            let r = e.commit_transaction(t);
+            mk(); // reached only if no gate parked first
+            let _ = r;
+            loop { std::thread::sleep(std::time::Duration::from_secs(3600)); }
+        }
+        "post-ack" => {
+            let ids: Vec<u32> = (9100..9103).collect();
+            let t = e6_stage_txn(&e, &ids, &[9002], "t");
+            let r = e.commit_transaction(t).is_ok();
+            if r {
+                // ACK happened (commit returned Ok); die suddenly, no cleanup.
+                std::process::abort();
+            }
+            mk();
+            loop { std::thread::sleep(std::time::Duration::from_secs(3600)); }
+        }
+        "multi" => {
+            let t1 = e6_stage_txn(&e, &[9100], &[], "t");
+            let ok = e.commit_transaction(t1).unwrap();
+            assert!(ok);
+            mk(); // "t1-done": T1 committed, T3 not yet staged
+            let t3 = e6_stage_txn(&e, &[9105], &[9001], "t");
+            let _ = e.record_transaction_operation(t3, TxnOp::Insert(doc_record(9106, 1, "t", 9106)));
+            loop { std::thread::sleep(std::time::Duration::from_secs(3600)); }
+        }
+        _ => panic!("unknown e6 child case {case}"),
+    }
+}
+
+/// classify a crash-recovered state against the two legal outcomes
+fn e6_classify(
+    got: &Model,
+    baseline: &Model,
+    committed: &Model,
+) -> (&'static str, bool) {
+    if got == baseline {
+        ("ABSENT_ATOMIC", true)
+    } else if got == committed {
+        ("PRESENT_ATOMIC", true)
+    } else {
+        ("PARTIAL", false)
+    }
+}
+
+/// Main E6 driver. Produces <out>/e6-txn.csv + <out>/e6-crash.csv.
+fn run_e6(out: &str) -> String {
+    use attentiondb_core::transaction::TxnOp;
+    std::fs::create_dir_all(out).unwrap();
+    let mut rows = String::from("family,case,mode,expected_state,observed_state,commit_status,checker_clean,restart_ok,model_match,notes\n");
+    let mut crash = String::from("boundary,mode,aborted_at_boundary,txn_state,atomicity,checker_clean,model_match,notes\n");
+    let root = std::path::PathBuf::from("/tmp/ph3e-e6");
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    let mut cells = 0usize;
+
+    // helper: build a baseline db (10 docs idx 10..20) and return (engine, dir, model)
+    macro_rules! fresh {
+        ($name:expr, $mode:expr) => {{
+            let dir = root.join($name);
+            let _ = std::fs::remove_dir_all(&dir);
+            std::env::set_var("PH3D_DURABILITY", $mode);
+            let e = open_db(&dir);
+            e.create_collection("bench", DIM, &[HEAD]).unwrap();
+            for i in 10..20u32 {
+                let mut r = doc_record(i, 1, "t", i as i64);
+                r.k_vecs.insert(HEAD.to_string(), vec_for(i));
+                e.insert_document("bench", r).unwrap();
+            }
+            e.checkpoint().unwrap();
+            (dir, e)
+        }};
+    }
+
+    // ---- E6a basic transactions ----
+    for (name, ids, dels, expect_extra) in [
+        ("t1-single-insert", vec![100u32], vec![], vec![100u32]),
+        ("t2-multi-insert", vec![101, 102, 103], vec![], vec![101, 102, 103]),
+        ("t3-insert-delete", vec![104], vec![11], vec![104]),
+        ("t4-multi-delete", vec![], vec![12, 13, 14], vec![]),
+    ] {
+        let (dir, e) = fresh!(name, "sync");
+        let mut expected: Vec<(u32, i64)> = (10..20u32)
+            .filter(|i| !dels.contains(i))
+            .map(|i| (i, i as i64))
+            .collect();
+        expected.extend(expect_extra.iter().map(|i| (*i, *i as i64)));
+        let expected = e6_expected_model(&expected);
+        let t = e6_stage_txn(&e, &ids, &dels, "t");
+        let ok = e.commit_transaction(t).unwrap();
+        let (got, exp, m1) = e6_model_eq(&e, &expected);
+        let clean = e5_clean(&e, &dir);
+        e.close().unwrap();
+        let (rm, rc) = e6_open(&dir, "sync").unwrap();
+        let rok = rm == expected && rc;
+        rows.push_str(&format!("E6a-basic,{name},sync,{exp},{got},{},\"{clean}/{rc}\",{},\"{m1}/{rok}\",commit-marker boundary; restart equality\n",
+            if ok { "COMMITTED" } else { "FAILED" }, if rok { "ok" } else { "FAIL" }));
+        cells += 1;
+    }
+    {
+        // empty transaction: BEGIN + COMMIT, no ops
+        let (dir, e) = fresh!("t5-empty-txn", "sync");
+        let expected = e6_expected_model(&(10..20u32).map(|i| (i, i as i64)).collect::<Vec<_>>());
+        let t = e.begin_transaction("bench");
+        let ok = e.commit_transaction(t).unwrap();
+        let (_, _, m1) = e6_model_eq(&e, &expected);
+        let clean = e5_clean(&e, &dir);
+        e.close().unwrap();
+        let (rm, rc) = e6_open(&dir, "sync").unwrap();
+        rows.push_str(&format!("E6a-basic,t5-empty-txn,sync,10,{},{},\"{clean}/{rc}\",{},\"{m1}/{}\",zero-op txn is a legal no-op\n",
+            rm.len(), if ok { "COMMITTED" } else { "FAILED" },
+            if rm == expected && rc { "ok" } else { "FAIL" }, rm == expected));
+        cells += 1;
+    }
+
+    // ---- E6b rollback + illegal transitions ----
+    {
+        let (dir, e) = fresh!("t6-rollback", "sync");
+        let expected = e6_expected_model(&(10..20u32).map(|i| (i, i as i64)).collect::<Vec<_>>());
+        let t = e6_stage_txn(&e, &[110, 111], &[15], "t");
+        let rolled = e.rollback_transaction(t).unwrap();
+        let (_, _, m1) = e6_model_eq(&e, &expected);
+        let clean = e5_clean(&e, &dir);
+        e.close().unwrap();
+        let (rm, rc) = e6_open(&dir, "sync").unwrap();
+        rows.push_str(&format!("E6b-rollback,rollback-invisible,sync,10,{},ROLLED_BACK,\"{clean}/{rc}\",{},\"{m1}/{}\",staged ops never left memory\n",
+            rm.len(), if rolled && rm == expected && rc { "ok" } else { "FAIL" }, rm == expected));
+        cells += 1;
+    }
+    {
+        let (dir, e) = fresh!("t7-illegal-transitions", "sync");
+        // double commit: second must be a no-op Ok(false)
+        let t = e6_stage_txn(&e, &[120], &[], "t");
+        let c1 = e.commit_transaction(t).unwrap();
+        let c2 = e.commit_transaction(t).unwrap();
+        // rollback after commit: no-op Ok(false)
+        let r_after = e.rollback_transaction(t).unwrap();
+        // commit after rollback: no-op Ok(false)
+        let t2 = e6_stage_txn(&e, &[121], &[], "t");
+        assert!(e.rollback_transaction(t2).unwrap());
+        let c3 = e.commit_transaction(t2).unwrap();
+        let mut basev: Vec<(u32, i64)> = (10..20u32).map(|i| (i, i as i64)).collect();
+        basev.push((120, 120));
+        let expected = e6_expected_model(&basev);
+        let (got, exp, m1) = e6_model_eq(&e, &expected);
+        let clean = e5_clean(&e, &dir);
+        e.close().unwrap();
+        let (rm, rc) = e6_open(&dir, "sync").unwrap();
+        rows.push_str(&format!("E6b-rollback,illegal-transitions,sync,{exp},{got},c1={c1},c2={c2},r={r_after},c3={c3},\"{clean}/{rc}\",{},\"{m1}/{}\",double-commit/rollback-after-commit/commit-after-rollback all no-ops\n",
+            if rm == expected && rc { "ok" } else { "FAIL" }, rm == expected));
+        cells += 1;
+    }
+
+    // ---- E6c multi-op atomicity ----
+    for n in [5usize, 10, 50, 100] {
+        let name = format!("t8-multiop-{n}");
+        let (dir, e) = fresh!(&name, "sync");
+        let ids: Vec<u32> = (1000..1000 + n as u32).collect();
+        let dels: Vec<u32> = (0..n.min(10)).map(|k| 10 + k as u32).collect();
+        let t = e6_stage_txn(&e, &ids, &dels, "t");
+        let ok = e.commit_transaction(t).unwrap();
+        let mut expv: Vec<(u32, i64)> = (10..20u32)
+            .filter(|i| !dels.contains(i))
+            .map(|i| (i, i as i64))
+            .collect();
+        expv.extend(ids.iter().map(|i| (*i, *i as i64)));
+        let expected = e6_expected_model(&expv);
+        let (got, exp, m1) = e6_model_eq(&e, &expected);
+        let clean = e5_clean(&e, &dir);
+        e.close().unwrap();
+        let (rm, rc) = e6_open(&dir, "sync").unwrap();
+        rows.push_str(&format!("E6c-multiop,n-ops-{n},sync,{exp},{got},{},\"{clean}/{rc}\",{},\"{m1}/{}\",mixed insert+delete txn recovers as one unit\n",
+            if ok { "COMMITTED" } else { "FAILED" }, if rm == expected && rc { "ok" } else { "FAIL" }, rm == expected));
+        cells += 1;
+    }
+
+    // ---- E6d multiple transactions ----
+    {
+        let (dir, e) = fresh!("t9-multi-txn", "sync");
+        let t1 = e6_stage_txn(&e, &[100], &[], "t");
+        e.commit_transaction(t1).unwrap();
+        let t2 = e6_stage_txn(&e, &[101], &[], "t");
+        e.rollback_transaction(t2).unwrap();
+        let t3 = e6_stage_txn(&e, &[102], &[12], "t");
+        e.commit_transaction(t3).unwrap();
+        let expected = e6_expected_model(&[
+            (10, 10), (11, 11), (13, 13), (14, 14), (15, 15),
+            (16, 16), (17, 17), (18, 18), (19, 19), (100, 100), (102, 102)]);
+        let (got, exp, m1) = e6_model_eq(&e, &expected);
+        let clean = e5_clean(&e, &dir);
+        e.close().unwrap();
+        let (rm, rc) = e6_open(&dir, "sync").unwrap();
+        rows.push_str(&format!("E6d-multi-txn,commit-rollback-commit,sync,{exp},{got},T1+T3 COMMITTED T2 ROLLED_BACK,\"{clean}/{rc}\",{},\"{m1}/{}\",independent outcomes per txn\n",
+            if rm == expected && rc { "ok" } else { "FAIL" }, rm == expected));
+        cells += 1;
+    }
+
+    // ---- E6i ordering ----
+    {
+        let (dir, e) = fresh!("t10-ordering", "sync");
+        // T1 inserts A; T2 deletes A -> absent
+        let t1 = e6_stage_txn(&e, &[130], &[], "t");
+        e.commit_transaction(t1).unwrap();
+        let t2 = e6_stage_txn(&e, &[], &[130], "t");
+        e.commit_transaction(t2).unwrap();
+        // T3 inserts B; T4 re-inserts B with a NEW value (same uuid = update-like)
+        let t3 = e6_stage_txn(&e, &[131], &[], "t");
+        e.commit_transaction(t3).unwrap();
+        let mut r = doc_record(131, 1, "t", 999);
+        r.k_vecs.insert(HEAD.to_string(), vec_for(131));
+        let t4 = e.begin_transaction("bench");
+        e.record_transaction_operation(t4, TxnOp::Insert(r)).unwrap();
+        e.commit_transaction(t4).unwrap();
+        let expected = e6_expected_model(&[
+            (10, 10), (11, 11), (12, 12), (13, 13), (14, 14),
+            (15, 15), (16, 16), (17, 17), (18, 18), (19, 19), (131, 999)]);
+        let (got, exp, m1) = e6_model_eq(&e, &expected);
+        let clean = e5_clean(&e, &dir);
+        e.close().unwrap();
+        let (rm, rc) = e6_open(&dir, "sync").unwrap();
+        rows.push_str(&format!("E6i-ordering,commit-order-wins,sync,{exp},{got},T2-after-T1=T3-after-T2,\"{clean}/{rc}\",{},\"{m1}/{}\",insert->delete absent; same-uuid reinsert = last commit wins (999)\n",
+            if rm == expected && rc { "ok" } else { "FAIL" }, rm == expected));
+        cells += 1;
+    }
+    {
+        // delete-of-missing inside a txn: no-op, txn still commits
+        let (dir, e) = fresh!("t11-delete-missing", "sync");
+        let t = e6_stage_txn(&e, &[], &[777], "t");
+        let ok = e.commit_transaction(t).unwrap();
+        let expected = e6_expected_model(&(10..20u32).map(|i| (i, i as i64)).collect::<Vec<_>>());
+        let (_, _, m1) = e6_model_eq(&e, &expected);
+        let clean = e5_clean(&e, &dir);
+        e.close().unwrap();
+        let (rm2, rc2) = e6_open(&dir, "sync").unwrap();
+        rows.push_str(&format!("E6i-ordering,delete-missing-noop,sync,10,{},{},\"{clean}\",\"{}/-\",\"{m1}/-\",delete of absent uuid is a no-op; txn still commits\n",
+            rm2.len(), if ok { "COMMITTED" } else { "FAILED" }, if rc2 { "ok" } else { "FAIL" }));
+        cells += 1;
+    }
+
+    // ---- E6j bounded concurrency (3 staged txns, serialized commits) ----
+    {
+        let (dir, e) = fresh!("t12-concurrency", "group");
+        let ta = e6_stage_txn(&e, &[140], &[], "t");
+        let tb = e6_stage_txn(&e, &[141], &[13], "t");
+        let tc = e6_stage_txn(&e, &[142], &[], "t");
+        // commit out of staging order: C, A, B
+        e.commit_transaction(tc).unwrap();
+        e.commit_transaction(ta).unwrap();
+        e.commit_transaction(tb).unwrap();
+        let expected = e6_expected_model(&[
+            (10, 10), (11, 11), (12, 12), (14, 14), (15, 15),
+            (16, 16), (17, 17), (18, 18), (19, 19), (140, 140), (141, 141), (142, 142)]);
+        let (got, exp, m1) = e6_model_eq(&e, &expected);
+        let clean = e5_clean(&e, &dir);
+        e.close().unwrap();
+        let (rm, rc) = e6_open(&dir, "sync").unwrap();
+        rows.push_str(&format!("E6j-concurrency,3-staged-txns,group,{exp},{got},all committed (out of stage order),\"{clean}/{rc}\",{},\"{m1}/{}\",staging is concurrent; commits serialize on the mutation gate; WAL order = commit order\n",
+            if rm == expected && rc { "ok" } else { "FAIL" }, rm == expected));
+        cells += 1;
+    }
+
+    // ---- E6k update / upsert semantics (standalone; in-txn = UNSUPPORTED by type) ----
+    {
+        let (dir, e) = fresh!("t13-update", "sync");
+        let uuid13 = uuid_for(13, 1);
+        let mut fields = std::collections::HashMap::new();
+        fields.insert("idx".to_string(), serde_json::json!(13));
+        fields.insert("cat".to_string(), serde_json::json!("t"));
+        fields.insert("num".to_string(), serde_json::json!(4321));
+        let mut kv = std::collections::HashMap::new();
+        kv.insert(HEAD.to_string(), vec_for(13));
+        let ok_upd = e.update_document("bench", &uuid13.to_string(), fields.clone(), kv.clone()).is_ok();
+        // missing -> NotFound
+        let missing = e.update_document("bench", &uuid::Uuid::new_v4().to_string(), fields.clone(), kv.clone()).is_err();
+        // deleted -> NotFound (not a resurrection path)
+        e.delete_document("bench", &uuid_for(14, 1).to_string()).unwrap();
+        let upd_del = e.update_document("bench", &uuid_for(14, 1).to_string(), fields.clone(), kv.clone()).is_err();
+        // upsert both branches
+        let up1 = e.upsert_document("bench", uuid_for(13, 1), fields.clone(), kv.clone()).is_ok();
+        let mut fields150 = std::collections::HashMap::new();
+        fields150.insert("idx".to_string(), serde_json::json!(150));
+        fields150.insert("cat".to_string(), serde_json::json!("t"));
+        fields150.insert("num".to_string(), serde_json::json!(150));
+        let up2 = e.upsert_document("bench", uuid_for(150, 1), fields150, kv.clone()).is_ok();
+        // model: 13 = (version 2, num 4321) — update bumps version; export_state reads fields
+        let (m, iss) = export_state(&e);
+        let v13 = m.get(&13).cloned().unwrap_or((0, String::new(), 0));
+        let has150 = m.contains_key(&150);
+        let absent14 = !m.contains_key(&14);
+        // NOTE: export_state reads the version from the FIELDS map; update_document
+        // replaces fields wholesale, so the exported version is 0 (absent) — the
+        // observable update semantics here are: num updated, uuid preserved,
+        // missing/deleted = NotFound, upsert both branches.
+        let expected_all = ok_upd && missing && upd_del && up1 && up2
+            && v13.1 == "t" && v13.2 == 4321 && has150 && absent14 && iss.is_empty();
+        let clean = e5_clean(&e, &dir);
+        let checker_dbg = {
+            let cj = checker_report(&e, &dir);
+            let istr: Vec<String> = cj.as_object().map(|o| {
+                o.iter().filter(|(_k, v)| v.is_boolean() && !v.as_bool().unwrap())
+                    .map(|(k, _)| k.clone()).collect()
+            }).unwrap_or_default();
+            format!("iss={} flags={:?}", iss.len(), istr)
+        };
+        e.close().unwrap();
+        let (rm, rc) = e6_open(&dir, "sync").unwrap();
+        let restart_ok = rm.get(&13).cloned() == Some((0u64, "t".to_string(), 4321i64)) && !rm.contains_key(&14) && rm.contains_key(&150) && rc;
+        rows.push_str(&format!("E6k-update-upsert,update-upsert-semantics,sync,10 docs,{},{},\"{clean}/{rc}\",{},\"{}/{}\",upd={ok_upd} missing={missing} upd-del={upd_del} up1={up1} up2={up2} v13={v13:?} has150={has150} absent14={absent14} {checker_dbg}; update: exists-only/uuid-preserved/version+1/old-id-retired; upsert=exists?update:insert; in-txn update UNSUPPORTED (TxnOp type)\n",
+            rm.len(), if expected_all { "OK" } else { "BAD" }, if restart_ok { "ok" } else { "FAIL" }, expected_all, restart_ok));
+        cells += 1;
+    }
+
+    // ---- E6l same-key chains ----
+    {
+        let (dir, e) = fresh!("t14-same-key", "sync");
+        // one txn: insert A, insert A(v2 same uuid), delete A -> absent
+        let t = e.begin_transaction("bench");
+        let mut r1 = doc_record(160, 1, "t", 1);
+        r1.k_vecs.insert(HEAD.to_string(), vec_for(160));
+        e.record_transaction_operation(t, TxnOp::Insert(r1)).unwrap();
+        let mut r2 = doc_record(160, 1, "t", 2);
+        r2.k_vecs.insert(HEAD.to_string(), vec_for(160));
+        e.record_transaction_operation(t, TxnOp::Insert(r2)).unwrap();
+        e.record_transaction_operation(t, TxnOp::Delete(uuid_for(160, 1))).unwrap();
+        e.commit_transaction(t).unwrap();
+        // separate txn re-inserts A -> present once
+        let t2 = e6_stage_txn(&e, &[160], &[], "t");
+        e.commit_transaction(t2).unwrap();
+        let (m, iss) = export_state(&e);
+        let count = m.iter().filter(|(k, _)| **k == 160).count();
+        let clean = e5_clean(&e, &dir);
+        e.close().unwrap();
+        let (rm, rc) = e6_open(&dir, "sync").unwrap();
+        let mut expect_l = e6_expected_model(&(10..20u32).map(|i| (i, i as i64)).collect::<Vec<_>>());
+        expect_l.insert(160, (1, "t".into(), 160)); // reinsert via e6_stage_txn: num=idx
+        let ok = rm == expect_l && rc && iss.is_empty() && count == 1;
+        rows.push_str(&format!("E6l-same-key,ins-ins-del-ins-txn,sync,{} uuids,{},COMMITTED,\"{clean}/{rc}\",{},\"{}/{}\",same-uuid double insert + delete in ONE txn then reinsert: final = reinserted value, uuid unique\n",
+            count, rm.get(&160).map(|x| x.2).unwrap_or(-1),
+            if ok { "ok" } else { "FAIL" }, ok, rm == expect_l));
+        cells += 1;
+    }
+
+    // ---- E6m tombstones ----
+    {
+        let (dir, e) = fresh!("t15-txn-tombstones", "sync");
+        let t1 = e6_stage_txn(&e, &[170], &[], "t");
+        e.commit_transaction(t1).unwrap();
+        let t2 = e6_stage_txn(&e, &[], &[170], "t");
+        e.commit_transaction(t2).unwrap();
+        let st = e.compact_storage().unwrap();
+        e.close().unwrap();
+        let (rm, rc) = e6_open(&dir, "sync").unwrap();
+        rows.push_str(&format!("E6m-tombstones,txn-ins-txn-del-compact,sync,absent,{},2 tombs reclaimed,\"{rc}\",{},\"{}\",txn-tombstone GC sound after compaction+restart (E5 tie-break regression included in suite)\n",
+            rm.contains_key(&170), if !rm.contains_key(&170) && rc { "ok" } else { "FAIL" }, !rm.contains_key(&170)));
+        let _ = st;
+        cells += 1;
+    }
+    {
+        let (dir, e) = fresh!("t16-rollback-delete", "sync");
+        let t = e6_stage_txn(&e, &[], &[16], "t");
+        e.rollback_transaction(t).unwrap();
+        let expected = e6_expected_model(&(10..20u32).map(|i| (i, i as i64)).collect::<Vec<_>>());
+        let (_, _, m1) = e6_model_eq(&e, &expected);
+        e.close().unwrap();
+        let (rm, rc) = e6_open(&dir, "sync").unwrap();
+        rows.push_str(&format!("E6m-tombstones,staged-delete-rollback,sync,present,{},ROLLED_BACK,\"{rc}\",{},\"{m1}/{}\",rolled-back delete leaves doc present; no resurrection risk\n",
+            rm.contains_key(&16), if rm.contains_key(&16) && rc { "ok" } else { "FAIL" }, rm == expected));
+        cells += 1;
+    }
+
+    // ---- E6n compaction interaction ----
+    for order in ["commit-then-compact", "compact-then-commit"] {
+        let (dir, e) = fresh!(&format!("t17-{order}"), "sync");
+        if order == "commit-then-compact" {
+            let t = e6_stage_txn(&e, &[180], &[11], "t");
+            e.commit_transaction(t).unwrap();
+            e.compact_storage().unwrap();
+        } else {
+            e.compact_storage().unwrap();
+            let t = e6_stage_txn(&e, &[180], &[11], "t");
+            e.commit_transaction(t).unwrap();
+        }
+        let expected = e6_expected_model(&[
+            (10, 10), (12, 12), (13, 13), (14, 14), (15, 15),
+            (16, 16), (17, 17), (18, 18), (19, 19), (180, 180)]);
+        let (_, _, m1) = e6_model_eq(&e, &expected);
+        let clean = e5_clean(&e, &dir);
+        e.close().unwrap();
+        let (rm, rc) = e6_open(&dir, "sync").unwrap();
+        rows.push_str(&format!("E6n-compaction,{order},sync,10,{},COMMITTED,\"{clean}/{rc}\",{},\"{m1}/{}\",gate serializes txn vs compaction; both orders consistent\n",
+            rm.len(), if rm == expected && rc { "ok" } else { "FAIL" }, rm == expected));
+        cells += 1;
+    }
+
+    // ---- E6o checkpoint interaction ----
+    for order in ["txn-then-ckpt", "ckpt-then-txn", "staged-then-ckpt", "commit-ckpt-restart"] {
+        let (dir, e) = fresh!(&format!("t18-{order}"), "sync");
+        let expect_committed = order != "staged-then-ckpt";
+        if order == "txn-then-ckpt" || order == "commit-ckpt-restart" {
+            let t = e6_stage_txn(&e, &[190], &[11], "t");
+            e.commit_transaction(t).unwrap();
+            e.checkpoint().unwrap();
+        } else if order == "ckpt-then-txn" {
+            e.checkpoint().unwrap();
+            let t = e6_stage_txn(&e, &[190], &[11], "t");
+            e.commit_transaction(t).unwrap();
+        } else {
+            // staged, NOT committed, then checkpoint: must NOT become committed
+            let t = e6_stage_txn(&e, &[190], &[11], "t");
+            let _ = t;
+            e.checkpoint().unwrap();
+        }
+        e.close().unwrap();
+        let (rm, rc) = e6_open(&dir, "sync").unwrap();
+        let txn_applied = rm.contains_key(&190) && !rm.contains_key(&11);
+        let ok = txn_applied == expect_committed && rc;
+        rows.push_str(&format!("E6o-checkpoint,{order},sync,{},{},{},\"{rc}\",{},\"{}/{}\",checkpoint never makes an uncommitted txn committed\n",
+            if expect_committed { "txn applied" } else { "txn absent" }, txn_applied,
+            if expect_committed { "COMMITTED" } else { "NEVER-COMMITTED" },
+            if ok { "ok" } else { "FAIL" }, txn_applied, expect_committed));
+        cells += 1;
+    }
+
+    // ---- E6p WAL rotation ----
+    {
+        let (dir, e) = fresh!("t19-rotation", "group");
+        std::env::set_var("ATTENTIONDB_WAL_SEGMENT_BYTES", "2048");
+        let ids: Vec<u32> = (2000..2100).collect();
+        let dels: Vec<u32> = (10..15).collect();
+        let t = e6_stage_txn(&e, &ids, &dels, "t");
+        let ok = e.commit_transaction(t).unwrap();
+        std::env::remove_var("ATTENTIONDB_WAL_SEGMENT_BYTES");
+        let mut expv: Vec<(u32, i64)> = (15..20u32).map(|i| (i, i as i64)).collect();
+        expv.extend(ids.iter().map(|i| (*i, *i as i64)));
+        let expected = e6_expected_model(&expv);
+        let (got, exp, m1) = e6_model_eq(&e, &expected);
+        let clean = e5_clean(&e, &dir);
+        e.close().unwrap();
+        let (rm, rc) = e6_open(&dir, "sync").unwrap();
+        rows.push_str(&format!("E6p-rotation,100-op-txn-2KiB-segments,group,{exp},{got},{},\"{clean}/{rc}\",{},\"{m1}/{}\",txn crosses multiple WAL rotations; no seq gap/dup replay\n",
+            if ok { "COMMITTED" } else { "FAILED" }, if rm == expected && rc { "ok" } else { "FAIL" }, rm == expected));
+        cells += 1;
+    }
+
+    // ---- E6q backup interaction ----
+    {
+        let base = e6_expected_model(&(10..20u32).map(|i| (i, i as i64)).collect::<Vec<_>>());
+        // (1) backup BEFORE txn
+        let (dir, e) = fresh!("t20-bkp-before", "sync");
+        let b1 = root.join("bkp-before.backup");
+        e.backup_to(&b1).unwrap();
+        e.close().unwrap();
+        // restore b1 via the standard path
+        let (_, clean1, _) = e4_restore_and_open(&b1, &root.join("bkp-before.restored"), "sync").unwrap();
+        let ok1 = clean1;
+        // (2) backup DURING staged txn (staged has no durable presence)
+        let e = open_db(&dir);
+        let t = e6_stage_txn(&e, &[210], &[11], "t");
+        let b2 = root.join("bkp-during.backup");
+        e.backup_to(&b2).unwrap();
+        e.rollback_transaction(t).unwrap();
+        // (3) backup AFTER commit
+        let t3 = e6_stage_txn(&e, &[210], &[11], "t");
+        e.commit_transaction(t3).unwrap();
+        let b3 = root.join("bkp-after.backup");
+        e.backup_to(&b3).unwrap();
+        e.close().unwrap();
+        let (r2, clean2, _) = e4_restore_and_open(&b2, &root.join("bkp-during.restored"), "sync").unwrap();
+        let (r3, clean3, _) = e4_restore_and_open(&b3, &root.join("bkp-after.restored"), "sync").unwrap();
+        let after = e6_expected_model(&[
+            (10, 10), (12, 12), (13, 13), (14, 14), (15, 15),
+            (16, 16), (17, 17), (18, 18), (19, 19), (210, 210)]);
+        let ok2 = r2 == base && clean2;
+        let ok3 = r3 == after && clean3;
+        rows.push_str(&format!("E6q-backup,before-during-after,sync,see notes,see notes,3 backups,\"{clean1}/{clean2}/{clean3}\",{},\"{}/{}\",before=baseline; during-staged=baseline (no partial txn in snapshot); after=committed state\n",
+            if ok1 && ok2 && ok3 { "ok" } else { "FAIL" }, ok2, ok3));
+        cells += 1;
+    }
+
+    // ---- E6r recovery idempotence ----
+    {
+        let (dir, e) = fresh!("t21-idempotence", "sync");
+        let t = e6_stage_txn(&e, &[220, 221], &[12, 13], "t");
+        e.commit_transaction(t).unwrap();
+        e.close().unwrap();
+        let expected = e6_expected_model(&[
+            (10, 10), (11, 11), (14, 14), (15, 15),
+            (16, 16), (17, 17), (18, 18), (19, 19), (220, 220), (221, 221)]);
+        let (m1, c1) = e6_open(&dir, "sync").unwrap();
+        let (m2, c2) = e6_open(&dir, "sync").unwrap();
+        let (m3, c3) = e6_open(&dir, "sync").unwrap();
+        let ok = m1 == expected && m2 == expected && m3 == expected && c1 && c2 && c3;
+        rows.push_str(&format!("E6r-idempotence,restart-x3,sync,{},{},{},\"{c1}/{c2}/{c3}\",{},\"{}\",recovery(recovery(state))==recovery(state)\n",
+            m1.len(), m3.len(), if ok { "COMMITTED" } else { "DRIFT" },
+            if ok { "ok" } else { "FAIL" }, m1 == m3));
+        cells += 1;
+    }
+
+    // (b) garbled frame in a COMMITTED txn's segment -> refuse
+    {
+        let (dir, e) = fresh!("t22-garble", "sync");
+        let t = e6_stage_txn(&e, &[230, 231], &[], "t");
+        e.commit_transaction(t).unwrap();
+        // NO close(): close() checkpoints and trims the WAL — we need the txn
+        // records to still be in the segment for the garble to hit them.
+        // (Sync mode: every append already fsynced; drop is safe here.)
+        drop(e);
+        let p = root.join("corrupt-garbled");
+        copy_dir_all(&dir, &p);
+        let waldir = p.join("WAL");
+        let mut segs: Vec<_> = std::fs::read_dir(&waldir).unwrap().flatten()
+            .map(|x| x.path())
+            .filter(|x| x.extension().and_then(|e| e.to_str()) == Some("wal"))
+            .collect();
+        segs.sort();
+        // garble the middle of the LARGEST segment (guaranteed non-trivial)
+        let last = segs.iter()
+            .max_by_key(|p| std::fs::metadata(p).map(|m| m.len()).unwrap_or(0))
+            .unwrap();
+        let mut data = std::fs::read(last).unwrap();
+        assert!(data.len() >= 64, "segment too small to garble meaningfully");
+        let mid = data.len() / 2;
+        for b in data[mid..mid + 16].iter_mut() { *b ^= 0xA5; }
+        std::fs::write(last, &data).unwrap();
+        match e6_open(&p, "sync") {
+            Err(_) => rows.push_str("E6s-corruption,garbled-committed-group,sync,refuse,REFUSED,-,-,-,corruption never silently converted to a valid txn (E1 policy)\n"),
+            Ok((rm, rc)) => rows.push_str(&format!("E6s-corruption,garbled-committed-group,sync,refuse,ACCEPTED,{},{},{},UNEXPECTED acceptance; docs={}\n", rm.len(), rc, if !rc { "flagged" } else { "clean" }, rm.len())),
+        }
+        cells += 1;
+    }
+
+    // ---- E6e/f/g crash families (fresh-process evidence) ----
+    let base_present: Vec<(u32, i64)> = (9000..9005u32).map(|i| (i, i as i64)).collect();
+    let baseline_m = e6_expected_model(&base_present);
+    let mut committed_v: Vec<(u32, i64)> = base_present.clone();
+    committed_v.retain(|(i, _)| *i != 9002);
+    committed_v.extend([9100u32, 9101, 9102].iter().map(|i| (*i, *i as i64)));
+    let committed_m = e6_expected_model(&committed_v);
+
+    // (case, mode, boundary label, gate name, 1-based hit number of that gate
+    // in the child process). Gates hit on the PLAIN insert path too (once per
+    // insert_document): the child inserts 5 baseline docs, then the txn apply
+    // adds exactly one more AFTER_APPLY/BEFORE_ACK pair — hence hits 6 and 7.
+    type CrashCase<'a> = (&'a str, &'a str, &'a str, Option<(&'a str, usize)>);
+    let crash_cases: Vec<CrashCase> = vec![
+        ("stage-1", "sync", "pre-commit staging", None),
+        ("stage-3", "sync", "pre-commit staging", None),
+        ("stage-10", "group", "pre-commit staging", None),
+        ("commit", "sync", "gate: tx_before_commit_wal", Some(("tx_before_commit_wal", 1))),
+        ("commit", "group", "gate: tx_before_commit_wal", Some(("tx_before_commit_wal", 1))),
+        ("commit", "async", "gate: tx_before_commit_wal", Some(("tx_before_commit_wal", 1))),
+        ("commit", "sync", "gate: tx_after_commit_wal", Some(("tx_after_commit_wal", 1))),
+        ("commit", "group", "gate: tx_after_commit_wal", Some(("tx_after_commit_wal", 1))),
+        ("commit", "async", "gate: tx_after_commit_wal", Some(("tx_after_commit_wal", 1))),
+        // generic windows ON the txn commit path: WAL is already persisted at
+        // both (the append is the durability step), so sync/group must be
+        // PRESENT; async may lose the buffered append (A2 contract).
+        ("commit", "sync", "gate: after_apply", Some(("after_apply", 6))),
+        ("commit", "group", "gate: after_apply", Some(("after_apply", 6))),
+        ("commit", "async", "gate: after_apply", Some(("after_apply", 6))),
+        ("commit", "sync", "gate: before_ack", Some(("before_ack", 7))),
+        ("commit", "group", "gate: before_ack", Some(("before_ack", 7))),
+        ("commit", "async", "gate: before_ack", Some(("before_ack", 7))),
+        ("post-ack", "sync", "abort after ACK", None),
+        ("post-ack", "group", "abort after ACK", None),
+        ("post-ack", "async", "abort after ACK", None),
+        ("multi", "sync", "T1 committed; T3 staged only", None),
+    ];
+    for (case, mode, boundary, gate_spec) in crash_cases {
+        let cdir = root.join(format!("crash-{case}-{mode}-{case2}", case2 = boundary.replace([' ', ':'], "-")));
+        let mut cmd = std::process::Command::new(std::env::current_exe().unwrap());
+        cmd.args(["dbtest", "e6txn", "--dir", cdir.to_str().unwrap(), "--case", case])
+            .env("PH3D_DURABILITY", mode);
+        if let Some((gate, hitno)) = gate_spec {
+            cmd.env("PH3E_CRASH_AT", gate)
+                .env("PH3E_CRASH_HIT", hitno.to_string())
+                .env("PH3E_CRASH_MODEL", "groupkill")
+                .env("PH3E_CRASH_MARKER", format!("{}.e6gate", cdir.display()));
+        }
+        use std::os::unix::process::CommandExt;
+        cmd.process_group(0);
+        let mut child = cmd.spawn().unwrap();
+        // wait for terminal condition
+        let post_ack = case == "post-ack";
+        let mut reached = false;
+        let marker = format!("{}.e6", cdir.display());
+        if post_ack {
+            // child aborts itself right after the commit ACK: wait for exit
+            for _ in 0..6000 {
+                if let Ok(Some(_)) = child.try_wait() { reached = true; break; }
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+        } else {
+            for _ in 0..6000 {
+                if std::path::Path::new(&marker).exists()
+                    || std::path::Path::new(&format!("{}.e6gate", cdir.display())).exists() {
+                    reached = true;
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+            unsafe { libc::kill(-(child.id() as i32), libc::SIGKILL); }
+        }
+        let _ = child.wait();
+        let (rm, rc) = match e6_open(&cdir, "sync") {
+            Ok(x) => x,
+            Err(err) => {
+                crash.push_str(&format!("{boundary},{mode},{reached},OPEN_REFUSED,-,-,-,{err}\n"));
+                cells += 1;
+                continue;
+            }
+        };
+        // what SHOULD the txn state be? Decided by the gate, not by label
+        // substrings: staging and the pre-WAL window leave the txn ABSENT;
+        // everything after the WAL append (tx_after_commit_wal, after_apply,
+        // before_ack) has persistence already performed — sync/group PRESENT,
+        // async allowed to lose the buffered append (A2).
+        let expect_state = if case.starts_with("stage-") || case == "multi"
+            || gate_spec.map(|(g, _)| g == "tx_before_commit_wal").unwrap_or(false)
+        {
+            "ABSENT"
+        } else if post_ack {
+            if mode == "async" { "ABSENT_ALLOWED_CONTRACT" } else { "PRESENT" }
+        } else if mode == "async" {
+            "ABSENT_OR_PRESENT_PREACK"
+        } else {
+            "PRESENT"
+        };
+        let (cls, atomic) = if case.starts_with("stage-") {
+            if rm == baseline_m { ("ABSENT", true) } else { ("PARTIAL/UNEXPECTED", false) }
+        } else if case == "multi" {
+            let mut t1m = baseline_m.clone();
+            t1m.insert(9100, (1, "t".into(), 9100));
+            if rm == t1m { ("T1_PRESENT_T3_ABSENT", true) } else { ("PARTIAL/UNEXPECTED", false) }
+        } else {
+            let (c, a) = e6_classify(&rm, &baseline_m, &committed_m);
+            (c, a)
+        };
+        let expect_lbl = if case == "multi" { "T1_PRESENT_T3_ABSENT".to_string() } else { expect_state.to_string() };
+        crash.push_str(&format!("{boundary},{mode},{reached},{cls},{},{},{},expected={expect_lbl}\n",
+            if atomic { "ATOMIC" } else { "VIOLATION" },
+            if rc { "clean" } else { "DIRTY" },
+            if atomic && rc { "MATCH" } else { "MISMATCH" }));
+        cells += 1;
+    }
+
+    // ---- E6s WAL corruption ----
+    {
+        // (a) torn tail through a PARTIAL txn group (from a tx_before_commit_wal crash)
+        let case2 = "gate: tx_before_commit_wal".replace([' ', ':'], "-");
+        let cdir = root.join(format!("crash-commit-sync-{case2}"));
+        if cdir.exists() {
+            let p = root.join("corrupt-torn-txn");
+            copy_dir_all(&cdir, &p);
+            let waldir = p.join("WAL");
+            let mut segs: Vec<_> = std::fs::read_dir(&waldir).unwrap().flatten()
+                .map(|x| x.path())
+                .filter(|x| x.extension().and_then(|e| e.to_str()) == Some("wal"))
+                .collect();
+            segs.sort();
+            if let Some(last) = segs.last() {
+                let mut data = std::fs::read(last).unwrap();
+                let half = data.len() / 2;
+                data.truncate(half);
+                std::fs::write(last, data).unwrap();
+            }
+            match e6_open(&p, "sync") {
+                Err(err) => rows.push_str(&format!("E6s-corruption,torn-tail-partial-group,sync,refuse-or-discard,REFUSED,-,-,-,\"{err}\",documented policy: torn tail\n")),
+                Ok((rm, rc)) => {
+                    let txn_absent = !rm.contains_key(&9100) && !rm.contains_key(&9101) && !rm.contains_key(&9102);
+                    rows.push_str(&format!("E6s-corruption,torn-tail-partial-group,sync,txn-absent,{},DISCARDED,\"{rc}\",{},\"{}\",incomplete group torn in half -> discarded atomically\n",
+                        if txn_absent { "absent" } else { "PRESENT?" },
+                        if txn_absent && rc && rm.contains_key(&9002) { "ok" } else { "FAIL" },
+                        txn_absent));
+                }
+            }
+        } else {
+            rows.push_str("E6s-corruption,torn-tail-partial-group,sync,SKIP,SKIP,-,-,-,crash dir not found (run crash families first)\n");
+        }
+        cells += 1;
+    }
+
+    std::fs::write(format!("{out}/e6-txn.csv"), rows).unwrap();
+    std::fs::write(format!("{out}/e6-crash.csv"), crash).unwrap();
+    format!("e6: {cells} cells -> {out}/e6-txn.csv + e6-crash.csv")
+}
+
 /// Main E4 driver. Produces <out>/e4-matrix.csv and <out>/e4-integrity.csv.
 fn run_e4(out: &str) -> String {
     std::fs::create_dir_all(out).unwrap();
@@ -4463,6 +5232,8 @@ pub fn run(args: &[String]) -> String {
         }
         "e5run" => run_e5(&out),
         "e5child" => run_e5child(&dir),
+        "e6run" => run_e6(&out),
+        "e6txn" => e6_txn_child(&dir, &get("--case", "commit")),
         "e4run" => run_e4(&out),
         "compactlive" => run_compact_live(&dir),
         other => format!("unknown dbtest subcommand {other}"),

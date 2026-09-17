@@ -5,6 +5,7 @@ hard-coded except the EXPECTATION table, which is the acceptance gate:
 any deviation between actual behavior and expectation becomes a MISMATCH
 row and a non-zero exit, so the consistency checker fails loudly."""
 import csv
+import re
 import json
 import os
 import sys
@@ -546,6 +547,191 @@ def _gen_e5_inner():
     return mismatches, len(rows) + len(rows2)
 
 
+# ================================================================
+# Phase 3E E6 — transaction semantics expectations
+# ================================================================
+
+# (family, case) whitelist — anything else means the raw run contains a cell
+# the generator has no registered expectation for (fail, never silently PASS).
+E6_TXN_CELLS = {
+    ("E6a-basic", "t1-single-insert"), ("E6a-basic", "t2-multi-insert"),
+    ("E6a-basic", "t3-insert-delete"), ("E6a-basic", "t4-multi-delete"),
+    ("E6a-basic", "t5-empty-txn"),
+    ("E6b-rollback", "rollback-invisible"), ("E6b-rollback", "illegal-transitions"),
+    ("E6c-multiop", "n-ops-5"), ("E6c-multiop", "n-ops-10"),
+    ("E6c-multiop", "n-ops-50"), ("E6c-multiop", "n-ops-100"),
+    ("E6d-multi-txn", "commit-rollback-commit"),
+    ("E6i-ordering", "commit-order-wins"), ("E6i-ordering", "delete-missing-noop"),
+    ("E6j-concurrency", "3-staged-txns"),
+    ("E6k-update-upsert", "update-upsert-semantics"),
+    ("E6l-same-key", "ins-ins-del-ins-txn"),
+    ("E6m-tombstones", "txn-ins-txn-del-compact"), ("E6m-tombstones", "staged-delete-rollback"),
+    ("E6n-compaction", "commit-then-compact"), ("E6n-compaction", "compact-then-commit"),
+    ("E6o-checkpoint", "txn-then-ckpt"), ("E6o-checkpoint", "ckpt-then-txn"),
+    ("E6o-checkpoint", "staged-then-ckpt"), ("E6o-checkpoint", "commit-ckpt-restart"),
+    ("E6p-rotation", "100-op-txn-2KiB-segments"),
+    ("E6q-backup", "before-during-after"),
+    ("E6r-idempotence", "restart-x3"),
+    ("E6s-corruption", "garbled-committed-group"), ("E6s-corruption", "torn-tail-partial-group"),
+}
+
+# structured fields only — never the free-text notes (they legitimately contain
+# the words "partial"/"FAIL" in benign policy statements)
+_E6_SCAN_FIELDS = ["expected_state", "observed_state", "commit_status",
+                   "checker_clean", "restart_ok", "model_match"]
+_E6_BAD_RE = re.compile(r"BAD|MISMATCH|VIOLATION|UNEXPECTED|PARTIAL/")
+
+
+def _e6_note_blob(r) -> str:
+    """notes field + csv restkey overflow (comma-separated note segments land
+    in the None key as a list)."""
+    parts = [r.get("notes") or ""]
+    extra = r.get(None) or []
+    for v in extra:
+        parts.append(v if isinstance(v, str) else str(v))
+    return " ".join(parts)
+
+
+def _e6_trueish(field: str, r) -> bool:
+    """composite field must be slash-separated true/- values with >=1 true."""
+    parts = (r[field] or "").split("/")
+    return bool(parts) and any(p == "true" for p in parts) and all(p in ("true", "-") for p in parts)
+
+
+def _e6_txn_ok(r) -> tuple[bool, str]:
+    """Per-case expectation for one e6-txn.csv cell. Returns (ok, reason)."""
+    key = (r["family"], r["case"])
+    if key not in E6_TXN_CELLS:
+        return False, f"unregistered txn cell {key}"
+    for f in _E6_SCAN_FIELDS:
+        if _E6_BAD_RE.search(r[f] or ""):
+            return False, f"failure marker in {f}={r[f]!r}"
+    case = r["case"]
+    if case == "illegal-transitions":
+        # state machine: the three illegal transitions must be no-ops
+        # (double-commit=true on first commit; the illegal attempts return false)
+        ok = (r["commit_status"] == "c1=true" and r["checker_clean"] == "c2=false"
+              and r["restart_ok"] == "r=false" and r["model_match"] == "c3=false"
+              and "no-op" in _e6_note_blob(r))
+        return ok, "illegal transitions must all be no-ops (c1=true,c2/r/c3=false)"
+    if case == "staged-then-ckpt":
+        ok = (r["commit_status"] == "NEVER-COMMITTED" and r["observed_state"] == "false"
+              and r["checker_clean"] == "true" and r["restart_ok"] == "ok"
+              and "checkpoint never" in _e6_note_blob(r))
+        return ok, "checkpoint must never commit an uncommitted txn"
+    if case == "garbled-committed-group":
+        ok = (r["observed_state"] == "REFUSED" and r["expected_state"] == "refuse"
+              and (r["model_match"] or "").startswith("corruption never silently"))
+        return ok, "garbled committed segment must be REFUSED (E1 policy)"
+    # default committed-cell rule: checker/restart/model composite fields must
+    # all be true/ok (slash-composites like true/true or true/true/true), and
+    # rollback/absent cells carry their semantics in commit_status.
+    for f in ("checker_clean", "model_match"):
+        if not _e6_trueish(f, r):
+            return False, f"{f}={r[f]!r} not trueish (true/- composites with >=1 true)"
+    if not (r["restart_ok"] or "").startswith("ok"):
+        return False, f"restart_ok={r['restart_ok']!r}"
+    if case == "update-upsert-semantics":
+        blob = _e6_note_blob(r)
+        if "UNSUPPORTED" not in blob:
+            # unsupported-claim guard: the E6k cell MUST record that in-txn
+            # update/upsert is unsupported by the TxnOp type — a PASS row that
+            # claimed support would be fabrication
+            return False, "E6k must record in-txn update/upsert UNSUPPORTED"
+    return True, "ok"
+
+
+# crash boundaries x legal recovered txn states. async (buffered appends) may
+# legally lose a post-WAL-append state — A2: ACK != machine durability.
+_E6_CRASH_LEGAL = {
+    "pre-commit staging": {"sync": {"ABSENT", "ABSENT_ATOMIC"},
+                           "group": {"ABSENT", "ABSENT_ATOMIC"},
+                           "async": {"ABSENT", "ABSENT_ATOMIC"}},
+    "gate: tx_before_commit_wal": {"sync": {"ABSENT_ATOMIC"},
+                                   "group": {"ABSENT_ATOMIC"},
+                                   "async": {"ABSENT_ATOMIC"}},
+    "gate: tx_after_commit_wal": {"sync": {"PRESENT_ATOMIC"},
+                                  "group": {"PRESENT_ATOMIC"},
+                                  "async": {"ABSENT_ATOMIC", "PRESENT_ATOMIC"}},
+    "gate: after_apply": {"sync": {"PRESENT_ATOMIC"},
+                          "group": {"PRESENT_ATOMIC"},
+                          "async": {"ABSENT_ATOMIC", "PRESENT_ATOMIC"}},
+    "gate: before_ack": {"sync": {"PRESENT_ATOMIC"},
+                         "group": {"PRESENT_ATOMIC"},
+                         "async": {"ABSENT_ATOMIC", "PRESENT_ATOMIC"}},
+    "abort after ACK": {"sync": {"PRESENT_ATOMIC"},
+                        "group": {"PRESENT_ATOMIC"},
+                        "async": {"ABSENT_ATOMIC", "PRESENT_ATOMIC"}},
+    "T1 committed; T3 staged only": {"sync": {"T1_PRESENT_T3_ABSENT"},
+                                     "group": {"T1_PRESENT_T3_ABSENT"},
+                                     "async": {"T1_PRESENT_T3_ABSENT"}},
+}
+
+
+def _e6_crash_ok(r) -> tuple[bool, str]:
+    b = r["boundary"]
+    if b not in _E6_CRASH_LEGAL:
+        return False, f"unregistered crash boundary {b!r}"
+    mode = r["mode"]
+    if mode not in ("sync", "group", "async"):
+        return False, f"unregistered mode {mode!r}"
+    if r["aborted_at_boundary"] != "true":
+        return False, "crash cell must record aborted_at_boundary=true"
+    if r["atomicity"] != "ATOMIC" or r["checker_clean"] != "clean" or r["model_match"] != "MATCH":
+        return False, (f"atomicity={r['atomicity']} checker={r['checker_clean']} "
+                       f"model={r['model_match']}")
+    if r["txn_state"] not in _E6_CRASH_LEGAL[b][mode]:
+        return False, f"txn_state {r['txn_state']!r} not legal at {b}/{mode}"
+    return True, "ok"
+
+
+def gen_e6(rawdir: str = "research/phase3/raw/runs/PH3E-TXN-001") -> int:
+    mismatches = 0
+    raw = f"{rawdir}/e6-txn.csv"
+    out = "research/phase3/results/e6-transactions.csv"
+    rows = list(csv.DictReader(open(raw)))
+    res = []
+    for r in rows:
+        r = {k: (v.strip() if isinstance(v, str) else v) for k, v in r.items()}
+        ok, why = _e6_txn_ok(r)
+        if not ok:
+            mismatches += 1
+        cls = "TXN_PROPERTIES_HOLD" if ok else "TXN_PROPERTY_VIOLATION"
+        res.append({"family": r["family"], "case": r["case"], "mode": r["mode"],
+                    "expected": why if not ok else "registered E6 cell expectation",
+                    "classification": cls,
+                    "commit_status": r["commit_status"],
+                    "checker": r["checker_clean"], "restart": r["restart_ok"],
+                    "model": r["model_match"],
+                    "match": "MATCH" if ok else "MISMATCH"})
+    with open(out, "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=list(res[0].keys()))
+        w.writeheader()
+        w.writerows(res)
+
+    raw2 = f"{rawdir}/e6-crash.csv"
+    out2 = "research/phase3/results/e6-crash-atomicity.csv"
+    rows2 = list(csv.DictReader(open(raw2)))
+    res2 = []
+    for r in rows2:
+        r = {k: (v.strip() if isinstance(v, str) else v) for k, v in r.items()}
+        ok, why = _e6_crash_ok(r)
+        if not ok:
+            mismatches += 1
+        res2.append({"boundary": r["boundary"], "mode": r["mode"],
+                     "txn_state": r["txn_state"],
+                     "expected": (f"legal states {_E6_CRASH_LEGAL.get(r['boundary'], {}).get(r['mode'], '?')}"
+                                  if not ok else "committed unit or never-happened, per boundary"),
+                     "atomicity": r["atomicity"],
+                     "checker": r["checker_clean"], "model": r["model_match"],
+                     "match": "MATCH" if ok else "MISMATCH"})
+    with open(out2, "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=list(res2[0].keys()))
+        w.writeheader()
+        w.writerows(res2)
+    return mismatches, len(rows) + len(rows2)
+
+
 def main() -> int:
     rows = list(csv.DictReader(open(RAW)))
     out, mismatches = [], 0
@@ -586,6 +772,7 @@ def main() -> int:
     mismatches += gen_e3()
     mismatches += gen_e4()
     mismatches += gen_e5()
+    mismatches += gen_e6()[0]
     m = json.load(open("research/phase3/raw/runs/PH3E-WAL-001/metrics.json"))
     summary = {"run": "PH3E-WAL-001", "cases": len(rows),
                "refused": m["refused"], "opened": m["opened"],

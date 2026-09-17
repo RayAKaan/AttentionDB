@@ -573,6 +573,84 @@ def main():
     if not os.path.exists(os.path.join(HERE, "methodology", "production-contract.md")):
         ERR.append("methodology/production-contract.md missing (E0 frozen contract)")
 
+    # 23. Phase 3E (E6): transaction semantics — atomicity evidence gates.
+    #     Rejects: partial committed txn, effects without commit proof,
+    #     duplicate application, crash PASS without fresh-process recovery,
+    #     unsupported update/upsert claims, unregistered cells.
+    for rid in ("PH3E-TXN-001", "PH3E-WAL-007", "PH3E-DUR-010",
+                "PH3E-E3-004", "PH3E-BACKUP-006", "PH3E-COMPACT-005"):
+        if rid not in ids:
+            ERR.append(f"{rid} missing from registry (E6 family)")
+    d6 = os.path.join(run, "PH3E-TXN-001")
+    if not os.path.isdir(d6):
+        ERR.append("PH3E-TXN-001 registered but raw dir missing")
+    else:
+        for f in ("run_info.txt", "config.json", "e6-txn.csv", "e6-crash.csv"):
+            if not os.path.exists(os.path.join(d6, f)):
+                ERR.append(f"PH3E-TXN-001: missing {f}")
+    e6_res = os.path.join(RES, "e6-transactions.csv")
+    e6_cres = os.path.join(RES, "e6-crash-atomicity.csv")
+    if not os.path.exists(e6_res) or not os.path.exists(e6_cres):
+        ERR.append("results/e6-*.csv missing (run generate_results_ph3e.py)")
+    else:
+        trows = rd(e6_res)
+        crows = rd(e6_cres)
+        raw_t = rd(os.path.join(d6, "e6-txn.csv")) if os.path.isdir(d6) else []
+        raw_c = rd(os.path.join(d6, "e6-crash.csv")) if os.path.isdir(d6) else []
+        if len(trows) != len(raw_t):
+            ERR.append(f"e6 txn row drift raw {len(raw_t)} vs results {len(trows)}")
+        if len(crows) != len(raw_c):
+            ERR.append(f"e6 crash row drift raw {len(raw_c)} vs results {len(crows)}")
+        for sr in trows:
+            if sr["match"] != "MATCH":
+                ERR.append(f"e6 violation: {sr['family']}/{sr['case']} {sr['classification']}")
+        for sr in crows:
+            if sr["match"] != "MATCH":
+                ERR.append(f"e6 crash violation: {sr['boundary']}/{sr['mode']} {sr['txn_state']}")
+            # partial committed txn can never be a PASS
+            if "PARTIAL" in (sr.get("txn_state") or ""):
+                ERR.append(f"e6 partial-transaction state present: {sr['boundary']}/{sr['mode']}")
+            # every crash PASS requires fresh-process recovery evidence
+            if (sr.get("match") == "MATCH") and not raw_c:
+                ERR.append("e6 crash PASS without raw fresh-process rows")
+        if raw_c:
+            for rr in raw_c:
+                if rr.get("aborted_at_boundary") != "true":
+                    ERR.append(f"e6 crash row without fresh-process abort evidence: {rr.get('boundary')}/{rr.get('mode')}")
+                # effects without commit proof: PRESENT_* states are only legal
+                # at boundaries AFTER the CommitTxn record is on WAL
+                if rr.get("txn_state", "").startswith("PRESENT") and rr.get("boundary") in (
+                        "pre-commit staging", "gate: tx_before_commit_wal"):
+                    ERR.append(f"e6 effects-without-commit-proof: PRESENT at {rr['boundary']}/{rr['mode']}")
+            # duplicate application: idempotence cell must exist and pass
+            names = {r["case"] for r in trows}
+            for req in ("restart-x3", "ins-ins-del-ins-txn", "staged-then-ckpt",
+                        "before-during-after", "100-op-txn-2KiB-segments",
+                        "torn-tail-partial-group", "garbled-committed-group",
+                        "update-upsert-semantics", "3-staged-txns"):
+                if req not in names:
+                    ERR.append(f"e6 results lack required cell {req}")
+            # unsupported update/upsert claim guard: the E6k raw cell MUST
+            # record in-txn update/upsert as UNSUPPORTED
+            k = [r for r in raw_t if r.get("case") == "update-upsert-semantics"]
+            if k:
+                blob = " ".join(str(v) for r in k for v in r.values())
+                if "UNSUPPORTED" not in blob:
+                    ERR.append("e6k: in-txn update/upsert support claimed without evidence (fabrication guard)")
+        # E1 regression byte-identity chain extended through E6
+        w7 = os.path.join(run, "PH3E-WAL-007", "wal-integrity.csv")
+        if os.path.exists(w1) and os.path.exists(w7):
+            if sorted(open(w1).read().splitlines()[1:]) != sorted(open(w7).read().splitlines()[1:]):
+                ERR.append("PH3E-WAL-007 (E1 regression under E6) differs from PH3E-WAL-001")
+    for rid in ("PH3E-WAL-007", "PH3E-DUR-010", "PH3E-E3-004", "PH3E-BACKUP-006", "PH3E-COMPACT-005"):
+        dd = os.path.join(run, rid)
+        if os.path.isdir(dd) and not os.path.exists(os.path.join(dd, "run_info.txt")):
+            ERR.append(f"{rid}: regression run missing run_info.txt")
+    if not os.path.exists(os.path.join(HERE, "phase3e-e6-final-report.md")):
+        ERR.append("phase3e-e6-final-report.md missing (E6 final report)")
+    if not os.path.exists(os.path.join(HERE, "methodology", "ph3e-e6-deviations.md")):
+        ERR.append("methodology/ph3e-e6-deviations.md missing (E6 deviations)")
+
     if ERR:
         print("PHASE 3 CONSISTENCY CHECK FAILED:")
         for e in ERR:

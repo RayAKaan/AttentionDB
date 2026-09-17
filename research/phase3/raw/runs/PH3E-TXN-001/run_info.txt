@@ -1,0 +1,8 @@
+run_id=PH3E-TXN-001
+experiment=E6 transaction semantics: atomic commit boundaries (T1-T7), multi-op transaction crash safety, rollback, update/upsert classification, txn x {checkpoint,compaction,backup,WAL-rotation,corruption}, recovery idempotence, bounded concurrency
+date=2026-09-17
+method=phase3-bench dbtest e6run — independent transaction-aware reference model (expected final state per scenario, full export_state equality, num/cat value checks); fresh-process recovery is the authoritative oracle for every crash cell (child process per cell, groupkill at instrumented boundary, parent polls marker then SIGKILLs process group); checker run on every recovered/reopened state; restart after every live cell
+config=see config.json
+status=COMPLETED — 49/49 cells MATCH (30 in-process txn cells + 19 fresh-process crash rows); 0 atomicity violations; 0 partial-transaction recoveries; async ABSENT states conform to A2 (ACK != machine durability); torn tail discarded atomically; garbled committed segment refused (E1 policy)
+commit=cdfd2823570636145b53de951bded357ca087349 (E5 final; tree dirty with E6 harness + test fixes — tree sha256 recorded in config.json notes; workspace tests 320 pass, clippy -D warnings clean)
+supersedes=nothing (first official E6 run; smoke runs in /tmp were rehearsals only, never raw)

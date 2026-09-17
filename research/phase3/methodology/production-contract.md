@@ -340,3 +340,41 @@ build, mutations, restart, replay, crash-recovery, compaction, concurrency, and 
     PH3E-DUR-009 ≡ DUR-001/002/003/004/008, PH3E-E3-003 ≡ E3-001/002
     (byte-identical), PH3E-BACKUP-005 (classification-identical, integrity
     byte-identical). Report: `research/phase3/phase3e-e5-final-report.md`.
+
+- **A6 (2026-09-17, E6) — Transaction atomicity semantics and the commit
+  boundary.**
+  - *Contract.* A transaction's durability boundary is the gate-held WAL group
+    `BeginTxn -> TxnOp\* -> CommitTxn`: the `CommitTxn` record is COMMIT.
+    Per-mode durability is performed synchronously inside the append call
+    (Sync fsyncs, Group flushes, Async buffers — A1/A2 semantics unchanged;
+    ACK≠machine durability under Async). After the append, the in-memory apply
+    is idempotent; a replay groups records by `txn_id` and applies a group
+    exactly once when (and only when) its `CommitTxn` is present; an
+    end-of-log group without `CommitTxn` is discarded with a warning. A
+    committed transaction therefore recovers, in a fresh process, as a
+    complete unit (T1/T4), and an uncommitted one as never-happened (T3) —
+    never a subset of its operations. Rollback is a logical discard of staged
+    state; nothing uncommitted is ever persisted (T5); the three illegal
+    transitions (double commit, rollback-after-commit, commit-after-rollback)
+    are no-ops. Staging is concurrent but commits serialize on the mutation
+    gate: WAL order = commit order (T7). No isolation level, serializability,
+    or MVCC guarantee is made or implied. Checkpoint, compaction, and backup
+    are gate-serialized with commit and can therefore neither interleave a
+    commit group nor snapshot a staged txn. In-transaction update/upsert
+    operations are **UNSUPPORTED by type** (`TxnOp = Insert | Delete` only);
+    standalone `update_document` (exists-only, uuid-preserving, fields map
+    replaced wholesale, old id retired) and upsert semantics are documented
+    and verified. WAL corruption is never silently converted: a torn tail
+    through a partial group discards the whole group; a corrupted committed
+    segment refuses to open (E1 policy).
+  - *Scope/boundary.* Single-process local store; failure model = process-
+    group death at instrumented gates (A3 unchanged — no power-loss/machine-
+    crash claims); one collection per transaction; no nesting; ≤ 100 000 ops
+    per txn (`MAX_TXN_OPS`, overflow = Corruption); async loss exactly per A2.
+  - *Evidence:* PH3E-TXN-001 (49/49 cells: 30 in-process + 19 fresh-process
+    crash rows across 7 windows × 3 durability modes); regressions
+    PH3E-WAL-007 ≡ WAL-001, PH3E-DUR-010 ≡ DUR-001/002/003/004,
+    PH3E-E3-004 ≡ E3-001 (all byte-identical), PH3E-BACKUP-006 ≡ BACKUP-004
+    (integrity byte-identical), PH3E-COMPACT-005 ≡ COMPACT-004
+    (classification-identical). Report:
+    `research/phase3/phase3e-e6-final-report.md`.

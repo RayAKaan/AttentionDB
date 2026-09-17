@@ -1,0 +1,11 @@
+{
+  "blocked": [
+    "F3-FS-DISRUPTION",
+    "F4-POWER-LOSS"
+  ],
+  "cells": 210,
+  "failure_models": [
+    "F0-CLOSE",
+    "F2E-GROUPKILL"
+  ]
+}

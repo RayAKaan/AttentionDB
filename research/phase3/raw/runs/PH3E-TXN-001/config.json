@@ -1,0 +1,28 @@
+{
+ "cases": [
+  "E6a basic txn lifecycle (single/multi insert, insert+delete, multi-delete, empty txn) + restart",
+  "E6b rollback invisibility + illegal state transitions (double-commit, rollback-after-commit, commit-after-rollback = no-ops)",
+  "E6c multi-op transactions 5/10/50/100 ops, restart, full model equality",
+  "E6d commit-rollback-commit interleaving across txns (T1 committed, T2 rolled back)",
+  "E6e crash-before-commit: fresh-process staging kills at 1/3/10 ops (parent groupkill, no marker)",
+  "E6f crash-during-commit: tx_before_commit_wal x3 modes, tx_after_commit_wal x3 modes, after_apply x3 (hit 6), before_ack x3 (hit 7); tx_after_commit_fsync coincident with after_commit_wal (documented, not separately instrumented)",
+  "E6g post-ACK crash x3 modes (child abort() after commit returns Ok)",
+  "E6h durability matrix via E6f+E6g windows: async loss = ABSENT allowed per A2 (ACK != machine durability)",
+  "E6i ordering: commit-order-wins on same key, delete-missing no-op commits",
+  "E6j bounded concurrency: 3 staged txns, commits out of stage order, WAL order = commit order",
+  "E6k update/upsert classification: standalone update (uuid preserved, fields replaced wholesale, version from fields map), upsert both branches, in-txn update UNSUPPORTED by type (TxnOp = Insert|Delete only)",
+  "E6l same-key chains inside one txn (ins-ins-del-ins -> exactly 1 uuid)",
+  "E6m txn tombstones: txn-ins-txn-del-compact + staged-delete-rollback leaves doc present",
+  "E6n txn x compaction both orders",
+  "E6o txn x checkpoint (staged-then-ckpt: NEVER-COMMITTED, absent; checkpoint never commits)",
+  "E6p txn x WAL rotation (100-op txn across 2KiB segments)",
+  "E6q backup during staged txn (snapshot = baseline, no partial txn) + before/after",
+  "E6r recovery idempotence (restart x3 identical)",
+  "E6s WAL corruption: torn tail through partial txn group (atomic discard) + garbled committed segment (open REFUSED, E1 policy)"
+ ],
+ "reference_model": "independent transaction-aware model (e6_expected_model): baseline docs 9000-9004 (minus deleted 9002) + committed txn docs 9100-9102 with (num,cat) values; full Model equality on export_state; fresh-process recovery authoritative for all crash cells",
+ "commit_boundary": "gate-held WAL group BEGIN -> TxnOp* -> CommitTxn, synchronous durability per mode inside the append, then idempotent in-memory apply; replay buffers by txn_id, CommitTxn flushes atomically, end-of-log uncommitted discarded",
+ "commit": "cdfd2823570636145b53de951bded357ca087349 (tree dirty with E6 harness: storage/src/crashgate.rs, core/src/engine.rs, benchmarks/phase3/src/dbtest.rs, core/tests phase1/phase2 flake fixes, query/src/filter.rs e6 semantics tests; workspace tests 320 pass, clippy -D warnings clean)",
+ "blocked_categories": "isolation levels / serializability / MVCC (out of scope by charter); distributed axes; machine/power-loss beyond gate-groupkill model (A3); in-txn update/upsert ops (UNSUPPORTED by TxnOp type)",
+ "notes": "49 cells = 30 in-process txn cells + 19 fresh-process crash rows (7 boundaries x modes). AFTER_APPLY/BEFORE_ACK windows exercised at child-process hit numbers 6/7 (5 baseline inserts + 1 txn apply). Raw CSVs immutable; run_id PH3E-TXN-001; supersedes nothing (first official E6 run)."
+}

@@ -647,3 +647,113 @@ mod tests {
         }
     }
 }
+
+/// E6 regression tests (E6-D9): pin the DOCUMENTED two-valued null/missing
+/// semantics of this module. The phase-2 integration test
+/// `type_mismatch_and_missing_never_match` asserted three-valued behavior for
+/// `NOT(...)`, contradicting these module docs since baseline; the tests here
+/// make the contract explicit and deterministic (pure AST evaluation, no ANN
+/// candidate pool involved).
+#[cfg(test)]
+mod e6_semantics_tests {
+    use super::*;
+
+    fn eq(field: &str, v: FilterValue) -> FilterExpr {
+        FilterExpr::Comparison {
+            field: field.to_string(),
+            op: FilterOp::Eq,
+            value: v,
+        }
+    }
+
+    fn fields_of(pairs: &[(&str, Value)]) -> HashMap<String, Value> {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.clone()))
+            .collect()
+    }
+
+    /// Documented contract: `NOT (a = 5)` DOES match documents missing `a`
+    /// (two-valued composition — module header, deliberate departure from SQL).
+    #[test]
+    fn not_matches_missing_two_valued() {
+        let missing = fields_of(&[]);
+        let f = FilterExpr::Not(Box::new(eq("a", FilterValue::Int(5))));
+        assert!(
+            f.eval(&missing),
+            "NOT(a=5) must match a document missing 'a' (documented two-valued semantics)"
+        );
+        // Or(p, NOT p) is a tautology under two-valued logic: matches missing
+        // AND present fields alike.
+        let taut = FilterExpr::Or(
+            Box::new(eq("a", FilterValue::Int(5))),
+            Box::new(FilterExpr::Not(Box::new(eq("a", FilterValue::Int(5))))),
+        );
+        assert!(taut.eval(&missing));
+        assert!(taut.eval(&fields_of(&[("a", Value::from(7))])));
+        assert!(taut.eval(&fields_of(&[("a", Value::from(5))])));
+    }
+
+    /// `In { negated }` has its own documented rule: missing/null never
+    /// matches even negated; present-and-not-in-list does.
+    #[test]
+    fn not_in_missing_never_matches() {
+        let missing = fields_of(&[]);
+        let f = FilterExpr::In {
+            field: "c".to_string(),
+            values: vec![FilterValue::Str("x".to_string())],
+            negated: true,
+        };
+        assert!(!f.eval(&missing), "NOT IN must not match a missing field");
+        assert!(
+            f.eval(&fields_of(&[("c", Value::from("y"))])),
+            "NOT IN matches present value not in the list"
+        );
+        assert!(
+            !f.eval(&fields_of(&[("c", Value::Null)])),
+            "NOT IN must not match a null field"
+        );
+    }
+
+    /// IsNull/IsNotNull are the presence operators (missing counts as null).
+    #[test]
+    fn is_null_presence_operators() {
+        let missing = fields_of(&[]);
+        assert!(FilterExpr::IsNull {
+            field: "c".to_string(),
+            negated: false
+        }
+        .eval(&missing));
+        assert!(!FilterExpr::IsNull {
+            field: "c".to_string(),
+            negated: true
+        }
+        .eval(&missing));
+        assert!(FilterExpr::IsNull {
+            field: "c".to_string(),
+            negated: true
+        }
+        .eval(&fields_of(&[("c", Value::from("x"))])));
+    }
+
+    /// Missing fields never match raw comparisons, for ANY op (module docs).
+    #[test]
+    fn missing_field_comparisons_all_false() {
+        let missing = fields_of(&[]);
+        for op in [
+            FilterOp::Eq,
+            FilterOp::Ne,
+            FilterOp::Gt,
+            FilterOp::Gte,
+            FilterOp::Lt,
+            FilterOp::Lte,
+        ] {
+            let f = FilterExpr::Comparison {
+                field: "a".to_string(),
+                op,
+                value: FilterValue::Int(5),
+            };
+            assert!(!f.eval(&missing), "op {op:?} on missing field must be false");
+        }
+    }
+}

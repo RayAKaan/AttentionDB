@@ -1,0 +1,32 @@
+{
+ "cases": [
+  "c0-offline-control",
+  "multigen-version-resolution",
+  "tombstone-gc-basic",
+  "tombstone-deep-reinsert",
+  "delete-reinsert-delete-x3",
+  "partial-merge-retains-tombstones(storage-api)",
+  "repeated-compaction-x4",
+  "readers-during-compaction",
+  "writer-during-compaction",
+  "multiwriter-during-compaction",
+  "ckpt-then-compact",
+  "compact-then-ckpt",
+  "wal-rotation-during-compaction",
+  "bkp-after-compact",
+  "bkp-before-compact",
+  "collections-isolation-compaction",
+  "compact-backup-restore-restart-compact",
+  "manifest-fallback-after-compact",
+  "partial-artifact-tmp",
+  "partial-artifact-garbage-sst",
+  "auto-scheduler-observation",
+  "crash-windows x4"
+ ],
+ "reference_model": "fsynced ACK sidecar + deterministic value map (full Model equality)",
+ "compaction_path": "Engine::compact_storage (C1: mutation gate -> WAL fsync -> flush -> compact_all full merge + tombstone GC -> unlink inputs -> reader-list swap)",
+ "commit": "cdfd2823570636145b53de951bded357ca087349 (E5 final; tree dirty with E6 harness: crashgate E6 windows, e6 harness, filter/test fixes; 320 tests pass, clippy -D warnings clean)",
+ "blocked_categories": "C2 fully online (unsupported by gate architecture); machine/power-loss axes (A3); E11 fault-injection matrix",
+ "reader_measurement": "per-attend latency (epoch us), p50/p99, error count, blocked-not-errored semantics",
+ "regression_of": "PH3E-COMPACT-004"
+}

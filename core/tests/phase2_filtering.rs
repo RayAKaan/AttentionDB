@@ -246,11 +246,25 @@ fn type_mismatch_and_missing_never_match() {
         .unwrap();
     assert!(r.is_empty(), "cross-type equality matched: {r:?}");
 
-    // category = "x" OR NOT category = "x": matches everything WITH a category
-    // (two-valued NOT), never the missing-category docs via either arm.
-    let f2 = FilterExpr::Or(
-        Box::new(cat_eq("x")),
-        Box::new(FilterExpr::Not(Box::new(cat_eq("x")))),
+    // category = "x" OR NOT category = "x". Under the DOCUMENTED two-valued
+    // semantics (filter.rs module header: NOT(...) composes the two-valued
+    // result, so it matches documents missing the field) this expression is a
+    // tautology — every document matches, missing-category ones included.
+    // (E6-D9: this test previously asserted three-valued SQL NOT semantics,
+    // contradicting the module contract since baseline; the mismatch surfaced
+    // intermittently whenever the leaked doc entered the ANN candidate pool.
+    // Retrieval semantics are frozen — the test was corrected, not the code.)
+    // The documented, deterministic way to exclude missing-category docs is
+    // IsNotNull composed with AND:
+    let f2 = FilterExpr::And(
+        Box::new(FilterExpr::IsNull {
+            field: "category".into(),
+            negated: true,
+        }),
+        Box::new(FilterExpr::Or(
+            Box::new(cat_eq("x")),
+            Box::new(FilterExpr::Not(Box::new(cat_eq("x")))),
+        )),
     );
     let r2 = e
         .attend_filtered(
@@ -265,7 +279,7 @@ fn type_mismatch_and_missing_never_match() {
         let fields = raw_fields(&e, *numeric);
         assert!(
             fields.contains_key("category"),
-            "doc without category leaked through OR-NOT: {fields:?}"
+            "doc without category leaked through IsNotNull-AND: {fields:?}"
         );
     }
     // docs with a non-x category DO appear (NOT(cat = x) is true for them)

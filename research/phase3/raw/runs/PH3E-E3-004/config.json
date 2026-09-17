@@ -1,0 +1,44 @@
+{
+ "failure_model": "F2E-GROUPKILL (process-group SIGKILL at fsynced window marker)",
+ "workloads": {
+  "ack": "10 acked inserts + target",
+  "mixed": "9 inserts + 3 deletes + 3 inserts + checkpoint/target",
+  "txn": "5 baseline + 10-op txn (8 ins + 2 del)",
+  "ckpt": "16 acked inserts + checkpoint",
+  "rotate": "small segments 2048B, crash inside rotation",
+  "close": "F0 control"
+ },
+ "windows": [
+  "C1 before_wal_append",
+  "C2 after_write",
+  "C3 after_apply",
+  "C4 after_flush (group only)",
+  "C5 after_fsync (sync only)",
+  "C6 before_ack",
+  "C7 after_ack",
+  "ckpt_after_wal_fsync",
+  "ckpt_after_sst",
+  "ckpt_after_idmap",
+  "manifest_after_tmp_write(hit2)",
+  "manifest_after_manifest_dirsync(hit2)",
+  "manifest_after_current_tmp_write(hit2)",
+  "manifest_after_current_rename(hit2)",
+  "sst_after_write (unused in cells; wired)",
+  "rotate_after_old_fsync",
+  "rotate_after_state_write(hit2)",
+  "ckpt_after_rotate",
+  "ckpt_after_trim"
+ ],
+ "reps": 3,
+ "modes": [
+  "sync",
+  "group",
+  "async"
+ ],
+ "commit": "cdfd2823570636145b53de951bded357ca087349 (E5 final; tree dirty with E6 harness: crashgate E6 windows, e6 harness, filter/test fixes; 320 tests pass, clippy -D warnings clean)",
+ "blocked_failure_models": [
+  "F3",
+  "F4"
+ ],
+ "regression_of": "PH3E-E3-003"
+}

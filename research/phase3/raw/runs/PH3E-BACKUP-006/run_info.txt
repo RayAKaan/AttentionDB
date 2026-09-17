@@ -1,0 +1,7 @@
+run_id=PH3E-BACKUP-006
+experiment=E4 backup regression after E6 (txn-staged state must never appear in a snapshot; backup gate serialization unchanged)
+date=2026-09-17
+method=identical to PH3E-BACKUP-004
+status=COMPLETED — e4-integrity.csv BYTE-IDENTICAL to PH3E-BACKUP-004/005; e4-matrix classification-identical (all 15 MATCH)
+commit=cdfd2823570636145b53de951bded357ca087349 (E5 final; tree dirty with E6 harness: crashgate E6 windows, e6 harness, filter/test fixes; 320 tests pass, clippy -D warnings clean)
+supersedes=nothing (regression re-run; original PH3E-BACKUP-005 preserved)

@@ -1,0 +1,7 @@
+run_id=PH3E-COMPACT-005
+experiment=E5 compaction regression after E6 (txn tombstones + commit-order serialization do not alter compaction resolution)
+date=2026-09-17
+method=identical to PH3E-COMPACT-004
+status=COMPLETED — e5-compaction.csv + e5-crash.csv classification-identical to PH3E-COMPACT-004 (25/25 MATCH)
+commit=cdfd2823570636145b53de951bded357ca087349 (E5 final; tree dirty with E6 harness: crashgate E6 windows, e6 harness, filter/test fixes; 320 tests pass, clippy -D warnings clean)
+supersedes=nothing (regression re-run; original PH3E-COMPACT-004 preserved)

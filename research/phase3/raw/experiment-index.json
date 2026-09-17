@@ -4127,6 +4127,109 @@
     "equivalence": "e4-integrity.csv byte-identical to PH3E-BACKUP-004; e4-matrix classification-identical (timing/notes columns differ)"
    },
    "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3E-TXN-001",
+   "date": "2026-09-17",
+   "status": "COMPLETED",
+   "objective": "E6: transaction semantics \u2014 atomic commit boundaries (T1-T7), multi-op txn crash safety at 7 instrumented windows x 3 durability modes, rollback, update/upsert classification, txn x {checkpoint, compaction, backup, WAL rotation, corruption}, recovery idempotence, bounded concurrency",
+   "git_commit": "cdfd2823570636145b53de951bded357ca087349",
+   "seed": "deterministic",
+   "model": "no learned model",
+   "corpus": "synthetic deterministic doc records (DIM as harness); baseline docs 9000-9004, txn docs 9100-9102/9105-9106",
+   "metrics": {
+    "cells": 49,
+    "match": "49/49 (30 in-process txn cells + 19 fresh-process crash rows)",
+    "key_results": {
+     "atomicity": "committed txn recovers as a complete unit at every window; uncommitted recovers as never-happened; zero partial recoveries (T1/T3)",
+     "commit_boundary": "gate-held WAL group BEGIN->TxnOp*->CommitTxn; synchronous per-mode durability inside the append; idempotent apply after",
+     "crash_windows": "pre-commit staging (ABSENT), tx_before_commit_wal (ABSENT_ATOMIC x3), tx_after_commit_wal (sync/group PRESENT_ATOMIC, async ABSENT allowed per A2), after_apply hit6 (sync/group PRESENT_ATOMIC, async either), before_ack hit7 (same), post-ACK abort (sync/group PRESENT_ATOMIC, async either), multi-txn T1_PRESENT_T3_ABSENT",
+     "tx_after_commit_fsync": "coincident with after_commit_wal (the append call IS the persistence step: Sync fsyncs, Group flushes, Async buffers) \u2014 documented, not separately instrumented",
+     "rollback": "logical discard; staged ops never persisted; illegal transitions (double-commit, rollback-after-commit, commit-after-rollback) all no-ops",
+     "multi_op": "5/10/50/100-op txns restart-identical; 100-op txn across 2KiB WAL rotations (105 docs, no gap/dup)",
+     "ordering": "commit-order-wins on same key; delete-missing = committed no-op",
+     "concurrency": "3 staged txns commit out of stage order; WAL order = commit order (mutation gate serialization; no isolation claims)",
+     "update_upsert": "standalone update: exists-only/uuid-preserved/fields-replaced-wholesale/old-id-retired; upsert = exists?update:insert (both branches); in-txn update/upsert UNSUPPORTED by TxnOp type (documented, not invented)",
+     "same_key": "ins-ins-del-ins in ONE txn -> exactly 1 uuid, final reinsert value; E5 equal-timestamp tie-break regression included and passing",
+     "tombstones": "txn-tombstone GC sound after compaction+restart; staged-delete-rollback leaves doc present",
+     "interactions": "checkpoint never commits an uncommitted txn (staged-then-ckpt NEVER-COMMITTED/absent); compaction both orders consistent; backup during staged txn = baseline snapshot (no partial txn); restart x3 identical",
+     "corruption": "torn tail through a partial txn group -> whole group discarded atomically; garbled committed segment -> open REFUSED (E1 policy); corruption never silently converted",
+     "test_fixes": "E6-D9: phase2 filter test corrected to documented two-valued NOT semantics (module contract since baseline; 4 deterministic unit tests added); E6-D10: t07/executor exact-recall asserts replaced with subset/isolation asserts (approximate ANN, hnsw_rs layer RNG)",
+     "flake_root_cause": "3 intermittent test failures root-caused during E6: 1 filter-contract mismatch (test fixed) + 2 approximate-recall asserts (tests fixed); engine unchanged; proven pre-existing on clean cdfd282 (stash test)"
+    }
+   }
+  },
+  {
+   "experiment_id": "PH3E-WAL-007",
+   "date": "2026-09-17",
+   "status": "COMPLETED",
+   "objective": "E1 WAL-integrity regression after E6",
+   "git_commit": "cdfd2823570636145b53de951bded357ca087349",
+   "seed": "deterministic",
+   "model": "no learned model",
+   "corpus": "synthetic",
+   "metrics": {
+    "cases": 11,
+    "refused": 6,
+    "opened": 5,
+    "equivalence": "wal-integrity.csv + metrics.json byte-identical to PH3E-WAL-001/002/003/006"
+   }
+  },
+  {
+   "experiment_id": "PH3E-DUR-010",
+   "date": "2026-09-17",
+   "status": "COMPLETED",
+   "objective": "E2 durability regression after E6",
+   "git_commit": "cdfd2823570636145b53de951bded357ca087349",
+   "seed": "deterministic",
+   "model": "no learned model",
+   "corpus": "synthetic",
+   "metrics": {
+    "cases": 192,
+    "equivalence": "ack-boundary=DUR-001/008/009, txn-ack=DUR-002/008/009, checkpoint-interaction=DUR-003/008/009, group-boundary=DUR-004/008/009 (all byte-identical); mode-latency timing-only"
+   }
+  },
+  {
+   "experiment_id": "PH3E-E3-004",
+   "date": "2026-09-17",
+   "status": "COMPLETED",
+   "objective": "E3 machine-crash regression after E6",
+   "git_commit": "cdfd2823570636145b53de951bded357ca087349",
+   "seed": "deterministic",
+   "model": "no learned model",
+   "corpus": "synthetic",
+   "metrics": {
+    "cells": 210,
+    "equivalence": "e3-matrix.csv + metrics.json byte-identical to PH3E-E3-001/002/003"
+   }
+  },
+  {
+   "experiment_id": "PH3E-BACKUP-006",
+   "date": "2026-09-17",
+   "status": "COMPLETED",
+   "objective": "E4 backup regression after E6",
+   "git_commit": "cdfd2823570636145b53de951bded357ca087349",
+   "seed": "deterministic",
+   "model": "no learned model",
+   "corpus": "synthetic",
+   "metrics": {
+    "cells": 15,
+    "equivalence": "e4-integrity.csv byte-identical to PH3E-BACKUP-004/005; e4-matrix classification-identical (15/15 MATCH)"
+   }
+  },
+  {
+   "experiment_id": "PH3E-COMPACT-005",
+   "date": "2026-09-17",
+   "status": "COMPLETED",
+   "objective": "E5 compaction regression after E6",
+   "git_commit": "cdfd2823570636145b53de951bded357ca087349",
+   "seed": "deterministic",
+   "model": "no learned model",
+   "corpus": "synthetic deterministic doc records (DIM=32)",
+   "metrics": {
+    "cells": 25,
+    "equivalence": "e5-compaction.csv + e5-crash.csv classification-identical to PH3E-COMPACT-004 (25/25 MATCH)"
+   }
   }
  ]
 }

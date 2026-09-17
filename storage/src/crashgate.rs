@@ -75,6 +75,20 @@ pub static GATE_CKPT_AFTER_ROTATE: Gate = Gate::new("ckpt_after_rotate");
 /// generation cleanup.
 pub static GATE_CKPT_AFTER_TRIM: Gate = Gate::new("ckpt_after_trim");
 
+// ---- E6 transaction commit windows (Engine::commit_transaction) ----
+/// COMMIT record not yet appended: WAL holds BEGIN+ops of this txn (the
+/// partial-WAL window); a crash here must recover as "transaction never
+/// happened". (Staged-but-uncommitted transactions have NO WAL presence at
+/// all: staging is in-memory only, so "crash before commit" at the API level
+/// needs no gate.)
+pub static GATE_TX_BEFORE_COMMIT_WAL: Gate = Gate::new("tx_before_commit_wal");
+/// COMMIT record appended (mode durability performed synchronously inside
+/// append: Sync=fsync, Group=flush, Async=buffered) and returned; in-memory
+/// apply has NOT started. In this implementation the append call IS the
+/// persistence step, so a distinct post-fsync gate would be the same code
+/// point (documented as coincident; not separately instrumented).
+pub static GATE_TX_AFTER_COMMIT_WAL: Gate = Gate::new("tx_after_commit_wal");
+
 // ---- E5 compaction windows (Engine::compact_storage — coordinated path) ----
 /// Memtable flushed (flush SST at final name); merge not started.
 pub static GATE_COMPACT_BEFORE_MERGE: Gate = Gate::new("compact_before_merge");
@@ -178,6 +192,9 @@ fn crash_cfg() -> Option<(&'static str, usize)> {
             "compact_after_output",
             "compact_after_install",
             "compact_after_cleanup",
+            // E6 transaction commit windows
+            "tx_before_commit_wal",
+            "tx_after_commit_wal",
         ];
         let name = NAMES.iter().find(|c| **c == name.as_str())?;
         Some((*name, n.max(1)))

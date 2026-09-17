@@ -1,0 +1,7 @@
+run_id=PH3E-WAL-007
+experiment=E1 WAL-integrity regression after E6 (txn crash windows + commit_transaction instrumentation + harness)
+date=2026-09-17
+method=identical to PH3E-WAL-001
+status=COMPLETED — wal-integrity.csv + metrics.json BYTE-IDENTICAL to PH3E-WAL-001/002/003/006 (E1 unchanged by E6)
+commit=cdfd2823570636145b53de951bded357ca087349 (E5 final; tree dirty with E6 harness: crashgate E6 windows, e6 harness, filter/test fixes; 320 tests pass, clippy -D warnings clean)
+supersedes=nothing (regression re-run; original PH3E-WAL-001 preserved)

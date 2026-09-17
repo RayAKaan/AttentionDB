@@ -1,0 +1,20 @@
+boundary,mode,aborted_at_boundary,txn_state,atomicity,checker_clean,model_match,notes
+pre-commit staging,sync,true,ABSENT,ATOMIC,clean,MATCH,expected=ABSENT
+pre-commit staging,sync,true,ABSENT,ATOMIC,clean,MATCH,expected=ABSENT
+pre-commit staging,group,true,ABSENT,ATOMIC,clean,MATCH,expected=ABSENT
+gate: tx_before_commit_wal,sync,true,ABSENT_ATOMIC,ATOMIC,clean,MATCH,expected=ABSENT
+gate: tx_before_commit_wal,group,true,ABSENT_ATOMIC,ATOMIC,clean,MATCH,expected=ABSENT
+gate: tx_before_commit_wal,async,true,ABSENT_ATOMIC,ATOMIC,clean,MATCH,expected=ABSENT
+gate: tx_after_commit_wal,sync,true,PRESENT_ATOMIC,ATOMIC,clean,MATCH,expected=PRESENT
+gate: tx_after_commit_wal,group,true,PRESENT_ATOMIC,ATOMIC,clean,MATCH,expected=PRESENT
+gate: tx_after_commit_wal,async,true,ABSENT_ATOMIC,ATOMIC,clean,MATCH,expected=ABSENT_OR_PRESENT_PREACK
+gate: after_apply,sync,true,PRESENT_ATOMIC,ATOMIC,clean,MATCH,expected=PRESENT
+gate: after_apply,group,true,PRESENT_ATOMIC,ATOMIC,clean,MATCH,expected=PRESENT
+gate: after_apply,async,true,ABSENT_ATOMIC,ATOMIC,clean,MATCH,expected=ABSENT_OR_PRESENT_PREACK
+gate: before_ack,sync,true,PRESENT_ATOMIC,ATOMIC,clean,MATCH,expected=PRESENT
+gate: before_ack,group,true,PRESENT_ATOMIC,ATOMIC,clean,MATCH,expected=PRESENT
+gate: before_ack,async,true,ABSENT_ATOMIC,ATOMIC,clean,MATCH,expected=ABSENT_OR_PRESENT_PREACK
+abort after ACK,sync,true,PRESENT_ATOMIC,ATOMIC,clean,MATCH,expected=PRESENT
+abort after ACK,group,true,PRESENT_ATOMIC,ATOMIC,clean,MATCH,expected=PRESENT
+abort after ACK,async,true,ABSENT_ATOMIC,ATOMIC,clean,MATCH,expected=ABSENT_ALLOWED_CONTRACT
+T1 committed; T3 staged only,sync,true,T1_PRESENT_T3_ABSENT,ATOMIC,clean,MATCH,expected=T1_PRESENT_T3_ABSENT

@@ -1,0 +1,7 @@
+run_id=PH3E-DUR-010
+experiment=E2 durability regression after E6 (txn commit path instrumented; ACK/COMMIT boundary semantics unchanged)
+date=2026-09-17
+method=identical to PH3E-DUR-001..009 suites
+status=COMPLETED — ack-boundary=DUR-001/008/009, txn-ack=DUR-002/008/009, checkpoint-interaction=DUR-003/008/009, group-boundary=DUR-004/008/009 (byte-identical); mode-latency timing-only
+commit=cdfd2823570636145b53de951bded357ca087349 (E5 final; tree dirty with E6 harness: crashgate E6 windows, e6 harness, filter/test fixes; 320 tests pass, clippy -D warnings clean)
+supersedes=nothing (regression re-run; original PH3E-DUR-009 preserved)

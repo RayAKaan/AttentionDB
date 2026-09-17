@@ -966,7 +966,12 @@ impl AttentionEngine {
         // 3) COMMIT — durability boundary
         let mut commit = WalRecord::new(0, RecordKind::CommitTxn);
         commit.txn_id = txn_id;
+        crashgate::GATE_TX_BEFORE_COMMIT_WAL.hit();
         self.wal_append(commit)?;
+        // Append performs the mode durability action synchronously (Sync fsync,
+        // Group flush, Async buffered) — after-commit-WAL == after-commit-
+        // persistence point; apply has not started.
+        crashgate::GATE_TX_AFTER_COMMIT_WAL.hit();
         crashgate::GATE_AFTER_WAL_APPEND.hit();
 
         // 4) Apply (idempotent primitives). Iterate ALL ops — never zip with the
