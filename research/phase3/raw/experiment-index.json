@@ -2,7 +2,7 @@
  "format": "attentiondb-experiment-index",
  "version": 1,
  "updated": "2026-09-17",
- "code_commit": "2be1faf4ea919fa474df4bcff78f80f7a41c3705",
+ "code_commit": "cf2be2700546198cfd799c47503013f3f8317d2d",
  "experiments": [
   {
    "experiment_id": "PH3-QUAL-FM-S",
@@ -4033,6 +4033,98 @@
    "metrics": {
     "cells": 210,
     "equivalence": "e3-matrix.csv + metrics.json byte-identical to PH3E-E3-001"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3E-COMPACT-004",
+   "date": "2026-09-17",
+   "git_commit": "cf2be2700546198cfd799c47503013f3f8317d2d",
+   "corpus": "synthetic deterministic doc records (DIM=32); 3 collections in isolation cell",
+   "seed": "deterministic",
+   "model": "no learned model",
+   "objective": "E5: coordinated compaction (C1) \u2014 version resolution incl. equal-timestamp ties, tombstone GC safety, concurrent readers/writers/multi-writer, checkpoint/WAL-rotation/backup interaction, fresh-process crash windows, manifest fallback, partial artifacts, auto-scheduler, lifecycle",
+   "metrics": {
+    "cells": 25,
+    "match": "25/25 (21 in-process + 4 fresh-process crash windows)",
+    "key_results": {
+     "c0_control": "3 SST -> 1, model equality + reopen equality + checker clean (190us)",
+     "multigen": "A=300/B=del/C=del/D/E exact vs sidecar-derived model; no mixtures",
+     "equal_timestamp": "storage-API regression test: compaction tie-break == open tie-break (later file wins); old rule kept stale version / resurrected via GC",
+     "tombstones": "basic/deep/reinsert-loop x3 all stay deleted after GC+restart; partial merge RETAINS tombstones (5 SSTs, merge 4, tombstones_removed=0)",
+     "id_reinsert": "fresh UUID present once after reinsert+compact+restart; retired ids excluded (checker)",
+     "repeated": "write/compact x4: model+checker after EVERY round; restart equality",
+     "readers": "3x200 attends during compaction: 0 errors, p50=53us p99=116us (blocked-not-errored)",
+     "writers": "single writer max op 1815-2278us incl gate wait; 3 writers serialize via mutation gate; no lost acked writes vs sidecar model",
+     "checkpoint": "ckpt->compact and compact->ckpt both consistent + restart-clean",
+     "wal_rotation": "2KiB segments during compaction: no seq gap/watermark damage; E1 regression byte-identical after",
+     "backup": "compact->backup and backup->compact: backup restores own snapshot, never references removed SSTs (restore verified from copy)",
+     "lifecycle": "compact->backup->restore->restart->compact(restored) all model-clean",
+     "manifest": "corrupt CURRENT after compaction -> valid-generation fallback (model equality)",
+     "artifacts": "garbage .tmp ignored+deleted; garbage .sst REFUSED loudly",
+     "auto_scheduler": "flush trigger bounded files [1..3]; explicit compact -> 1 file",
+     "crash_windows": "before_merge/after_output/after_cleanup/after_install: groupkill at gate -> FRESH-process open: same logical state (updated idx1, deleted idx2 absent), checker clean, tmp=0, second compaction ok",
+     "publication_order": "output -> unlink inputs -> reader-list swap (justified by scan-based recovery + in-memory readers; crash-tested at each boundary)"
+    },
+    "e5_code_change": "do_compact tie-break fix (INV-C2); DocumentStore::reload_sstables; Engine::compact_storage (C1); 4 compaction crash gates + allowlist"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3E-WAL-006",
+   "date": "2026-09-17",
+   "git_commit": "cf2be2700546198cfd799c47503013f3f8317d2d",
+   "corpus": "synthetic",
+   "seed": "deterministic",
+   "model": "no learned model",
+   "objective": "E1 WAL-integrity regression after E5 changes",
+   "metrics": {
+    "cases": 11,
+    "refused": 6,
+    "opened": 5,
+    "equivalence": "wal-integrity.csv + metrics.json byte-identical to PH3E-WAL-001"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3E-DUR-009",
+   "date": "2026-09-17",
+   "git_commit": "cf2be2700546198cfd799c47503013f3f8317d2d",
+   "corpus": "synthetic",
+   "seed": "deterministic",
+   "model": "no learned model",
+   "objective": "E2 durability regression after E5 changes",
+   "metrics": {
+    "cells": 192,
+    "equivalence": "ack-boundary=DUR-001/008, txn-ack=DUR-002/008, checkpoint-interaction=DUR-003/008, group-boundary=DUR-004/008 (byte-identical); mode-latency timing-only"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3E-E3-003",
+   "date": "2026-09-17",
+   "git_commit": "cf2be2700546198cfd799c47503013f3f8317d2d",
+   "corpus": "synthetic",
+   "seed": "deterministic",
+   "model": "no learned model",
+   "objective": "E3 crash-recovery matrix regression after E5 changes",
+   "metrics": {
+    "cells": 210,
+    "equivalence": "e3-matrix.csv + metrics.json byte-identical to PH3E-E3-001/002"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3E-BACKUP-005",
+   "date": "2026-09-17",
+   "git_commit": "cf2be2700546198cfd799c47503013f3f8317d2d",
+   "corpus": "synthetic",
+   "seed": "deterministic",
+   "model": "no learned model",
+   "objective": "E4 backup/restore regression after E5 changes",
+   "metrics": {
+    "cells": 25,
+    "equivalence": "e4-integrity.csv byte-identical to PH3E-BACKUP-004; e4-matrix classification-identical (timing/notes columns differ)"
    },
    "status": "COMPLETED"
   }

@@ -290,3 +290,53 @@ build, mutations, restart, replay, crash-recovery, compaction, concurrency, and 
   - *Boundary:* claims hold for single-process local backups on ext4/VM at the tested
     sizes (≤ 20 000 docs). No incremental/remote/concurrent-backup-pairs claims; no
     machine-durability claim is derived from backup tests (A3 boundary unchanged).
+
+- **A5 (2026-09-17, E5) — Compaction semantics (coordinated) and compaction safety.**
+  - *Old wording:* document-store SST compaction existed as an automatic post-flush
+    maintenance step (`compact`, full merge when all files are in the merge set,
+    tombstone GC only then) and `compact_all` (full merge from the db root). No
+    compaction claim was made in the contract; version resolution at compaction
+    differed from open on equal-timestamp ties (latent bug, fixed in E5).
+  - *New wording (exactly as verified, no stronger):*
+    - **Class: C1 coordinated.** `Engine::compact_storage()` holds the engine mutation
+      gate for the whole boundary→publish window; it is also the path used by the
+      existing automatic trigger (post-flush, when ≥ 4 SST files exist, ≤ 8 files per
+      merge — unchanged). Writers pause for the compaction window (bounded, ms-scale
+      at the tested sizes; measured max writer op 1.8–2.3 ms including gate wait).
+      Readers block under the document-store write lock for the merge/install window
+      and never error (measured p50 53 µs / p99 116 µs across 604 concurrent attends
+      during a real merge). **Fully online (C2) compaction is UNSUPPORTED and not
+      claimed.**
+    - **Version/tombstone semantics.** Compaction resolves overlapping versions with
+      the SAME rule as open/recovery: (entry timestamp, file order), higher wins —
+      including equal-timestamp ties (E5 fix). Tombstones are reclaimed only when the
+      merge covers EVERY SST file (full merge proves no older version can become
+      visible again, given that document UUIDs are never reused); partial merges
+      retain tombstones. Deletion is permanent across compaction + restart.
+    - **Publication & crash semantics.** Publication order is output SST
+      (tmp→fsync→rename) → unlink superseded inputs → reader-list swap under the
+      store write lock. Recovery never requires a removed SST (the catalog manifest
+      names no SSTs; open scans sst/ and resolves versions by content). Group-kill
+      at each instrumented window (before merge / after output / after cleanup /
+      after install) restarts, in a fresh process, to exactly the pre-compaction or
+      post-compaction logical state — never a hybrid — with zero stray .tmp
+      artifacts; a later compaction then succeeds. Garbage `.tmp` files are ignored
+      and removed; garbage `.sst` files are refused loudly (recovery fails — the
+      documented corruption policy).
+    - **Checkpoint / WAL / backup interaction.** Compaction does not touch the WAL,
+      checkpoint_seq, wal-state.json, or manifest generations (no new generation is
+      published). Checkpoint→compact and compact→checkpoint are both verified
+      consistent; WAL rotation during compaction causes no sequence gap or watermark
+      damage; backup and compaction are serialized by the mutation gate — a backup
+      never references an SST that compaction later removes, and compaction never
+      mutates an existing backup directory.
+    - **Scope/boundary.** Verified for the single-process local document store at
+      tested sizes (≤ 50 000 docs, ms-scale merges) on ext4/VM. No incremental/
+      background/throttled scheduler beyond the existing flush trigger; no
+      cross-process or distributed compaction; no claim beyond the tested failure
+      model (process-group death; A3 boundary unchanged).
+  - *Evidence:* PH3E-COMPACT-004 (25/25 cells incl. 4 fresh-process crash windows;
+    supersedes PH3E-COMPACT-003); regressions PH3E-WAL-006 ≡ WAL-001,
+    PH3E-DUR-009 ≡ DUR-001/002/003/004/008, PH3E-E3-003 ≡ E3-001/002
+    (byte-identical), PH3E-BACKUP-005 (classification-identical, integrity
+    byte-identical). Report: `research/phase3/phase3e-e5-final-report.md`.

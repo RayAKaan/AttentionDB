@@ -360,6 +360,23 @@ impl DocumentStore {
         Ok(())
     }
 
+    /// E5: swap the reader list to the on-disk SST set under the caller's write
+    /// lock (explicit coordinated compaction publish step). Returns the number of
+    /// SST files now backing the store. Logical state is unchanged by definition:
+    /// the on-disk set is exactly the compacted output that replaced the inputs.
+    pub fn reload_sstables(&mut self) -> Result<usize, StorageError> {
+        if let Some(ref dir) = self.storage_dir {
+            let readers = Self::load_sstables(dir)?;
+            let n = readers.len();
+            self.sstables = readers;
+            Ok(n)
+        } else {
+            Err(StorageError::RecoveryFailed(
+                "reload_sstables on non-persistent DocumentStore".into(),
+            ))
+        }
+    }
+
     /// Reload the SSTable reader list from disk (after compaction/restore).
     fn load_sstables(dir: &PathBuf) -> Result<Vec<SSTableReader>, StorageError> {
         let mut paths: Vec<std::path::PathBuf> = std::fs::read_dir(dir)?

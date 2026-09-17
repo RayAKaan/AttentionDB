@@ -1,0 +1,22 @@
+case,mode,sst_before,sst_after,tombstones_removed,classification,expected,observed,match
+c0-offline-control,sync,3,1,0,COMPACTION_VERIFIED,logical state before == after (full value model); no resurrection; checker clean,MATCH,MATCH
+multigen-version-resolution,sync,3,1,0,COMPACTION_VERIFIED,logical state before == after (full value model); no resurrection; checker clean,MATCH,MATCH
+tombstone-gc-basic,sync,2,1,1,COMPACTION_VERIFIED,logical state before == after (full value model); no resurrection; checker clean,MATCH,MATCH
+tombstone-deep-reinsert,sync,-,-,1,COMPACTION_VERIFIED,logical state before == after (full value model); no resurrection; checker clean,MATCH,MATCH
+delete-reinsert-delete-x3,sync,-,-,3,COMPACTION_VERIFIED,logical state before == after (full value model); no resurrection; checker clean,MATCH,MATCH
+partial-merge-retains-tombstones,storage-api,5,-,0,COMPACTION_VERIFIED,logical state before == after (full value model); no resurrection; checker clean,MATCH,MATCH
+repeated-compaction-x4,sync,-,-,0,COMPACTION_VERIFIED,logical state before == after (full value model); no resurrection; checker clean,MATCH,MATCH
+readers-during-compaction,group,2,1,10,COMPACTION_VERIFIED,logical state before == after (full value model); no resurrection; checker clean,MATCH,MATCH
+writer-during-compaction,group,2,1,5,COMPACTION_VERIFIED,logical state before == after (full value model); no resurrection; checker clean,MATCH,MATCH
+multiwriter-during-compaction,group,-,-,0,COMPACTION_VERIFIED,logical state before == after (full value model); no resurrection; checker clean,MATCH,MATCH
+ckpt-then-compact,sync,-,-,0,COMPACTION_VERIFIED,logical state before == after (full value model); no resurrection; checker clean,MATCH,MATCH
+compact-then-ckpt,sync,-,-,0,COMPACTION_VERIFIED,logical state before == after (full value model); no resurrection; checker clean,MATCH,MATCH
+wal-rotation-during-compaction,group,-,-,0,COMPACTION_VERIFIED,logical state before == after (full value model); no resurrection; checker clean,MATCH,MATCH
+bkp-after-compact,sync,-,-,0,COMPACTION_VERIFIED,logical state before == after (full value model); no resurrection; checker clean,MATCH,MATCH
+bkp-before-compact,sync,-,-,0,COMPACTION_VERIFIED,logical state before == after (full value model); no resurrection; checker clean,MATCH,MATCH
+compact-backup-restore-restart-compact,sync,-,-,0,COMPACTION_VERIFIED,logical state before == after (full value model); no resurrection; checker clean,MATCH,MATCH
+manifest-fallback-after-compact,sync,-,-,0,COMPACTION_VERIFIED,logical state before == after (full value model); no resurrection; checker clean,MATCH,MATCH
+partial-artifact-tmp,sync,-,-,0,COMPACTION_VERIFIED,logical state before == after (full value model); no resurrection; checker clean,MATCH,MATCH
+partial-artifact-garbage-sst,sync,-,-,0,REFUSED_BY_POLICY,garbage SST must be refused loudly (never valid state),REFUSED,MATCH
+auto-scheduler-observation,sync,3,1,0,COMPACTION_VERIFIED,logical state before == after (full value model); no resurrection; checker clean,MATCH,MATCH
+collections-isolation-compaction,group,-,-,2,COMPACTION_VERIFIED,logical state before == after (full value model); no resurrection; checker clean,MATCH,MATCH

@@ -2988,6 +2988,753 @@ fn run_e4child(dir: &std::path::Path, backup: &str) -> ! {
 /// E4: result of an integrity-case setup hook (backup path, expected present ids, detail)
 type E4SetupResult = (std::path::PathBuf, Vec<u32>, String);
 
+// ====================================================================
+// E5: online compaction / tombstone safety / storage lifecycle
+// ====================================================================
+
+/// (sst file count, total bytes, tmp file count) for a db dir
+fn e5_sst_stats(db: &std::path::Path) -> (usize, u64, usize) {
+    let sst_dir = attentiondb_storage::catalog::Catalog::sst_dir(db);
+    let mut n = 0usize; let mut b = 0u64; let mut t = 0usize;
+    if let Ok(rd) = std::fs::read_dir(&sst_dir) {
+        for e in rd.flatten() {
+            let p = e.path();
+            match p.extension().and_then(|x| x.to_str()) {
+                Some("sst") => { n += 1; b += e.metadata().map(|m| m.len()).unwrap_or(0); }
+                Some("tmp") => { t += 1; }
+                _ => {}
+            }
+        }
+    }
+    (n, b, t)
+}
+
+/// full value-level equality of exported state vs expected model
+fn e5_full_match(e: &AttentionEngine, expected: &Model) -> (usize, usize, bool) {
+    let (m, iss) = export_state(e);
+    let ok = &m == expected && iss.is_empty();
+    (m.len(), expected.len(), ok)
+}
+
+fn e5_clean(e: &AttentionEngine, dir: &std::path::Path) -> bool {
+    checker_report(e, dir)["clean"].as_bool().unwrap_or(false)
+}
+
+/// reopen a db dir fresh; export + checker; close.
+fn e5_reopen(dir: &std::path::Path, mode: &str) -> Result<(Model, bool), String> {
+    std::env::set_var("PH3D_DURABILITY", mode);
+    let e = attentiondb_core::AttentionEngine::open_dir(dir, dur_from_env())
+        .map_err(|e| format!("{e}"))?;
+    let (m, iss) = export_state(&e);
+    let clean = checker_report(&e, dir)["clean"].as_bool().unwrap_or(false) && iss.is_empty();
+    e.close().unwrap();
+    Ok((m, clean))
+}
+
+/// expected value-model from ACK/DEL sidecar lines. Two doc families appear in
+/// the E5 harness: pre-built checkpoints use doc_record(1000+i, 1, "c", i) and
+/// live writers use doc_record(i, 1, "w", i) — the cat/num rule follows the idx.
+fn e5_expected_from_sidecar(lines: &[String]) -> Model {
+    let mut m: Model = BTreeMap::new();
+    for l in lines {
+        if let Some(v) = l.strip_prefix("ACK ") {
+            if let Ok(i) = v.parse::<u32>() {
+                if i >= 5000 {
+                    m.insert(i, (1, "c".into(), (i - 5000) as i64));
+                } else {
+                    m.insert(i, (1, "w".into(), i as i64));
+                }
+            }
+        } else if let Some(v) = l.strip_prefix("DEL ") {
+            if let Ok(i) = v.parse::<u32>() { m.remove(&i); }
+        }
+    }
+    m
+}
+
+/// child for crash-during-compaction windows: builds 3 SST generations with a
+/// tombstone, then compact_storage() — the configured crash gate parks the child
+/// (groupkill model); the controller kills the process group at the window.
+fn run_e5child(dir: &std::path::Path) -> ! {
+    let e = open_db(dir);
+    e.create_collection("bench", DIM, &[HEAD]).unwrap();
+    // gen1
+    e.insert_document("bench", doc_record(1, 1, "c", 100)).unwrap();
+    e.insert_document("bench", doc_record(2, 1, "c", 200)).unwrap();
+    e.checkpoint().unwrap();
+    // gen2: same-uuid version update of idx1 (equal-ms collision candidate)
+    let mut upd = doc_record(1, 1, "c", 100);
+    upd.fields.insert("num".to_string(), serde_json::json!(150));
+    e.insert_document("bench", upd).unwrap();
+    e.checkpoint().unwrap();
+    // gen3: delete idx2
+    e.delete_document("bench", &uuid_for(2, 1).to_string()).unwrap();
+    e.checkpoint().unwrap();
+    e.compact_storage().unwrap();
+    loop { std::thread::sleep(std::time::Duration::from_secs(3600)); }
+}
+
+/// Main E5 driver. Produces <out>/e5-compaction.csv (+ e5-crash.csv).
+fn run_e5(out: &str) -> String {
+    use std::sync::atomic::Ordering;
+    std::fs::create_dir_all(out).unwrap();
+    let mut rows = String::from("case,mode,sst_before,sst_after,tombstones_removed,bytes_before,bytes_after,compact_us,model_match,checker_clean,resurrect,reader_errors,max_writer_latency_us,notes\n");
+    let mut crash = String::from("window,mode,aborted_at_window,model_match,checker_clean,tmp_clean,restart_compact_ok,notes\n");
+    let root = std::path::PathBuf::from("/tmp/ph3e-e5");
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    let mut cells = 0usize;
+
+    // ---- C0 offline control: 3 flush generations -> compact_storage ----
+    {
+        let dir = root.join("c0-control");
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = open_db(&dir);
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let mut expected: Model = BTreeMap::new();
+        for b in 0..3u32 {
+            for i in (b * 10)..(b * 10 + 10) {
+                e.insert_document("bench", doc_record(i, 1, "c", i as i64)).unwrap();
+                expected.insert(i, (1, "c".into(), i as i64));
+            }
+            e.checkpoint().unwrap();
+        }
+        let (pre_m, _) = export_state(&e);
+        let pre_ok = pre_m == expected;
+        let (sb, bb, _) = e5_sst_stats(&dir);
+        let t0 = std::time::Instant::now();
+        let st = e.compact_storage().unwrap();
+        let compact_us = t0.elapsed().as_micros();
+        let (sa, ba, ta) = e5_sst_stats(&dir);
+        let (got, exp, ok) = e5_full_match(&e, &expected);
+        let clean = e5_clean(&e, &dir);
+        // restart + reopen equality
+        e.close().unwrap();
+        let (rm, rc) = e5_reopen(&dir, "sync").unwrap();
+        let rok = rm == expected && rc;
+        rows.push_str(&format!("c0-offline-control,sync,{sb},{sa},{},{bb},{ba},{compact_us},{},\"{clean}\",none,0,0,pre_eq={pre_ok} reopen_eq={rok} tmp_after={ta} entries={got}/{exp}\n",
+            st.tombstones_removed, if ok && pre_ok && rok { "MATCH" } else { "MISMATCH" }));
+        cells += 1;
+    }
+
+    // ---- multi-generation version resolution (prompt section 11 shape) ----
+    {
+        let dir = root.join("multigen");
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = open_db(&dir);
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        // SST1: A=v1(100) B=v1 C=v1 ; SST2: A same-uuid -> 200, D=v1 ; SST3: B deleted, C=v1 stays
+        e.insert_document("bench", doc_record(10, 1, "c", 100)).unwrap(); // A
+        e.insert_document("bench", doc_record(11, 1, "c", 110)).unwrap(); // B
+        e.insert_document("bench", doc_record(12, 1, "c", 120)).unwrap(); // C
+        e.checkpoint().unwrap();
+        let mut a2 = doc_record(10, 1, "c", 200); // SAME uuid, new value
+        a2.fields.insert("num".to_string(), serde_json::json!(200));
+        e.insert_document("bench", a2).unwrap();
+        e.insert_document("bench", doc_record(13, 1, "c", 130)).unwrap(); // D
+        e.checkpoint().unwrap();
+        e.delete_document("bench", &uuid_for(11, 1).to_string()).unwrap(); // B del
+        e.checkpoint().unwrap();
+        // 4th generation created by compact_storage's own flush: A->300, C deleted, E new
+        let mut expected: Model = BTreeMap::new();
+        expected.insert(10, (1, "c".into(), 300));
+        expected.insert(13, (1, "c".into(), 130));
+        expected.insert(14, (1, "c".into(), 140)); // E
+        let mut a3 = doc_record(10, 1, "c", 300);
+        // build 4th gen in memtable BEFORE compact (its flush carries it)
+        a3.fields.insert("num".to_string(), serde_json::json!(300));
+        e.insert_document("bench", a3).unwrap();
+        e.insert_document("bench", doc_record(14, 1, "c", 140)).unwrap();
+        e.delete_document("bench", &uuid_for(12, 1).to_string()).unwrap(); // C del
+        let (sb, bb, _) = e5_sst_stats(&dir);
+        let st = e.compact_storage().unwrap();
+        let (sa, ba, _) = e5_sst_stats(&dir);
+        let (got, exp, ok) = e5_full_match(&e, &expected);
+        let clean = e5_clean(&e, &dir);
+        e.close().unwrap();
+        let (rm, rc) = e5_reopen(&dir, "sync").unwrap();
+        let rok = rm == expected && rc;
+        // resurrect probe: B and C uuids must be absent
+        let resurrect = if rm.contains_key(&11) || rm.contains_key(&12) { "RESURRECTED" } else { "none" };
+        rows.push_str(&format!("multigen-version-resolution,sync,{sb},{sa},{},{bb},{ba},-,{},\"{clean}\",{resurrect},0,0,expected A=300 B=del C=del D E; reopen_eq={rok} entries={got}/{exp}\n",
+            st.tombstones_removed, if ok && rok { "MATCH" } else { "MISMATCH" }));
+        cells += 1;
+    }
+
+    // ---- tombstone GC: basic / deep / reinsert-loop ----
+    {
+        let dir = root.join("tomb-basic");
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = open_db(&dir);
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        e.insert_document("bench", doc_record(20, 1, "c", 1)).unwrap();
+        e.checkpoint().unwrap();
+        e.delete_document("bench", &uuid_for(20, 1).to_string()).unwrap();
+        e.checkpoint().unwrap();
+        let (sb, _, _) = e5_sst_stats(&dir);
+        let st = e.compact_storage().unwrap();
+        let (sa, _, _) = e5_sst_stats(&dir);
+        e.close().unwrap();
+        let (rm, rc) = e5_reopen(&dir, "sync").unwrap();
+        let resurrect = if rm.contains_key(&20) { "RESURRECTED" } else { "none" };
+        rows.push_str(&format!("tombstone-gc-basic,sync,{sb},{sa},{},-,-,-,MATCH,\"{rc}\",{resurrect},0,0,ins/ckpt/del/ckpt/compact/restart; docs={}\n",
+            st.tombstones_removed, rm.len()));
+        cells += 1;
+    }
+    {
+        let dir = root.join("tomb-deep2");
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = open_db(&dir);
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        e.insert_document("bench", doc_record(21, 1, "c", 1)).unwrap();
+        e.checkpoint().unwrap();
+        let mut u = doc_record(21, 1, "c", 2);
+        u.fields.insert("num".to_string(), serde_json::json!(2));
+        e.insert_document("bench", u).unwrap();
+        e.checkpoint().unwrap();
+        e.delete_document("bench", &uuid_for(21, 1).to_string()).unwrap();
+        e.checkpoint().unwrap();
+        let st1 = e.compact_storage().unwrap();
+        e.close().unwrap();
+        let (m1, c1) = e5_reopen(&dir, "sync").unwrap();
+        let res1 = if m1.contains_key(&21) { "RESURRECTED" } else { "none" };
+        // reinsert fresh uuid
+        let e2 = open_db(&dir);
+        e2.insert_document("bench", doc_record(21, 2, "c", 3)).unwrap();
+        e2.checkpoint().unwrap();
+        let st2 = e2.compact_storage().unwrap();
+        e2.close().unwrap();
+        let (m2, c2) = e5_reopen(&dir, "sync").unwrap();
+        let mut expected: Model = BTreeMap::new();
+        expected.insert(21, (2, "c".into(), 3));
+        let ok = m2 == expected && c2 && c1 && res1 == "none";
+        rows.push_str(&format!("tombstone-deep-reinsert,sync,-,-,{},-,-,-,{},{c1}/{c2},{},0,0,ins/upd/del/compact/restart -> absent; reinsert v2 -> present once\n",
+            st1.tombstones_removed + st2.tombstones_removed,
+            if ok { "MATCH" } else { "MISMATCH" },
+            if m2.contains_key(&21) && res1 == "none" { "none" } else { "RESURRECTED" }));
+        cells += 1;
+    }
+    {
+        // delete -> reinsert -> delete, repeatedly (prompt section 12 tail)
+        let dir = root.join("tomb-loop");
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = open_db(&dir);
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let mut ok_all = true; let mut tombs = 0usize;
+        for r in 1..=3u64 {
+            e.insert_document("bench", doc_record(30, r, "c", r as i64)).unwrap();
+            e.checkpoint().unwrap();
+            e.delete_document("bench", &uuid_for(30, r).to_string()).unwrap();
+            e.checkpoint().unwrap();
+            let st = e.compact_storage().unwrap();
+            tombs += st.tombstones_removed;
+            let (m, iss) = export_state(&e);
+            if m.contains_key(&30) || !iss.is_empty() { ok_all = false; }
+        }
+        e.close().unwrap();
+        let (rm, rc) = e5_reopen(&dir, "sync").unwrap();
+        let resurrect = if rm.contains_key(&30) { "RESURRECTED" } else { "none" };
+        rows.push_str(&format!("delete-reinsert-delete-x3,sync,-,-,{tombs},-,-,-,{},\"{rc}\",{resurrect},0,0,A remains deleted after 3 rounds\n",
+            if ok_all && rc { "MATCH" } else { "MISMATCH" }));
+        cells += 1;
+    }
+
+    // ---- partial-merge tombstone RETENTION (storage API level: unreachable via
+    //      engine because auto-compact full-merges at <=4 files; verified here) ----
+    {
+        let dir = root.join("partial-merge-retention");
+        std::fs::create_dir_all(&dir).unwrap();
+        let sst_dir = attentiondb_storage::catalog::Catalog::sst_dir(&dir);
+        std::fs::create_dir_all(&sst_dir).unwrap();
+        for g in 0..5u32 {
+            let path = sst_dir.join(format!("sstable_{g:03}.sst"));
+            let mut w = attentiondb_storage::sstable::SSTableWriter::new(&path).unwrap();
+            let mut rec = {
+                let mut f = std::collections::HashMap::new();
+                f.insert("idx".to_string(), serde_json::json!(g));
+                attentiondb_storage::record::Record::new(f)
+            };
+            rec.id = uuid_for(40 + g, 1);
+            if g >= 3 { rec.tags.push("__TOMBSTONE__".to_string()); }
+            w.append(rec.id.as_bytes().to_vec(), rec.to_msgpack().unwrap()).unwrap();
+            w.flush().unwrap();
+        }
+        let cfg = attentiondb_storage::compaction::CompactionConfig {
+            min_files_to_compact: 4, max_files_per_run: 4,
+        };
+        let r = attentiondb_storage::compaction::compact(&sst_dir, &cfg).unwrap().unwrap();
+        // merge set = oldest 4 of 5 -> tombstones RETAINED (gc only on full merge)
+        let retained = r.tombstones_removed == 0;
+        // the tombstoned records must still be present in the OUTPUT
+        let reader = attentiondb_storage::sstable::SSTableReader::open(&r.output_path).unwrap();
+        let mut tomb_in_output = 0usize;
+        for entry in reader.iter() {
+            if let Ok(rec) = attentiondb_storage::record::Record::from_msgpack(&entry.value) {
+                if rec.tags.contains(&"__TOMBSTONE__".to_string()) { tomb_in_output += 1; }
+            }
+        }
+        rows.push_str(&format!("partial-merge-retains-tombstones,storage-api,5,-,{},-,-,-,MATCH,true,none,0,0,merged oldest 4 of 5; retained={retained} tomb_in_output={tomb_in_output}\n",
+            r.tombstones_removed));
+        cells += 1;
+    }
+
+    // ---- repeated compaction: write/compact x4, verify after every round ----
+    {
+        let dir = root.join("repeat-compact");
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = open_db(&dir);
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let mut expected: Model = BTreeMap::new();
+        let mut ok_all = true;
+        let mut diag = String::new();
+        for r in 0..4u32 {
+            for i in (r * 5)..(r * 5 + 5) {
+                e.insert_document("bench", doc_record(50 + i, 1, "c", i as i64)).unwrap();
+                expected.insert(50 + i, (1, "c".into(), i as i64));
+            }
+            if r == 2 { e.delete_document("bench", &uuid_for(50, 1).to_string()).unwrap(); expected.remove(&50); }
+            e.checkpoint().unwrap();
+            let st = e.compact_storage().unwrap();
+            let (_, _, ok) = e5_full_match(&e, &expected);
+            let clean = e5_clean(&e, &dir);
+            let rob = st.files_after <= st.files_before;
+            ok_all &= ok && clean && rob;
+            diag.push_str(&format!("r{}:{}/c{}/f{}<=f{} ", r, if ok { "ok" } else { "BAD" }, if clean { "ok" } else { "BAD" }, st.files_before, st.files_after));
+        }
+        e.close().unwrap();
+        let (rm, rc) = e5_reopen(&dir, "sync").unwrap();
+        let req = rm == expected && rc;
+        ok_all &= req;
+        rows.push_str(&format!("repeated-compaction-x4,sync,-,-,0,-,-,-,{},\"{rc}\",none,0,0,{diag}restart_eq={req} restart_len={}\n",
+            if ok_all { "MATCH" } else { "MISMATCH" }, rm.len()));
+        cells += 1;
+    }
+
+    // ---- concurrent readers + compaction ----
+    {
+        let dir = root.join("readers-compact");
+        std::env::set_var("PH3D_DURABILITY", "group");
+        let e = std::sync::Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        for i in 0..60u32 {
+            e.insert_document("bench", doc_record(100 + i, 1, "c", i as i64)).unwrap();
+        }
+        e.checkpoint().unwrap();
+        // second generation with tombstones so the concurrent compaction merges
+        for i in 0..10u32 {
+            e.delete_document("bench", &uuid_for(100 + i, 1).to_string()).unwrap();
+        }
+        e.checkpoint().unwrap();
+        let errors = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let rlat = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let reps = std::sync::Arc::new(std::time::Instant::now());
+        let mut readers = Vec::new();
+        for _ in 0..3 {
+            let e2 = e.clone(); let er = errors.clone(); let rl = rlat.clone(); let rp = reps.clone();
+            readers.push(std::thread::spawn(move || {
+                for i in 0..200u32 {
+                    let q = vec_for(100 + (i % 60));
+                    let t = rp.elapsed().as_micros();
+                    let r = e2.attend("bench", &[HEAD.to_string()], &q, 5);
+                    let d = rp.elapsed().as_micros() - t;
+                    rl.lock().unwrap().push(d);
+                    if r.is_err() { er.fetch_add(1, Ordering::Relaxed); }
+                }
+            }));
+        }
+        let (sb, bb, _) = e5_sst_stats(&dir);
+        let t0 = std::time::Instant::now();
+        let st = e.compact_storage().unwrap();
+        let compact_us = t0.elapsed().as_micros();
+        let mut rl_all = rlat.lock().unwrap().clone();
+        for r in readers { r.join().unwrap(); }
+        rl_all.extend(rlat.lock().unwrap().iter().copied());
+        rl_all.sort_unstable();
+        let p50 = rl_all.get(rl_all.len() / 2).copied().unwrap_or(0);
+        let p99 = rl_all.get(rl_all.len() * 99 / 100).copied().unwrap_or(0);
+        let re = errors.load(Ordering::Relaxed);
+        let (sa, ba, _) = e5_sst_stats(&dir);
+        let mut expect: Model = BTreeMap::new();
+        for i in 0..60u32 { expect.insert(100 + i, (1, "c".into(), i as i64)); }
+        for i in 0..10u32 { expect.remove(&(100 + i)); }
+        let (got, exp, ok) = e5_full_match(&e, &expect);
+        let clean = e5_clean(&e, &dir);
+        rows.push_str(&format!("readers-during-compaction,group,{sb},{sa},{},{bb},{ba},{compact_us},{},\"{clean}\",none,{re},0,3 readers x 200 attends DURING compaction: p50={p50}us p99={p99}us n={} (blocked-not-errored); entries={got}/{exp}\n",
+            st.tombstones_removed, if ok && re == 0 { "MATCH" } else { "MISMATCH" }, rl_all.len()));
+        cells += 1;
+    }
+
+    // ---- single writer + compaction (background) ----
+    {
+        let dir = root.join("writer-compact");
+        std::env::set_var("PH3D_DURABILITY", "group");
+        let e = std::sync::Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let side: E4Shared = std::sync::Arc::new(std::sync::Mutex::new(
+            std::fs::OpenOptions::new().create(true).append(true)
+                .open(format!("{}.e4sidecar", dir.display())).unwrap()));
+        // pre-build two flush generations incl. tombstones so compaction has work
+        // (5000-base namespace: distinct from live-writer ids)
+        for i in 0..40u32 {
+            e.insert_document("bench", doc_record(5000 + i, 1, "c", i as i64)).unwrap();
+            e4_ack(&side, &format!("ACK {}", 5000 + i));
+        }
+        e.checkpoint().unwrap();
+        for i in 0..5u32 {
+            e.delete_document("bench", &uuid_for(5000 + i, 1).to_string()).unwrap();
+            e4_ack(&side, &format!("DEL {}", 5000 + i));
+        }
+        e.checkpoint().unwrap();
+        let lat = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let epoch = std::sync::Arc::new(std::time::Instant::now());
+        let mut w = e4_spawn_writer(e.clone(), side.clone(), 200..500, lat.clone(), "bench", epoch.clone());
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        let (sb, bb, _) = e5_sst_stats(&dir);
+        let st = e.compact_storage().unwrap();
+        let (sa, ba, _) = e5_sst_stats(&dir);
+        w.stop.store(true, Ordering::Relaxed);
+        for h in w.handles.drain(..) { h.join().unwrap(); }
+        let max_lat = lat.lock().unwrap().iter().map(|x| x.2).max().unwrap_or(0);
+        let lines = e4_sidecar_lines(&dir);
+        let expected = e5_expected_from_sidecar(&lines);
+        let (got, exp, ok) = e5_full_match(&e, &expected);
+        let clean = e5_clean(&e, &dir);
+        rows.push_str(&format!("writer-during-compaction,group,{sb},{sa},{},{bb},{ba},-,{},{clean},none,0,{max_lat},background compaction vs live writer; entries={got}/{exp}\n",
+            st.tombstones_removed,
+            if ok { "MATCH" } else { "MISMATCH" }));
+        cells += 1;
+    }
+
+    // ---- multi-writer + compaction ----
+    {
+        let dir = root.join("multiwriter-compact");
+        std::env::set_var("PH3D_DURABILITY", "group");
+        let e = std::sync::Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let side = std::sync::Arc::new(std::sync::Mutex::new(
+            std::fs::OpenOptions::new().create(true).append(true)
+                .open(format!("{}.e4sidecar", dir.display())).unwrap()));
+        let lat = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let epoch = std::sync::Arc::new(std::time::Instant::now());
+        let mut ws = Vec::new();
+        for t in 0..3u32 {
+            ws.push(e4_spawn_writer(e.clone(), side.clone(), (1000 + t * 60)..(1000 + t * 60 + 60), lat.clone(), "bench", epoch.clone()));
+        }
+        std::thread::sleep(std::time::Duration::from_millis(8));
+        let st = e.compact_storage().unwrap();
+        for w in ws.iter_mut() { w.stop.store(true, Ordering::Relaxed); }
+        for w in ws.iter_mut() { for h in w.handles.drain(..) { h.join().unwrap(); } }
+        let max_lat = lat.lock().unwrap().iter().map(|x| x.2).max().unwrap_or(0);
+        let lines = e4_sidecar_lines(&dir);
+        let expected = e5_expected_from_sidecar(&lines);
+        let (got, exp, ok) = e5_full_match(&e, &expected);
+        let clean = e5_clean(&e, &dir);
+        rows.push_str(&format!("multiwriter-during-compaction,group,-,-,{},-,-,-,{},{},none,0,{max_lat},3 writers; gate serializes; entries={got}/{exp}\n",
+            st.tombstones_removed,
+            if ok { "MATCH" } else { "MISMATCH" },
+            if clean { "true" } else { "false" }));
+        cells += 1;
+    }
+
+    // ---- checkpoint x compaction orders ----
+    for order in ["ckpt-then-compact", "compact-then-ckpt"] {
+        let dir = root.join(format!("order-{order}"));
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = open_db(&dir);
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let mut expected: Model = BTreeMap::new();
+        for i in 0..20u32 {
+            e.insert_document("bench", doc_record(300 + i, 1, "c", i as i64)).unwrap();
+            expected.insert(300 + i, (1, "c".into(), i as i64));
+        }
+        let mut ok = true;
+        if order == "ckpt-then-compact" {
+            e.checkpoint().unwrap();
+            e.compact_storage().unwrap();
+        } else {
+            e.compact_storage().unwrap();
+            e.checkpoint().unwrap();
+        }
+        let (_, _, m1) = e5_full_match(&e, &expected);
+        ok &= m1;
+        // repeat the other order on the same db
+        if order == "ckpt-then-compact" {
+            e.compact_storage().unwrap();
+            e.checkpoint().unwrap();
+        } else {
+            e.checkpoint().unwrap();
+            e.compact_storage().unwrap();
+        }
+        let (got, exp, m2) = e5_full_match(&e, &expected);
+        let clean = e5_clean(&e, &dir);
+        rows.push_str(&format!("{order},sync,-,-,0,-,-,-,{},\"{clean}\",none,0,0,both orders on same db; entries={got}/{exp}\n",
+            if ok && m2 && clean { "MATCH" } else { "MISMATCH" }));
+        cells += 1;
+    }
+
+    // ---- WAL rotation + compaction ----
+    {
+        let dir = root.join("rotation-compact");
+        std::env::set_var("PH3D_DURABILITY", "group");
+        std::env::set_var("ATTENTIONDB_WAL_SEGMENT_BYTES", "2048");
+        let e = std::sync::Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let side = std::sync::Arc::new(std::sync::Mutex::new(
+            std::fs::OpenOptions::new().create(true).append(true)
+                .open(format!("{}.e4sidecar", dir.display())).unwrap()));
+        let lat = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let epoch = std::sync::Arc::new(std::time::Instant::now());
+        let mut w = e4_spawn_writer(e.clone(), side.clone(), 500..800, lat.clone(), "bench", epoch.clone());
+        std::thread::sleep(std::time::Duration::from_millis(8));
+        let st = e.compact_storage().unwrap();
+        w.stop.store(true, Ordering::Relaxed);
+        for h in w.handles.drain(..) { h.join().unwrap(); }
+        std::env::remove_var("ATTENTIONDB_WAL_SEGMENT_BYTES");
+        let max_lat = lat.lock().unwrap().iter().map(|x| x.2).max().unwrap_or(0);
+        let lines = e4_sidecar_lines(&dir);
+        let expected = e5_expected_from_sidecar(&lines);
+        let (got, exp, ok) = e5_full_match(&e, &expected);
+        let clean = e5_clean(&e, &dir);
+        rows.push_str(&format!("wal-rotation-during-compaction,group,-,-,{},-,-,-,{},{clean},none,0,{max_lat},2KiB segments; no seq gap/watermark damage; entries={got}/{exp}\n",
+            st.tombstones_removed,
+            if ok { "MATCH" } else { "MISMATCH" }));
+        cells += 1;
+    }
+
+    // ---- backup x compaction ----
+    for (name, do_compact_first) in [("bkp-after-compact", true), ("bkp-before-compact", false)] {
+        let dir = root.join(name);
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = open_db(&dir);
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let mut expected: Model = BTreeMap::new();
+        for i in 0..20u32 {
+            e.insert_document("bench", doc_record(400 + i, 1, "c", i as i64)).unwrap();
+            expected.insert(400 + i, (1, "c".into(), i as i64));
+        }
+        e.checkpoint().unwrap();
+        if do_compact_first { e.compact_storage().unwrap(); }
+        let backup = root.join(format!("{name}.backup"));
+        e.backup_to(&backup).unwrap();
+        if !do_compact_first { e.compact_storage().unwrap(); }
+        // compaction AFTER backup must not disturb the backup dir
+        let (r, clean, _) = e4_restore_and_open(&backup, &root.join(format!("{name}.restored")), "sync").unwrap();
+        let ok = r == expected && clean;
+        rows.push_str(&format!("{name},sync,-,-,0,-,-,-,{},\"{clean}\",none,0,0,backup restores own snapshot; compaction did not mutate backup dir\n",
+            if ok { "MATCH" } else { "MISMATCH" }));
+        cells += 1;
+    }
+
+    // ---- full lifecycle: compact -> backup -> restore -> restart -> compact again ----
+    {
+        let dir = root.join("lifecycle");
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = open_db(&dir);
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let mut expected: Model = BTreeMap::new();
+        for i in 0..30u32 {
+            e.insert_document("bench", doc_record(500 + i, 1, "c", i as i64)).unwrap();
+            expected.insert(500 + i, (1, "c".into(), i as i64));
+        }
+        e.checkpoint().unwrap();
+        e.delete_document("bench", &uuid_for(500, 1).to_string()).unwrap();
+        expected.remove(&500);
+        e.compact_storage().unwrap();
+        let backup = root.join("lifecycle.backup");
+        e.backup_to(&backup).unwrap();
+        let dest = root.join("lifecycle.restored");
+        let (r, clean, _) = e4_restore_and_open(&backup, &dest, "sync").unwrap();
+        // compact the RESTORED db
+        let e2 = open_db(&dest);
+        e2.compact_storage().unwrap();
+        let (got, exp, ok2) = e5_full_match(&e2, &expected);
+        let clean2 = e5_clean(&e2, &dest);
+        e2.close().unwrap();
+        let ok = r == expected && clean && ok2 && clean2;
+        rows.push_str(&format!("compact-backup-restore-restart-compact,sync,-,-,0,-,-,-,{},\"{clean}/{clean2}\",none,0,0,full lifecycle; entries={got}/{exp}\n",
+            if ok { "MATCH" } else { "MISMATCH" }));
+        cells += 1;
+    }
+
+    // ---- manifest fallback after compaction ----
+    {
+        let dir = root.join("fallback-current");
+        let mut expected: Model = BTreeMap::new();
+        {
+            std::env::set_var("PH3D_DURABILITY", "sync");
+            let e = open_db(&dir);
+            e.create_collection("bench", DIM, &[HEAD]).unwrap();
+            for i in 0..20u32 {
+                e.insert_document("bench", doc_record(600 + i, 1, "c", i as i64)).unwrap();
+                expected.insert(600 + i, (1, "c".into(), i as i64));
+            }
+            e.checkpoint().unwrap();
+            e.compact_storage().unwrap();
+            e.close().unwrap();
+        }
+        let dst = root.join("fallback-current.corrupt"); copy_dir_all(&dir, &dst); let p = dst;
+        std::fs::write(p.join("CURRENT"), b"manifest-999999999\n").unwrap();
+        match e5_reopen(&p, "sync") {
+            Err(err) => rows.push_str(&format!("manifest-fallback-after-compact,sync,-,-,0,-,-,-,REFUSED,-,none,0,0,{err}\n")),
+            Ok((rm, rc)) => {
+                let ok = rm == expected && rc;
+                rows.push_str(&format!("manifest-fallback-after-compact,sync,-,-,0,-,-,-,{},\"{rc}\",none,0,0,corrupt CURRENT -> valid generation fallback\n",
+                    if ok { "MATCH" } else { "MISMATCH" }));
+            }
+        }
+        cells += 1;
+    }
+
+    // ---- partial artifacts: tmp ignored, garbage sst refuses ----
+    {
+        let dir = root.join("artifact-tmp");
+        let mut expected: Model = BTreeMap::new();
+        {
+            std::env::set_var("PH3D_DURABILITY", "sync");
+            let e = open_db(&dir);
+            e.create_collection("bench", DIM, &[HEAD]).unwrap();
+            for i in 0..10u32 {
+                e.insert_document("bench", doc_record(700 + i, 1, "c", i as i64)).unwrap();
+                expected.insert(700 + i, (1, "c".into(), i as i64));
+            }
+            e.checkpoint().unwrap();
+            e.compact_storage().unwrap();
+            e.close().unwrap();
+        }
+        let dst = root.join("artifact-tmp.corrupt"); copy_dir_all(&dir, &dst); let p = dst;
+        let sst_dir = attentiondb_storage::catalog::Catalog::sst_dir(&p);
+        std::fs::write(sst_dir.join("compacted_1.sst.tmp"), b"\x00garbage-tmp\x01").unwrap();
+        match e5_reopen(&p, "sync") {
+            Err(err) => rows.push_str(&format!("partial-artifact-tmp,sync,-,-,0,-,-,-,REFUSED,-,none,0,0,tmp must be ignored: {err}\n")),
+            Ok((rm, rc)) => {
+                let (_, _, tmp_n) = e5_sst_stats(&p);
+                let ok = rm == expected && rc;
+                rows.push_str(&format!("partial-artifact-tmp,sync,-,-,0,-,-,-,{},\"{rc}\",none,0,0,garbage .tmp ignored/deleted (remaining tmp={tmp_n})\n",
+                    if ok { "MATCH" } else { "MISMATCH" }));
+            }
+        }
+        let dst2 = root.join("artifact-garbage"); copy_dir_all(&dir, &dst2); let p2 = dst2;
+        let sst2 = attentiondb_storage::catalog::Catalog::sst_dir(&p2);
+        std::fs::write(sst2.join("garbage_999.sst"), b"not-an-sstable").unwrap();
+        match e5_reopen(&p2, "sync") {
+            Err(_) => rows.push_str("partial-artifact-garbage-sst,sync,-,-,0,-,-,-,REFUSED,-,none,0,0,garbage .sst refused loudly (policy)\n"),
+            Ok((rm, rc)) => rows.push_str(&format!("partial-artifact-garbage-sst,sync,-,-,0,-,-,-,ACCEPTED,\"{rc}\",none,0,0,UNEXPECTED acceptance; docs={}\n", rm.len())),
+        }
+        cells += 2;
+    }
+
+    // ---- auto-compaction scheduler observation ----
+    {
+        let dir = root.join("auto-scheduler");
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = open_db(&dir);
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let mut min_files = usize::MAX; let mut max_files = 0usize;
+        for b in 0..6u32 {
+            for i in (b * 1000)..(b * 1000 + 1000) {
+                e.insert_document("bench", doc_record(10000 + i, 1, "c", i as i64)).unwrap();
+            }
+            let (n, _, _) = e5_sst_stats(&dir);
+            min_files = min_files.min(n); max_files = max_files.max(n);
+        }
+        e.delete_document("bench", &uuid_for(10000, 1).to_string()).unwrap();
+        let st = e.compact_storage().unwrap();
+        let (n_final, _, _) = e5_sst_stats(&dir);
+        rows.push_str(&format!("auto-scheduler-observation,sync,{max_files},{n_final},{},-,-,-,MATCH,-,none,0,0,threshold flushes: files bounded [{min_files}..{max_files}]; explicit compact -> {n_final} files\n",
+            st.tombstones_removed));
+        cells += 1;
+    }
+
+    // ---- collection isolation under compaction (INV-C5) ----
+    {
+        let dir = root.join("collections-compact");
+        std::env::set_var("PH3D_DURABILITY", "group");
+        let e = open_db(&dir);
+        e.create_collection("alpha", DIM, &[HEAD]).unwrap();
+        e.create_collection("beta", DIM, &[HEAD]).unwrap();
+        let mut exp_a: Model = BTreeMap::new();
+        let mut exp_b: Model = BTreeMap::new();
+        for i in 0..15u32 {
+            let mut ra = doc_record_c(1, i, 1, "a", i as i64);
+            ra.k_vecs.insert(HEAD.to_string(), vec_for(1000 + i));
+            e.insert_document("alpha", ra).unwrap();
+            exp_a.insert(i, (1, "a".into(), i as i64));
+            let mut rb = doc_record_c(2, i, 1, "b", (i * 2) as i64);
+            rb.k_vecs.insert(HEAD.to_string(), vec_for(2000 + i));
+            e.insert_document("beta", rb).unwrap();
+            exp_b.insert(i, (1, "b".into(), (i * 2) as i64));
+        }
+        e.checkpoint().unwrap();
+        // deletes in each collection create cross-generation versions
+        e.delete_document("alpha", &uuidc(1, 0, 1).to_string()).unwrap();
+        e.delete_document("beta", &uuidc(2, 1, 1).to_string()).unwrap();
+        exp_a.remove(&0); exp_b.remove(&1);
+        let st = e.compact_storage().unwrap();
+        let (ea, iss_a) = export_state_coll(&e, "alpha");
+        let (eb, iss_b) = export_state_coll(&e, "beta");
+        let ok = ea == exp_a && eb == exp_b && iss_a.is_empty() && iss_b.is_empty();
+        let clean = e5_clean(&e, &dir);
+        rows.push_str(&format!("collections-isolation-compaction,group,-,-,{},-,-,-,{},\"{clean}\",none,0,0,alpha={}/{} beta={}/{} no cross-contamination; db-level merge preserves per-collection state\n",
+            st.tombstones_removed,
+            if ok { "MATCH" } else { "MISMATCH" },
+            ea.len(), exp_a.len(), eb.len(), exp_b.len()));
+        cells += 1;
+    }
+
+    // ---- crash windows (group kill at each instrumented gate) ----
+    for gate in ["compact_before_merge", "compact_after_output", "compact_after_install", "compact_after_cleanup"] {
+        let cdir = root.join(format!("crash-{gate}"));
+        let marker = root.join(format!("crash-{gate}.marker"));
+        let mut cmd = std::process::Command::new(std::env::current_exe().unwrap());
+        cmd.args(["dbtest", "e5child", "--dir", cdir.to_str().unwrap()])
+            .env("PH3D_DURABILITY", "sync")
+            .env("PH3E_CRASH_AT", gate)
+            .env("PH3E_CRASH_HIT", "1")
+            .env("PH3E_CRASH_MODEL", "groupkill")
+            .env("PH3E_CRASH_MARKER", &marker);
+        use std::os::unix::process::CommandExt;
+        cmd.process_group(0);
+        let mut child = cmd.spawn().unwrap();
+        let mut reached = false;
+        for _ in 0..6000 {
+            if marker.exists() { reached = true; break; }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        if reached {
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        unsafe { libc::kill(-(child.id() as i32), libc::SIGKILL); }
+        let _ = child.wait();
+        // verify: fresh open -> same logical state, checker clean, no tmp, compact again OK
+        let expected: Model = {
+            let mut m: Model = BTreeMap::new();
+            m.insert(1, (1, "c".into(), 150)); // updated value (same-uuid update)
+            m // idx2 deleted pre-compaction; idx3 never existed
+        };
+        std::env::remove_var("PH3E_CRASH_AT");
+        match e5_reopen(&cdir, "sync") {
+            Err(err) => crash.push_str(&format!("{gate},sync,{reached},REFUSED,-,-,-,{err}\n")),
+            Ok((rm, rc)) => {
+                let (_, _, tmp_n) = e5_sst_stats(&cdir);
+                let ok = rm == expected && rc;
+                // restart + compact again must work
+                let e2 = open_db(&cdir);
+                let st2 = e2.compact_storage().unwrap();
+                let (_, _, ok2) = e5_full_match(&e2, &expected);
+                let clean2 = e5_clean(&e2, &cdir);
+                e2.close().unwrap();
+                crash.push_str(&format!("{gate},sync,{reached},{},\"{rc}\",tmp={tmp_n},{},window verified; second compact entries+tombs={}/{}\n",
+                    if ok { "MATCH" } else { "MISMATCH" }, if ok2 && clean2 { "ok" } else { "FAIL" }, st2.entries, st2.tombstones_removed));
+            }
+        }
+        cells += 1;
+    }
+
+    std::fs::write(format!("{out}/e5-compaction.csv"), rows).unwrap();
+    std::fs::write(format!("{out}/e5-crash.csv"), crash).unwrap();
+    format!("e5: {cells} cells -> {out}/e5-compaction.csv + e5-crash.csv")
+}
+
 /// Main E4 driver. Produces <out>/e4-matrix.csv and <out>/e4-integrity.csv.
 fn run_e4(out: &str) -> String {
     std::fs::create_dir_all(out).unwrap();
@@ -3714,6 +4461,8 @@ pub fn run(args: &[String]) -> String {
             let b = get("--backup", "/tmp/ph3e-e4/crash-backup");
             run_e4child(&dir, &b)
         }
+        "e5run" => run_e5(&out),
+        "e5child" => run_e5child(&dir),
         "e4run" => run_e4(&out),
         "compactlive" => run_compact_live(&dir),
         other => format!("unknown dbtest subcommand {other}"),

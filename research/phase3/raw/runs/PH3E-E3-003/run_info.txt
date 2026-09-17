@@ -1,0 +1,6 @@
+run_id=PH3E-E3-003
+experiment=E3 crash-recovery matrix regression after E5 changes
+date=2026-09-17
+method=identical to PH3E-E3-001
+status=COMPLETED — e3-matrix.csv + metrics.json BYTE-IDENTICAL to PH3E-E3-001/002 (E3 unchanged; the E5 tie-break fix does not affect these workloads: distinct keys, no equal-ms same-key versions)
+commit=cf2be2700546198cfd799c47503013f3f8317d2d

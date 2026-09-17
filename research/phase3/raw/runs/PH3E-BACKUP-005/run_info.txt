@@ -1,0 +1,6 @@
+run_id=PH3E-BACKUP-005
+experiment=E4 backup regression after E5 changes
+date=2026-09-17
+method=identical to PH3E-BACKUP-004
+status=COMPLETED — e4-integrity.csv BYTE-IDENTICAL to PH3E-BACKUP-004; e4-matrix classification-identical (all 15 MATCH, crash SOURCE_OK/REFUSED/true/true); timing+wait-note columns differ only
+commit=cf2be2700546198cfd799c47503013f3f8317d2d

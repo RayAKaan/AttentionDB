@@ -412,7 +412,8 @@ E4_INTEGRITY_EXPECT = {
 E4_CRASH_EXPECT = ("SOURCE_OK", "REFUSED", "true")  # source ok, partial refused, early ok
 
 
-def _gen_e4(mismatches):
+def _gen_e4():
+    mismatches = 0
     raw = "research/phase3/raw/runs/PH3E-BACKUP-004/e4-matrix.csv"
     out = "research/phase3/results/e4-backup-matrix.csv"
     rows = list(csv.DictReader(open(raw)))
@@ -470,13 +471,79 @@ def _gen_e4(mismatches):
         w = csv.DictWriter(f, fieldnames=["case", "action", "observed", "expected", "match"])
         w.writeheader()
         w.writerows(res2)
-    return len(rows) + len(rows2)
+    return mismatches, len(rows) + len(rows2)
 
 
 def gen_e4() -> int:
-    mismatches = 0
-    _gen_e4(mismatches)
+    mismatches, _n = _gen_e4()
     return mismatches
+
+
+# ================================================================
+# Phase 3E E5 — compaction expectations
+# ================================================================
+
+# cases whose expected classification is a REFUSAL (documented corruption policy)
+E5_REFUSAL_CASES = {"partial-artifact-garbage-sst"}
+
+
+def gen_e5() -> int:
+    mismatches, _n = _gen_e5_inner()
+    return mismatches
+
+
+def _gen_e5_inner():
+    raw = "research/phase3/raw/runs/PH3E-COMPACT-004/e5-compaction.csv"
+    raw2 = "research/phase3/raw/runs/PH3E-COMPACT-004/e5-crash.csv"
+    out = "research/phase3/results/e5-compaction.csv"
+    mismatches = 0
+    rows = list(csv.DictReader(open(raw)))
+    res = []
+    for r in rows:
+        r = {k: (v.strip() if isinstance(v, str) else v) for k, v in r.items()}
+        case = r["case"]
+        if case in E5_REFUSAL_CASES:
+            ok = r["model_match"] == "REFUSED"
+            cls = "REFUSED_BY_POLICY" if ok else "UNEXPECTED_ACCEPT"
+            expected = "garbage SST must be refused loudly (never valid state)"
+        else:
+            ok = (r["model_match"] == "MATCH" and r["resurrect"] == "none"
+                  and (r["checker_clean"].startswith("true") or r["checker_clean"] == "-"))
+            cls = "COMPACTION_VERIFIED" if ok else "COMPACTION_VIOLATION"
+            expected = ("logical state before == after (full value model); "
+                        "no resurrection; checker clean")
+        if not ok:
+            mismatches += 1
+        res.append({"case": case, "mode": r["mode"],
+                    "sst_before": r["sst_before"], "sst_after": r["sst_after"],
+                    "tombstones_removed": r["tombstones_removed"],
+                    "classification": cls, "expected": expected,
+                    "observed": r["model_match"],
+                    "match": "MATCH" if ok else "MISMATCH"})
+    with open(out, "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=list(res[0].keys()))
+        w.writeheader()
+        w.writerows(res)
+
+    # crash windows: every instrumented window must restart to the SAME valid
+    # logical state, checker-clean, no tmp artifacts, and accept a second compaction
+    rows2 = list(csv.DictReader(open(raw2)))
+    res2 = []
+    for r in rows2:
+        r = {k: (v.strip() if isinstance(v, str) else v) for k, v in r.items()}
+        ok = (r["aborted_at_window"] == "true" and r["model_match"] == "MATCH"
+              and r["checker_clean"] == "true" and r["tmp_clean"] == "tmp=0"
+              and r["restart_compact_ok"] == "ok")
+        if not ok:
+            mismatches += 1
+        res2.append({"window": r["window"], "observed_state": r["model_match"],
+                     "expected": "aborted at window; restart to valid state; no tmp; second compact ok",
+                     "match": "MATCH" if ok else "MISMATCH"})
+    with open("research/phase3/results/e5-crash-windows.csv", "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=["window", "observed_state", "expected", "match"])
+        w.writeheader()
+        w.writerows(res2)
+    return mismatches, len(rows) + len(rows2)
 
 
 def main() -> int:
@@ -518,6 +585,7 @@ def main() -> int:
     mismatches += gen_durability()
     mismatches += gen_e3()
     mismatches += gen_e4()
+    mismatches += gen_e5()
     m = json.load(open("research/phase3/raw/runs/PH3E-WAL-001/metrics.json"))
     summary = {"run": "PH3E-WAL-001", "cases": len(rows),
                "refused": m["refused"], "opened": m["opened"],

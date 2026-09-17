@@ -113,9 +113,15 @@ fn do_compact(
         "Starting SSTable compaction"
     );
 
-    let mut merged: BTreeMap<Vec<u8>, (Vec<u8>, i64, bool)> = BTreeMap::new();
+    let mut merged: BTreeMap<Vec<u8>, (Vec<u8>, i64, bool, usize)> = BTreeMap::new();
 
-    for path in &files_to_merge {
+    // E5 INV-C2: version resolution at compaction MUST match version resolution
+    // at open (`DocumentStore::open_inner`): (timestamp, file order), higher wins.
+    // Entry timestamps are wall-clock MILLISECONDS, so two flushes of the same key
+    // within one millisecond collide; breaking the tie toward the older file (the
+    // old strictly-greater rule) could publish a stale version that a restart
+    // would then resolve differently — a latent lost-update/resurrection bug.
+    for (file_idx, path) in files_to_merge.iter().enumerate() {
         let reader = SSTableReader::open(path)?;
         for entry in reader.iter() {
             let is_tombstone = if let Ok(record) = Record::from_msgpack(&entry.value) {
@@ -125,22 +131,25 @@ fn do_compact(
             };
 
             let should_replace = match merged.get(&entry.key) {
-                Some((_, existing_ts, _)) => entry.timestamp > *existing_ts,
+                Some((_, existing_ts, _, existing_file)) => {
+                    entry.timestamp > *existing_ts
+                        || (entry.timestamp == *existing_ts
+                            && file_idx > *existing_file)
+                }
                 None => true,
             };
 
             if should_replace {
                 merged.insert(
                     entry.key.clone(),
-                    (entry.value.clone(), entry.timestamp, is_tombstone),
+                    (entry.value.clone(), entry.timestamp, is_tombstone, file_idx),
                 );
             }
         }
     }
-
     let before_gc = merged.len();
     if gc_tombstones {
-        merged.retain(|_, (_, _, is_tombstone)| !*is_tombstone);
+        merged.retain(|_, (_, _, is_tombstone, _)| !*is_tombstone);
     }
     let total_tombstones = before_gc - merged.len();
 
@@ -151,7 +160,7 @@ fn do_compact(
     // Preserve each entry's ORIGINAL logical timestamp: the output must compete
     // fairly with files outside the merge set (a re-stamped old record could
     // otherwise shadow a newer tombstone/update and resurrect deleted data).
-    for (key, (value, ts, _)) in &merged {
+    for (key, (value, ts, _, _)) in &merged {
         writer.append_with_timestamp(key.clone(), value.clone(), *ts)?;
     }
     writer.flush()?;
@@ -267,6 +276,51 @@ mod tests {
 
         let removed = cleanup_merged_files(&result).unwrap();
         assert_eq!(removed, 4);
+    }
+
+    #[test]
+    fn test_compaction_timestamp_tie_breaks_to_later_file() {
+        // E5 INV-C2: two versions of one key with EQUAL entry timestamps (same
+        // flush millisecond) must resolve to the LATER file's version — the same
+        // rule DocumentStore::open_inner applies. The old strictly-greater rule
+        // kept the older file's version here (latent stale-publish bug).
+        let dir = tempdir().unwrap();
+        let sst_dir = crate::catalog::Catalog::sst_dir(dir.path());
+        std::fs::create_dir_all(&sst_dir).unwrap();
+        let write_sst = |name: &str, key: &[u8], val: &[u8], ts: i64| {
+            let path = sst_dir.join(name);
+            let mut w = SSTableWriter::new(&path).unwrap();
+            w.append_with_timestamp(key.to_vec(), val.to_vec(), ts).unwrap();
+            w.flush().unwrap();
+        };
+        // Force the same logical millisecond on both versions.
+        write_sst("sstable_001.sst", b"k", b"v_old", 1234);
+        write_sst("sstable_002.sst", b"k", b"v_new", 1234);
+        // A tombstone story too: older file has live value, newer has tombstone.
+        let mut rec = make_record(1, false);
+        rec.id = uuid::Uuid::new_v4();
+        let live = rec.clone();
+        let mut tomb = make_record(2, true);
+        tomb.id = rec.id;
+        write_sst("sstable_003.sst", b"k2", &live.to_msgpack().unwrap(), 1234);
+        write_sst("sstable_004.sst", b"k2", &tomb.to_msgpack().unwrap(), 1234);
+
+        // Compact ALL four (tombstone GC active) directly via compact_all.
+        let result = compact_all(dir.path()).unwrap().expect("merge 4 files");
+        assert_eq!(result.files_merged, 4);
+        let reader = SSTableReader::open(&result.output_path).unwrap();
+        let get = |k: &[u8]| reader.get(k).map(|e| e.value.clone());
+        assert_eq!(
+            get(b"k").as_deref(),
+            Some(b"v_new".as_slice()),
+            "later file must win the ts tie"
+        );
+        // Newer tombstone wins the ts tie -> full-merge GC removes it entirely.
+        // (Under the old strictly-greater rule the LIVE value won the tie, the
+        // tombstone never survived into `merged`, and full compaction would have
+        // RE-PUBLISHED the pre-delete value — resurrection.)
+        assert!(get(b"k2").is_none(), "tombstone must win the ts tie and be GCed");
+        cleanup_merged_files(&result).unwrap();
     }
 
     #[test]

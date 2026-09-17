@@ -1615,6 +1615,90 @@ impl AttentionEngine {
         Ok(info)
     }
 
+    // ================================================================
+    // E5: coordinated full compaction (C1)
+    // ================================================================
+
+    /// Coordinated full compaction of the document-store SST set (C1): holds the
+    /// mutation gate for the whole boundary→publish window, fsyncs the WAL, flushes
+    /// the memtable, merges EVERY SST (tombstone GC sound only under the full-merge
+    /// proof), swaps the reader list, then unlinks the superseded inputs.
+    /// Writers pause for the window (gate); readers pause under the store write
+    /// lock (no errors). Fully non-blocking (C2) compaction is NOT provided.
+    /// Invariants: INV-C1..C10 of phase3e-e5-spec.md; the WAL, checkpoint_seq and
+    /// high-water mark are untouched (INV-C10) — compaction never publishes a
+    /// manifest generation.
+    pub fn compact_storage(&self) -> Result<StorageCompactionStats, CoreError> {
+        let _gate = self.mutation_gate.lock();
+        let db_dir = self
+            .data_dir
+            .clone()
+            .ok_or_else(|| CoreError::InvalidOperation("engine is not persistent".into()))?;
+        let started = std::time::Instant::now();
+
+        // 1) WAL durable first: the authoritative log must never lag the merged
+        //    state this call is about to produce.
+        {
+            let mut wal_guard = self.wal.lock();
+            let wal = wal_guard
+                .as_mut()
+                .ok_or_else(|| CoreError::InvalidOperation("engine is not persistent".into()))?;
+            wal.fsync()?;
+        }
+
+        // 2) Flush the memtable so every acked op is in an SST before merging.
+        self.document_store.write().flush()?;
+
+        use attentiondb_storage::crashgate;
+        let sst_dir = attentiondb_storage::catalog::Catalog::sst_dir(&db_dir);
+        let files_before = sst_file_count(&sst_dir);
+        let bytes_before = sst_dir_bytes(&sst_dir);
+        crashgate::GATE_COMPACT_BEFORE_MERGE.hit();
+
+        // 3) Full merge (writes compacted_<ns>.sst via tmp→fsync→rename).
+        let result = attentiondb_storage::compact_all(&db_dir)?;
+        let mut stats = StorageCompactionStats {
+            files_before,
+            files_after: files_before,
+            entries: 0,
+            tombstones_removed: 0,
+            bytes_before,
+            bytes_after: bytes_before,
+            duration_ms: started.elapsed().as_secs_f64() * 1000.0,
+        };
+        if let Some(r) = result {
+            crashgate::GATE_COMPACT_AFTER_OUTPUT.hit();
+
+            // 4) Publish: unlink superseded inputs FIRST, then swap the reader
+            //    list under the write lock. Unlink is always reader-safe here:
+            //    SSTableReader materializes all entries in memory at open, and
+            //    readers only borrow the reader list inside RwLock scopes
+            //    (INV-C7/C8). Cleanup-then-reload keeps the published list
+            //    exactly equal to the on-disk set.
+            attentiondb_storage::cleanup_merged_files(&r)?;
+            crashgate::GATE_COMPACT_AFTER_CLEANUP.hit();
+            let files_after = {
+                let mut ds = self.document_store.write();
+                ds.reload_sstables()?
+            };
+            crashgate::GATE_COMPACT_AFTER_INSTALL.hit();
+
+            stats.files_after = files_after;
+            stats.entries = r.output_entries;
+            stats.tombstones_removed = r.tombstones_removed;
+            stats.bytes_after = sst_dir_bytes(&sst_dir);
+            stats.duration_ms = started.elapsed().as_secs_f64() * 1000.0;
+        }
+        tracing::info!(
+            files_before = stats.files_before,
+            files_after = stats.files_after,
+            tombstones_removed = stats.tombstones_removed,
+            duration_ms = stats.duration_ms,
+            "coordinated compaction complete"
+        );
+        Ok(stats)
+    }
+
     /// Graceful shutdown: stop accepting writes → flush → checkpoint → CLOSED.
     /// Returns an error if durability steps failed (never reports clean shutdown
     /// falsely — §22 of the Phase 1 spec).
@@ -2082,6 +2166,40 @@ fn default_max_segment_bytes() -> u64 {
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(64 * 1024 * 1024)
+}
+
+/// E5: statistics of a coordinated full compaction.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct StorageCompactionStats {
+    pub files_before: usize,
+    pub files_after: usize,
+    pub entries: usize,
+    pub tombstones_removed: usize,
+    pub bytes_before: u64,
+    pub bytes_after: u64,
+    pub duration_ms: f64,
+}
+
+fn sst_file_count(dir: &std::path::Path) -> usize {
+    match std::fs::read_dir(dir) {
+        Ok(rd) => rd
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("sst"))
+            .count(),
+        Err(_) => 0,
+    }
+}
+
+fn sst_dir_bytes(dir: &std::path::Path) -> u64 {
+    match std::fs::read_dir(dir) {
+        Ok(rd) => rd
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("sst"))
+            .filter_map(|e| e.metadata().ok())
+            .map(|m| m.len())
+            .sum(),
+        Err(_) => 0,
+    }
 }
 
 fn cleanup_old_manifests(db_dir: &Path) -> Result<(), CoreError> {

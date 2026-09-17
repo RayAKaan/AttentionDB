@@ -1,0 +1,5 @@
+window,observed_state,expected,match
+compact_before_merge,MATCH,aborted at window; restart to valid state; no tmp; second compact ok,MATCH
+compact_after_output,MATCH,aborted at window; restart to valid state; no tmp; second compact ok,MATCH
+compact_after_install,MATCH,aborted at window; restart to valid state; no tmp; second compact ok,MATCH
+compact_after_cleanup,MATCH,aborted at window; restart to valid state; no tmp; second compact ok,MATCH

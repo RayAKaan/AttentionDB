@@ -1,0 +1,22 @@
+case,mode,sst_before,sst_after,tombstones_removed,bytes_before,bytes_after,compact_us,model_match,checker_clean,resurrect,reader_errors,max_writer_latency_us,notes
+c0-offline-control,sync,3,1,0,18650,18610,187,MATCH,"true",none,0,0,pre_eq=true reopen_eq=true tmp_after=0 entries=30/30
+multigen-version-resolution,sync,3,1,0,3573,1884,-,MATCH,"true",none,0,0,expected A=300 B=del C=del D E; reopen_eq=true entries=3/3
+tombstone-gc-basic,sync,2,1,1,-,-,-,MATCH,"true",none,0,0,ins/ckpt/del/ckpt/compact/restart; docs=0
+tombstone-deep-reinsert,sync,-,-,1,-,-,-,MATCH,true/true,none,0,0,ins/upd/del/compact/restart -> absent; reinsert v2 -> present once
+delete-reinsert-delete-x3,sync,-,-,3,-,-,-,MATCH,"true",none,0,0,A remains deleted after 3 rounds
+partial-merge-retains-tombstones,storage-api,5,-,0,-,-,-,MATCH,true,none,0,0,merged oldest 4 of 5; retained=true tomb_in_output=1
+repeated-compaction-x4,sync,-,-,0,-,-,-,MATCH,"true",none,0,0,r0:ok/cok/f1<=f1 r1:ok/cok/f2<=f1 r2:ok/cok/f2<=f1 r3:ok/cok/f2<=f1 restart_eq=true restart_len=19
+readers-during-compaction,group,2,1,10,41442,31102,654,MATCH,"true",none,0,0,3 readers x 200 attends DURING compaction: p50=52us p99=99us n=614 (blocked-not-errored); entries=50/50
+writer-during-compaction,group,2,1,5,27055,123623,-,MATCH,true,none,0,2607,background compaction vs live writer; entries=199/199
+multiwriter-during-compaction,group,-,-,0,-,-,-,MATCH,true,none,0,3350,3 writers; gate serializes; entries=133/133
+ckpt-then-compact,sync,-,-,0,-,-,-,MATCH,"true",none,0,0,both orders on same db; entries=20/20
+compact-then-ckpt,sync,-,-,0,-,-,-,MATCH,"true",none,0,0,both orders on same db; entries=20/20
+wal-rotation-during-compaction,group,-,-,0,-,-,-,MATCH,true,none,0,808,2KiB segments; no seq gap/watermark damage; entries=160/160
+bkp-after-compact,sync,-,-,0,-,-,-,MATCH,"true",none,0,0,backup restores own snapshot; compaction did not mutate backup dir
+bkp-before-compact,sync,-,-,0,-,-,-,MATCH,"true",none,0,0,backup restores own snapshot; compaction did not mutate backup dir
+compact-backup-restore-restart-compact,sync,-,-,0,-,-,-,MATCH,"true/true",none,0,0,full lifecycle; entries=29/29
+manifest-fallback-after-compact,sync,-,-,0,-,-,-,MATCH,"true",none,0,0,corrupt CURRENT -> valid generation fallback
+partial-artifact-tmp,sync,-,-,0,-,-,-,MATCH,"true",none,0,0,garbage .tmp ignored/deleted (remaining tmp=0)
+partial-artifact-garbage-sst,sync,-,-,0,-,-,-,REFUSED,-,none,0,0,garbage .sst refused loudly (policy)
+auto-scheduler-observation,sync,3,1,0,-,-,-,MATCH,-,none,0,0,threshold flushes: files bounded [1..3]; explicit compact -> 1 files
+collections-isolation-compaction,group,-,-,2,-,-,-,MATCH,"true",none,0,0,alpha=14/14 beta=14/14 no cross-contamination; db-level merge preserves per-collection state

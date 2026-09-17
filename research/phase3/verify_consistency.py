@@ -524,6 +524,46 @@ def main():
         ERR.append("phase3e-e4-final-report.md missing (E4 final report)")
     if not os.path.exists(os.path.join(HERE, "methodology", "ph3e-e4-deviations.md")):
         ERR.append("methodology/ph3e-e4-deviations.md missing (E4 deviations)")
+
+    # 22. Phase 3E (E5): compaction — evidence, concurrency classes, crash
+    #     windows, refusal policy; no online claims from offline-only cells
+    for rid in ("PH3E-COMPACT-004", "PH3E-WAL-006", "PH3E-DUR-009",
+                "PH3E-E3-003", "PH3E-BACKUP-005"):
+        if rid not in ids:
+            ERR.append(f"{rid} missing from registry (E5 family)")
+    d5 = os.path.join(run, "PH3E-COMPACT-004")
+    if not os.path.isdir(d5):
+        ERR.append("PH3E-COMPACT-004 registered but raw dir missing")
+    else:
+        for f in ("run_info.txt", "config.json", "e5-compaction.csv", "e5-crash.csv"):
+            if not os.path.exists(os.path.join(d5, f)):
+                ERR.append(f"PH3E-COMPACT-004: missing {f}")
+    e5_res = os.path.join(RES, "e5-compaction.csv")
+    e5_cres = os.path.join(RES, "e5-crash-windows.csv")
+    if not os.path.exists(e5_res) or not os.path.exists(e5_cres):
+        ERR.append("results/e5-*.csv missing (run generate_results_ph3e.py)")
+    else:
+        e5rows = rd(e5_res)
+        for sr in e5rows:
+            if sr["match"] != "MATCH":
+                ERR.append(f"e5 violation: {sr['case']} {sr['classification']}")
+            if sr["classification"] == "COMPACTION_VERIFIED" and                sr["case"] in ("c0-offline-control",) and sr["mode"] == "sync" and                not any(r["case"].endswith("during-compaction") for r in e5rows):
+                ERR.append("e5: coordinated/online claim from offline-only cells")
+        names = {r["case"] for r in e5rows}
+        for req in ("readers-during-compaction", "writer-during-compaction",
+                    "multiwriter-during-compaction", "collections-isolation-compaction",
+                    "repeated-compaction-x4"):
+            if req not in names:
+                ERR.append(f"e5 results lack required concurrency/completeness cell {req}")
+        for sr in rd(e5_cres):
+            if sr["match"] != "MATCH":
+                ERR.append(f"e5 crash window violation: {sr['window']}")
+        if not any(r["window"] == "compact_after_output" for r in rd(e5_cres)):
+            ERR.append("e5: missing fresh-process crash evidence at output window")
+    if not os.path.exists(os.path.join(HERE, "phase3e-e5-final-report.md")):
+        ERR.append("phase3e-e5-final-report.md missing (E5 final report)")
+    if not os.path.exists(os.path.join(HERE, "methodology", "ph3e-e5-deviations.md")):
+        ERR.append("methodology/ph3e-e5-deviations.md missing (E5 deviations)")
     if not os.path.exists(os.path.join(HERE, "methodology", "ph3e-e3-deviations.md")):
         ERR.append("methodology/ph3e-e3-deviations.md missing (E3 deviations)")
     if not os.path.exists(os.path.join(HERE, "methodology", "ph3e-spec-deviations.md")):

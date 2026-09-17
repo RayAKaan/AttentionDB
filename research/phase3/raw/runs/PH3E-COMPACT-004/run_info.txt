@@ -1,0 +1,8 @@
+run_id=PH3E-COMPACT-004
+experiment=E5 compaction: C0 offline control, multi-generation version resolution (incl. equal-ms same-key tie), tombstone GC + restart, deep delete/reinsert loops, partial-merge tombstone retention (storage API), repeated compaction x4, concurrent readers, single writer, multi-writer, checkpoint x compaction orders, WAL rotation, backup x compaction, full compact->backup->restore->restart->compact lifecycle, manifest fallback post-compaction, partial artifacts (tmp ignored / garbage SST refused), auto-scheduler observation, crash-during-compaction at 4 instrumented windows (groupkill at gate)
+date=2026-09-17
+method=phase3-bench dbtest e5run — independent reference model = fsynced per-op ACK sidecar (+deterministic value map); full value-level Model equality (idx->(version,cat,num)) not just counts; checker on every live/restored/reopened state; crash windows via crashgate groupkill markers
+config=see config.json
+status=COMPLETED — 25/25 cells MATCH (21 in-process + 4 crash windows); 0 resurrection; readers 0 errors p50=53us p99=116us; writers serialize via mutation gate (C1 coordinated)
+commit=cf2be2700546198cfd799c47503013f3f8317d2d
+supersedes=PH3E-COMPACT-003 (harness completeness gap, not engine behavior: 003 lacked the collection-isolation family and reader-latency percentiles; all 003 cells MATCH and remain preserved)

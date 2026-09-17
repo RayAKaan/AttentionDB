@@ -75,6 +75,18 @@ pub static GATE_CKPT_AFTER_ROTATE: Gate = Gate::new("ckpt_after_rotate");
 /// generation cleanup.
 pub static GATE_CKPT_AFTER_TRIM: Gate = Gate::new("ckpt_after_trim");
 
+// ---- E5 compaction windows (Engine::compact_storage — coordinated path) ----
+/// Memtable flushed (flush SST at final name); merge not started.
+pub static GATE_COMPACT_BEFORE_MERGE: Gate = Gate::new("compact_before_merge");
+/// Merged output SST fsynced + renamed at its final name; inputs still present;
+/// reader list still the pre-compaction set.
+pub static GATE_COMPACT_AFTER_OUTPUT: Gate = Gate::new("compact_after_output");
+/// Input files unlinked (reader-safe: readers materialize entries in memory);
+/// reader list still the pre-compaction set.
+pub static GATE_COMPACT_AFTER_CLEANUP: Gate = Gate::new("compact_after_cleanup");
+/// Reader list swapped to the post-compaction (output-only) set — fully complete.
+pub static GATE_COMPACT_AFTER_INSTALL: Gate = Gate::new("compact_after_install");
+
 pub struct Gate {
     name: &'static str,
     hit: AtomicUsize,
@@ -161,6 +173,11 @@ fn crash_cfg() -> Option<(&'static str, usize)> {
             "sst_after_write",
             "ckpt_after_rotate",
             "ckpt_after_trim",
+            // E5 compaction windows
+            "compact_before_merge",
+            "compact_after_output",
+            "compact_after_install",
+            "compact_after_cleanup",
         ];
         let name = NAMES.iter().find(|c| **c == name.as_str())?;
         Some((*name, n.max(1)))

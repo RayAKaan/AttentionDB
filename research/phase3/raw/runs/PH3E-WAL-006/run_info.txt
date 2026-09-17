@@ -1,0 +1,6 @@
+run_id=PH3E-WAL-006
+experiment=E1 WAL-integrity regression after E5 (compaction tie-break fix + crashgate E5 windows + reload_sstables + Engine::compact_storage)
+date=2026-09-17
+method=identical to PH3E-WAL-001
+status=COMPLETED — wal-integrity.csv + metrics.json BYTE-IDENTICAL to PH3E-WAL-001 (E1 unchanged)
+commit=cf2be2700546198cfd799c47503013f3f8317d2d

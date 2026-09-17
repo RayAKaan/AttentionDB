@@ -1,0 +1,5 @@
+window,mode,aborted_at_window,model_match,checker_clean,tmp_clean,restart_compact_ok,notes
+compact_before_merge,sync,true,MATCH,"true",tmp=0,ok,window verified; second compact entries+tombs=1/1
+compact_after_output,sync,true,MATCH,"true",tmp=0,ok,window verified; second compact entries+tombs=1/1
+compact_after_install,sync,true,MATCH,"true",tmp=0,ok,window verified; second compact entries+tombs=0/0
+compact_after_cleanup,sync,true,MATCH,"true",tmp=0,ok,window verified; second compact entries+tombs=0/0
