@@ -1,0 +1,16 @@
+{
+ "durability": "async",
+ "n_docs": 40,
+ "txn_docs": 10,
+ "crash_points": [
+  "after_acks",
+  "after_flush",
+  "after_checkpoint",
+  "mid_inserts",
+  "mid_flush",
+  "during_commit_txn",
+  "after_compact"
+ ],
+ "kill": "SIGKILL for parked points; exit(137) (Drop skipped) for terminal points",
+ "verifier": "reopen; present==acked => ALL_ACKED; proper prefix + zero unacked + checker-clean => PREFIX; txn 10/10 or 0/10 vs post-commit marker"
+}

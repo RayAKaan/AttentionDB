@@ -1,0 +1,8 @@
+durability,crash_point,verdict,acked,unacked_present,txn
+group,after_acks,ALL_ACKED,40/40,0,txn=0/10 marker= ABSENT
+group,after_flush,ALL_ACKED,40/40,0,txn=0/10 marker= ABSENT
+group,after_checkpoint,ALL_ACKED,40/40,0,txn=0/10 marker= ABSENT
+group,mid_inserts,ALL_ACKED,21/21,0,txn=0/10 marker= ABSENT
+group,mid_flush,ALL_ACKED,40/40,0,txn=0/10 marker= ABSENT
+group,during_commit_txn,ALL_ACKED,40/40,0,txn=10/10 marker=committed COMMITTED_DURABLE
+group,after_compact,ALL_ACKED,40/40,0,txn=0/10 marker= ABSENT

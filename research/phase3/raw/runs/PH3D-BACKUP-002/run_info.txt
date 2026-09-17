@@ -1,0 +1,7 @@
+run_id=PH3D-BACKUP-002
+experiment=backup inventory + independent integrity verification (§28): sizes, files, sha256 checksums
+date=2026-09-17
+method=benchmarks/phase3/src/dbtest.rs via 'phase3-bench dbtest <subcommand>' (deterministic; DIM=32, head h)
+config=see config.json
+status=COMPLETED — backupinv: 6 passed, 0 FAILED (files=6 bytes=76501)
+notes=quiescent path (documented requirement); inventory.csv holds the full per-file checksum record

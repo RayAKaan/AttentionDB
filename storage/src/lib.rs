@@ -7,6 +7,7 @@ pub mod record;
 pub mod sstable;
 pub mod wal;
 
+pub use wal::{read_wal_state, write_wal_state, WalState};
 pub use catalog::{
     fsync_dir, Catalog, CollectionMeta, HeadMeta, IdMapSnapshot, DATABASE_FORMAT_VERSION,
     IDMAP_FORMAT_VERSION, MANIFEST_FORMAT_VERSION,

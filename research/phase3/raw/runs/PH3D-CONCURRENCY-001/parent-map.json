@@ -1,0 +1,1 @@
+{"child_run": "PH3D-CONCURRENCY-001", "parents": ["PH3D-CONC-001","PH3D-CONC-002","PH3D-CONC-003"], "role": "concurrency family (§22-25): read ladder, mixed r/w, deterministic logs + replay, contention model"}

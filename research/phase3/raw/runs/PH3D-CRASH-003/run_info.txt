@@ -1,0 +1,7 @@
+run_id=PH3D-CRASH-003
+experiment=crash-recovery matrix (§15–17): 7 crash points x Durability=sync; acked-sidecar protocol; txn all-or-nothing probe
+date=2026-09-17
+method=benchmarks/phase3/src/dbtest.rs via 'phase3-bench dbtest <subcommand>' (deterministic; DIM=32, head h)
+config=see config.json
+status=COMPLETED — all 7 points consistent
+notes=crash points: after_acks after_flush after_checkpoint mid_inserts mid_flush during_commit_txn after_compact; SIGKILL for parked children; process-crash axis only for group/async

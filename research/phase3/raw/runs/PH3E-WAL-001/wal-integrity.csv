@@ -1,0 +1,12 @@
+case,checkpoint,verdict,detail
+delete_required_segment_pre_checkpoint,false,REFUSED,WAL_LOST_SEGMENT
+delete_all_segments_post_checkpoint,true,REFUSED,WAL_LOST_SEGMENT
+rename_segment_gap,false,REFUSED,WAL_REPLAY_CORRUPTION
+corrupt_wal_state_record,false,REFUSED,WAL_STATE_CORRUPT
+delete_wal_state_record_legacy,true,OPENED,docs=20 checker_clean=true watermark=-
+truncate_torn_tail,false,OPENED,docs=11 checker_clean=true watermark=0
+corrupt_frame,false,REFUSED,WAL_REPLAY_CORRUPTION
+corrupt_current_manifest_fallback,true,OPENED,docs=20 checker_clean=true watermark=21
+corrupt_all_manifests,true,REFUSED,MANIFEST_UNREADABLE
+fresh_no_documents,false,OPENED,docs=20 checker_clean=true watermark=0
+trimmed_reopen,true,OPENED,docs=20 checker_clean=true watermark=21

@@ -1,0 +1,22 @@
+run,durability,crash_point,verdict,acked_present,unacked_present,txn
+PH3D-CRASH-001,group,after_acks,ALL_ACKED,40/40,0,txn=0/10 marker= ABSENT
+PH3D-CRASH-001,group,after_flush,ALL_ACKED,40/40,0,txn=0/10 marker= ABSENT
+PH3D-CRASH-001,group,after_checkpoint,ALL_ACKED,40/40,0,txn=0/10 marker= ABSENT
+PH3D-CRASH-001,group,mid_inserts,ALL_ACKED,21/21,0,txn=0/10 marker= ABSENT
+PH3D-CRASH-001,group,mid_flush,ALL_ACKED,40/40,0,txn=0/10 marker= ABSENT
+PH3D-CRASH-001,group,during_commit_txn,ALL_ACKED,40/40,0,txn=10/10 marker=committed COMMITTED_DURABLE
+PH3D-CRASH-001,group,after_compact,ALL_ACKED,40/40,0,txn=0/10 marker= ABSENT
+PH3D-CRASH-002,async,after_acks,PREFIX,35/40,0,txn=0/10 marker= ABSENT
+PH3D-CRASH-002,async,after_flush,ALL_ACKED,40/40,0,txn=0/10 marker= ABSENT
+PH3D-CRASH-002,async,after_checkpoint,ALL_ACKED,40/40,0,txn=0/10 marker= ABSENT
+PH3D-CRASH-002,async,mid_inserts,PREFIX,11/21,0,txn=0/10 marker= ABSENT
+PH3D-CRASH-002,async,mid_flush,PREFIX,35/40,0,txn=0/10 marker= ABSENT
+PH3D-CRASH-002,async,during_commit_txn,ALL_ACKED,40/40,0,txn=0/10 marker=committed COMMITTED_NOT_DURABLE_ASYNC
+PH3D-CRASH-002,async,after_compact,PREFIX,35/40,0,txn=0/10 marker= ABSENT
+PH3D-CRASH-003,sync,after_acks,ALL_ACKED,40/40,0,txn=0/10 marker= ABSENT
+PH3D-CRASH-003,sync,after_flush,ALL_ACKED,40/40,0,txn=0/10 marker= ABSENT
+PH3D-CRASH-003,sync,after_checkpoint,ALL_ACKED,40/40,0,txn=0/10 marker= ABSENT
+PH3D-CRASH-003,sync,mid_inserts,ALL_ACKED,21/21,0,txn=0/10 marker= ABSENT
+PH3D-CRASH-003,sync,mid_flush,ALL_ACKED,40/40,0,txn=0/10 marker= ABSENT
+PH3D-CRASH-003,sync,during_commit_txn,ALL_ACKED,40/40,0,txn=10/10 marker=committed COMMITTED_DURABLE
+PH3D-CRASH-003,sync,after_compact,ALL_ACKED,40/40,0,txn=0/10 marker= ABSENT

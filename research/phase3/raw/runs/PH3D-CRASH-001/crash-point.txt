@@ -1,0 +1,8 @@
+durability=group
+after_acks,ALL_ACKED,40/40,txn=0/10 marker= ABSENT
+after_flush,ALL_ACKED,40/40,txn=0/10 marker= ABSENT
+after_checkpoint,ALL_ACKED,40/40,txn=0/10 marker= ABSENT
+mid_inserts,ALL_ACKED,21/21,txn=0/10 marker= ABSENT
+mid_flush,ALL_ACKED,40/40,txn=0/10 marker= ABSENT
+during_commit_txn,ALL_ACKED,40/40,txn=10/10 marker=committed COMMITTED_DURABLE
+after_compact,ALL_ACKED,40/40,txn=0/10 marker= ABSENT

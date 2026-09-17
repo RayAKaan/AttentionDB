@@ -1,0 +1,9 @@
+{
+  "modes": {
+    "truncate_torn": {"outcome": "OPENED", "n_docs": 23, "checker_clean": true, "note": "torn tail truncated; intact 23-doc prefix recovered; sidecar says 40 acked (driver surgery removed the rest of the WAL bytes)"},
+    "garbage_tail": {"outcome": "ERROR_ON_OPEN", "note": "appended garbage bytes -> frame parse fails -> open refuses"},
+    "flip_byte": {"outcome": "ERROR_ON_OPEN", "note": "CRC/format failure at byte 25 -> open refuses"},
+    "delete_segment": {"outcome": "OPENED", "n_docs": 0, "checker_clean": true, "note": "only segment removed before any checkpoint -> opens as empty DB; structurally undetectable (no WAL high-water mark in catalog) — documented OPEN limitation"},
+    "duplicate_segment_gap": {"outcome": "ERROR_ON_OPEN", "note": "segment continuity check: name says seq 999, first record seq 1 -> corruption error"}
+  }
+}

@@ -417,6 +417,17 @@ impl AttentionEngine {
             tracing::warn!("WAL had a torn tail (crash during append); tail was truncated — data after the last valid record was not acknowledged");
         }
 
+        // ---- 4b. WAL-integrity invariant (Phase 3E E1) -----------------------
+        // A durable watermark record anchors how far the WAL had advanced and
+        // which segment is the active one. If required history is missing, the
+        // database must refuse to open — never masquerade as fresh/trimmed.
+        enforce_wal_integrity(
+            &wal_dir,
+            catalog.checkpoint_seq,
+            outcome.first_seq,
+            outcome.last_seq,
+        )?;
+
         let engine = Self {
             collections: Arc::new(RwLock::new(HashMap::new())),
             document_store: Arc::new(RwLock::new(document_store)),
@@ -2072,6 +2083,94 @@ fn cleanup_old_manifests(db_dir: &Path) -> Result<(), CoreError> {
     Ok(())
 }
 
+/// Phase 3E E1: WAL-integrity invariant enforced at open.
+///
+/// `checkpoint_seq` — manifest coverage; `first_seq`/`last_seq` — replay
+/// outcome (first_seq == 0 ⇔ no records). Refuses (CoreError) when required
+/// WAL history is missing; never silently opens as a smaller valid database.
+fn enforce_wal_integrity(
+    wal_dir: &std::path::Path,
+    checkpoint_seq: u64,
+    first_seq: u64,
+    last_seq: u64,
+) -> Result<(), CoreError> {
+    let ws = attentiondb_storage::read_wal_state(wal_dir)
+        .map_err(|e| CoreError::RecoveryFailed(format!("WAL integrity record unreadable: {e}")))?;
+    let Some(ws) = ws else {
+        // Legacy (pre-adoption) or brand-new database: the invariant is not yet
+        // authoritative. The checker-side gap heuristic still applies. Documented
+        // migration boundary — the record appears at the first segment creation.
+        return Ok(());
+    };
+
+    let wal_files = || -> usize {
+        std::fs::read_dir(wal_dir)
+            .map(|d| {
+                d.flatten()
+                    .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("wal"))
+                    .count()
+            })
+            .unwrap_or(0)
+    };
+
+    // (1) The recorded active segment must still exist (or a newer one — a
+    // crash between checkpoint-manifest install and the rotation's state write
+    // leaves a stale active_start pointing at a legitimately trimmed segment).
+    if !wal_dir.join(format!("{:020}.wal", ws.active_start)).exists() {
+        let newer = std::fs::read_dir(wal_dir)
+            .map(|d| {
+                d.flatten().any(|e| {
+                    e.path()
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .and_then(|s| s.parse::<u64>().ok())
+                        .map(|n| n > ws.active_start)
+                        .unwrap_or(false)
+                })
+            })
+            .unwrap_or(false);
+        if !newer {
+            return Err(CoreError::RecoveryFailed(format!(
+                "WAL_LOST_SEGMENT: the active WAL segment (start seq {}) recorded by the durable watermark is missing — WAL history was deleted or renamed; refusing to open (checkpoint_seq={})",
+                ws.active_start, checkpoint_seq
+            )));
+        }
+    }
+
+    // (2) A watermark record implies at least one segment file must exist.
+    if wal_files() == 0 {
+        return Err(CoreError::RecoveryFailed(format!(
+            "WAL_LOST_SEGMENT: a durable WAL watermark exists (high_watermark={}, active_start={}) but no WAL segments remain — WAL history was deleted; refusing to open",
+            ws.high_watermark, ws.active_start
+        )));
+    }
+
+    // (3) Required history: everything above the checkpoint must still be there.
+    //     W > checkpoint_seq means completed segments above the checkpoint were
+    //     durably recorded; losing them loses acknowledged mutations.
+    let w = ws.high_watermark.max(checkpoint_seq);
+    if w > checkpoint_seq && (first_seq == 0 || last_seq < w) {
+        return Err(CoreError::RecoveryFailed(format!(
+            "WAL_LOST_SEGMENT: WAL covers seqs {}..{} but the durable watermark is {} (checkpoint_seq={}) — required WAL history above the checkpoint is missing; refusing to open",
+            first_seq, last_seq, ws.high_watermark, checkpoint_seq
+        )));
+    }
+
+    // (4) Uncovered gap between the checkpoint and the oldest surviving record
+    //     (mirrors the checker; enforced here so open itself refuses).
+    if first_seq != 0 && first_seq > checkpoint_seq + 1 {
+        return Err(CoreError::RecoveryFailed(format!(
+            "WAL_SEQ_GAP: oldest WAL record has seq {} but the checkpoint covers through {} — seqs {}..{} are missing; refusing to open",
+            first_seq,
+            checkpoint_seq,
+            checkpoint_seq + 1,
+            first_seq - 1
+        )));
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2466,5 +2565,157 @@ mod tests {
             e.insert_document("c", rec(1, 4)),
             Err(CoreError::Unavailable(_))
         ));
+    }
+
+    // ---------- Phase 3E E1: WAL-integrity invariant ----------
+
+    fn e1_rec(i: usize, dim: usize) -> Record {
+        one_hot_rec(i, dim)
+    }
+
+    fn e1_build(dir: &std::path::Path, n: usize, dim: usize, checkpoint: bool) {
+        let e = AttentionEngine::open_dir(dir, Durability::Sync).unwrap();
+        e.create_collection("papers", dim, &["default"]).unwrap();
+        for i in 0..n {
+            e.insert_document("papers", e1_rec(i, dim)).unwrap();
+        }
+        if checkpoint {
+            e.close().unwrap();
+        }
+        // explicit drop otherwise: segments remain on disk (Sync fsync per append)
+    }
+
+    fn e1_wal_dir(dir: &std::path::Path) -> std::path::PathBuf {
+        dir.join("WAL")
+    }
+
+    fn e1_first_segment(dir: &std::path::Path) -> std::path::PathBuf {
+        let mut segs: Vec<_> = std::fs::read_dir(e1_wal_dir(dir))
+            .unwrap()
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("wal"))
+            .collect();
+        segs.sort();
+        segs.into_iter().next().unwrap()
+    }
+
+    fn e1_open_err_contains(dir: &std::path::Path, needle: &str) -> bool {
+        match AttentionEngine::open_dir(dir, Durability::Sync) {
+            Err(e) => format!("{e}").contains(needle),
+            Ok(_) => false,
+        }
+    }
+
+    #[test]
+    fn wal_integrity_delete_required_segment_refuses() {
+        // THE E1 hole: deleting the only pre-checkpoint segment used to open
+        // as a valid empty database. It must now refuse.
+        let dir = tmp();
+        e1_build(dir.path(), 20, 16, false);
+        assert!(e1_wal_dir(dir.path()).join("wal-state.json").exists());
+        std::fs::remove_file(e1_first_segment(dir.path())).unwrap();
+        assert!(e1_open_err_contains(dir.path(), "WAL_LOST_SEGMENT"));
+    }
+
+    #[test]
+    fn wal_integrity_delete_active_after_checkpoint_refuses() {
+        let dir = tmp();
+        e1_build(dir.path(), 20, 16, true); // close() checkpoints + trims
+        // the trimmed state keeps the post-checkpoint active segment; deleting
+        // every segment must refuse
+        for seg in std::fs::read_dir(e1_wal_dir(dir.path())).unwrap().flatten() {
+            let p = seg.path();
+            if p.extension().and_then(|s| s.to_str()) == Some("wal") {
+                std::fs::remove_file(&p).unwrap();
+            }
+        }
+        assert!(e1_open_err_contains(dir.path(), "WAL_LOST_SEGMENT"));
+    }
+
+    #[test]
+    fn wal_integrity_rename_segment_refuses() {
+        // rename the only segment to a gap position: the first record's seq no
+        // longer matches the segment name (replay corruption) OR the watermark
+        // anchor goes missing — either way the open must refuse.
+        let dir = tmp();
+        e1_build(dir.path(), 20, 16, false);
+        let seg = e1_first_segment(dir.path());
+        std::fs::rename(&seg, e1_wal_dir(dir.path()).join("00000000000000001000.wal")).unwrap();
+        let refused = e1_open_err_contains(dir.path(), "WAL_LOST_SEGMENT")
+            || e1_open_err_contains(dir.path(), "WAL replay failed");
+        assert!(refused);
+    }
+
+    #[test]
+    fn wal_integrity_corrupt_wal_state_record_refuses() {
+        let dir = tmp();
+        e1_build(dir.path(), 20, 16, false);
+        std::fs::write(e1_wal_dir(dir.path()).join("wal-state.json"), b"{ not json").unwrap();
+        assert!(e1_open_err_contains(dir.path(), "WAL integrity record unreadable"));
+    }
+
+    #[test]
+    fn wal_integrity_truncated_tail_still_recovers_prefix() {
+        // torn tail stays a WARNING + intact prefix (pre-E1 behavior preserved)
+        let dir = tmp();
+        e1_build(dir.path(), 40, 16, false);
+        let seg = e1_first_segment(dir.path());
+        let bytes = std::fs::read(&seg).unwrap();
+        std::fs::write(&seg, &bytes[..bytes.len() * 3 / 5]).unwrap();
+        let e = AttentionEngine::open_dir(dir.path(), Durability::Sync).unwrap();
+        let n = e.document_store.read().list_all_records().len();
+        assert!(n > 0 && n < 40, "expected intact prefix, got {n}");
+    }
+
+    #[test]
+    fn wal_integrity_corrupt_frame_refuses() {
+        let dir = tmp();
+        e1_build(dir.path(), 40, 16, false);
+        let seg = e1_first_segment(dir.path());
+        let mut bytes = std::fs::read(&seg).unwrap();
+        bytes[40] ^= 0xFF;
+        std::fs::write(&seg, &bytes).unwrap();
+        assert!(e1_open_err_contains(dir.path(), "WAL replay failed"));
+    }
+
+    #[test]
+    fn wal_integrity_legacy_db_without_watermark_opens() {
+        // pre-adoption databases carry no watermark record: they open with
+        // pre-E1 semantics (documented migration boundary)
+        let dir = tmp();
+        e1_build(dir.path(), 20, 16, true);
+        std::fs::remove_file(e1_wal_dir(dir.path()).join("wal-state.json")).unwrap();
+        let e = AttentionEngine::open_dir(dir.path(), Durability::Sync).unwrap();
+        assert_eq!(e.document_store.read().list_all_records().len(), 20);
+    }
+
+    #[test]
+    fn wal_integrity_trimmed_and_fresh_states_open() {
+        // no false positives: (a) a legitimately checkpoint-trimmed DB and
+        // (b) a brand-new empty DB both open cleanly
+        let dir = tmp();
+        e1_build(dir.path(), 15, 16, true);
+        {
+            let e = AttentionEngine::open_dir(dir.path(), Durability::Sync).unwrap();
+            assert_eq!(e.document_store.read().list_all_records().len(), 15);
+        }
+        let fresh = tmp();
+        {
+            let e = AttentionEngine::open_dir(fresh.path(), Durability::Sync).unwrap();
+            e.create_collection("x", 8, &["default"]).unwrap();
+        }
+        AttentionEngine::open_dir(fresh.path(), Durability::Sync).unwrap();
+    }
+
+    #[test]
+    fn wal_integrity_repeated_restart_stable() {
+        let dir = tmp();
+        e1_build(dir.path(), 12, 16, true);
+        for _ in 0..4 {
+            let e = AttentionEngine::open_dir(dir.path(), Durability::Sync).unwrap();
+            assert_eq!(e.document_store.read().list_all_records().len(), 12);
+            e.close().unwrap();
+        }
     }
 }

@@ -1,0 +1,1 @@
+{"probe": "compact_all invoked while an idle engine holds the dir open; no cleanup performed"}

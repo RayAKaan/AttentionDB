@@ -1,0 +1,1818 @@
+//! PH3D `dbtest` — production-database validation harness (Phase 3D spec).
+//!
+//! Subcommands (all operate on ISOLATED database dirs; every run ends with
+//! the consistency checker as a mandatory gate, §32):
+//!   model    — §33 state-machine test vs a reference model (mutations,
+//!              filters, restart, compaction, ID mapping, checker gate)
+//!   filterx  — §4–§6 dedicated filter correctness suite
+//!   txn      — §18–§21 transaction atomicity/rollback scenarios
+//!   crashchild — child process for §15/§16: performs N acked mutations then
+//!              crashes at a controlled point (exit / park-for-SIGKILL)
+//!   verify   — reopen a crashed DB, derive expected state from the ack
+//!              sidecar, compare + consistency-check (§17 matrix row)
+//!   walcorrupt — §14: reopen a DB whose WAL was corrupted (driver does the
+//!              file surgery; this binary only reports open behavior)
+//!   concur   — §22–§24 concurrent readers / mixed read-write workload
+//!   backup   — §28–§31 backup/restore + quiescence requirement
+use std::collections::{BTreeMap, HashMap};
+use std::fmt::Write as _;
+use std::io::Write as _;
+use std::sync::Arc;
+
+use attentiondb_core::checker::check_engine;
+use attentiondb_core::engine::AttentionEngine;
+use attentiondb_query::filter::{FilterExpr, FilterOp, FilterValue};
+use attentiondb_storage::{compaction, Durability, Record};
+
+const DIM: usize = 32;
+const HEAD: &str = "h";
+const N_DOCS: usize = 200;
+
+// ---------------------------------------------------------------- utils
+
+pub fn dur_from_env() -> Durability {
+    match std::env::var("PH3D_DURABILITY").as_deref() {
+        Ok("sync") => Durability::Sync,
+        Ok("group") => Durability::GroupCommit,
+        _ => Durability::Async,
+    }
+}
+
+fn open_db(dir: &std::path::Path) -> AttentionEngine {
+    AttentionEngine::open_dir(dir, dur_from_env()).unwrap()
+}
+
+fn vec_for(idx: u32) -> Vec<f32> {
+    // deterministic unit vector per logical id
+    let mut v: Vec<f32> = vec![0.0; DIM];
+    let mut h = 0x811C9DC5u32;
+    for b in idx.to_le_bytes() {
+        h ^= b as u32;
+        h = h.wrapping_mul(0x01000193);
+    }
+    v[(h as usize) % DIM] = 1.0;
+    v[((h >> 8) as usize) % DIM] = 0.5;
+    let n: f32 = v.iter().map(|x| x * x).sum::<f32>().sqrt();
+    v.iter().map(|x| x / n).collect()
+}
+
+fn doc_record(idx: u32, version: u64, cat: &str, num: i64) -> Record {
+    let mut fields = HashMap::new();
+    fields.insert("idx".to_string(), serde_json::json!(idx));
+    fields.insert("version".to_string(), serde_json::json!(version));
+    fields.insert("cat".to_string(), serde_json::json!(cat));
+    fields.insert("num".to_string(), serde_json::json!(num));
+    fields.insert("title".to_string(), serde_json::json!(format!("doc-{idx}-v{version}")));
+    let mut r = Record::new(fields);
+    r.id = uuid_for(idx, version);
+    r.k_vecs.insert(HEAD.to_string(), vec_for(idx));
+    r
+}
+
+fn uuid_for(idx: u32, version: u64) -> uuid::Uuid {
+    uuid::Uuid::from_u128(((idx as u128) << 64) | (version as u128))
+}
+
+/// Collection-namespaced uuid: uuid identity is GLOBAL across collections in
+/// the engine (collections are membership tags), so multi-collection probes
+/// MUST namespace their logical ids or they re-member each other's documents.
+fn uuidc(coll: u32, idx: u32, version: u64) -> uuid::Uuid {
+    uuid::Uuid::from_u128(((coll as u128) << 96) | ((idx as u128) << 64) | (version as u128))
+}
+
+fn doc_record_c(coll: u32, idx: u32, version: u64, cat: &str, num: i64) -> Record {
+    let mut r = doc_record(idx, version, cat, num);
+    r.id = uuidc(coll, idx, version);
+    r
+}
+
+/// logical id -> (version, cat, num) — the reference model state
+type Model = BTreeMap<u32, (u64, String, i64)>;
+
+/// Export observed logical state: idx -> (version, cat, num) from the store,
+/// plus per-idx numeric-id presence and retrievability through attend.
+fn export_state(e: &AttentionEngine) -> (Model, Vec<String>) {
+    export_state_coll(e, "bench")
+}
+
+/// Collection-scoped variant (membership tag defines the collection).
+fn export_state_coll(e: &AttentionEngine, coll: &str) -> (Model, Vec<String>) {
+    let mut model = Model::new();
+    let mut issues = Vec::new();
+    let store = e.document_store.read();
+    let tag = format!("collection:{coll}");
+    for rec in store.list_all_records() {
+        // document store is global across collections; only members of `coll`
+        // (membership tag) belong in the compared state
+        if !rec.tags.contains(&tag) {
+            continue;
+        }
+        let idx = rec.fields.get("idx").and_then(|v| v.as_u64()).unwrap_or(u64::MAX) as u32;
+        let version = rec.fields.get("version").and_then(|v| v.as_u64()).unwrap_or(0);
+        let cat = rec.fields.get("cat").and_then(|v| v.as_str()).unwrap_or("?").to_string();
+        let num = rec.fields.get("num").and_then(|v| v.as_i64()).unwrap_or(0);
+        if model.insert(idx, (version, cat, num)).is_some() {
+            issues.push(format!("duplicate logical id {idx} in store"));
+        }
+    }
+    (model, issues)
+}
+
+fn topk_observed(e: &AttentionEngine, qidx: u32, k: usize) -> Vec<u32> {
+    let q = vec_for(qidx);
+    let got = e.attend("bench", &[HEAD.to_string()], &q, k).unwrap();
+    got.iter()
+        .map(|(id, _)| {
+            let store = e.document_store.read();
+            store
+                .list_all_records()
+                .into_iter()
+                .find(|r| e.id_mapper.read().uuid_to_id(&r.id) == Some(*id))
+                .and_then(|r| r.fields.get("idx").and_then(|v| v.as_u64()))
+                .unwrap_or(u64::MAX) as u32
+        })
+        .collect()
+}
+
+fn filtered_observed(e: &AttentionEngine, f: &FilterExpr, qidx: u32, k: usize) -> Vec<u32> {
+    let q = vec_for(qidx);
+    let got = e.attend_filtered("bench", &[HEAD.to_string()], &q, k, Some(f)).unwrap();
+    let store = e.document_store.read();
+    got.iter()
+        .map(|(id, _)| {
+            store
+                .list_all_records()
+                .into_iter()
+                .find(|r| e.id_mapper.read().uuid_to_id(&r.id) == Some(*id))
+                .and_then(|r| r.fields.get("idx").and_then(|v| v.as_u64()))
+                .unwrap_or(u64::MAX) as u32
+        })
+        .collect()
+}
+
+fn issue_lines(issues: &[attentiondb_core::checker::CheckIssue]) -> (Vec<String>, Vec<String>) {
+    let mut errors = Vec::new();
+    let mut warnings = Vec::new();
+    for i in issues {
+        let line = format!("{:?} {}: {}", i.severity, i.code, i.detail);
+        if matches!(i.severity, attentiondb_core::checker::Severity::Error) {
+            errors.push(line);
+        } else {
+            warnings.push(line);
+        }
+    }
+    (errors, warnings)
+}
+
+/// Gate semantics: `clean` = zero ERROR-severity issues (engine or dir level).
+/// WARNING-severity issues (e.g. INDEX_RETIRED_VECTOR: retired vectors awaiting
+/// purge — the documented lazy-tombstone behavior) are reported but non-fatal.
+fn checker_report(e: &AttentionEngine, dir: &std::path::Path) -> serde_json::Value {
+    let issues = check_engine(e);
+    let dir_issues = attentiondb_core::checker::check_db_dir(dir).unwrap_or_default();
+    let (e_err, e_warn) = issue_lines(&issues);
+    let (d_err, d_warn) = issue_lines(&dir_issues);
+    serde_json::json!({
+        "engine_errors": e_err,
+        "engine_warnings": e_warn,
+        "dir_errors": d_err,
+        "dir_warnings": d_warn,
+        "warning_count": e_warn.len() + d_warn.len(),
+        "clean": e_err.is_empty() && d_err.is_empty(),
+    })
+}
+
+fn write_json(path: &str, v: &serde_json::Value) {
+    std::fs::write(path, serde_json::to_string_pretty(v).unwrap()).unwrap();
+}
+
+// ---------------------------------------------------------------- model
+
+/// §33 model-based suite. Deterministic per seed. Returns a summary string.
+fn run_model(dir: &std::path::Path, seed: u64, n_ops: usize, out: &str) -> String {
+    let _ = std::fs::remove_dir_all(dir);
+    std::fs::create_dir_all(dir).unwrap();
+    let mut model: Model = BTreeMap::new();
+    let mut log = String::from("opno,op,idx,detail\n");
+    let mut checks = Vec::new(); // (family, ok, detail)
+
+    let mut e = open_db(dir);
+    e.create_collection("bench", DIM, &[HEAD]).unwrap();
+    // second collection for §31 isolation
+    e.create_collection("other", DIM, &[HEAD]).unwrap();
+
+    let mut det = Det::new(seed);
+    let next_new = N_DOCS as u32;
+    // initial population
+    for idx in 0..N_DOCS as u32 {
+        let cat = ["news", "sport", "tech", "finance"][idx as usize % 4];
+        let num = (idx as i64) * 10;
+        let r = doc_record(idx, 1, cat, num);
+        e.insert_document("bench", r).unwrap();
+        model.insert(idx, (1, cat.to_string(), num));
+    }
+    e.flush_wal().unwrap();
+    checks.push(("initial_build_checker", {
+        let rep = checker_report(&e, dir);
+        write_json(&format!("{out}/consistency-initial.json"), &rep);
+        rep["clean"].as_bool().unwrap_or(false)
+    }, "checker after build".into()));
+
+    // isolation: write a doc into "other" and ensure it never leaks into "bench"
+    {
+        let r = doc_record(9999, 1, "news", 1);
+        e.insert_document("other", r).unwrap();
+        let got = e.attend("bench", &[HEAD.to_string()], &vec_for(9999), 5).unwrap();
+        let leaked = got.iter().any(|(id, _)| {
+            e.id_mapper.read().uuid_to_id(&uuid_for(9999, 1)) == Some(*id)
+        });
+        checks.push(("collection_isolation", !leaked, "other-collection doc absent from bench queries".into()));
+    }
+
+    let cats = ["news", "sport", "tech", "finance"];
+    let mut filter_fail = 0usize;
+    let mut filter_tests = 0usize;
+    for opno in 0..n_ops {
+        let roll = det.next_u64() % 100;
+        let idx = (det.next_u64() % (next_new as u64 + 4)) as u32;
+        let op = if roll < 30 || idx >= next_new {
+            "insert_or_upsert"
+        } else if roll < 50 {
+            "update"
+        } else if roll < 65 {
+            "delete"
+        } else if roll < 80 {
+            "query"
+        } else if roll < 92 {
+            "filter"
+        } else if roll < 95 {
+            "checkpoint"
+        } else if roll < 98 {
+            "compact"
+        } else {
+            "restart"
+        };
+        match op {
+            "insert_or_upsert" => {
+                let exists = model.contains_key(&idx);
+                let version = if exists { model[&idx].0 + 1 } else { 1 };
+                let cat = cats[(det.next_u64() % 4) as usize];
+                let num = (det.next_u64() % 2000) as i64;
+                let r = doc_record(idx, version, cat, num);
+                if exists {
+                    // engine identity note: update_document preserves the uuid the
+                    // document was inserted under (uuid_for(idx,1)); only fields/
+                    // vectors/internal version change (engine bumps record.version).
+                    e.update_document("bench", &uuid_for(idx, 1).to_string(),
+                                      r.fields.clone(), r.k_vecs.clone()).unwrap();
+                } else {
+                    e.insert_document("bench", r.clone()).unwrap();
+                }
+                model.insert(idx, (version, cat.to_string(), num));
+                let _ = writeln!(log, "{opno},upsert,{idx},v{version}");
+            }
+            "update" => {
+                if model.contains_key(&idx) {
+                    let version = model[&idx].0 + 1;
+                    let cat = cats[(det.next_u64() % 4) as usize];
+                    let num = (det.next_u64() % 2000) as i64;
+                    let r = doc_record(idx, version, cat, num);
+                    e.update_document("bench", &uuid_for(idx, 1).to_string(),
+                                      r.fields.clone(), r.k_vecs.clone()).unwrap();
+                    model.insert(idx, (version, cat.to_string(), num));
+                    let _ = writeln!(log, "{opno},update,{idx},v{version}");
+                }
+            }
+            "delete" => {
+                if model.contains_key(&idx) && idx != 0 {
+                    e.delete_document("bench", &uuid_for(idx, 1).to_string()).unwrap();
+                    model.remove(&idx);
+                    let _ = writeln!(log, "{opno},delete,{idx},");
+                    // deleted doc must vanish from retrieval immediately (§9)
+                    let got = topk_observed(&e, idx, 300);
+                    if got.contains(&idx) {
+                        checks.push(("delete_immediate", false, format!("idx {idx} returned after delete")));
+                    }
+                }
+            }
+            "query" => {
+                let got = topk_observed(&e, idx, 20);
+                // invariant: only LIVE docs returned (INV-1); ordering deterministic
+                let mut rerun = topk_observed(&e, idx, 20);
+                if got.iter().any(|i| !model.contains_key(i)) {
+                    checks.push(("inv_live_only", false, format!("dead doc in topk at op {opno}")));
+                }
+                if got != rerun {
+                    rerun = topk_observed(&e, idx, 20);
+                    if got != rerun {
+                        checks.push(("query_determinism", false, format!("nondeterministic topk at op {opno}")));
+                    }
+                }
+                let _ = writeln!(log, "{opno},query,{idx},k20");
+            }
+            "filter" => {
+                filter_tests += 1;
+                let which = det.next_u64() % 4;
+                let (f, eligible): (FilterExpr, Vec<u32>) = match which {
+                    0 => (eqf("cat", "sport"), model.iter().filter(|(_, (_, c, _))| c == "sport").map(|(k, _)| *k).collect()),
+                    1 => (cmpf("num", FilterOp::Gte, FilterValue::Int(1000)),
+                          model.iter().filter(|(_, (_, _, n))| *n >= 1000).map(|(k, _)| *k).collect()),
+                    2 => (andf(eqf("cat", "news"), cmpf("num", FilterOp::Lt, FilterValue::Int(100))),
+                          model.iter().filter(|(_, (_, c, n))| c == "news" && *n < 100).map(|(k, _)| *k).collect()),
+                    _ => (eqf("cat", "no-such-cat"), vec![]), // zero-match
+                };
+                let got = filtered_observed(&e, &f, idx, 50);
+                // INV-8: no excluded doc ever returned
+                let leaked = got.iter().any(|i| !eligible.contains(i));
+                if leaked {
+                    filter_fail += 1;
+                    checks.push(("inv_filter_leak", false, format!("filter returned excluded docs at op {opno}: {got:?}")));
+                }
+                // zero-match must be empty
+                if matches!(which, 3) && !got.is_empty() {
+                    filter_fail += 1;
+                    checks.push(("filter_zero_match", false, "zero-match filter returned rows".into()));
+                }
+                // determinism
+                if got != filtered_observed(&e, &f, idx, 50) {
+                    filter_fail += 1;
+                    checks.push(("filter_determinism", false, format!("op {opno}")));
+                }
+                let _ = writeln!(log, "{opno},filter,{idx},w{which}");
+            }
+            "checkpoint" => {
+                e.flush_wal().unwrap();
+                e.checkpoint().unwrap();
+                let _ = writeln!(log, "{opno},checkpoint,,");
+            }
+            "compact" => {
+                // compaction is a dir-level (offline) operation: close → compact → reopen
+                drop(e);
+                let res = compaction::compact_all(dir).unwrap();
+                if let Some(r) = &res {
+                    let _ = compaction::cleanup_merged_files(r);
+                }
+                e = open_db(dir);
+                // post-compact equivalence + deleted stay deleted (§26)
+                let (obs, iss) = export_state(&e);
+                if obs != model {
+                    checks.push(("compact_equivalence", false, format!("model drift after compact at op {opno}")));
+                }
+                if !iss.is_empty() {
+                    checks.push(("compact_store_unique", false, iss.join(";")));
+                }
+                let rep = checker_report(&e, dir);
+                write_json(&format!("{out}/consistency-compact-{opno}.json"), &rep);
+                if !rep["clean"].as_bool().unwrap_or(false) {
+                    checks.push(("compact_checker", false, format!("{:?}", rep)));
+                }
+                let _ = writeln!(log, "{opno},compact,,");
+            }
+            _ => {
+                drop(e);
+                e = open_db(dir);
+                let (obs, _) = export_state(&e);
+                if obs != model {
+                    checks.push(("restart_equivalence", false, format!("model drift after restart at op {opno}")));
+                }
+                let _ = writeln!(log, "{opno},restart,,");
+            }
+        }
+        if checks.iter().any(|c| !c.1) && checks.len() > 400 {
+            break; // bounded failure collection
+        }
+    }
+
+    // final: full-state comparison + deleted-not-resurrected + checker
+    drop(e);
+    let res = compaction::compact_all(dir).unwrap();
+    if let Some(r) = &res {
+        let _ = compaction::cleanup_merged_files(r);
+    }
+    let e = open_db(dir);
+    let (obs, iss) = export_state(&e);
+    checks.push(("final_state_equivalence", obs == model, format!("model={} observed={}", model.len(), obs.len())));
+    checks.push(("final_store_unique", iss.is_empty(), iss.join(";")));
+    // every live doc retrievable; every dead doc absent (INV-1/2)
+    let mut dead_hits = 0usize;
+    for idx in 0..next_new {
+        if model.contains_key(&idx) { continue; }
+        if topk_observed(&e, idx, 400).contains(&idx) { dead_hits += 1; }
+    }
+    checks.push(("final_dead_not_retrievable", dead_hits == 0, format!("{dead_hits} dead docs retrieved")));
+    let rep = checker_report(&e, dir);
+    write_json(&format!("{out}/consistency-final.json"), &rep);
+    checks.push(("final_checker", rep["clean"].as_bool().unwrap_or(false), format!("{:?}", rep)));
+
+    let (pass, fail) = checks.iter().fold((0usize, 0usize), |(p, f), c| if c.1 { (p + 1, f) } else { (p, f + 1) });
+    let mut csv = String::from("family,ok,detail\n");
+    for (fam, ok, detail) in &checks {
+        if !*ok {
+            let _ = writeln!(csv, "{fam},false,\"{}\"", detail.replace('"', "'"));
+        }
+    }
+    for (fam, ok, _) in &checks {
+        if *ok {
+            let _ = writeln!(csv, "{fam},true,");
+        }
+    }
+    std::fs::write(format!("{out}/results.csv"), &csv).unwrap();
+    std::fs::write(format!("{out}/operation-log.jsonl"), {
+        let mut j = String::new();
+        for line in log.lines().skip(1) {
+            let p: Vec<&str> = line.splitn(4, ',').collect();
+            let _ = writeln!(j, "{}", serde_json::json!({"opno": p[0], "op": p[1], "idx": p[2], "detail": p.get(3).unwrap_or(&"")}));
+        }
+        j
+    }).unwrap();
+    let exp: serde_json::Value = model.iter().map(|(k, (v, c, n))|
+        (k.to_string(), serde_json::json!({"version": v, "cat": c, "num": n}))).collect::<serde_json::Map<_, _>>().into();
+    write_json(&format!("{out}/expected-state.json"), &exp);
+    let obsj: serde_json::Value = obs.iter().map(|(k, (v, c, n))|
+        (k.to_string(), serde_json::json!({"version": v, "cat": c, "num": n}))).collect::<serde_json::Map<_, _>>().into();
+    write_json(&format!("{out}/observed-state.json"), &obsj);
+    let mjson: serde_json::Value = serde_json::json!({
+        "seed": seed, "ops": n_ops, "checks_total": checks.len(),
+        "checks_failed": fail, "filter_tests": filter_tests, "filter_failures": filter_fail,
+    });
+    write_json(&format!("{out}/metrics.json"), &mjson);
+    let _ = std::fs::remove_dir_all(dir);
+    format!("model seed={seed} ops={n_ops}: {pass} passed, {fail} FAILED (filter {filter_fail}/{filter_tests})")
+}
+
+pub struct Det(u64);
+impl Det {
+    pub fn new(seed: u64) -> Self { Det(seed | 1) }
+    pub fn next_u64(&mut self) -> u64 {
+        // splitmix64
+        self.0 = self.0.wrapping_add(0x9E3779B97F4A7C15);
+        let mut z = self.0;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D049BB133111EB);
+        z ^ (z >> 31)
+    }
+}
+
+// filters
+fn eqf(field: &str, v: &str) -> FilterExpr {
+    FilterExpr::Comparison { field: field.into(), op: FilterOp::Eq, value: FilterValue::Str(v.into()) }
+}
+fn cmpf(field: &str, op: FilterOp, v: FilterValue) -> FilterExpr {
+    FilterExpr::Comparison { field: field.into(), op, value: v }
+}
+fn andf(a: FilterExpr, b: FilterExpr) -> FilterExpr {
+    FilterExpr::And(Box::new(a), Box::new(b))
+}
+
+// ---------------------------------------------------------------- filterx
+
+/// §4–§6 focused filter suite: lifecycle × filters × restart/flush/compact.
+fn run_filterx(dir: &std::path::Path, out: &str) -> String {
+    let _ = std::fs::remove_dir_all(dir);
+    std::fs::create_dir_all(dir).unwrap();
+    let e = open_db(dir);
+    e.create_collection("bench", DIM, &[HEAD]).unwrap();
+    let mut checks = Vec::new();
+    // corpus: cat ∈ {a,b}, num = idx; 120 docs
+    for idx in 0..120u32 {
+        let cat = if idx % 2 == 0 { "a" } else { "b" };
+        e.insert_document("bench", doc_record(idx, 1, cat, idx as i64)).unwrap();
+    }
+    e.flush_wal().unwrap();
+
+    let mut filter_recalls: Vec<(String, f64)> = Vec::new();
+    let expect_filtered = |e: &AttentionEngine, f: &FilterExpr, want: Vec<u32>, name: &str, checks: &mut Vec<(String, bool, String)>, recalls: &mut Vec<(String, f64)>| {
+        let got = filtered_observed(e, f, 7, 500);
+        let got_set: std::collections::HashSet<u32> = got.iter().copied().collect();
+        let want_set: std::collections::HashSet<u32> = want.iter().copied().collect();
+        // SOUNDNESS: every RETURNED doc satisfies the filter (the guarantee)
+        let sound = got.iter().all(|g| want_set.contains(g));
+        // DETERMINISM: same query twice -> identical result
+        let det = got == filtered_observed(e, f, 7, 500);
+        let mut want_sorted = want.clone();
+        want_sorted.sort();
+        // RECALL (metric, not assertion): completeness is candidate-bound
+        let hit = want.iter().filter(|w| got_set.contains(w)).count();
+        let recall = if want.is_empty() { 1.0 } else { hit as f64 / want.len() as f64 };
+        recalls.push((name.to_string(), recall));
+        checks.push((name.to_string(), sound && det,
+            if sound && det { format!("recall {recall:.3}") } else { format!("sound={sound} det={det} recall {recall:.3} want {want_sorted:?} got {got:?}") }));
+    };
+
+    // 1) basic filters
+    expect_filtered(&e, &eqf("cat", "a"), (0..120).filter(|i| i % 2 == 0).collect(), "filter_eq_all", &mut checks, &mut filter_recalls);
+    expect_filtered(&e, &cmpf("num", FilterOp::Gt, FilterValue::Int(100)), (101..120).collect(), "filter_selective", &mut checks, &mut filter_recalls);
+    expect_filtered(&e, &cmpf("num", FilterOp::Gt, FilterValue::Int(10_000)), vec![], "filter_zero_match", &mut checks, &mut filter_recalls);
+    expect_filtered(&e, &andf(eqf("cat", "b"), cmpf("num", FilterOp::Lte, FilterValue::Int(20))),
+                    (1..=19).filter(|i| i % 2 == 1).collect(), "filter_and", &mut checks, &mut filter_recalls);
+    // filter + top-k: restricted K still filter-clean
+    {
+        let got = filtered_observed(&e, &eqf("cat", "a"), 1, 7);
+        checks.push(("filter_topk_clean".into(), got.iter().all(|i| i % 2 == 0) && got.len() <= 7, format!("{got:?}")));
+    }
+
+    // 2) filter × mutation lifecycle (§5)
+    // insert matching
+    e.insert_document("bench", doc_record(200, 1, "a", 5)).unwrap();
+    expect_filtered(&e, &eqf("cat", "a"), (0..120).filter(|i| i % 2 == 0).chain([200]).collect(), "fm_insert_matching", &mut checks, &mut filter_recalls);
+    // update so it LEAVES the filter
+    e.update_document("bench", &uuid_for(200, 1).to_string(),
+                      doc_record(200, 2, "b", 5).fields, doc_record(200, 2, "b", 5).k_vecs).unwrap();
+    expect_filtered(&e, &eqf("cat", "a"), (0..120).filter(|i| i % 2 == 0).collect(), "fm_update_leaves", &mut checks, &mut filter_recalls);
+    // update so it re-ENTERS with new num
+    e.update_document("bench", &uuid_for(200, 1).to_string(),
+                      doc_record(200, 3, "b", 999).fields, doc_record(200, 3, "b", 999).k_vecs).unwrap();
+    expect_filtered(&e, &andf(eqf("cat", "b"), cmpf("num", FilterOp::Eq, FilterValue::Int(999))), vec![200], "fm_update_enters", &mut checks, &mut filter_recalls);
+    // delete matching / nonmatching
+    e.delete_document("bench", &uuid_for(200, 1).to_string()).unwrap();
+    expect_filtered(&e, &andf(eqf("cat", "b"), cmpf("num", FilterOp::Eq, FilterValue::Int(999))), vec![], "fm_delete_matching", &mut checks, &mut filter_recalls);
+    e.delete_document("bench", &uuid_for(1, 1).to_string()).unwrap();
+    expect_filtered(&e, &eqf("cat", "b"), (1..120).filter(|i| i % 2 == 1 && *i != 1).collect(), "fm_delete_nonmatching", &mut checks, &mut filter_recalls);
+    // reinsert deleted logical doc (new version)
+    e.insert_document("bench", doc_record(1, 2, "b", 1)).unwrap();
+    expect_filtered(&e, &eqf("cat", "b"), (1..120).filter(|i| i % 2 == 1).collect(), "fm_reinsert", &mut checks, &mut filter_recalls);
+
+    // 3) restart / flush / compact persistence of filter semantics (§6)
+    e.flush_wal().unwrap();
+    e.checkpoint().unwrap();
+    drop(e);
+    let e = open_db(dir);
+    expect_filtered(&e, &eqf("cat", "b"), (1..120).filter(|i| i % 2 == 1).collect(), "fr_restart", &mut checks, &mut filter_recalls);
+    drop(e);
+    let res = compaction::compact_all(dir).unwrap();
+    if let Some(r) = &res {
+        let _ = compaction::cleanup_merged_files(r);
+    }
+    let e = open_db(dir);
+    expect_filtered(&e, &eqf("cat", "b"), (1..120).filter(|i| i % 2 == 1).collect(), "fr_compact", &mut checks, &mut filter_recalls);
+    let rep = checker_report(&e, dir);
+    checks.push(("final_checker".into(), rep["clean"].as_bool().unwrap_or(false), format!("{rep:?}")));
+
+    let (pass, fail) = checks.iter().fold((0usize, 0usize), |(p, f), c| if c.1 { (p + 1, f) } else { (p, f + 1) });
+    let mut csv = String::from("check,ok,detail\n");
+    for (n, ok, d) in &checks {
+        let _ = writeln!(csv, "{n},{ok},\"{}\"", d.replace('"', "'"));
+    }
+    std::fs::write(format!("{out}/results.csv"), &csv).unwrap();
+    write_json(&format!("{out}/metrics.json"), &serde_json::json!({
+        "passed": pass, "failed": fail,
+        "filter_recall": filter_recalls.iter().map(|(n, r)| serde_json::json!({"check": n, "recall": r})).collect::<Vec<_>>(),
+    }));
+    let _ = std::fs::remove_dir_all(dir);
+    format!("filterx: {pass} passed, {fail} FAILED")
+}
+
+// ---------------------------------------------------------------- txn
+
+/// §18–§21. The engine's transaction model is: staged Insert/Delete ops,
+/// WAL BeginTxn→TxnOp*→CommitTxn, then apply. No update op; no isolation.
+fn run_txn(dir: &std::path::Path, out: &str) -> String {
+    use attentiondb_core::transaction::TxnOp;
+    let _ = std::fs::remove_dir_all(dir);
+    std::fs::create_dir_all(dir).unwrap();
+    let mut checks: Vec<(String, bool, String)> = Vec::new();
+    let e = open_db(dir);
+    e.create_collection("bench", DIM, &[HEAD]).unwrap();
+    for idx in 0..20u32 {
+        e.insert_document("bench", doc_record(idx, 1, "a", idx as i64)).unwrap();
+    }
+    e.flush_wal().unwrap();
+
+    // commit: all ops visible
+    let t = e.txn_manager.begin_transaction("bench");
+    let ins1 = doc_record(100, 1, "new", 1);
+    let ins2 = doc_record(101, 1, "new", 2);
+    e.txn_manager.record_operation(t, TxnOp::Insert(ins1)).unwrap();
+    e.txn_manager.record_operation(t, TxnOp::Insert(ins2)).unwrap();
+    e.txn_manager.record_operation(t, TxnOp::Delete(uuid_for(3, 1))).unwrap();
+    let ok = e.commit_transaction(t).unwrap();
+    let (obs, _) = export_state(&e);
+    checks.push(("txn_commit_applied".to_string(),
+                 ok && obs.contains_key(&100) && obs.contains_key(&101) && !obs.contains_key(&3),
+                 format!("{obs:?}")));
+    // rollback: nothing visible
+    let t = e.txn_manager.begin_transaction("bench");
+    e.txn_manager.record_operation(t, TxnOp::Insert(doc_record(102, 1, "new", 3))).unwrap();
+    e.txn_manager.record_operation(t, TxnOp::Delete(uuid_for(4, 1))).unwrap();
+    let rolled = e.txn_manager.rollback_transaction(t).unwrap();
+    let (obs, _) = export_state(&e);
+    checks.push(("txn_rollback_invisible".to_string(),
+                 rolled && !obs.contains_key(&102) && obs.contains_key(&4),
+                 format!("{obs:?}")));
+    // repeated/re-entrant use after rollback must fail cleanly
+    let gone = e.txn_manager.get_staged_transaction(t).is_none();
+    checks.push(("txn_rollback_unstaged".to_string(), gone, String::new()));
+    // multi-op matrix (insert+delete mixes) in ONE txn
+    let t = e.txn_manager.begin_transaction("bench");
+    for i in 0..5u32 {
+        e.txn_manager.record_operation(t, TxnOp::Insert(doc_record(110 + i, 1, "m", i as i64))).unwrap();
+    }
+    e.txn_manager.record_operation(t, TxnOp::Delete(uuid_for(5, 1))).unwrap();
+    e.txn_manager.record_operation(t, TxnOp::Delete(uuid_for(6, 1))).unwrap();
+    e.commit_transaction(t).unwrap();
+    let (obs, _) = export_state(&e);
+    let ok = (110..115).all(|i| obs.contains_key(&(i as u32))) && !obs.contains_key(&5) && !obs.contains_key(&6);
+    checks.push(("txn_multiop_matrix".to_string(), ok, String::new()));
+    // §20 injected commit failure: an op that fails pre-validation must abort
+    // the WHOLE commit — no partial apply, engine unchanged, checker clean.
+    {
+        let t = e.txn_manager.begin_transaction("bench");
+        let mut bad = doc_record(300, 1, "bad", 1);
+        bad.k_vecs.insert(HEAD.to_string(), vec![0.0; DIM + 7]); // wrong dim
+        e.txn_manager.record_operation(t, TxnOp::Insert(bad)).unwrap();
+        let good = doc_record(301, 1, "bad", 2);
+        e.txn_manager.record_operation(t, TxnOp::Insert(good)).unwrap();
+        let r = e.commit_transaction(t);
+        let (obs, _) = export_state(&e);
+        checks.push(("txn_commit_failure_atomic".to_string(),
+                     r.is_err() && !obs.contains_key(&300) && !obs.contains_key(&301),
+                     format!("commit_err={} has300={} has301={}", r.is_err(), obs.contains_key(&300), obs.contains_key(&301))));
+    }
+    // delete-if-present: deleting an unknown uuid inside a committed txn must
+    // be a clean no-op (TxnOp::Delete with numeric 0 semantics), not an error.
+    {
+        let t = e.txn_manager.begin_transaction("bench");
+        e.txn_manager.record_operation(t, TxnOp::Delete(uuid::Uuid::from_u128(0xf0f0_f0f0))).unwrap();
+        let r = e.commit_transaction(t);
+        let rep2 = checker_report(&e, dir);
+        checks.push(("txn_delete_missing_noop".to_string(),
+                     r.is_ok() && rep2["clean"].as_bool().unwrap_or(false),
+                     format!("commit_ok={}", r.is_ok())));
+    }
+    let rep = checker_report(&e, dir);
+    checks.push(("txn_checker".to_string(), rep["clean"].as_bool().unwrap_or(false), format!("{rep:?}")));
+
+    // crash-in-commit: parent kills the process mid/after WAL-commit; on
+    // reopen the txn must be ALL-or-NOTHING (atomic via WAL markers).
+    // This part runs in crashchild mode (see run()); here we only verify
+    // the post-crash state given the sidecar marker file if present.
+    let side = std::path::PathBuf::from(format!("{}.txncrash", dir.display()));
+    if side.exists() {
+        let data = std::fs::read_to_string(&side).unwrap();
+        // marker: "committed" if CommitTxn WAL append returned before crash
+        let committed = data.trim_end().ends_with("committed");
+        drop(e);
+        let e2 = open_db(dir);
+        let (obs, _) = export_state(&e2);
+        let has_all = (200..210).all(|i| obs.contains_key(&(i as u32)));
+        let has_none = (200..210).all(|i| !obs.contains_key(&(i as u32)));
+        checks.push(("txn_crash_atomicity".to_string(),
+                     has_all || has_none,
+                     format!("committed_marker={committed} all={has_all} none={has_none}")));
+        checks.push(("txn_crash_matches_wal".to_string(),
+                     if committed { has_all } else { has_none || has_all /* apply-phase crash recovers to all via replay */ },
+                     String::new()));
+        let rep = checker_report(&e2, dir);
+        checks.push(("txn_crash_checker".to_string(), rep["clean"].as_bool().unwrap_or(false), format!("{rep:?}")));
+        let _ = std::fs::remove_dir_all(dir);
+        let _ = std::fs::remove_file(&side);
+    }
+
+    let (pass, fail) = checks.iter().fold((0usize, 0usize), |(p, f), c| if c.1 { (p + 1, f) } else { (p, f + 1) });
+    let mut csv = String::from("check,ok,detail\n");
+    for (n, ok, d) in &checks {
+        let _ = writeln!(csv, "{n},{ok},\"{}\"", d.replace('"', "'"));
+    }
+    std::fs::write(format!("{out}/results.csv"), &csv).unwrap();
+    write_json(&format!("{out}/metrics.json"), &serde_json::json!({"passed": pass, "failed": fail}));
+    if !side.exists() {
+        let _ = std::fs::remove_dir_all(dir);
+    }
+    format!("txn: {pass} passed, {fail} FAILED")
+}
+
+/// child for the crash-in-commit test: commit a 10-insert txn; parent
+/// SIGKILLs at an uncontrolled moment; we mark "committed" AFTER
+/// commit_transaction returns.
+fn txn_child(dir: &std::path::Path) -> ! {
+    use attentiondb_core::transaction::TxnOp;
+    let _ = std::fs::remove_dir_all(dir);
+    std::fs::create_dir_all(dir).unwrap();
+    let e = open_db(dir);
+    e.create_collection("bench", DIM, &[HEAD]).unwrap();
+    for idx in 0..10u32 {
+        e.insert_document("bench", doc_record(idx, 1, "a", idx as i64)).unwrap();
+    }
+    e.flush_wal().unwrap();
+    let t = e.txn_manager.begin_transaction("bench");
+    for i in 200..210u32 {
+        e.txn_manager.record_operation(t, TxnOp::Insert(doc_record(i, 1, "txn", i as i64))).unwrap();
+    }
+    let r = e.commit_transaction(t);
+    let side = std::path::PathBuf::from(format!("{}.txncrash", dir.display()));
+    let mut f = std::fs::File::create(&side).unwrap();
+    let _ = writeln!(f, "{}", if r.is_ok() { "committed" } else { "failed" });
+    let _ = f.flush();
+    loop { std::thread::sleep(std::time::Duration::from_secs(3600)); } // parent will SIGKILL
+}
+
+// ---------------------------------------------------------------- crash child / verify
+
+/// child: N acked mutations; sidecar records acks; crash at `point`.
+fn run_crashchild(dir: &std::path::Path, point: &str, n: usize) -> ! {
+    let _ = std::fs::remove_dir_all(dir);
+    std::fs::create_dir_all(dir).unwrap();
+    let e = open_db(dir);
+    e.create_collection("bench", DIM, &[HEAD]).unwrap();
+    let side = format!("{}.sidecar", dir.display());
+    let mut sc = std::fs::File::create(&side).unwrap();
+    let ack = |sc: &mut std::fs::File, i: usize| {
+        let _ = writeln!(sc, "ACK {i}");
+        let _ = sc.flush();
+    };
+    for i in 0..n {
+        let idx = 1000 + i as u32;
+        e.insert_document("bench", doc_record(idx, 1, "c", i as i64)).unwrap();
+        ack(&mut sc, i);
+        if point == "mid_inserts" && i == n / 2 {
+            loop { std::thread::sleep(std::time::Duration::from_secs(3600)); } // parent SIGKILLs
+        }
+    }
+    match point {
+        "after_acks" => std::process::exit(137), // no flush, no checkpoint
+        "after_flush" => { e.flush_wal().unwrap(); std::process::exit(137); }
+        "after_checkpoint" => { e.flush_wal().unwrap(); e.checkpoint().unwrap(); std::process::exit(137); }
+        "mid_flush" => { loop { std::thread::sleep(std::time::Duration::from_secs(3600)); } }
+        "during_commit_txn" => {
+            // same engine, same dir, same sidecar bookkeeping: flush the acked
+            // baseline, then commit one 10-insert txn; marker records the commit
+            // call's outcome AFTER it returns; parent SIGKILLs while we park.
+            use attentiondb_core::transaction::TxnOp;
+            e.flush_wal().unwrap();
+            let t = e.txn_manager.begin_transaction("bench");
+            for i in 2000..2010u32 {
+                e.txn_manager.record_operation(t, TxnOp::Insert(doc_record(i, 1, "txn", i as i64))).unwrap();
+            }
+            let r = e.commit_transaction(t);
+            let side = std::path::PathBuf::from(format!("{}.txncrash", dir.display()));
+            let mut f = std::fs::File::create(&side).unwrap();
+            let _ = writeln!(f, "{}", if r.is_ok() { "committed" } else { "failed" });
+            let _ = f.flush();
+            loop { std::thread::sleep(std::time::Duration::from_secs(3600)); }
+        }
+        _ => {
+            let _ = compaction::compact_all(dir); // after_compact
+            std::process::exit(137);
+        }
+    }
+}
+
+/// reopen after crash; derive expected from sidecar acks; compare + checker.
+fn run_verify(dir: &std::path::Path, point: &str) -> String {
+    let side = format!("{}.sidecar", dir.display());
+    let acked = std::fs::read_to_string(&side)
+        .map(|s| s.lines().filter(|l| l.starts_with("ACK ")).count())
+        .unwrap_or(0);
+    let open_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| open_db(dir)));
+    match open_result {
+        Err(_) => {
+            let _ = std::fs::remove_dir_all(dir);
+            let _ = std::fs::remove_file(&side);
+            format!("{point},ERROR_ON_OPEN,0/0,0,pre_existing=0,txn=-")
+        }
+        Ok(e) => {
+            let (obs, iss) = export_state(&e);
+            // expected: docs 1000..1000+acked present (GroupCommit/flushed cases)
+            let mut present = 0usize;
+            for i in 0..acked {
+                if obs.contains_key(&(1000 + i as u32)) {
+                    present += 1;
+                }
+            }
+            // no UNACKED doc may be present (beyond acked)
+            let mut unacked_present = 0usize;
+            for i in acked..acked + 64 {
+                if obs.contains_key(&(1000 + i as u32)) {
+                    unacked_present += 1;
+                }
+            }
+            let rep = checker_report(&e, dir);
+            let clean = rep["clean"].as_bool().unwrap_or(false);
+            // txn all-or-nothing (atomicity under crash): the 10 txn inserts
+            // (2000..2009) must be ALL present or ALL absent — never partial —
+            // and must agree with the marker the child wrote after commit
+            // returned ("committed" => all 10; "failed"/absent => 0).
+            let txn_present = (2000..2010u32).filter(|i| obs.contains_key(i)).count();
+            let marker = std::fs::read_to_string(format!("{}.txncrash", dir.display()))
+                .map(|m| m.trim().to_string())
+                .unwrap_or_default();
+            let partial = txn_present > 0 && txn_present < 10;
+            // A commit that returned Ok but vanished is only admissible under
+            // Durability::Async (userspace buffer lost with the process;
+            // all-or-nothing still holds). Under group/sync it is a real
+            // durability violation.
+            let async_mode = matches!(dur_from_env(), Durability::Async);
+            let txn_ok = if partial {
+                false
+            } else {
+                match marker.as_str() {
+                    "committed" => txn_present == 10 || (async_mode && txn_present == 0),
+                    "failed" => txn_present == 0,
+                    _ => txn_present == 0 || txn_present == 10,
+                }
+            };
+            let txn_verdict = if partial {
+                "PARTIAL"
+            } else if marker == "committed" && txn_present == 0 {
+                "COMMITTED_NOT_DURABLE_ASYNC"
+            } else if txn_present == 10 {
+                "COMMITTED_DURABLE"
+            } else {
+                "ABSENT"
+            };
+            let txn_note = format!("txn={txn_present}/10 marker={marker} {txn_verdict}");
+            let verdict = if !clean || !txn_ok {
+                "INCONSISTENT"
+            } else if present == acked {
+                "ALL_ACKED"
+            } else if present < acked && unacked_present == 0 {
+                "PREFIX"
+            } else {
+                "MISMATCH"
+            };
+            let n_start: usize = obs.keys().filter(|k| **k < 1000).count();
+            let _ = iss;
+            let _ = std::fs::remove_dir_all(dir);
+            let _ = std::fs::remove_file(&side);
+            format!("{point},{verdict},{present}/{acked},{unacked_present},pre_existing={n_start},{txn_note}")
+        }
+    }
+}
+
+/// §14 helper: reopen a (possibly corrupted) DB and report behavior only.
+fn run_walcorrupt_verify(dir: &std::path::Path, mode: &str) -> String {
+    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let e = open_db(dir);
+        let (obs, iss) = export_state(&e);
+        let rep = checker_report(&e, dir);
+        (obs.len(), iss.len(), rep["clean"].as_bool().unwrap_or(false))
+    }));
+    let _ = std::fs::remove_dir_all(dir);
+    match r {
+        Err(_) => format!("{mode},ERROR_ON_OPEN,,"),
+        Ok((n, iss, clean)) => format!("{mode},OPENED,n_docs={n},store_issues={iss},checker_clean={clean}"),
+    }
+}
+
+// ---------------------------------------------------------------- concur
+
+fn run_concur(dir: &std::path::Path, readers: usize, writers: usize, out: &str) -> String {
+    let _ = std::fs::remove_dir_all(dir);
+    std::fs::create_dir_all(dir).unwrap();
+    let e = Arc::new(open_db(dir));
+    e.create_collection("bench", DIM, &[HEAD]).unwrap();
+    for idx in 0..300u32 {
+        e.insert_document("bench", doc_record(idx, 1, "a", idx as i64)).unwrap();
+    }
+    e.flush_wal().unwrap();
+    let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    // deterministic per-writer op log (§24): writers record each cycle's ops
+    let oplog = Arc::new(std::sync::Mutex::new(
+        std::fs::File::create(format!("{out}/operation-log.jsonl")).unwrap()));
+    let mut errors = 0usize;
+    let mut lat_all: Vec<f64> = Vec::new();
+    let mut handles = Vec::new();
+    let t_start = std::time::Instant::now();
+    for r in 0..readers {
+        let e = Arc::clone(&e);
+        let stop = Arc::clone(&stop);
+        handles.push(std::thread::spawn(move || {
+            let mut lat = Vec::new();
+            let mut errs = 0usize;
+            while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+                let q = vec_for((r * 7 + 3) as u32);
+                let t0 = std::time::Instant::now();
+                let got = e.attend("bench", &[HEAD.to_string()], &q, 10);
+                lat.push(t0.elapsed().as_secs_f64() * 1e6);
+                match got {
+                    Ok(res) if res.len() > 10 => errs += 1,
+                    Ok(_) => {}
+                    Err(_) => errs += 1,
+                }
+            }
+            (lat, errs)
+        }));
+    }
+    for w in 0..writers {
+        let e = Arc::clone(&e);
+        let stop = Arc::clone(&stop);
+        let oplog = Arc::clone(&oplog);
+        handles.push(std::thread::spawn(move || {
+            let mut errs = 0usize;
+            let mut i = 0u64;
+            let slot = 1000 + w as u32 * 100_000;
+            while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+                let idx = slot + i as u32;
+                // deterministic mixed cycle: insert -> update -> (delete on i%5==4)
+                let r = doc_record(idx, 1, "w", i as i64);
+                let ok_ins = e.insert_document("bench", r).is_ok();
+                if !ok_ins { errs += 1; }
+                if i % 2 == 1 {
+                    let upd = doc_record(idx, 2, "w2", i as i64);
+                    if e.update_document("bench", &uuid_for(idx, 1).to_string(),
+                                         upd.fields, upd.k_vecs).is_err() { errs += 1; }
+                }
+                if i % 5 == 4
+                    && e.delete_document("bench", &uuid_for(idx, 1).to_string()).is_err()
+                {
+                    errs += 1;
+                }
+                if i % 25 == 24 {
+                    let _ = e.flush_wal();
+                }
+                {
+                    let mut f = oplog.lock().unwrap();
+                    let _ = writeln!(f, "{{\"writer\":{w},\"opno\":{i},\"idx\":{idx},\"op\":\"ins{},upd{},del{}\"}}",
+                        ok_ins as u8, (i % 2 == 1) as u8, (i % 5 == 4) as u8);
+                }
+                i += 1;
+            }
+            (Vec::new(), errs)
+        }));
+    }
+    std::thread::sleep(std::time::Duration::from_secs(4));
+    stop.store(true, std::sync::atomic::Ordering::Relaxed);
+    for h in handles {
+        if let Ok((lat, errs)) = h.join() {
+            errors += errs;
+            lat_all.extend(lat);
+        }
+    }
+    let elapsed = t_start.elapsed().as_secs_f64();
+    let total = lat_all.len();
+    let qps = total as f64 / elapsed;
+    let mut latc = lat_all.clone();
+    latc.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let pc = |p: f64| latc[((p / 100.0) * (latc.len() as f64 - 1.0)).round() as usize % latc.len().max(1)];
+    // post-workload checker gate + logical sanity
+    let (obs, iss) = export_state(&e);
+    let rep = checker_report(&e, dir);
+    let clean = rep["clean"].as_bool().unwrap_or(false) && iss.is_empty();
+    let warn_ct = rep["warning_count"].as_u64().unwrap_or(0);
+    let mut csv = String::from("readers,writers,queries,p50_us,p95_us,p99_us,qps,errors,checker_clean,checker_warnings,live_docs\n");
+    let _ = writeln!(csv, "{readers},{writers},{total},{:.1},{:.1},{:.1},{qps:.0},{errors},{clean},{warn_ct},{}", pc(50.0), pc(95.0), pc(99.0), obs.len());
+    std::fs::write(format!("{out}/results.csv"), &csv).unwrap();
+    write_json(&format!("{out}/metrics.json"), &serde_json::json!({
+        "readers": readers, "writers": writers, "queries": total, "qps": qps,
+        "errors": errors, "checker_clean": clean, "checker_warnings": warn_ct,
+        "store_issues": iss, "live_docs": obs.len(),
+    }));
+    let _ = std::fs::remove_dir_all(dir);
+    format!("concur r{readers}w{writers}: {total} queries, {errors} errors, {qps:.0} QPS, checker_clean={clean}")
+}
+
+// ---------------------------------------------------------------- backup
+
+fn run_backup(dir: &std::path::Path, out: &str) -> String {
+    use attentiondb_core::backup::{copy_database_dir, restore_backup};
+    let _ = std::fs::remove_dir_all(dir);
+    std::fs::create_dir_all(dir).unwrap();
+    let mut checks: Vec<(String, bool, String)> = Vec::new();
+    let e = open_db(dir);
+    e.create_collection("bench", DIM, &[HEAD]).unwrap();
+    for idx in 0..150u32 {
+        e.insert_document("bench", doc_record(idx, 1, "a", idx as i64)).unwrap();
+    }
+    e.flush_wal().unwrap();
+    e.checkpoint().unwrap();
+    let bak = std::path::PathBuf::from(format!("{}.bak", dir.display()));
+    let _ = std::fs::remove_dir_all(&bak);
+    copy_database_dir(dir, &bak).unwrap();
+    let manifest = restore_backup(&bak, &std::path::PathBuf::from(format!("{}.restore", dir.display())));
+    // capture backup-state BEFORE further mutation
+    let backup_state = export_state(&e).0;
+    // mutate A: inserts + deletes + update
+    for idx in 150..170u32 {
+        e.insert_document("bench", doc_record(idx, 1, "post", idx as i64)).unwrap();
+    }
+    e.delete_document("bench", &uuid_for(0, 1).to_string()).unwrap();
+    e.update_document("bench", &uuid_for(1, 1).to_string(),
+                      doc_record(1, 9, "mutated", 1).fields, doc_record(1, 9, "mutated", 1).k_vecs).unwrap();
+    e.flush_wal().unwrap();
+    drop(e);
+    // open restored DB and compare against backup state
+    let rdir = std::path::PathBuf::from(format!("{}.restore", dir.display()));
+    let rb = open_db(&rdir);
+    let (rstate, riss) = export_state(&rb);
+    checks.push(("restore_state_equals_backup".into(), rstate == backup_state,
+                 format!("backup={} restored={}", backup_state.len(), rstate.len())));
+    checks.push(("restore_store_unique".into(), riss.is_empty(), riss.join(";")));
+    checks.push(("restore_not_mutated".into(),
+                 !rstate.contains_key(&150) && rstate.contains_key(&1),
+                 format!("has150={} has1={}", rstate.contains_key(&150), rstate.contains_key(&1))));
+    let rep = checker_report(&rb, &rdir);
+    checks.push(("restore_checker".into(), rep["clean"].as_bool().unwrap_or(false), format!("{rep:?}")));
+    let m = manifest.ok();
+    checks.push(("restore_manifest".into(), m.is_some(), String::new()));
+    // backup during activity: copy while engine holds the dir + writes happen.
+    // copy_database_dir does NOT coordinate with the mutation gate, so this
+    // probe DOCUMENTS the outcome (quiescence requirement) rather than gating.
+    {
+        let e2 = Arc::new(open_db(dir));
+        for idx in 300..320u32 {
+            let _ = e2.insert_document("bench", doc_record(idx, 1, "live", idx as i64));
+        }
+        // ACTIVE writers during the copy (phase 2 of the probe)
+        let stop_w = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let mut wh = Vec::new();
+        for wid in 0..2usize {
+            let e2 = Arc::clone(&e2);
+            let stop_w = Arc::clone(&stop_w);
+            wh.push(std::thread::spawn(move || {
+                let mut i = 0u64;
+                let slot = 5000 + wid as u32 * 10_000;
+                while !stop_w.load(std::sync::atomic::Ordering::Relaxed) {
+                    let idx = slot + i as u32;
+                    let _ = e2.insert_document("bench", doc_record(idx, 1, "lw", i as i64));
+                    i += 1;
+                }
+                i
+            }));
+        }
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        let live_bak = std::path::PathBuf::from(format!("{}.livebak", dir.display()));
+        let _ = std::fs::remove_dir_all(&live_bak);
+        let copy_ok = copy_database_dir(dir, &live_bak).is_ok();
+        stop_w.store(true, std::sync::atomic::Ordering::Relaxed);
+        let mut written = 0u64;
+        for h in wh {
+            written += h.join().unwrap_or(0);
+        }
+        if copy_ok {
+            let rd = std::path::PathBuf::from(format!("{}.liverestore", dir.display()));
+            let r = restore_backup(&live_bak, &rd);
+            let ok = r.is_ok();
+            if ok {
+                let re = open_db(&rd);
+                let (st, _) = export_state(&re);
+                // a copy taken under ACTIVE writers: we DOCUMENT whether it
+                // opened checker-clean (§28–30: no online backup implemented;
+                // quiescent backup is the supported path).
+                let rep2 = checker_report(&re, &rd);
+                checks.push(("live_writer_backup_documented".into(), true,
+                             format!("docs={} consistent={} writers_wrote={}", st.len(),
+                                     rep2["clean"].as_bool().unwrap_or(false), written)));
+                let _ = std::fs::remove_dir_all(&rd);
+            } else {
+                checks.push(("live_backup_consistent".into(), true,
+                             "restore refused live backup (documented: quiescent required)".into()));
+            }
+        } else {
+            checks.push(("live_backup_consistent".into(), true,
+                         "copy refused while active (documented: quiescent required)".into()));
+        }
+        let _ = std::fs::remove_dir_all(&live_bak);
+    }
+    let _ = std::fs::remove_dir_all(&bak);
+    let _ = std::fs::remove_dir_all(&rdir);
+    let _ = std::fs::remove_dir_all(dir);
+
+    let (pass, fail) = checks.iter().fold((0usize, 0usize), |(p, f), c| if c.1 { (p + 1, f) } else { (p, f + 1) });
+    let mut csv = String::from("check,ok,detail\n");
+    for (n, ok, d) in &checks {
+        let _ = writeln!(csv, "{n},{ok},\"{}\"", d.replace('"', "'"));
+    }
+    std::fs::write(format!("{out}/results.csv"), &csv).unwrap();
+    write_json(&format!("{out}/metrics.json"), &serde_json::json!({"passed": pass, "failed": fail}));
+    format!("backup: {pass} passed, {fail} FAILED")
+}
+
+// ---------------------------------------------------------------- compaction
+
+/// §26: offline compaction before/after equivalence. Populate (with updates +
+/// deletes so tombstones exist), checkpoint, close, compact_all + cleanup,
+/// reopen: observed state must be identical and checker-clean.
+fn run_compact(dir: &std::path::Path, out: &str) -> String {
+    let _ = std::fs::remove_dir_all(dir);
+    std::fs::create_dir_all(dir).unwrap();
+    let mut checks: Vec<(String, bool, String)> = Vec::new();
+    let e = open_db(dir);
+    e.create_collection("bench", DIM, &[HEAD]).unwrap();
+    for idx in 0..300u32 {
+        e.insert_document("bench", doc_record(idx, 1, "a", idx as i64)).unwrap();
+    }
+    // churn: updates + deletes create overwrites + tombstones for GC
+    for idx in 0..100u32 {
+        let r = doc_record(idx, 2, "b", idx as i64 * 10);
+        e.update_document("bench", &uuid_for(idx, 1).to_string(), r.fields, r.k_vecs).unwrap();
+    }
+    for idx in 100..150u32 {
+        e.delete_document("bench", &uuid_for(idx, 1).to_string()).unwrap();
+    }
+    e.flush_wal().unwrap();
+    e.checkpoint().unwrap(); // generation 1 SST
+    // second generation: more writes so a second SST exists to merge into
+    for idx in 300..360u32 {
+        e.insert_document("bench", doc_record(idx, 1, "c", idx as i64)).unwrap();
+    }
+    for idx in 0..30u32 {
+        let r = doc_record(idx, 3, "c", idx as i64 * 100);
+        e.update_document("bench", &uuid_for(idx, 1).to_string(), r.fields, r.k_vecs).unwrap();
+    }
+    e.flush_wal().unwrap();
+    e.checkpoint().unwrap(); // generation 2 SST
+    let (before, biss) = export_state(&e);
+    checks.push(("before_checker".into(), checker_report(&e, dir)["clean"].as_bool().unwrap_or(false) && biss.is_empty(), format!("{biss:?}")));
+    drop(e);
+    let cres = compaction::compact_all(dir);
+    let did = matches!(&cres, Ok(Some(_)));
+    let cerr = match &cres { Err(er) => er.to_string(), Ok(None) => "no-op (<2 sst)".into(), Ok(Some(_)) => String::new() };
+    let removed = match &cres {
+        Ok(Some(res)) => compaction::cleanup_merged_files(res).unwrap_or(0),
+        _ => 0,
+    };
+    let e = open_db(dir);
+    let (after, aiss) = export_state(&e);
+    checks.push(("after_state_equal".into(), before == after && aiss.is_empty(),
+        if before == after { format!("docs={}", after.len()) } else { format!("before={} after={} iss={biss:?}/{aiss:?}", before.len(), after.len()) }));
+    checks.push(("after_checker".into(), checker_report(&e, dir)["clean"].as_bool().unwrap_or(false), String::new()));
+    // §10 spot: twice-updated doc survives compaction at LATEST content (v3)
+    checks.push(("updated_content_survives".into(),
+        after.get(&20).map(|(_, c, n)| c == "c" && *n == 2000).unwrap_or(false), String::new()));
+    // §9 spot: deleted docs stay deleted after compaction (tombstone GC)
+    checks.push(("deleted_stay_deleted".into(),
+        (100..150u32).all(|i| !after.contains_key(&i)), String::new()));
+    let (pass, fail) = checks.iter().fold((0usize, 0usize), |(p, f), c| if c.1 { (p + 1, f) } else { (p, f + 1) });
+    let mut csv = String::from("check,ok,detail\n");
+    for (n, ok, d) in &checks { let _ = writeln!(csv, "{n},{ok},\"{}\"", d.replace('"', "'")); }
+    std::fs::write(format!("{out}/results.csv"), &csv).unwrap();
+    write_json(&format!("{out}/metrics.json"), &serde_json::json!({
+        "passed": pass, "failed": fail, "compaction_ran": did,
+        "compaction_error": cerr, "merged_files_removed": removed, "docs": after.len(),
+    }));
+    let _ = std::fs::remove_dir_all(dir);
+    format!("compact: {pass} passed, {fail} FAILED (ran={did} removed={removed})")
+}
+
+/// §27: compaction-under-load probe. compact_all is dir-level/offline; this
+/// documents what happens when it is invoked while an engine holds the dir
+/// open. Detect + document only — never a pass/fail correctness gate.
+fn run_compact_live(dir: &std::path::Path) -> String {
+    let _ = std::fs::remove_dir_all(dir);
+    std::fs::create_dir_all(dir).unwrap();
+    {
+        let e = open_db(dir);
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        for idx in 0..50u32 {
+            e.insert_document("bench", doc_record(idx, 1, "a", idx as i64)).unwrap();
+        }
+        e.flush_wal().unwrap();
+        e.checkpoint().unwrap();
+        // three SST generations: below the auto-compact threshold (4 files)
+        for gen in 0..2u32 {
+            for idx in (50 + gen * 15)..(65 + gen * 15) {
+                e.insert_document("bench", doc_record(idx, 1, "a", idx as i64)).unwrap();
+            }
+            e.flush_wal().unwrap();
+            e.checkpoint().unwrap();
+        }
+        let r = compaction::compact_all(dir); // engine still open (idle)
+        match r {
+            Ok(Some(res)) => format!("compactlive,COMPACTED_WHILE_OPEN,merged={},out_entries={} (NOT cleaning up; engine holds the dir)", res.files_merged, res.output_entries),
+            Ok(None) => "compactlive,NOOP,<2 sst files".into(),
+            Err(er) => format!("compactlive,REFUSED,{er}"),
+        }
+        // engine dropped here without cleanup_merged_files
+    }
+}
+
+// ---------------------------------------------------------------- integration
+
+/// §11/§31/§4 + §6/§26/§29 cross-feature integration: multi-collection
+/// isolation across restart/compaction/backup-restore, graceful-shutdown
+/// durability of all four mutation kinds, filter × multi-head soundness.
+fn run_integration(dir: &std::path::Path, out: &str) -> String {
+    use attentiondb_core::backup::{copy_database_dir, restore_backup};
+    let _ = std::fs::remove_dir_all(dir);
+    std::fs::create_dir_all(dir).unwrap();
+    let mut checks: Vec<(String, bool, String)> = Vec::new();
+    let e = open_db(dir);
+    e.create_collection("alpha", DIM, &[HEAD]).unwrap();
+    e.create_collection("beta", DIM, &[HEAD]).unwrap();
+    e.create_collection("gamma", DIM, &[HEAD, "h2"]).unwrap();
+    for i in 0..60u32 {
+        e.insert_document("alpha", doc_record_c(1, i, 1, "x", i as i64)).unwrap();
+    }
+    for i in 0..40u32 {
+        e.insert_document("beta", doc_record_c(2, i, 1, "y", i as i64)).unwrap();
+    }
+    for i in 0..24u32 {
+        e.insert_document("gamma", doc_record_c(3, i, 1, "g", i as i64)).unwrap();
+    }
+    e.flush_wal().unwrap();
+    e.checkpoint().unwrap(); // generation 1
+    // churn: updates first (0..10 incl. odd ids), then deletes on the REMAINING
+    // odd ids (11..59) — never deleting a doc the update loop must still see
+    for i in 0..10u32 {
+        let r = doc_record_c(1, i, 2, "x2", i as i64 * 3);
+        e.update_document("alpha", &uuidc(1, i, 1).to_string(), r.fields, r.k_vecs).unwrap();
+    }
+    for i in (11..60u32).step_by(2) {
+        e.delete_document("alpha", &uuidc(1, i, 1).to_string()).unwrap();
+    }
+    let r = doc_record_c(2, 2000, 1, "y", 7);
+    e.insert_document("beta", r.clone()).unwrap(); // upsert: new logical id
+    let r = doc_record_c(2, 0, 2, "y2", 100);
+    e.update_document("beta", &uuidc(2, 0, 1).to_string(), r.fields, r.k_vecs).unwrap(); // upsert: existing
+    for i in 24..36u32 {
+        e.insert_document("gamma", doc_record_c(3, i, 1, "g", i as i64)).unwrap();
+    }
+    e.flush_wal().unwrap();
+    e.checkpoint().unwrap(); // generation 2 (enables offline merge)
+
+    // (a) live isolation (§31)
+    let (sa, _) = export_state_coll(&e, "alpha");
+    let (sb, _) = export_state_coll(&e, "beta");
+    let (sg, _) = export_state_coll(&e, "gamma");
+    let alpha_ok = sa.len() == 35
+        && (0..60u32).step_by(2).all(|i| sa.contains_key(&i))
+        && (11..60u32).step_by(2).all(|i| !sa.contains_key(&i))
+        && (1..10u32).step_by(2).all(|i| sa.contains_key(&i))
+        && sa.get(&5).map(|(_, c, _)| c == "x2").unwrap_or(false);
+    checks.push(("isol_live_alpha".into(), alpha_ok, format!("docs={} first={sa:?}", sa.len())));
+    checks.push(("isol_live_beta".into(),
+                 sb.len() == 41 && sb.contains_key(&2000) && sb.get(&0).map(|(v, c, _)| *v == 2 && c == "y2").unwrap_or(false),
+                 format!("docs={}", sb.len())));
+    checks.push(("isol_live_gamma".into(), sg.len() == 36, format!("docs={}", sg.len())));
+
+    // (b) filter × multi-head (§4): soundness + determinism across heads h+h2
+    {
+        let heads = vec![HEAD.to_string(), "h2".to_string()];
+        let f = eqf("cat", "g");
+        let got = filtered_observed_multi(&e, "gamma", &heads, &f, 1, 40);
+        let got2 = filtered_observed_multi(&e, "gamma", &heads, &f, 1, 40);
+        checks.push(("filter_multihead_sound".into(),
+                     got.iter().all(|i| sg.contains_key(i)) && got == got2 && got.len() <= 40,
+                     format!("{got:?}")));
+        let zero = filtered_observed_multi(&e, "gamma", &heads, &eqf("cat", "no-such"), 1, 40);
+        checks.push(("filter_multihead_zero_match".into(), zero.is_empty(), format!("{zero:?}")));
+    }
+
+    // (c) graceful-shutdown durability (§11): close -> reopen -> all four
+    // mutation kinds (insert/update/delete/upsert) persisted
+    e.close().unwrap();
+    let e2 = open_db(dir);
+    let (ra, _) = export_state_coll(&e2, "alpha");
+    let (rb, _) = export_state_coll(&e2, "beta");
+    let (rg, _) = export_state_coll(&e2, "gamma");
+    checks.push(("graceful_restart_alpha".into(), ra == sa, format!("equal={}", ra == sa)));
+    checks.push(("graceful_restart_beta".into(), rb == sb, format!("equal={}", rb == sb)));
+    checks.push(("graceful_restart_gamma".into(), rg == sg, format!("equal={}", rg == sg)));
+    checks.push(("graceful_checker".into(), checker_report(&e2, dir)["clean"].as_bool().unwrap_or(false), String::new()));
+    drop(e2);
+
+    // (d) compaction preserves both collections + isolation (§26/§31)
+    let cres = compaction::compact_all(dir);
+    if let Ok(Some(res)) = &cres {
+        compaction::cleanup_merged_files(res).unwrap();
+    }
+    let e3 = open_db(dir);
+    let (ca, _) = export_state_coll(&e3, "alpha");
+    let (cb, _) = export_state_coll(&e3, "beta");
+    checks.push(("compact_alpha_equal".into(), ca == sa, String::new()));
+    checks.push(("compact_beta_equal".into(), cb == sb, String::new()));
+    checks.push(("compact_checker".into(), checker_report(&e3, dir)["clean"].as_bool().unwrap_or(false), String::new()));
+
+    // (e) backup/restore reproduces BOTH collections (§29/§31)
+    let bak = std::path::PathBuf::from(format!("{}.bak", dir.display()));
+    let rdir = std::path::PathBuf::from(format!("{}.restored", dir.display()));
+    let _ = std::fs::remove_dir_all(&bak);
+    let _ = std::fs::remove_dir_all(&rdir);
+    let copy_ok = copy_database_dir(dir, &bak).is_ok();
+    let m = if copy_ok { restore_backup(&bak, &rdir).ok() } else { None };
+    if let Some(_m) = &m {
+        let re = open_db(&rdir);
+        let (ra2, _) = export_state_coll(&re, "alpha");
+        let (rb2, _) = export_state_coll(&re, "beta");
+        checks.push(("restore_alpha_equal".into(), ra2 == sa, String::new()));
+        checks.push(("restore_beta_equal".into(), rb2 == sb, String::new()));
+        // isolation by content: collection membership tags must not mix —
+        // alpha docs keep x/x2 cats, beta docs keep y/y2 (logical idx spaces
+        // overlap by design; uuid namespaces keep identities separate)
+        checks.push(("restore_isolation".into(),
+                     ra2.values().all(|(_, c, _)| c == "x" || c == "x2")
+                         && rb2.values().all(|(_, c, _)| c == "y" || c == "y2"),
+                     format!("alpha_cats={:?}",
+                         ra2.values().map(|(_, c, _)| c.clone()).collect::<std::collections::BTreeSet<_>>())));
+        checks.push(("restore_checker".into(), checker_report(&re, &rdir)["clean"].as_bool().unwrap_or(false), String::new()));
+    } else {
+        checks.push(("restore_alpha_equal".into(), false, format!("copy_ok={copy_ok}")));
+    }
+    let _ = std::fs::remove_dir_all(&bak);
+    let _ = std::fs::remove_dir_all(&rdir);
+    let _ = std::fs::remove_dir_all(dir);
+
+    let (pass, fail) = checks.iter().fold((0usize, 0usize), |(p, f), c| if c.1 { (p + 1, f) } else { (p, f + 1) });
+    let mut csv = String::from("check,ok,detail\n");
+    for (n, ok, d) in &checks { let _ = writeln!(csv, "{n},{ok},\"{}\"", d.replace('"', "'")); }
+    std::fs::write(format!("{out}/results.csv"), &csv).unwrap();
+    write_json(&format!("{out}/metrics.json"), &serde_json::json!({"passed": pass, "failed": fail}));
+    format!("integration: {pass} passed, {fail} FAILED")
+}
+
+/// attend_filtered over explicit heads (helper for the multi-head probe).
+fn filtered_observed_multi(
+    e: &AttentionEngine,
+    coll: &str,
+    heads: &[String],
+    f: &FilterExpr,
+    qidx: u32,
+    k: usize,
+) -> Vec<u32> {
+    let q = vec_for(qidx);
+    let got = e.attend_filtered(coll, heads, &q, k, Some(f)).unwrap();
+    let store = e.document_store.read();
+    got.iter()
+        .map(|(id, _)| {
+            store
+                .list_all_records()
+                .into_iter()
+                .find(|r| e.id_mapper.read().uuid_to_id(&r.id) == Some(*id))
+                .and_then(|r| r.fields.get("idx").and_then(|v| v.as_u64()))
+                .unwrap_or(u64::MAX) as u32
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------- concur replay
+
+/// §24: deterministic concurrent mutation logs + post-hoc expected-state
+/// replay. Phase 1: disjoint key ranges per writer -> replaying the merged
+/// op logs MUST equal the observed state exactly. Phase 2: two writers on
+/// the SAME keys -> documents the visibility model (mutation-gate serialized;
+/// per-key last-write-wins; records never torn).
+fn run_concur_replay(dir: &std::path::Path, out: &str) -> String {
+    let _ = std::fs::remove_dir_all(dir);
+    std::fs::create_dir_all(dir).unwrap();
+    let mut checks: Vec<(String, bool, String)> = Vec::new();
+    let e = std::sync::Arc::new(open_db(dir));
+    e.create_collection("bench", DIM, &[HEAD]).unwrap();
+    for idx in 0..50u32 {
+        e.insert_document("bench", doc_record(idx, 1, "seed", idx as i64)).unwrap();
+    }
+    e.flush_wal().unwrap();
+
+    // ---- phase 1: disjoint ranges, logged, then replayed
+    let oplog = std::sync::Arc::new(std::sync::Mutex::new(
+        std::fs::File::create(format!("{out}/operation-log.jsonl")).unwrap()));
+    let mut handles = Vec::new();
+    for w in 0..2usize {
+        let e = std::sync::Arc::clone(&e);
+        let oplog = std::sync::Arc::clone(&oplog);
+        handles.push(std::thread::spawn(move || {
+            let base = 10_000u32 * (w as u32 + 1);
+            for i in 0..250u32 {
+                let idx = base + i;
+                let r = doc_record(idx, 1, "w", i as i64);
+                let ins = e.insert_document("bench", r).is_ok();
+                let mut upd = false;
+                let mut del = false;
+                if i % 2 == 1 {
+                    let u = doc_record(idx, 2, "w2", i as i64);
+                    upd = e.update_document("bench", &uuid_for(idx, 1).to_string(), u.fields, u.k_vecs).is_ok();
+                }
+                if i % 5 == 4 {
+                    del = e.delete_document("bench", &uuid_for(idx, 1).to_string()).is_ok();
+                }
+                let mut f = oplog.lock().unwrap();
+                let _ = writeln!(f, "{{\"w\":{w},\"i\":{i},\"idx\":{idx},\"ins\":{ins},\"upd\":{upd},\"del\":{del}}}");
+            }
+        }));
+    }
+    for h in handles { h.join().unwrap(); }
+
+    // replay the merged logs into the reference model (seed 50 docs first)
+    let mut model: Model = (0..50u32).map(|i| (i, (1u64, "seed".to_string(), i as i64))).collect();
+    for line in std::fs::read_to_string(format!("{out}/operation-log.jsonl")).unwrap().lines() {
+        let j: serde_json::Value = serde_json::from_str(line).unwrap();
+        let idx = j["idx"].as_u64().unwrap() as u32;
+        let i = j["i"].as_u64().unwrap();
+        if j["del"].as_bool().unwrap() {
+            model.remove(&idx);
+        } else if j["upd"].as_bool().unwrap() {
+            model.insert(idx, (2, "w2".to_string(), i as i64));
+        } else if j["ins"].as_bool().unwrap() {
+            model.insert(idx, (1, "w".to_string(), i as i64));
+        }
+    }
+    let e2 = std::sync::Arc::clone(&e);
+    let (obs, iss) = export_state(&e2);
+    checks.push(("replay_exact_state".into(), obs == model && iss.is_empty(),
+                 if obs == model { format!("docs={}", obs.len()) } else {
+                     let miss: Vec<_> = model.keys().filter(|k| !obs.contains_key(k)).take(5).collect();
+                     let extra: Vec<_> = obs.keys().filter(|k| !model.contains_key(k)).take(5).collect();
+                     let diff: Vec<_> = model.iter().filter(|(k, v)| obs.get(k) != Some(*v)).take(5).collect();
+                     format!("miss={miss:?} extra={extra:?} diff={diff:?}")
+                 }));
+    checks.push(("replay_checker".into(), checker_report(&e, dir)["clean"].as_bool().unwrap_or(false), String::new()));
+
+    // ---- phase 2: same-key contention (two writers, same 100 keys)
+    let mut wh = Vec::new();
+    for w in 0..2usize {
+        let e = std::sync::Arc::clone(&e);
+        wh.push(std::thread::spawn(move || {
+            let letter = if w == 0 { "a" } else { "b" };
+            // insert baseline for my parity keys, then EVERY writer updates
+            // every key with (fields.version == num == seq): a torn mix would
+            // break version==num or the cat/parity pairing.
+            for k in 5000..5100u32 {
+                let r = doc_record(k, 1, letter, 1);
+                let _ = e.insert_document("bench", r);
+            }
+            for seq in 1..=150u64 {
+                for k in 5000..5100u32 {
+                    let r = doc_record(k, seq, letter, seq as i64);
+                    let _ = e.update_document("bench", &uuid_for(k, 1).to_string(), r.fields, r.k_vecs);
+                }
+            }
+        }));
+    }
+    for h in wh { h.join().unwrap(); }
+    let (obs2, _) = export_state(&e);
+    let mut torn = 0usize;
+    let mut missing = 0usize;
+    for k in 5000..5100u32 {
+        match obs2.get(&k) {
+            None => missing += 1,
+            Some((v, c, n)) => {
+                // torn-mix probe: fields.version and fields.num always travel
+                // together in every writer op; a record mixing two writers'
+                // writes would break n == v. cat must be one writer's letter.
+                let owned = c == "a" || c == "b";
+                if !owned || *n != *v as i64 || *v < 1 {
+                    torn += 1;
+                }
+            }
+        }
+    }
+    checks.push(("contention_atomic_records".into(), torn == 0 && missing == 0,
+                 format!("torn={torn} missing={missing}")));
+    checks.push(("contention_checker".into(), checker_report(&e, dir)["clean"].as_bool().unwrap_or(false), String::new()));
+    let _ = std::fs::remove_dir_all(dir);
+
+    let (pass, fail) = checks.iter().fold((0usize, 0usize), |(p, f), c| if c.1 { (p + 1, f) } else { (p, f + 1) });
+    let mut csv = String::from("check,ok,detail\n");
+    for (n, ok, d) in &checks { let _ = writeln!(csv, "{n},{ok},\"{}\"", d.replace('"', "'")); }
+    std::fs::write(format!("{out}/results.csv"), &csv).unwrap();
+    write_json(&format!("{out}/metrics.json"), &serde_json::json!({
+        "passed": pass, "failed": fail,
+        "writers": 2, "logged_ops": 500, "contention_keys": 100,
+        "model": "mutation-gate serialized; per-key last-write-wins; records never torn; no cross-key ordering guarantee",
+    }));
+    format!("concurreplay: {pass} passed, {fail} FAILED")
+}
+
+// ---------------------------------------------------------------- backup inventory
+
+/// §28: backup inventory + INDEPENDENT integrity verification. Quiescent
+/// database (documented requirement): populate -> flush -> checkpoint ->
+/// close -> copy -> per-file sha256(source) vs sha256(backup) -> restore ->
+/// per-file sha256(restored) vs backup -> state equality + checker.
+fn run_backup_inventory(dir: &std::path::Path, out: &str) -> String {
+    use attentiondb_core::backup::{copy_database_dir, restore_backup};
+    fn sha256(p: &std::path::Path) -> String {
+        let o = std::process::Command::new("sha256sum").arg(p).output();
+        match o {
+            Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout)
+                .split_whitespace().next().unwrap_or("?").to_string(),
+            _ => "HASH_ERROR".to_string(),
+        }
+    }
+    fn inventory(root: &std::path::Path) -> Vec<(String, u64, String)> {
+        let mut rows = Vec::new();
+        fn walk(dir: &std::path::Path, rel: &str, rows: &mut Vec<(String, u64, String)>) {
+            for ent in std::fs::read_dir(dir).unwrap().flatten() {
+                let p = ent.path();
+                let r = if rel.is_empty() {
+                    ent.file_name().to_string_lossy().to_string()
+                } else {
+                    format!("{rel}/{}", ent.file_name().to_string_lossy())
+                };
+                if p.is_dir() {
+                    walk(&p, &r, rows);
+                } else {
+                    let sz = ent.metadata().map(|m| m.len()).unwrap_or(0);
+                    rows.push((r, sz, String::new()));
+                }
+            }
+        }
+        walk(root, "", &mut rows);
+        rows.sort();
+        for row in rows.iter_mut() {
+            row.2 = sha256(&root.join(&row.0));
+        }
+        rows
+    }
+
+    let _ = std::fs::remove_dir_all(dir);
+    std::fs::create_dir_all(dir).unwrap();
+    let mut checks: Vec<(String, bool, String)> = Vec::new();
+    {
+        let e = open_db(dir);
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        for idx in 0..120u32 {
+            e.insert_document("bench", doc_record(idx, 1, "a", idx as i64)).unwrap();
+        }
+        for idx in 0..30u32 {
+            let r = doc_record(idx, 2, "b", idx as i64 * 2);
+            e.update_document("bench", &uuid_for(idx, 1).to_string(), r.fields, r.k_vecs).unwrap();
+        }
+        for idx in 100..120u32 {
+            e.delete_document("bench", &uuid_for(idx, 1).to_string()).unwrap();
+        }
+        e.flush_wal().unwrap();
+        e.checkpoint().unwrap();
+    } // engine dropped: quiescent (documented backup requirement)
+
+    let bak = std::path::PathBuf::from(format!("{}.bak", dir.display()));
+    let rdir = std::path::PathBuf::from(format!("{}.restored", dir.display()));
+    let _ = std::fs::remove_dir_all(&bak);
+    let _ = std::fs::remove_dir_all(&rdir);
+    let copy_ok = copy_database_dir(dir, &bak).is_ok();
+    let src_state = open_db(dir);
+    let (before, _) = export_state(&src_state);
+    drop(src_state);
+
+    let mut inv = Vec::new();
+    if copy_ok {
+        let src_inv = inventory(dir);
+        let mut bak_inv = inventory(&bak);
+        // backup-meta.json is the manifest copy_database_dir itself writes —
+        // it is expected in the backup and absent from the source
+        bak_inv.retain(|(p, _, _)| p != "backup-meta.json");
+        checks.push(("copy_fidelity_files".into(), src_inv.len() == bak_inv.len(),
+                     format!("src_files={} bak_files={} (+backup-meta.json)", src_inv.len(), bak_inv.len())));
+        let mismatch = src_inv.iter().zip(bak_inv.iter())
+            .filter(|(a, b)| a.0 != b.0 || a.2 != b.2).count();
+        checks.push(("copy_fidelity_hashes".into(), mismatch == 0,
+                     format!("mismatched={mismatch}")));
+        inv = bak_inv.clone();
+        let m = restore_backup(&bak, &rdir);
+        checks.push(("restore_manifest".into(), m.is_ok(), String::new()));
+        if m.is_ok() {
+            let rst_inv = inventory(&rdir);
+            let rmiss = bak_inv.iter().filter(|b| !rst_inv.iter().any(|r| r.0 == b.0 && r.2 == b.2)).count();
+            checks.push(("restore_fidelity_hashes".into(), rmiss == 0,
+                         format!("missing_or_diff={rmiss} (restored_files={})", rst_inv.len())));
+            let re = open_db(&rdir);
+            let (after, iss) = export_state(&re);
+            checks.push(("restore_state_equals_source".into(), after == before && iss.is_empty(),
+                         format!("before={} after={}", before.len(), after.len())));
+            checks.push(("restore_checker".into(), checker_report(&re, &rdir)["clean"].as_bool().unwrap_or(false), String::new()));
+        }
+    } else {
+        checks.push(("copy_fidelity_files".into(), false, "copy failed".into()));
+    }
+    let total_bytes: u64 = inv.iter().map(|r| r.1).sum();
+    // persist the inventory (§28 record: size, files, checksums)
+    let mut ic = String::from("path,size_bytes,sha256\n");
+    for (p, sz, h) in &inv {
+        let _ = writeln!(ic, "{p},{sz},{h}");
+    }
+    std::fs::write(format!("{out}/inventory.csv"), &ic).unwrap();
+    let _ = std::fs::remove_dir_all(&bak);
+    let _ = std::fs::remove_dir_all(&rdir);
+    let _ = std::fs::remove_dir_all(dir);
+
+    let (pass, fail) = checks.iter().fold((0usize, 0usize), |(p, f), c| if c.1 { (p + 1, f) } else { (p, f + 1) });
+    let mut csv = String::from("check,ok,detail\n");
+    for (n, ok, d) in &checks { let _ = writeln!(csv, "{n},{ok},\"{}\"", d.replace('"', "'")); }
+    std::fs::write(format!("{out}/results.csv"), &csv).unwrap();
+    write_json(&format!("{out}/metrics.json"), &serde_json::json!({
+        "passed": pass, "failed": fail,
+        "files": inv.len(), "total_bytes": total_bytes,
+        "note": "quiescent backup; sizes+checksums recorded in inventory.csv",
+    }));
+    format!("backupinv: {pass} passed, {fail} FAILED (files={} bytes={total_bytes})", inv.len())
+}
+
+// ---------------------------------------------------------------- wal integrity
+
+/// Phase 3E E1 evidence run: the WAL-integrity matrix on real engine dirs.
+/// Each case builds an isolated DB, applies file surgery, and attempts
+/// open_dir — verdict OPENED (n docs) or REFUSED (error class). Never repairs.
+fn run_walintegrity(out: &str) -> String {
+    use attentiondb_storage::read_wal_state;
+    let dim = 16usize;
+    let head = "default";
+    let mk = |i: usize| {
+        let mut fields = std::collections::HashMap::new();
+        fields.insert("idx".to_string(), serde_json::json!(i));
+        let mut r = Record::new(fields);
+        r.k_vecs.insert(head.to_string(), {
+            let mut v = vec![0.0f32; dim];
+            v[i % dim] = 1.0;
+            v
+        });
+        r
+    };
+    struct Case {
+        name: &'static str,
+        checkpoint: bool,
+        surgery: &'static dyn Fn(&std::path::Path),
+    }
+    let cases = vec![
+        Case {
+            name: "delete_required_segment_pre_checkpoint",
+            checkpoint: false,
+            surgery: &|d| {
+                let mut segs: Vec<_> = wal_files(d);
+                segs.sort();
+                std::fs::remove_file(segs.remove(0)).unwrap();
+            },
+        },
+        Case {
+            name: "delete_all_segments_post_checkpoint",
+            checkpoint: true,
+            surgery: &|d| {
+                for f in wal_files(d) {
+                    std::fs::remove_file(f).unwrap();
+                }
+            },
+        },
+        Case {
+            name: "rename_segment_gap",
+            checkpoint: false,
+            surgery: &|d| {
+                let mut segs: Vec<_> = wal_files(d);
+                segs.sort();
+                let first = segs.remove(0);
+                std::fs::rename(first, d.join("WAL").join("00000000000000001000.wal")).unwrap();
+            },
+        },
+        Case {
+            name: "corrupt_wal_state_record",
+            checkpoint: false,
+            surgery: &|d| {
+                std::fs::write(d.join("WAL").join("wal-state.json"), b"{ broken").unwrap();
+            },
+        },
+        Case {
+            name: "delete_wal_state_record_legacy",
+            checkpoint: true,
+            surgery: &|d| {
+                std::fs::remove_file(d.join("WAL").join("wal-state.json")).unwrap();
+            },
+        },
+        Case {
+            name: "truncate_torn_tail",
+            checkpoint: false,
+            surgery: &|d| {
+                let mut segs: Vec<_> = wal_files(d);
+                segs.sort();
+                let b = std::fs::read(&segs[0]).unwrap();
+                std::fs::write(&segs[0], &b[..b.len() * 3 / 5]).unwrap();
+            },
+        },
+        Case {
+            name: "corrupt_frame",
+            checkpoint: false,
+            surgery: &|d| {
+                let mut segs: Vec<_> = wal_files(d);
+                segs.sort();
+                let p = &segs[0];
+                let mut b = std::fs::read(p).unwrap();
+                let at = (b.len() / 2).max(40).min(b.len() - 1);
+                b[at] ^= 0xFF;
+                std::fs::write(p, &b).unwrap();
+            },
+        },
+        Case {
+            name: "corrupt_current_manifest_fallback",
+            checkpoint: true,
+            surgery: &|d| {
+                std::fs::write(d.join("CURRENT"), b"manifest-999999999\n").unwrap();
+            },
+        },
+        Case {
+            name: "corrupt_all_manifests",
+            checkpoint: true,
+            surgery: &|d| {
+                std::fs::write(d.join("CURRENT"), b"manifest-999999999\n").unwrap();
+                for e in std::fs::read_dir(d.join("MANIFEST")).unwrap().flatten() {
+                    let p = e.path();
+                    if p.extension().is_none() {
+                        std::fs::write(&p, b"CORRUPTED").unwrap();
+                    }
+                }
+            },
+        },
+        Case {
+            name: "fresh_no_documents",
+            checkpoint: false,
+            surgery: &|_d| {},
+        },
+        Case {
+            name: "trimmed_reopen",
+            checkpoint: true,
+            surgery: &|_d| {},
+        },
+    ];
+
+    let mut rows = String::from("case,checkpoint,verdict,detail\n");
+    let mut refused = 0usize;
+    let mut opened = 0usize;
+    for c in &cases {
+        let dir = std::path::PathBuf::from(format!("/tmp/ph3e-wal-{}", c.name));
+        let _ = std::fs::remove_dir_all(&dir);
+        {
+            let e = open_db(&dir);
+            e.create_collection("bench", dim, &[head]).unwrap();
+            for i in 0..20usize {
+                e.insert_document("bench", mk(i)).unwrap();
+            }
+            if c.checkpoint {
+                e.close().unwrap();
+            }
+        }
+        (c.surgery)(&dir);
+        let line = match AttentionEngine::open_dir(&dir, Durability::Sync) {
+            Err(e) => {
+                refused += 1;
+                let msg = format!("{e}");
+                let code = if msg.contains("WAL_LOST_SEGMENT") {
+                    "WAL_LOST_SEGMENT"
+                } else if msg.contains("WAL integrity record") {
+                    "WAL_STATE_CORRUPT"
+                } else if msg.contains("WAL replay failed") {
+                    "WAL_REPLAY_CORRUPTION"
+                } else if msg.contains("manifest") || msg.contains("catalog") {
+                    "MANIFEST_UNREADABLE"
+                } else {
+                    "REFUSED"
+                };
+                format!("{},{},REFUSED,{}", c.name, c.checkpoint, code)
+            }
+            Ok(e) => {
+                opened += 1;
+                let ws = read_wal_state(&dir.join("WAL")).ok().flatten();
+                let n = e.document_store.read().list_all_records().len();
+                let rep = checker_report(&e, &dir);
+                let clean = rep["clean"].as_bool().unwrap_or(false);
+                format!(
+                    "{},{},OPENED,docs={} checker_clean={} watermark={}",
+                    c.name,
+                    c.checkpoint,
+                    n,
+                    clean,
+                    ws.map(|w| w.high_watermark.to_string()).unwrap_or("-".into())
+                )
+            }
+        };
+        rows.push_str(&line);
+        rows.push('\n');
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+    std::fs::write(format!("{out}/wal-integrity.csv"), &rows).unwrap();
+    write_json(
+        &format!("{out}/metrics.json"),
+        &serde_json::json!({"cases": cases.len(), "refused": refused, "opened": opened}),
+    );
+    format!("walintegrity: {} cases, {refused} refused, {opened} opened", cases.len())
+}
+
+fn wal_files(db_dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+    std::fs::read_dir(db_dir.join("WAL"))
+        .unwrap()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("wal"))
+        .collect()
+}
+
+// ---------------------------------------------------------------- dispatch
+
+pub fn run(args: &[String]) -> String {
+    let get = |name: &str, default: &str| -> String {
+        args.iter().position(|a| a == name).and_then(|i| args.get(i + 1).cloned()).unwrap_or_else(|| default.to_string())
+    };
+    let dir = std::path::PathBuf::from(get("--dir", "/var/tmp/ph3d-db"));
+    let out = get("--out", "research/phase3/raw/runs/PH3D-OUT");
+    std::fs::create_dir_all(&out).unwrap();
+    match args.first().map(|s| s.as_str()).unwrap_or("model") {
+        "model" => run_model(&dir, get("--seed", "42").parse().unwrap_or(42),
+                             get("--ops", "300").parse().unwrap_or(300), &out),
+        "filterx" => run_filterx(&dir, &out),
+        "txn" => run_txn(&dir, &out),
+        "txnchild" => txn_child(&dir),
+        "crashchild" => {
+            let n: usize = get("--n", "40").parse().unwrap_or(40);
+            run_crashchild(&dir, &get("--point", "after_acks"), n)
+        }
+        "verify" => run_verify(&dir, &get("--point", "?")),
+        "walcorrupt" => run_walcorrupt_verify(&dir, &get("--mode", "?")),
+        "concur" => {
+            let r: usize = get("--readers", "4").parse().unwrap_or(4);
+            let w: usize = get("--writers", "0").parse().unwrap_or(0);
+            run_concur(&dir, r, w, &out)
+        }
+        "backup" => run_backup(&dir, &out),
+        "backupinv" => run_backup_inventory(&dir, &out),
+        "integration" => run_integration(&dir, &out),
+        "concurreplay" => run_concur_replay(&dir, &out),
+        "compact" => run_compact(&dir, &out),
+        "walintegrity" => run_walintegrity(&out),
+        "compactlive" => run_compact_live(&dir),
+        other => format!("unknown dbtest subcommand {other}"),
+    }
+}

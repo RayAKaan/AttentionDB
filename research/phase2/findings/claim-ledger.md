@@ -98,3 +98,60 @@ improves retrieval" = NOT SUPPORTED (multiview; controlled/noise
 untestable on frozen caches per HC-6). §29 STOP condition engaged: no
 deeper/cross-attention architectures. Gating retained as the architecture;
 QK optional (no measured benefit anywhere).
+
+**Addendum 3 (2026-09-17, PH3D).** Database validation (Phase 3D): new claims, each
+run-backed — correctness of mixed-workload state vs a reference model (PH3D-STATE-001..004,
+0/24 gated checks failed); filter SOUNDNESS guaranteed / completeness candidate-bound,
+recall 0.967–1.0 (PH3D-FILTER-001); acked-write durability per selected mode with
+GroupCommit/Sync ALL_ACKED at 7 crash points and Async proper-prefix + explicit
+committed-txn-loss semantics (PH3D-CRASH-001..003, 21/21 contract-consistent, zero
+resurrection); WAL corruption detect-and-refuse (torn tail warned+truncated; corrupt
+frame/gapped segment refuses open; pre-checkpoint segment deletion undetectable — OPEN);
+transactions all-or-nothing under crash and injected failure, NO update op, NO isolation
+claim (PH3D-TX-001); concurrency stable with zero errors, p99 tail growth documented, NO
+linearizability claim (PH3D-CONC-001/002); backup/restore exact on the quiescent path,
+online backup UNSUPPORTED/documented (PH3D-BACKUP-001). Two product fixes with regression
+tests: `compact_all` now resolves `db_dir/sst` (was an unreachable silent no-op) and
+`check_db_dir` WAL-gap invariant replaces a post-checkpoint false positive. No ACID/
+linearizability/production-ready claims beyond what these runs justify; production
+readiness recorded only as a 25-capability matrix (results/production-readiness.csv),
+never a single score. Memory optimization NOT attempted (PH3D-MEM-OPT-001 reserved).
+
+**Addendum 4 (2026-09-17, PH3D audit closure).** Re-audit of Phase 3D against the full
+spec: registered the spec-conforming IDs PH3D-MUTATION-001, PH3D-RECOVERY-001,
+PH3D-COMPACTION-001, PH3D-CONCURRENCY-001 (child runs mapping to the delivered families;
+parent-map.json in each run dir) and ran three NEW experiments — PH3D-INTEGRATION-001
+(multi-collection isolation across restart/compaction/backup-restore 16/16; graceful
+close→reopen durability for all four mutation kinds; filter × multi-head soundness;
+discovered + documented: engine uuid identity is GLOBAL, collections are membership tags,
+same-uuid insert re-members the document — multi-collection callers must namespace ids),
+PH3D-CONC-003 (deterministic concurrent mutation logs; merged-log replay == observed state
+exactly, 450 docs; same-key contention 100 keys × 150 rounds, 0 torn records — visibility
+model documented, no linearizability claim), PH3D-BACKUP-002 (per-file size+sha256 backup
+inventory; independent integrity: source==backup and backup==restored, 0 mismatches).
+Crash-point mapping to the spec's 10 points, txn-failure injection granularity, §21
+UNSUPPORTED update-combos, §34 fuzz scope, and §41–42 numbering recorded in
+methodology/ph3d-spec-deviations.md. Deterministic fuzz regression tests added for the WAL
+parser (random bytes + truncated valid WALs: never panic, strict prefix or error) and
+filter validate/eval. All prior PH3D claims unchanged; tables renumbered to spec order
+(1–8 + extras 9–11); figures renamed figure-ph3d-1..3 (PH3C 1–9 untouched).
+
+## Addendum 5 (2026-09-17) — Phase 3E E1: WAL-integrity refusal invariant
+
+**Change:** durable rotation-time WAL high-water sidecar (`WAL/wal-state.json`) +
+`open_dir` refusal of databases missing required WAL history (`WAL_LOST_SEGMENT`,
+`WAL_SEQ_GAP`, `WAL_STATE_CORRUPT`). Closes the PH3D-WALCORRUPT-001 `delete_segment`
+OPEN hole (previously: deleted pre-checkpoint segment → apparently-valid empty DB).
+
+**Claim now justified:** "a single-node AttentionDB database whose required pre-checkpoint
+WAL history has been deleted or gapped REFUSES to open, and reports the loss — it never
+opens as an apparently-valid partial database." Evidence: PH3E-WAL-001 (11 cases, 6
+refusals, 5 legitimate opens, 0 expectation mismatches) + 9 engine unit tests.
+
+**Boundary (documented, not hidden):** watermark anchors at segment rotation, not per
+append — loss of the post-last-rotation ACTIVE segment remains undetectable while no
+watermark covers it (bounded by the segment-size threshold). Legacy sidecar-less DBs open
+with pre-E1 semantics. The catalog gains NO field (bincode v1 positional) — sidecar only.
+
+**Not claimed:** durability level changes (E2 pending); crash-machine coverage (E3
+pending); no ACID/linearizability/exactly-once vocabulary introduced by E1.

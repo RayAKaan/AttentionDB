@@ -1,0 +1,4 @@
+{
+ "consistency_reports": "per-point engine+dir checker gate; all clean",
+ "run": "PH3D-CRASH-001"
+}

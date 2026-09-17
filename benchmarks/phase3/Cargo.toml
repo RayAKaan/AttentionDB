@@ -9,5 +9,7 @@ publish = false
 attentiondb-core = { path = "../../core" }
 attentiondb-storage = { path = "../../storage" }
 attentiondb-learned = { path = "../../learned" }
+attentiondb-query = { path = "../../query" }
+uuid = { version = "1.7", features = ["v4"] }
 phase2b-bench = { path = "../phase2b" }
 serde_json = "1"

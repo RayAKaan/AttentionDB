@@ -1,0 +1,7 @@
+run_id=PH3D-WALCORRUPT-001
+experiment=WAL corruption handling (§14): detect + report only; no silent false recovery
+date=2026-09-17
+method=benchmarks/phase3/src/dbtest.rs via 'phase3-bench dbtest <subcommand>' (deterministic; DIM=32, head h)
+config=see config.json
+status=COMPLETED — torn tail recovers intact prefix (clean); garbage/CRC-corrupt/gapped segments refuse to open; deleted pre-checkpoint segment opens empty (undetectable, documented OPEN limitation)
+notes=5 modes; crashchild after_flush populates 40 docs first

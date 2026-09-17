@@ -543,4 +543,107 @@ mod tests {
         }
         .eval(&empty));
     }
+
+    /// §34 fuzz: filter construction + validate + eval must be total — no
+    /// panics on deterministic pseudo-random expression trees; validate()
+    /// must reject over-deep trees.
+    #[test]
+    fn filter_validate_eval_fuzz_no_panic() {
+        let fields = fields(&[
+            ("cat", json!("sport")),
+            ("num", json!(42)),
+            ("f", json!(1.5)),
+            ("flag", json!(true)),
+            ("empty", Value::Null),
+        ]);
+        let leaf_fields = ["cat", "num", "f", "flag", "empty", "missing"];
+        let mut x = 0x1234_5678_9ABC_DEF0u64;
+        let mut next = || {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            x
+        };
+        let mk_value = |n: u64| match n % 5 {
+            0 => FilterValue::Str("sport".into()),
+            1 => FilterValue::Int((n % 200) as i64),
+            2 => FilterValue::Float((n % 97) as f64),
+            3 => FilterValue::Bool(n % 2 == 0),
+            _ => FilterValue::Null,
+        };
+        for _ in 0..256u32 {
+            let expr = build_random(next(), &leaf_fields, &mk_value, 0);
+            let _ = expr.node_count();
+            let v = expr.validate();
+            assert!(v.is_ok(), "bounded random tree must validate");
+            let _ = expr.eval(&fields); // total: no panic
+            let neg = FilterExpr::Not(Box::new(expr));
+            assert!(neg.validate().is_ok());
+            let _ = neg.eval(&fields);
+        }
+        // over-deep chain must be rejected by validate
+        let mut deep = FilterExpr::Comparison {
+            field: "num".into(),
+            op: FilterOp::Eq,
+            value: FilterValue::Int(1),
+        };
+        for _ in 0..(MAX_FILTER_DEPTH + 2) {
+            deep = FilterExpr::Not(Box::new(deep));
+        }
+        assert!(deep.validate().is_err(), "over-deep filter must fail validation");
+    }
+
+    fn build_random(
+        mut n: u64,
+        leaf_fields: &[&str],
+        mk_value: &impl Fn(u64) -> FilterValue,
+        depth: usize,
+    ) -> FilterExpr {
+        n = n.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        if depth >= 3 {
+            return FilterExpr::Comparison {
+                field: leaf_fields[(n % leaf_fields.len() as u64) as usize].to_string(),
+                op: match n % 6 {
+                    0 => FilterOp::Eq,
+                    1 => FilterOp::Ne,
+                    2 => FilterOp::Gt,
+                    3 => FilterOp::Gte,
+                    4 => FilterOp::Lt,
+                    _ => FilterOp::Lte,
+                },
+                value: mk_value(n >> 8),
+            };
+        }
+        match n % 5 {
+            0 => FilterExpr::And(
+                Box::new(build_random(n ^ 1, leaf_fields, mk_value, depth + 1)),
+                Box::new(build_random(n ^ 2, leaf_fields, mk_value, depth + 1)),
+            ),
+            1 => FilterExpr::Or(
+                Box::new(build_random(n ^ 3, leaf_fields, mk_value, depth + 1)),
+                Box::new(build_random(n ^ 4, leaf_fields, mk_value, depth + 1)),
+            ),
+            2 => FilterExpr::IsNull {
+                field: leaf_fields[(n % leaf_fields.len() as u64) as usize].to_string(),
+                negated: n % 2 == 0,
+            },
+            3 => FilterExpr::In {
+                field: leaf_fields[(n % leaf_fields.len() as u64) as usize].to_string(),
+                values: (0..3).map(|k| mk_value(n.wrapping_add(k))).collect(),
+                negated: n % 2 == 1,
+            },
+            _ => FilterExpr::Comparison {
+                field: leaf_fields[(n % leaf_fields.len() as u64) as usize].to_string(),
+                op: match n % 6 {
+                    0 => FilterOp::Eq,
+                    1 => FilterOp::Ne,
+                    2 => FilterOp::Gt,
+                    3 => FilterOp::Gte,
+                    4 => FilterOp::Lt,
+                    _ => FilterOp::Lte,
+                },
+                value: mk_value(n >> 8),
+            },
+        }
+    }
 }

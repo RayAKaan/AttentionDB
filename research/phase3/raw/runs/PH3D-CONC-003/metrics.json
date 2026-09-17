@@ -1,0 +1,8 @@
+{
+  "contention_keys": 100,
+  "failed": 0,
+  "logged_ops": 500,
+  "model": "mutation-gate serialized; per-key last-write-wins; records never torn; no cross-key ordering guarantee",
+  "passed": 4,
+  "writers": 2
+}

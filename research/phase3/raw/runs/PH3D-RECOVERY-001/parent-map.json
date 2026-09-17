@@ -1,0 +1,1 @@
+{"child_run": "PH3D-RECOVERY-001", "parents": ["PH3D-WALCORRUPT-001","PH3D-CRASH-001","PH3D-CRASH-002","PH3D-CRASH-003","PH3D-STATE-001","PH3D-STATE-002","PH3D-STATE-003"], "role": "WAL replay + recovery family (§13-14): mixed-op replay, torn/corrupt handling, restart equivalence"}

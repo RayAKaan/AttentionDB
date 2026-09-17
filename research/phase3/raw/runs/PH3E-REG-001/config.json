@@ -1,0 +1,1 @@
+{"model": {"seed": 42, "ops": 300}, "crash_legs": ["after_acks", "after_flush", "after_checkpoint", "mid_inserts", "mid_flush", "during_commit_txn", "after_compact"], "crash_durability": "group", "suites": ["filterx", "integration"]}

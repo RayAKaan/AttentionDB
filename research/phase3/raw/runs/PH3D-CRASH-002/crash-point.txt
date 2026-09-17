@@ -1,0 +1,8 @@
+durability=async
+after_acks,PREFIX,35/40,txn=0/10 marker= ABSENT
+after_flush,ALL_ACKED,40/40,txn=0/10 marker= ABSENT
+after_checkpoint,ALL_ACKED,40/40,txn=0/10 marker= ABSENT
+mid_inserts,PREFIX,11/21,txn=0/10 marker= ABSENT
+mid_flush,PREFIX,35/40,txn=0/10 marker= ABSENT
+during_commit_txn,ALL_ACKED,40/40,txn=0/10 marker=committed COMMITTED_NOT_DURABLE_ASYNC
+after_compact,PREFIX,35/40,txn=0/10 marker= ABSENT

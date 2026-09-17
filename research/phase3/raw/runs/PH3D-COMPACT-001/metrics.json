@@ -1,0 +1,8 @@
+{
+  "compaction_error": "",
+  "compaction_ran": true,
+  "docs": 310,
+  "failed": 0,
+  "merged_files_removed": 2,
+  "passed": 5
+}

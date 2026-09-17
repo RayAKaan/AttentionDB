@@ -78,11 +78,15 @@ pub fn compact(
 /// Full compaction: merge EVERY SSTable in the directory and reclaim tombstones.
 /// Safe because no unmerged file can hold an older version of any key.
 pub fn compact_all(dir: &Path) -> Result<Option<CompactionResult>, StorageError> {
-    let sst_paths = list_sst_files(dir)?;
+    // `dir` is the database dir; SSTables live in its `sst/` subdirectory
+    // (Catalog::sst_dir). Resolving here keeps the public contract dir-level —
+    // passing the db root used to scan the wrong directory and silently no-op.
+    let sst_dir = crate::catalog::Catalog::sst_dir(dir);
+    let sst_paths = list_sst_files(&sst_dir)?;
     if sst_paths.len() < 2 {
         return Ok(None);
     }
-    do_compact(dir, sst_paths, true)
+    do_compact(&sst_dir, sst_paths, true)
 }
 
 fn list_sst_files(dir: &Path) -> Result<Vec<PathBuf>, StorageError> {
@@ -200,6 +204,32 @@ mod tests {
             rec.tags.push("__TOMBSTONE__".to_string());
         }
         rec
+    }
+
+    #[test]
+    #[test]
+    fn compact_all_resolves_sst_subdir_from_db_root() {
+        // regression: compact_all(db_root) must find sstables in db_root/sst/
+        let base = tempdir().unwrap();
+        let sst_dir = crate::catalog::Catalog::sst_dir(base.path());
+        std::fs::create_dir_all(&sst_dir).unwrap();
+        for gen in 0..2 {
+            let p = sst_dir.join(format!("gen{gen}.sst"));
+            let mut w = SSTableWriter::new(&p).unwrap();
+            let key = format!("k{gen}").into_bytes();
+            let rec = Record::new(
+                [("idx".to_string(), serde_json::json!(gen))]
+                    .into_iter()
+                    .collect(),
+            );
+            w.append(key, rec.to_msgpack().unwrap()).unwrap();
+            w.flush().unwrap();
+        }
+        let r = compact_all(base.path()).unwrap();
+        assert!(r.is_some(), "compact_all(db_root) must merge sst/ files");
+        assert_eq!(r.as_ref().unwrap().files_merged, 2);
+        cleanup_merged_files(r.as_ref().unwrap()).unwrap();
+        assert_eq!(list_sst_files(&sst_dir).unwrap().len(), 1);
     }
 
     #[test]

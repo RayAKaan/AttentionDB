@@ -1,0 +1,7 @@
+check,ok,detail
+copy_fidelity_files,true,"src_files=6 bak_files=6 (+backup-meta.json)"
+copy_fidelity_hashes,true,"mismatched=0"
+restore_manifest,true,""
+restore_fidelity_hashes,true,"missing_or_diff=0 (restored_files=6)"
+restore_state_equals_source,true,"before=100 after=100"
+restore_checker,true,""

@@ -1,0 +1,1 @@
+{"collections": {"alpha": 60, "beta": 40, "gamma": 24}, "probes": ["multi-collection isolation live/restart/compact/backup-restore", "graceful close->reopen durability (insert/update/delete/upsert)", "filter x multi-head (h+h2) soundness+determinism+zero-match"], "uuid_namespacing": "uuidc(coll,idx,version) — engine uuid identity is GLOBAL across collections"}

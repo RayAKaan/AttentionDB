@@ -1,0 +1,7 @@
+run_id=PH3D-COMPACT-002
+experiment=compaction-under-load probe (§27): document (not gate) live-invocation behavior
+date=2026-09-17
+method=benchmarks/phase3/src/dbtest.rs via 'phase3-bench dbtest <subcommand>' (deterministic; DIM=32, head h)
+config=see config.json
+status=COMPLETED — compactlive,COMPACTED_WHILE_OPEN,merged=3,out_entries=80 (NOT cleaning up; engine holds the dir)
+notes=documented: compact_all is offline; uncoordinated with mutation gate; never cleaned up while open

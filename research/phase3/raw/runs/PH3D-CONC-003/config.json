@@ -1,0 +1,1 @@
+{"phase1": "2 writers x 250 disjoint-key ops (ins/upd/del) with per-writer deterministic logs; merged-log replay must equal observed state", "phase2": "2 writers x 150 update rounds on the SAME 100 keys; per-record torn-mix probe (fields.version==fields.num, cat in {a,b})"}

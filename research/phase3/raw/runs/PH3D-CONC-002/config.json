@@ -1,0 +1,1 @@
+{"matrix": ["1x1","2x1","4x1","4x2","8x2","16x4"], "writer_cycle": "insert -> update(i%2) -> delete(i%5==4) -> flush(i%25==24)", "docs_initial": 300, "window_s": 4}

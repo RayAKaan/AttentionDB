@@ -1,0 +1,3 @@
+{"seed": 42, "ops": 100, "n_initial_docs": 200, "collections": ["bench","other"],
+ "op_mix": {"upsert": 0.30, "update": 0.20, "delete": 0.15, "query": 0.15, "filter": 0.12, "checkpoint": 0.03, "compact": 0.03, "restart": 0.02},
+ "durability": "async", "checker_gates": ["initial", "per-compact", "final"]}

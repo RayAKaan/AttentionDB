@@ -1,0 +1,7 @@
+run_id=PH3D-COMPACT-001
+experiment=offline compaction before/after equivalence (§26) incl. tombstone GC
+date=2026-09-17
+method=phase3-bench dbtest compact (close -> compact_all(db_dir) -> cleanup_merged_files -> reopen)
+config=see config.json
+status=COMPLETED — compact: 5 passed, 0 FAILED (ran=true removed=2)
+notes=compact_all fixed in PH3D to resolve db_dir/sst (was a silent no-op); regression test compact_all_resolves_sst_subdir_from_db_root in storage tests

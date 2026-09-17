@@ -1,0 +1,1 @@
+{"generations": 2, "churn": "100 updates + 50 deletes + 60 inserts + 30 updates", "method": "close -> compact_all(db_dir) -> cleanup -> reopen"}

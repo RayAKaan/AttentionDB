@@ -19,6 +19,7 @@ use attentiondb_learned::gating_v2::{
 };
 use attentiondb_storage::{Durability, Record};
 
+mod dbtest;
 mod headsqual;
 mod memprobe;
 mod textqual;
@@ -802,6 +803,12 @@ fn uniform_weights(n: usize) -> Vec<f32> {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    if args.get(1).map(|s| s.as_str()) == Some("dbtest") {
+        // Phase 3D harness has its own flag parser; bypass the quality-arg loop.
+        let rest: Vec<String> = args[2..].to_vec();
+        println!("{}", crate::dbtest::run(&rest));
+        return;
+    }
     let cmd = args.get(1).map(|s| s.as_str()).unwrap_or("quality");
     let mut tier = "S".to_string();
     let mut data = "/tmp/phase3/fashion-S".to_string();

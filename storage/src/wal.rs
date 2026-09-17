@@ -127,6 +127,65 @@ pub enum Durability {
 }
 
 /// Result of replaying the log.
+/// Durable WAL watermark record (Phase 3E E1). Written atomically at every
+/// segment creation; absent for legacy databases (pre-adoption) and for a
+/// brand-new empty database.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct WalState {
+    pub format_version: u32,
+    /// highest sequence number inside COMPLETED segments at write time
+    /// (equal to the last seq before the active segment started; 0 while the
+    /// first segment is still the active one)
+    pub high_watermark: u64,
+    /// sequence number the active segment was created at
+    pub active_start: u64,
+}
+
+pub const WAL_STATE_FORMAT_VERSION: u32 = 1;
+pub const WAL_STATE_FILE: &str = "wal-state.json";
+
+/// Atomically persist the WAL state record (tmp -> rename -> fsync dir).
+pub fn write_wal_state(wal_dir: &Path, state: &WalState) -> Result<(), crate::error::StorageError> {
+    let tmp = wal_dir.join(format!("{WAL_STATE_FILE}.tmp"));
+    let final_path = wal_dir.join(WAL_STATE_FILE);
+    {
+        let mut f = File::create(&tmp)?;
+        serde_json::to_writer_pretty(&mut f, state)
+            .map_err(|e| crate::error::StorageError::Serialization(e.to_string()))?;
+        f.sync_all()?;
+    }
+    std::fs::rename(&tmp, &final_path)?;
+    crate::catalog::fsync_dir(wal_dir)?;
+    Ok(())
+}
+
+/// Load the durable WAL state record.
+/// - `Ok(None)` — no record (legacy database or brand-new): invariant not yet
+///   authoritative; the open path proceeds with pre-E1 semantics.
+/// - `Err` — a record exists but cannot be parsed: an integrity record that
+///   cannot be trusted must refuse the open, never be ignored.
+pub fn read_wal_state(wal_dir: &Path) -> Result<Option<WalState>, crate::error::StorageError> {
+    let path = wal_dir.join(WAL_STATE_FILE);
+    if !path.exists() {
+        return Ok(None);
+    }
+    let bytes = std::fs::read(&path)?;
+    if bytes.is_empty() {
+        return Err(crate::error::StorageError::corruption(
+            path.display().to_string(),
+            "WAL state record is empty",
+        ));
+    }
+    serde_json::from_slice::<WalState>(&bytes)
+        .map(Some)
+        .map_err(|e| {
+            crate::error::StorageError::corruption(
+                path.display().to_string(),
+                format!("WAL state record unreadable: {e}"),
+            )
+        })
+}
+
 #[derive(Debug, Default)]
 pub struct ReplayOutcome {
     pub records: Vec<WalRecord>,
@@ -465,6 +524,20 @@ impl Wal {
         self.active_path = Some(path);
         self.active_start_seq = start_seq;
         self.active_bytes = 0;
+        // E1 WAL-integrity invariant: a durable watermark record is written
+        // whenever a segment is created (first append or rotation). It anchors
+        // (a) that the WAL dir must keep at least the recorded active segment
+        // and (b) how far completed segments had advanced — so deleting
+        // required WAL history can no longer masquerade as a fresh/trimmed
+        // database. Atomic tmp -> rename -> dir fsync, like the manifest.
+        write_wal_state(
+            &self.dir,
+            &WalState {
+                format_version: WAL_STATE_FORMAT_VERSION,
+                high_watermark: self.next_seq - 1,
+                active_start: start_seq,
+            },
+        )?;
         Ok(())
     }
 
@@ -629,6 +702,7 @@ mod tests {
                 .unwrap()
                 .filter_map(|e| e.ok())
                 .map(|e| e.path())
+                .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("wal"))
                 .collect();
             entries.sort();
             entries.pop().unwrap()
@@ -666,6 +740,7 @@ mod tests {
                 .unwrap()
                 .filter_map(|e| e.ok())
                 .map(|e| e.path())
+                .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("wal"))
                 .collect();
             entries.sort();
             entries.pop().unwrap()
@@ -696,6 +771,7 @@ mod tests {
                 .unwrap()
                 .filter_map(|e| e.ok())
                 .map(|e| e.path())
+                .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("wal"))
                 .collect();
             entries.sort();
             entries.pop().unwrap()
@@ -771,5 +847,111 @@ mod tests {
         std::fs::write(dir.path().join("notaseq.wal"), b"junk").unwrap();
         let mut wal = Wal::open(dir.path(), Durability::Sync, 1 << 20).unwrap();
         assert!(wal.replay(0).is_err());
+    }
+
+    /// §34 fuzz: the WAL parser must NEVER panic on arbitrary bytes —
+    /// replay either succeeds (intact prefix) or returns Err (corruption
+    /// detected). Deterministic PRNG so failures are reproducible.
+    #[test]
+    fn replay_fuzz_random_bytes_never_panics() {
+        for seed in 0..64u64 {
+            let dir = tmpdir();
+            let mut x = seed.wrapping_mul(0x9E3779B97F4A7C15) ^ 0xDEADBEEF;
+            let mut next = || {
+                x ^= x << 13;
+                x ^= x >> 7;
+                x ^= x << 17;
+                x
+            };
+            let len = 1 + (next() % 4096) as usize;
+            let bytes: Vec<u8> = (0..len).map(|_| next() as u8).collect();
+            let seg = dir.path().join("00000000000000000001.wal");
+            std::fs::write(&seg, &bytes).unwrap();
+            match Wal::open(dir.path(), Durability::Async, u64::MAX) {
+                Ok(mut wal) => {
+                    // Ok or Err are both acceptable; a panic is the failure.
+                    let _ = wal.replay(0);
+                }
+                Err(_) => {}
+            }
+        }
+    }
+
+    /// §34 fuzz: random truncations of a VALID WAL must always yield a clean
+    /// prefix replay or an error — never a panic, never a fabricated record
+    /// with a sequence that breaks continuity.
+    #[test]
+    fn replay_fuzz_truncated_valid_wal_never_panics() {
+        let src = tmpdir();
+        {
+            let mut wal = Wal::open(src.path(), Durability::Sync, 1 << 20).unwrap();
+            for i in 0..40u64 {
+                wal.append(rec(RecordKind::InsertDocument, format!("payload-{i}").as_bytes()))
+                    .unwrap();
+            }
+            wal.flush().unwrap();
+        }
+        let valid = std::fs::read(src.path().join("00000000000000000001.wal")).unwrap();
+        assert!(!valid.is_empty());
+        for seed in 0..32u64 {
+            let dir = tmpdir();
+            let mut x = seed.wrapping_mul(0x2545F4914F6CDD1D) ^ 0xA5A5A5A5;
+            x ^= x << 13; x ^= x >> 7; x ^= x << 17;
+            let cut = 1 + (x as usize) % valid.len();
+            let seg = dir.path().join("00000000000000000001.wal");
+            std::fs::write(&seg, &valid[..cut]).unwrap();
+            match Wal::open(dir.path(), Durability::Async, u64::MAX) {
+                Ok(mut wal) => {
+                    if let Ok(outcome) = wal.replay(0) {
+                        // recovered records must form a strict prefix of the seq space
+                        for (k, r) in outcome.records.iter().enumerate() {
+                            assert_eq!(r.seq, (k + 1) as u64, "seed {seed}: non-prefix replay");
+                        }
+                    }
+                }
+                Err(_) => {}
+            }
+        }
+    }
+
+    // ---------- Phase 3E E1: durable watermark record ----------
+
+    #[test]
+    fn wal_state_written_on_first_append_and_rotation() {
+        let dir = tmpdir();
+        {
+            let mut wal = Wal::open(dir.path(), Durability::Sync, 1 << 20).unwrap();
+            // no segment yet -> no state record
+            assert!(read_wal_state(dir.path()).unwrap().is_none());
+            for i in 0..5u64 {
+                wal.append(rec(RecordKind::InsertDocument, format!("p{i}").as_bytes()))
+                    .unwrap();
+            }
+            let ws = read_wal_state(dir.path()).unwrap().expect("state after first append");
+            // first segment still active: completed coverage is empty (0),
+            // active segment starts at 1
+            assert_eq!(ws.high_watermark, 0);
+            assert_eq!(ws.active_start, 1);
+            wal.rotate().unwrap();
+            let ws2 = read_wal_state(dir.path()).unwrap().expect("state after rotate");
+            // seqs 1..=5 are now in a completed segment
+            assert_eq!(ws2.high_watermark, 5);
+            assert_eq!(ws2.active_start, 6);
+            wal.append(rec(RecordKind::InsertDocument, b"x")).unwrap();
+            let ws3 = read_wal_state(dir.path()).unwrap().unwrap();
+            // the new record lives in the ACTIVE segment: no anchor until the
+            // next rotation (documented boundary)
+            assert_eq!(ws3.high_watermark, 5);
+            assert_eq!(ws3.active_start, 6);
+        }
+    }
+
+    #[test]
+    fn wal_state_corrupt_record_is_an_error_not_ignored() {
+        let dir = tmpdir();
+        let mut wal = Wal::open(dir.path(), Durability::Sync, 1 << 20).unwrap();
+        wal.append(rec(RecordKind::InsertDocument, b"p")).unwrap();
+        std::fs::write(dir.path().join(WAL_STATE_FILE), b"garbage{").unwrap();
+        assert!(read_wal_state(dir.path()).is_err());
     }
 }

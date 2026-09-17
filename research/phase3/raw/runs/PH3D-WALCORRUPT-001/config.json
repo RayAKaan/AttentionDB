@@ -1,0 +1,1 @@
+{"modes": ["truncate_torn","garbage_tail","flip_byte","delete_segment","duplicate_segment_gap"], "surgery": "driver-side file surgery; engine behavior reported only (no repair assertions)"}

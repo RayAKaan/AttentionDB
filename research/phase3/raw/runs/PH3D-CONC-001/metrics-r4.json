@@ -1,0 +1,11 @@
+{
+  "checker_clean": true,
+  "checker_warnings": 0,
+  "errors": 0,
+  "live_docs": 300,
+  "qps": 22421.87980411954,
+  "queries": 89720,
+  "readers": 4,
+  "store_issues": [],
+  "writers": 0
+}

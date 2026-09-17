@@ -1,0 +1,8 @@
+check,ok,detail
+before_checker,true,[]
+after_state_equal,true,docs=310
+after_checker,true,
+updated_content_survives,true,
+deleted_stay_deleted,true,
+compaction_ran,true,merged_files_removed=2 docs=310
+live_invocation_probe,documented,"compactlive,COMPACTED_WHILE_OPEN,merged=3,out_entries=80 (NOT cleaning up; engine holds the dir)"

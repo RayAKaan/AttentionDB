@@ -1,0 +1,7 @@
+run_id=PH3D-CONC-003
+experiment=concurrent mutations with deterministic op logs + post-hoc expected-state replay (§24); same-key contention model probe
+date=2026-09-17
+method=benchmarks/phase3/src/dbtest.rs via 'phase3-bench dbtest <subcommand>' (deterministic; DIM=32, head h)
+config=see config.json
+status=COMPLETED — concurreplay: 4 passed, 0 FAILED
+notes=documented visibility model: mutation-gate serialized; per-key last-write-wins; records never torn; no cross-key ordering guarantee; no linearizability claim

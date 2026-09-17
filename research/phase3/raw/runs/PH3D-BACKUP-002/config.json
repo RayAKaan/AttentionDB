@@ -1,0 +1,1 @@
+{"flow": "populate 120 + churn (30 upd, 20 del) -> flush -> checkpoint -> close (quiescent) -> copy -> per-file sha256 source-vs-backup -> restore -> per-file sha256 backup-vs-restored -> state equality + checker", "note": "backup-meta.json is the backup manifest copy_database_dir writes (expected extra file)"}

@@ -1,0 +1,72 @@
+{
+ "durability": "group",
+ "n_docs": 40,
+ "kill_signal": "SIGKILL (park points) / exit(137) (self points, Drop skipped)",
+ "sidecar": "{db_dir}.sidecar flushed ACK lines",
+ "txn_marker": "{db_dir}.txncrash",
+ "points": [
+  {
+   "durability": "group",
+   "crash_point": "after_acks",
+   "verdict": "ALL_ACKED",
+   "acked_present": "40/40",
+   "unacked_present": "0",
+   "pre_existing": "pre_existing=0",
+   "txn_note": "txn=0/10 marker= ABSENT"
+  },
+  {
+   "durability": "group",
+   "crash_point": "after_flush",
+   "verdict": "ALL_ACKED",
+   "acked_present": "40/40",
+   "unacked_present": "0",
+   "pre_existing": "pre_existing=0",
+   "txn_note": "txn=0/10 marker= ABSENT"
+  },
+  {
+   "durability": "group",
+   "crash_point": "after_checkpoint",
+   "verdict": "ALL_ACKED",
+   "acked_present": "40/40",
+   "unacked_present": "0",
+   "pre_existing": "pre_existing=0",
+   "txn_note": "txn=0/10 marker= ABSENT"
+  },
+  {
+   "durability": "group",
+   "crash_point": "mid_inserts",
+   "verdict": "ALL_ACKED",
+   "acked_present": "21/21",
+   "unacked_present": "0",
+   "pre_existing": "pre_existing=0",
+   "txn_note": "txn=0/10 marker= ABSENT"
+  },
+  {
+   "durability": "group",
+   "crash_point": "mid_flush",
+   "verdict": "ALL_ACKED",
+   "acked_present": "40/40",
+   "unacked_present": "0",
+   "pre_existing": "pre_existing=0",
+   "txn_note": "txn=0/10 marker= ABSENT"
+  },
+  {
+   "durability": "group",
+   "crash_point": "during_commit_txn",
+   "verdict": "ALL_ACKED",
+   "acked_present": "40/40",
+   "unacked_present": "0",
+   "pre_existing": "pre_existing=0",
+   "txn_note": "txn=10/10 marker=committed COMMITTED_DURABLE"
+  },
+  {
+   "durability": "group",
+   "crash_point": "after_compact",
+   "verdict": "ALL_ACKED",
+   "acked_present": "40/40",
+   "unacked_present": "0",
+   "pre_existing": "pre_existing=0",
+   "txn_note": "txn=0/10 marker= ABSENT"
+  }
+ ]
+}

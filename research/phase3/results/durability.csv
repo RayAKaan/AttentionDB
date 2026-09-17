@@ -1,0 +1,4 @@
+durability,after_acks,after_flush,after_checkpoint,mid_inserts,mid_flush,after_compact,commit_txn_outcome,overall
+group,ALL_ACKED,ALL_ACKED,ALL_ACKED,ALL_ACKED,ALL_ACKED,ALL_ACKED,txn=10/10 marker=committed COMMITTED_DURABLE,documented-contract-consistent
+async,PREFIX,ALL_ACKED,ALL_ACKED,PREFIX,PREFIX,PREFIX,txn=0/10 marker=committed COMMITTED_NOT_DURABLE_ASYNC,documented-contract-consistent
+sync,ALL_ACKED,ALL_ACKED,ALL_ACKED,ALL_ACKED,ALL_ACKED,ALL_ACKED,txn=10/10 marker=committed COMMITTED_DURABLE,documented-contract-consistent

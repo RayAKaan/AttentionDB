@@ -1,0 +1,7 @@
+family,ok,detail
+initial_build_checker,true,
+collection_isolation,true,
+final_state_equivalence,true,
+final_store_unique,true,
+final_dead_not_retrievable,true,
+final_checker,true,

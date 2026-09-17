@@ -1,0 +1,34 @@
+subsystem,capability,status,evidence
+Storage,insert/update/delete lifecycle,VERIFIED,"PH3D-STATE-001..003 (3000 ops, 0 failures)"
+Storage,ID mapping across delete/reinsert/restart/compact,VERIFIED,PH3D-STATE-* state equivalence
+Storage,offline compaction + tombstone GC,VERIFIED,PH3D-COMPACT-001 (post-fix)
+Storage,online compaction under load,UNSUPPORTED,compact_all is offline; live invocation uncoordinated (PH3D-COMPACT-002)
+Retrieval,deterministic live-only top-K,VERIFIED,PH3D-STATE-* invariant checks
+Retrieval,filter soundness,VERIFIED,PH3D-FILTER-001 14/14
+Retrieval,filter completeness,PARTIALLY VERIFIED,candidate-bound by design; recall 0.967-1.0 measured (PH3D-FILTER-001)
+Durability,GroupCommit process-crash durability,VERIFIED,PH3D-CRASH-001 (7/7 ALL_ACKED)
+Durability,Sync machine-crash durability,PARTIALLY VERIFIED,PH3D-CRASH-003 process-crash axis; no power-loss harness
+Durability,Async ack durability,NOT VERIFIED (documented: acks may be lost),PH3D-CRASH-002 COMMITTED_NOT_DURABLE_ASYNC
+Recovery,WAL replay incl. torn tail,VERIFIED,PH3D-WALCORRUPT-001 truncate_torn; PH3D-CRASH-*
+Recovery,corrupt-frame refusal,VERIFIED,PH3D-WALCORRUPT-001 garbage_tail/flip_byte/duplicate_segment_gap
+Recovery,pre-checkpoint segment-loss detection,UNSUPPORTED (documented OPEN),PH3D-WALCORRUPT-001 delete_segment opens empty
+Transactions,commit/rollback atomicity incl. crash + injected failure,VERIFIED,PH3D-TX-001 7/7; PH3D-CRASH-* txn all-or-nothing
+Transactions,multi-operation transactions,VERIFIED,PH3D-TX-001 multiop matrix
+Transactions,update op inside txn,UNSUPPORTED,TxnOp = Insert|Delete only
+Transactions,isolation levels / concurrent txns,UNSUPPORTED,single mutation gate; no isolation contract
+Concurrency,parallel readers with zero errors,VERIFIED,PH3D-CONC-001 (1..32 readers)
+Concurrency,mixed read/write with checker-clean state,VERIFIED,"PH3D-CONC-002 (6 combos, 0 errors)"
+Concurrency,linearizability,NOT VERIFIED (no claim),no history-based test (§25)
+Backup,quiescent backup/restore equivalence,VERIFIED,PH3D-BACKUP-001
+Backup,online backup under active writes,UNSUPPORTED (documented quiescence requirement),"PH3D-BACKUP-001 live-writer probe (single sample observed consistent, not certified)"
+Memory,engine-dir release on clean drop,VERIFIED (PH3C),PH3C leak matrix; PH3D reuses engine dirs
+Memory,active optimization,NOT ATTEMPTED IN PH3D,PH3D-MEM-OPT-001 optional family not run
+Scaling,multi-head retrieval (frozen architecture),VERIFIED (PH3C),PH3C-HEAD-001/002
+Compaction,offline full-merge equivalence + tombstone GC,VERIFIED,PH3D-COMPACT-001 (also PH3D-COMPACTION-001 child record)
+Compaction,online compaction under load,BLOCKED,offline-only API; live invocation uncoordinated (PH3D-COMPACT-002)
+Observability,consistency checker gates + per-run consistency JSONs + op logs,PARTIALLY VERIFIED,"checker gates in every PH3D family; consistency-*.json, operation-log.jsonl, inventory.csv; no metrics endpoint/LOG integration"
+API stability,versioned API / stability policy,NOT VERIFIED,no stability policy exists; API documented as-is in methodology/database-guarantees.md
+Benchmark reproducibility,script-generated tables/figures + raw-run registry + consistency gates,VERIFIED,tables/generate_*_ph3d.py from raw runs; phase2+phase3 verify_consistency.py PASS
+Correctness,"cross-feature integration (multi-collection, multi-head filters, graceful durability)",VERIFIED,PH3D-INTEGRATION-001 16/16
+Concurrency,deterministic concurrent-mutation logs + expected-state replay,VERIFIED,PH3D-CONC-003 4/4 (replay exact; contention records never torn)
+Backup,backup inventory + independent checksum integrity,VERIFIED,"PH3D-BACKUP-002 6/6 (per-file sha256, copy+restore fidelity)"

@@ -1,0 +1,7 @@
+run_id=PH3D-TX-001
+experiment=transaction semantics (§18–21): commit/rollback atomicity, injected commit failure, delete-if-present
+date=2026-09-17
+method=benchmarks/phase3/src/dbtest.rs via 'phase3-bench dbtest <subcommand>' (deterministic; DIM=32, head h)
+config=see config.json
+status=COMPLETED — txn: 7 passed, 0 FAILED
+notes=no update TxnOp exists (documented); single-collection; no isolation claim

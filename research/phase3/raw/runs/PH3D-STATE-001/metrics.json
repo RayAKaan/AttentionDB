@@ -1,0 +1,8 @@
+{
+  "checks_failed": 0,
+  "checks_total": 6,
+  "filter_failures": 0,
+  "filter_tests": 120,
+  "ops": 1000,
+  "seed": 42
+}

@@ -1,0 +1,7 @@
+run_id=PH3E-REG-001
+experiment=Phase 3E E1 regression: PH3D workload families re-run under the new WAL-integrity invariant — no false refusals on legitimate states
+date=2026-09-17
+method=phase3-bench dbtest model --seed 42 --ops 300; plus driver-scripted group-durability crash legs (7 points) verified with PH3D verify; filterx + integration suites
+config=see config.json
+status=COMPLETED — model 6/6 passed, filterx 14/14, integration 16/16, crash group 7/7 legs verify clean (acked recovery intact, no resurrection)
+notes=negative gate for the E1 invariant: legitimate opens (fresh/trimmed/legacy/recovered) must not newly refuse

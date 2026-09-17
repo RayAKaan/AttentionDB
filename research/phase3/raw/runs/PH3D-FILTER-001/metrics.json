@@ -1,0 +1,54 @@
+{
+  "failed": 0,
+  "filter_recall": [
+    {
+      "check": "filter_eq_all",
+      "recall": 0.9833333333333333
+    },
+    {
+      "check": "filter_selective",
+      "recall": 0.9473684210526315
+    },
+    {
+      "check": "filter_zero_match",
+      "recall": 1.0
+    },
+    {
+      "check": "filter_and",
+      "recall": 1.0
+    },
+    {
+      "check": "fm_insert_matching",
+      "recall": 0.9836065573770492
+    },
+    {
+      "check": "fm_update_leaves",
+      "recall": 0.9833333333333333
+    },
+    {
+      "check": "fm_update_enters",
+      "recall": 1.0
+    },
+    {
+      "check": "fm_delete_matching",
+      "recall": 1.0
+    },
+    {
+      "check": "fm_delete_nonmatching",
+      "recall": 0.9830508474576272
+    },
+    {
+      "check": "fm_reinsert",
+      "recall": 0.9833333333333333
+    },
+    {
+      "check": "fr_restart",
+      "recall": 0.9833333333333333
+    },
+    {
+      "check": "fr_compact",
+      "recall": 0.9833333333333333
+    }
+  ],
+  "passed": 14
+}

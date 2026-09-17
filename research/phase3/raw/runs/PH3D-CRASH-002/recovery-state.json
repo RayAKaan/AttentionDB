@@ -1,0 +1,49 @@
+{
+ "run_id": "PH3D-CRASH-002",
+ "durability": "async",
+ "recovered_points": {
+  "after_acks": {
+   "verdict": "PREFIX",
+   "acked_present": "35/40",
+   "unacked_present": "0",
+   "txn": "txn=0/10 marker= ABSENT"
+  },
+  "after_flush": {
+   "verdict": "ALL_ACKED",
+   "acked_present": "40/40",
+   "unacked_present": "0",
+   "txn": "txn=0/10 marker= ABSENT"
+  },
+  "after_checkpoint": {
+   "verdict": "ALL_ACKED",
+   "acked_present": "40/40",
+   "unacked_present": "0",
+   "txn": "txn=0/10 marker= ABSENT"
+  },
+  "mid_inserts": {
+   "verdict": "PREFIX",
+   "acked_present": "11/21",
+   "unacked_present": "0",
+   "txn": "txn=0/10 marker= ABSENT"
+  },
+  "mid_flush": {
+   "verdict": "PREFIX",
+   "acked_present": "35/40",
+   "unacked_present": "0",
+   "txn": "txn=0/10 marker= ABSENT"
+  },
+  "during_commit_txn": {
+   "verdict": "ALL_ACKED",
+   "acked_present": "40/40",
+   "unacked_present": "0",
+   "txn": "txn=0/10 marker=committed COMMITTED_NOT_DURABLE_ASYNC"
+  },
+  "after_compact": {
+   "verdict": "PREFIX",
+   "acked_present": "35/40",
+   "unacked_present": "0",
+   "txn": "txn=0/10 marker= ABSENT"
+  }
+ },
+ "consistency": "checker gate clean at every verified point"
+}

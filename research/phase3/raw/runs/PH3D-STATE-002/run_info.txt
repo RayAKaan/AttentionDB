@@ -1,0 +1,7 @@
+run_id=PH3D-STATE-002
+experiment=model-based state-machine suite (§33): mutations+lifecycle+ID-mapping+filters+restart/compact equivalence; seed=7 ops=1000
+date=2026-09-17
+method=benchmarks/phase3/src/dbtest.rs via 'phase3-bench dbtest <subcommand>' (deterministic; DIM=32, head h)
+config=see config.json
+status=COMPLETED — checks_failed=0/6 filter_failures=0/134 (rc=0)
+notes=reference model Map<idx,(ver,cat,num)>; invariant checks live-only/determinism/filter-leak/zero-match/collection-isolation; checker gates initial/compact/final

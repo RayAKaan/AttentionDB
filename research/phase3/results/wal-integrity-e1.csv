@@ -1,0 +1,12 @@
+case,checkpoint,verdict,observed,expected,match
+delete_required_segment_pre_checkpoint,false,REFUSED,WAL_LOST_SEGMENT,REFUSED:WAL_LOST_SEGMENT,MATCH
+delete_all_segments_post_checkpoint,true,REFUSED,WAL_LOST_SEGMENT,REFUSED:WAL_LOST_SEGMENT,MATCH
+rename_segment_gap,false,REFUSED,WAL_REPLAY_CORRUPTION,REFUSED:WAL_SEQ_GAP_or_REPLAY,MATCH
+corrupt_wal_state_record,false,REFUSED,WAL_STATE_CORRUPT,REFUSED:WAL_STATE_CORRUPT,MATCH
+delete_wal_state_record_legacy,true,OPENED,docs=20 checker_clean=true watermark=-,OPENED:LEGITIMATE_LEGACY_NO_SIDECAR,MATCH
+truncate_torn_tail,false,OPENED,docs=11 checker_clean=true watermark=0,OPENED:LEGITIMATE_TORN_TAIL_PREFIX,MATCH
+corrupt_frame,false,REFUSED,WAL_REPLAY_CORRUPTION,REFUSED:WAL_REPLAY_CORRUPTION,MATCH
+corrupt_current_manifest_fallback,true,OPENED,docs=20 checker_clean=true watermark=21,OPENED:LEGITIMATE_MANIFEST_FALLBACK,MATCH
+corrupt_all_manifests,true,REFUSED,MANIFEST_UNREADABLE,REFUSED:MANIFEST_UNREADABLE,MATCH
+fresh_no_documents,false,OPENED,docs=20 checker_clean=true watermark=0,OPENED:LEGITIMATE_FRESH_REOPEN,MATCH
+trimmed_reopen,true,OPENED,docs=20 checker_clean=true watermark=21,OPENED:LEGITIMATE_POST_CHECKPOINT_TRIM,MATCH

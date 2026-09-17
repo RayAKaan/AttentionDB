@@ -1,8 +1,8 @@
 {
  "format": "attentiondb-experiment-index",
  "version": 1,
- "updated": "2026-09-05",
- "code_commit": "86de099",
+ "updated": "2026-09-17",
+ "code_commit": "1204e354946f0c622b499b2e9b959a34d42450a2",
  "experiments": [
   {
    "experiment_id": "PH3-QUAL-FM-S",
@@ -3294,6 +3294,415 @@
    ],
    "hardware": "sandbox 2 CPUs / 1984 MB RAM",
    "status": "COMPLETED (analysis run)"
+  },
+  {
+   "experiment_id": "PH3D-STATE-001",
+   "date": "2026-09-17",
+   "git_commit": "e8ce38d7acd78e4c862723042f4208aefc535dbc",
+   "corpus": "synthetic model docs (200 initial, DIM 32, head h)",
+   "seed": "42",
+   "model": "model-based state machine: upsert .30/update .20/delete .15/query .15/filter .12/checkpoint .03/compact .03/restart .02",
+   "objective": "PH3D \u00a733 mixed-workload state equivalence",
+   "metrics": {
+    "checks": "0 failed / 6 gated",
+    "filter_probes": "120",
+    "filter_failures": "0",
+    "logged_ops": "926"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3D-STATE-002",
+   "date": "2026-09-17",
+   "git_commit": "e8ce38d7acd78e4c862723042f4208aefc535dbc",
+   "corpus": "synthetic model docs",
+   "seed": "7",
+   "model": "same mix as PH3D-STATE-001",
+   "objective": "PH3D \u00a733 seed replication",
+   "metrics": {
+    "checks": "0 failed / 6 gated",
+    "filter_probes": "134",
+    "filter_failures": "0",
+    "logged_ops": "936"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3D-STATE-003",
+   "date": "2026-09-17",
+   "git_commit": "e8ce38d7acd78e4c862723042f4208aefc535dbc",
+   "corpus": "synthetic model docs",
+   "seed": "1",
+   "model": "same mix as PH3D-STATE-001",
+   "objective": "PH3D \u00a733 seed replication",
+   "metrics": {
+    "checks": "0 failed / 6 gated",
+    "filter_probes": "125",
+    "filter_failures": "0",
+    "logged_ops": "925"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3D-STATE-004",
+   "date": "2026-09-17",
+   "git_commit": "e8ce38d7acd78e4c862723042f4208aefc535dbc",
+   "corpus": "synthetic model docs",
+   "seed": "42",
+   "model": "same mix, 100 ops (small-scale anchor)",
+   "objective": "PH3D \u00a733 small-scale anchor",
+   "metrics": {
+    "checks": "0 failed / 6 gated",
+    "filter_probes": "15",
+    "filter_failures": "0"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3D-FILTER-001",
+   "date": "2026-09-17",
+   "git_commit": "e8ce38d7acd78e4c862723042f4208aefc535dbc",
+   "corpus": "synthetic docs 120",
+   "seed": "-",
+   "model": "filter semantics: soundness/determinism gates + measured recall; mutation-lifecycle; restart/compact",
+   "objective": "PH3D \u00a74-6 filter guarantees",
+   "metrics": {
+    "checks": "14 passed / 0 failed",
+    "recall_min": "0.9667",
+    "recall_max": "1.0000",
+    "zero_match": "always empty"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3D-TX-001",
+   "date": "2026-09-17",
+   "git_commit": "e8ce38d7acd78e4c862723042f4208aefc535dbc",
+   "corpus": "synthetic docs 20+",
+   "seed": "-",
+   "model": "txn begin/record/commit/rollback; injected validation failure; delete-if-present",
+   "objective": "PH3D \u00a718-21 transaction semantics",
+   "metrics": {
+    "checks": "7 passed / 0 failed",
+    "crash_txn_atomicity": "all-or-nothing in 21/21 crash points"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3D-CRASH-001",
+   "date": "2026-09-17",
+   "git_commit": "e8ce38d7acd78e4c862723042f4208aefc535dbc",
+   "corpus": "40 acked inserts + 10-insert txn (sidecar ack protocol)",
+   "seed": "durability=group",
+   "model": "7 crash points x Durability::group; SIGKILL/exit(137); verify=presence+prefix+no-resurrection+checker+txn marker",
+   "objective": "PH3D \u00a715-17 crash-recovery matrix",
+   "metrics": {
+    "points": "7",
+    "consistent": "ALL_ACKED 7/7; txn COMMITTED_DURABLE",
+    "inconsistent": "0",
+    "resurrection": "0"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3D-CRASH-002",
+   "date": "2026-09-17",
+   "git_commit": "e8ce38d7acd78e4c862723042f4208aefc535dbc",
+   "corpus": "40 acked inserts + 10-insert txn (sidecar ack protocol)",
+   "seed": "durability=async",
+   "model": "7 crash points x Durability::async; SIGKILL/exit(137); verify=presence+prefix+no-resurrection+checker+txn marker",
+   "objective": "PH3D \u00a715-17 crash-recovery matrix",
+   "metrics": {
+    "points": "7",
+    "consistent": "PREFIX where unflushed (35/40, 11/21); txn COMMITTED_NOT_DURABLE_ASYNC (0/10, atomic)",
+    "inconsistent": "0",
+    "resurrection": "0"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3D-CRASH-003",
+   "date": "2026-09-17",
+   "git_commit": "e8ce38d7acd78e4c862723042f4208aefc535dbc",
+   "corpus": "40 acked inserts + 10-insert txn (sidecar ack protocol)",
+   "seed": "durability=sync",
+   "model": "7 crash points x Durability::sync; SIGKILL/exit(137); verify=presence+prefix+no-resurrection+checker+txn marker",
+   "objective": "PH3D \u00a715-17 crash-recovery matrix",
+   "metrics": {
+    "points": "7",
+    "consistent": "ALL_ACKED 7/7; txn COMMITTED_DURABLE",
+    "inconsistent": "0",
+    "resurrection": "0"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3D-WALCORRUPT-001",
+   "date": "2026-09-17",
+   "git_commit": "e8ce38d7acd78e4c862723042f4208aefc535dbc",
+   "corpus": "40-doc WAL then driver file surgery",
+   "seed": "-",
+   "model": "truncate_torn / garbage_tail / flip_byte / delete_segment / duplicate_segment_gap \u2014 detect+report",
+   "objective": "PH3D \u00a714 WAL corruption handling",
+   "metrics": {
+    "torn_tail": "prefix recovery (23 docs, clean)",
+    "garbage_tail": "ERROR_ON_OPEN",
+    "flip_byte": "ERROR_ON_OPEN",
+    "delete_segment": "opens empty (undetectable pre-checkpoint; OPEN limitation)",
+    "duplicate_segment_gap": "ERROR_ON_OPEN"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3D-COMPACT-001",
+   "date": "2026-09-17",
+   "git_commit": "e8ce38d7acd78e4c862723042f4208aefc535dbc",
+   "corpus": "310 live docs, 2 SST generations + churn (150 updates, 50 deletes)",
+   "seed": "-",
+   "model": "close -> compact_all(db_dir) -> cleanup -> reopen; state equivalence",
+   "objective": "PH3D \u00a726 offline compaction equivalence",
+   "metrics": {
+    "checks": "5 passed / 0 failed",
+    "merged": "2 files, 2 removed",
+    "note": "compact_all sst/-path fix verified"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3D-COMPACT-002",
+   "date": "2026-09-17",
+   "git_commit": "e8ce38d7acd78e4c862723042f4208aefc535dbc",
+   "corpus": "80 docs, 3 SST generations",
+   "seed": "-",
+   "model": "compact_all invoked while an idle engine holds the dir (documented, not gated)",
+   "objective": "PH3D \u00a727 compaction-under-load probe",
+   "metrics": {
+    "outcome": "COMPACTED_WHILE_OPEN merged=3 (no cleanup while open; offline-only supported)"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3D-CONC-001",
+   "date": "2026-09-17",
+   "git_commit": "e8ce38d7acd78e4c862723042f4208aefc535dbc",
+   "corpus": "300 docs; thread readers",
+   "seed": "r in {1,2,4,8,16,32}, w=0",
+   "model": "4s windows; per-query percentiles; post-window checker gate",
+   "objective": "PH3D \u00a722 read-concurrency ladder",
+   "metrics": {
+    "qps": "13518 (r1) .. 21619 (r2) .. 21261 (r32) plateau",
+    "p50_us": "67.9-93.2",
+    "p99_us": "127.9 (r1) .. 60181.5 (r32)",
+    "errors": "0",
+    "checker_clean": "all true"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3D-CONC-002",
+   "date": "2026-09-17",
+   "git_commit": "e8ce38d7acd78e4c862723042f4208aefc535dbc",
+   "corpus": "300 docs; writer cycle ins->upd->del->flush with per-writer op logs",
+   "seed": "(r,w) in {(1,1),(2,1),(4,1),(4,2),(8,2),(16,4)}",
+   "model": "4s windows; deterministic op logs; post-window checker gate + live-doc count",
+   "objective": "PH3D \u00a723-24 mixed concurrency",
+   "metrics": {
+    "errors": "0 across 6 combos",
+    "checker_clean": "all true",
+    "r1w1_p50_us": "753.5 (mutation-gate serialization documented)",
+    "r4w1_p50_us": "65.2",
+    "retired_vector_warnings": "3.4-3.7K per run (lazy purge backlog)"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3D-BACKUP-001",
+   "date": "2026-09-17",
+   "git_commit": "e8ce38d7acd78e4c862723042f4208aefc535dbc",
+   "corpus": "150 docs + live probes",
+   "seed": "-",
+   "model": "copy->restore->mutate-original->equivalence; live-idle copy; live-ACTIVE-writer copy (documented)",
+   "objective": "PH3D \u00a728-31 backup/restore",
+   "metrics": {
+    "checks": "6 passed / 0 failed",
+    "restore": "== backup state; no post-backup mutations; checker clean; manifest present",
+    "live_writer_probe": "docs=841 consistent=true writers_wrote=665 (single sample; quiescence required, documented)"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3D-INTEGRATION-001",
+   "date": "2026-09-17",
+   "git_commit": "77b6eb18efa1e618b5cffcc0a47fd415317f6c32",
+   "corpus": "3 collections (alpha 60, beta 40, gamma 24, gamma dual-head)",
+   "seed": "-",
+   "model": "multi-collection isolation across live/restart/compaction/backup-restore; graceful close->reopen durability for insert/update/delete/upsert; filter x multi-head soundness",
+   "objective": "PH3D \u00a731/\u00a711/\u00a74/\u00a76/\u00a726/\u00a729 cross-feature integration",
+   "metrics": {
+    "checks": "16 passed / 0 failed",
+    "isol_live_alpha": "35 docs exact model",
+    "isol_live_beta": "41 docs incl upsert-new + upsert-existing",
+    "filter_multihead": "sound + deterministic + zero-match empty",
+    "graceful_restart": "all three collections equal",
+    "compact_equal": "alpha+beta equal",
+    "restore_equal": "alpha+beta equal, isolation by content",
+    "discovery": "uuid identity GLOBAL across collections; collections are membership tags; same-uuid insert re-members (harness namespaced ids)"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3D-CONC-003",
+   "date": "2026-09-17",
+   "git_commit": "77b6eb18efa1e618b5cffcc0a47fd415317f6c32",
+   "corpus": "50 seed + 500 disjoint-key ops + 2x150 same-key update rounds",
+   "seed": "-",
+   "model": "phase1: deterministic per-writer op logs -> merged-log replay == observed state; phase2: same-key contention torn-mix probe",
+   "objective": "PH3D \u00a724 concurrent mutation test with expected-state replay",
+   "metrics": {
+    "checks": "4 passed / 0 failed",
+    "replay_exact_state": "450 docs exact",
+    "contention_atomic_records": "0 torn / 0 missing (100 keys)",
+    "model": "mutation-gate serialized; per-key last-write-wins; records never torn; no cross-key ordering guarantee"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3D-BACKUP-002",
+   "date": "2026-09-17",
+   "git_commit": "77b6eb18efa1e618b5cffcc0a47fd415317f6c32",
+   "corpus": "120 docs + churn (30 upd, 20 del)",
+   "seed": "-",
+   "model": "quiescent copy -> per-file sha256(source vs backup) -> restore -> per-file sha256(backup vs restored) -> state equality + checker",
+   "objective": "PH3D \u00a728 backup inventory + independent integrity verification",
+   "metrics": {
+    "checks": "6 passed / 0 failed",
+    "files": "6 db files (+backup-meta.json manifest)",
+    "total_bytes": "76501",
+    "copy_fidelity": "0 mismatched hashes",
+    "restore_fidelity": "0 missing/diff",
+    "state_equality": "100==100 docs"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3D-MUTATION-001",
+   "date": "2026-09-17",
+   "git_commit": "77b6eb18efa1e618b5cffcc0a47fd415317f6c32",
+   "corpus": "child run \u2014 evidence lives in parent runs",
+   "seed": "-",
+   "model": "no separate workload; see parent-map.json in the run dir",
+   "objective": "PH3D \u00a77-10 mutation correctness (child of the state-machine/filter/compaction runs)",
+   "metrics": {
+    "child_of": [
+     "PH3D-STATE-001",
+     "PH3D-STATE-002",
+     "PH3D-STATE-003",
+     "PH3D-FILTER-001",
+     "PH3D-COMPACT-001"
+    ]
+   },
+   "status": "COMPLETED (child run)"
+  },
+  {
+   "experiment_id": "PH3D-RECOVERY-001",
+   "date": "2026-09-17",
+   "git_commit": "77b6eb18efa1e618b5cffcc0a47fd415317f6c32",
+   "corpus": "child run \u2014 evidence lives in parent runs",
+   "seed": "-",
+   "model": "no separate workload; see parent-map.json in the run dir",
+   "objective": "PH3D \u00a713-14 WAL replay + recovery (child run)",
+   "metrics": {
+    "child_of": [
+     "PH3D-WALCORRUPT-001",
+     "PH3D-CRASH-001",
+     "PH3D-CRASH-002",
+     "PH3D-CRASH-003",
+     "PH3D-STATE-001",
+     "PH3D-STATE-002",
+     "PH3D-STATE-003"
+    ]
+   },
+   "status": "COMPLETED (child run)"
+  },
+  {
+   "experiment_id": "PH3D-COMPACTION-001",
+   "date": "2026-09-17",
+   "git_commit": "77b6eb18efa1e618b5cffcc0a47fd415317f6c32",
+   "corpus": "child run \u2014 evidence lives in parent runs",
+   "seed": "-",
+   "model": "no separate workload; see parent-map.json in the run dir",
+   "objective": "PH3D \u00a726-27 compaction correctness + under-load documentation (child run)",
+   "metrics": {
+    "child_of": [
+     "PH3D-COMPACT-001",
+     "PH3D-COMPACT-002"
+    ]
+   },
+   "status": "COMPLETED (child run)"
+  },
+  {
+   "experiment_id": "PH3D-CONCURRENCY-001",
+   "date": "2026-09-17",
+   "git_commit": "77b6eb18efa1e618b5cffcc0a47fd415317f6c32",
+   "corpus": "child run \u2014 evidence lives in parent runs",
+   "seed": "-",
+   "model": "no separate workload; see parent-map.json in the run dir",
+   "objective": "PH3D \u00a722-25 concurrency (child run)",
+   "metrics": {
+    "child_of": [
+     "PH3D-CONC-001",
+     "PH3D-CONC-002",
+     "PH3D-CONC-003"
+    ]
+   },
+   "status": "COMPLETED (child run)"
+  },
+  {
+   "experiment_id": "PH3E-WAL-001",
+   "date": "2026-09-17",
+   "git_commit": "1204e354946f0c622b499b2e9b959a34d42450a2",
+   "corpus": "synthetic: 20 records per case DB, dim 16, head 'default'",
+   "seed": "deterministic",
+   "model": "no learned model",
+   "objective": "Phase 3E E1: WAL-integrity refusal matrix on real engine dirs (closes the PH3D delete-segment OPEN hole)",
+   "metrics": {
+    "cases": 11,
+    "refused": 6,
+    "opened": 5,
+    "refusal_codes": {
+     "delete_required_segment_pre_checkpoint": "WAL_LOST_SEGMENT",
+     "delete_all_segments_post_checkpoint": "WAL_LOST_SEGMENT",
+     "rename_segment_gap": "WAL_REPLAY_CORRUPTION",
+     "corrupt_wal_state_record": "WAL_STATE_CORRUPT",
+     "corrupt_frame": "WAL_REPLAY_CORRUPTION",
+     "corrupt_all_manifests": "MANIFEST_UNREADABLE"
+    },
+    "legitimate_opens": [
+     "delete_wal_state_record_legacy",
+     "truncate_torn_tail",
+     "corrupt_current_manifest_fallback",
+     "fresh_no_documents",
+     "trimmed_reopen"
+    ]
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3E-REG-001",
+   "date": "2026-09-17",
+   "git_commit": "1204e354946f0c622b499b2e9b959a34d42450a2",
+   "corpus": "synthetic: model workload (seed 42, 300 ops), filterx suite, integration suite, crash group legs (40 docs)",
+   "seed": "42",
+   "model": "no learned model",
+   "objective": "Phase 3E E1 regression: no false refusals of legitimate DB states under the new WAL-integrity invariant",
+   "metrics": {
+    "model_passed": "6/6",
+    "filter_passed": "14/14",
+    "integration_passed": "16/16",
+    "crash_group_legs": "7/7 verify clean",
+    "unacked_docs": 0
+   },
+   "status": "COMPLETED"
   }
  ]
 }

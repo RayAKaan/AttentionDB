@@ -1,0 +1,5 @@
+check,ok,detail
+replay_exact_state,true,"docs=450"
+replay_checker,true,""
+contention_atomic_records,true,"torn=0 missing=0"
+contention_checker,true,""

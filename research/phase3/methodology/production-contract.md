@@ -1,0 +1,145 @@
+# AttentionDB — Production Contract (Phase 3E, E0 freeze)
+
+Date frozen: 2026-09-17 · Author: Rayyan Kaan · Basis: Phase 3B/3C retrieval validation,
+Phase 3D database validation (runs PH3D-*), code at commit 1204e35 (E0 freeze point).
+Amendments to this contract are appended as dated sections (A1, A2, …) — semantics never
+change silently. Companion: `phase3e-spec.md` (execution plan).
+
+Vocabulary: **VERIFIED** (implementation + experiment exercising the failure mode),
+**PARTIALLY VERIFIED**, **NOT VERIFIED**, **UNSUPPORTED**, **BLOCKED**, **OPEN**.
+
+---
+
+## 1. What AttentionDB guarantees
+
+G1. **Logical state correctness** — VERIFIED (PH3D-STATE-001..003, INTEGRATION-001):
+under mixed insert/update/upsert/delete/query/filter/checkpoint/compact/restart streams,
+the observable logical state equals a reference model after every restart, compaction and
+at the end; dead documents are never returned; results are deterministic.
+
+G2. **Filter soundness** — VERIFIED (PH3D-FILTER-001): a document not matching the filter
+expression can never be returned. Completeness is NOT guaranteed (candidate-bound;
+measured recall 0.967–1.0 on tested shapes).
+
+G3. **Durability per selected mode** — VERIFIED on the process-crash axis
+(PH3D-CRASH-001..003, 21/21 points):
+   - `Durability::Sync`: fsync per WAL append. An acknowledged write survives process
+     death; by implementation also machine failure, but the machine axis is PARTIALLY
+     VERIFIED (§3).
+   - `Durability::GroupCommit`: WAL appends flushed to the OS page cache. An acknowledged
+     write survives process death; it does NOT necessarily survive OS/power failure.
+   - `Durability::Async`: WAL appends buffered in userspace. An acknowledged write is NOT
+     guaranteed to survive process death (documented, run-backed:
+     `COMMITTED_NOT_DURABLE_ASYNC`). `flush_wal()` / `checkpoint()` promote acks.
+
+G4. **Crash recovery** — VERIFIED for the tested points: recovery yields all acknowledged
+writes (Sync/GroupCommit) or the intact acknowledged prefix with zero unacknowledged
+leakage (Async); transactions are all-or-nothing (never partial) at every tested point;
+a torn WAL tail is truncated with a WARNING and the intact prefix recovers.
+
+G5. **WAL corruption refusal** — VERIFIED (PH3D-WALCORRUPT-001): a corrupt frame, a gapped
+or misnamed segment, or a broken sequence continuum refuses to open. The database never
+silently fabricates data. (Pre-E1 exception: §2/Amendment A1.)
+
+G6. **Transaction atomicity** — VERIFIED (PH3D-TX-001; crash legs): commits apply
+completely or not at all, under validation failure and process death; rollback discards.
+Scope: `TxnOp = Insert | Delete`, single collection per transaction. **No update txn op,
+no cross-collection transactions, no isolation levels (UNSUPPORTED).**
+
+G7. **Concurrent stability** — VERIFIED (PH3D-CONC-001..003): parallel readers and mixed
+read/write runs complete with zero errors and checker-clean state; mutation records are
+never torn; per-key last-write-wins under gate serialization. **No linearizability or
+isolation claim.**
+
+G8. **Backup/restore (quiescent)** — VERIFIED (PH3D-BACKUP-001/002): a copy taken from a
+closed/quiescent database restores to exactly the captured logical state, with per-file
+sha256 integrity. Restore requires the manifest (`backup-meta.json`).
+
+G9. **Compaction** — VERIFIED offline (PH3D-COMPACT-001): full merge + tombstone GC
+preserves logical state, latest versions, and deletions. Automatic incremental compaction
+triggers at ≥4 SST files and RETAINS tombstones in partial merges (anti-resurrection).
+
+G10. **Multi-collection isolation** — VERIFIED with namespaced ids (PH3D-INTEGRATION-001):
+uuid identity is GLOBAL; a collection is a membership tag. Callers must namespace logical
+ids per collection (documented semantics).
+
+## 2. What AttentionDB does NOT guarantee (as of freeze)
+
+N1. No isolation levels, no serializability, no linearizability (not implemented; no
+history-based claim). Operation ordering = single mutation gate + per-key last-write-wins.
+N2. No update operation, no upsert op, and no cross-collection transactions.
+N3. No online backup: `copy_database_dir` requires a quiescent database (UNSUPPORTED
+under active writers; the one observed consistent sample is documentation, not support).
+N4. No online (engine-open) compaction: `compact_all` is dir-level, offline (UNSUPPORTED
+under load; BLOCKED by design).
+N5. Async-mode acknowledged durability across process death (UNSUPPORTED by design; use
+GroupCommit/Sync).
+N6. Machine/power-loss durability: PARTIALLY VERIFIED (implemented via fsync in Sync;
+no power-cut harness — see §3 and Phase 3E E3).
+N7. **Pre-E1 hole**: deleting the only pre-checkpoint WAL segment let a database open as
+apparently-valid and empty. **Closed by Amendment A1 (E1).**
+N8. No distributed operation, replication, or sharding (out of scope by standing decision).
+N9. No memory optimization claims (PH3D-MEM-OPT-001 not run; Phase 3C baselines stand).
+
+## 3. Operational semantics (the ten E0 questions)
+
+Q1 **Write acknowledged → what happened?** The mutation is in the WAL and applied to
+in-memory state; visibility to subsequent reads is immediate (read-your-writes within the
+process). Persistence depends on the durability mode (G3): Sync = fsync'd; GroupCommit =
+page-cache flushed; Async = userspace buffer only.
+
+Q2 **Process crash?** Reopen recovers per G3/G4: all acked (Sync/GroupCommit), intact
+prefix (Async), transactions all-or-nothing, torn tail warned+truncated, corrupt WAL
+refuses to open. Any unhandled termination leaks the engine directory on disk (PH3C
+finding) — operational nuisance, never a correctness event.
+
+Q3 **Power loss?** NOT TESTED. Sync's fsync-per-append is designed for it; GroupCommit/
+Async are not. Verdict stays PARTIALLY VERIFIED until a machine-crash harness exists (E3).
+
+Q4 **WAL files disappear?** Pre-E1: post-checkpoint deletion of required history was
+detectable only partially (gap check); a deleted pre-checkpoint segment opened as a valid
+empty database (the N5/E1 hole). Amendment A1 makes required-WAL loss a refusal to open.
+
+Q5 **Backup during activity?** UNSUPPORTED: the copy does not coordinate with the mutation
+gate; supported path is quiescent. Documented (PH3D-BACKUP-001 live probes).
+
+Q6 **Compaction during activity?** UNSUPPORTED: `compact_all` is offline (close engine →
+compact → reopen). Invoking it while an engine holds the dir merges files without cleanup
+(PH3D-COMPACT-002, documented). Automatic incremental compaction during operation is
+internal to flush and retains tombstones (safe by construction, G9).
+
+Q7 **Transaction isolation?** None. Transactions serialize on the mutation gate with all
+other mutations; there is no snapshot, no conflict detection, no concurrent-transaction
+scheduling.
+
+Q8 **Concurrency ordering?** Mutations: total order via the mutation gate (single
+process). Reads: consistent per-call; readers may observe the state between gate
+sections. No cross-key ordering guarantees are exposed; per-key writes are never torn.
+
+Q9 **Supported database size?** Maximum = maximum reproducible configuration under a
+stated envelope (Phase 3C principle). Measured envelope @DIM 512, ~2 GB sandbox:
+≈30K head-docs (1h/30K ≈ 941 MB · 2h/20K ≈ 1152 MB · 4h/10K ≈ 1092 MB · 8h/5K ≈ 960 MB);
+8h×10K×512 OOMs (preserved). Memory is the binding constraint (duplication ≥2× raw;
+~6–8× unexplained — E9 will attribute). Phase 3D validated correctness up to ~1.8K live
+docs in multi-collection/multi-head setups; larger corpora untested for DB semantics.
+
+Q10 **Acknowledgment API distinction (planned, E2)?** Currently `commit()`/mutation
+results do not distinguish Committed (applied+logged) from Durable (survives failure
+classes). This distinction is scheduled for E2 and will be an API-visible contract
+change recorded as Amendment A2. Until then, the mode table in G3 IS the ack contract.
+
+## 4. Consistency gate
+
+`check_engine`/`check_db_dir` remain the mandatory gate: ERROR-severity issues fail a run;
+WARNINGs (retired-vector purge backlog) are documented non-fatal. The gate runs after
+build, mutations, restart, replay, crash-recovery, compaction, concurrency, and restore.
+
+## 5. Amendment log
+
+- **A1 (2026-09-17, E1)** — WAL integrity invariant: a durable rotation-time WAL
+  high-water record in the `WAL/wal-state.json` sidecar makes required-WAL loss a
+  REFUSAL to open (`WAL_LOST_SEGMENT` / `WAL_SEQ_GAP`); unparseable sidecar records
+  refuse (`WAL_STATE_CORRUPT`); absent sidecar = legacy database, opens with current
+  semantics and adopts the invariant at its next segment creation/rotation. The
+  catalog gains NO watermark field (bincode v1 positional — durable sidecar files
+  only). Details in `phase3e-spec.md` §E1 and the E1 evidence report.

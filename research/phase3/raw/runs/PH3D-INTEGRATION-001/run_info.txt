@@ -1,0 +1,7 @@
+run_id=PH3D-INTEGRATION-001
+experiment=cross-feature integration (§31/§11/§4/§6/§26/§29): multi-collection isolation, graceful durability, filter x multi-head
+date=2026-09-17
+method=benchmarks/phase3/src/dbtest.rs via 'phase3-bench dbtest <subcommand>' (deterministic; DIM=32, head h)
+config=see config.json
+status=COMPLETED — integration: 16 passed, 0 FAILED
+notes=discovered+documented: uuid identity is global; collections are membership tags; inserting an existing uuid into another collection re-members it (harness now namespaces ids)

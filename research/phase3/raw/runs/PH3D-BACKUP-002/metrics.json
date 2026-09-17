@@ -1,0 +1,7 @@
+{
+  "failed": 0,
+  "files": 6,
+  "note": "quiescent backup; sizes+checksums recorded in inventory.csv",
+  "passed": 6,
+  "total_bytes": 76501
+}

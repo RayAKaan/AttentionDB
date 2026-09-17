@@ -1,0 +1,13 @@
+run,check,ok,detail
+PH3D-BACKUP-001,restore_state_equals_backup,true,backup=150 restored=150
+PH3D-BACKUP-001,restore_store_unique,true,
+PH3D-BACKUP-001,restore_not_mutated,true,has150=false has1=true
+PH3D-BACKUP-001,restore_checker,true,"Object {'clean': Bool(true), 'dir_errors': Array [], 'dir_warnings': Array [], 'engine_errors': Array [], 'engine_warnings': Array [], 'warning_count': Number(0)}"
+PH3D-BACKUP-001,restore_manifest,true,
+PH3D-BACKUP-001,live_writer_backup_documented,true,docs=913 consistent=true writers_wrote=736
+PH3D-BACKUP-002,copy_fidelity_files,true,src_files=6 bak_files=6 (+backup-meta.json)
+PH3D-BACKUP-002,copy_fidelity_hashes,true,mismatched=0
+PH3D-BACKUP-002,restore_manifest,true,
+PH3D-BACKUP-002,restore_fidelity_hashes,true,missing_or_diff=0 (restored_files=6)
+PH3D-BACKUP-002,restore_state_equals_source,true,before=100 after=100
+PH3D-BACKUP-002,restore_checker,true,

@@ -1,0 +1,1 @@
+{"child_run": "PH3D-MUTATION-001", "parents": ["PH3D-STATE-001","PH3D-STATE-002","PH3D-STATE-003","PH3D-FILTER-001","PH3D-COMPACT-001"], "role": "mutation correctness family (§7-10): insert/update/upsert/delete lifecycle, ID mapping, update v1->v4 semantics"}

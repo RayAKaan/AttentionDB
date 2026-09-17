@@ -1,0 +1,7 @@
+check,ok,detail
+restore_state_equals_backup,true,"backup=150 restored=150"
+restore_store_unique,true,""
+restore_not_mutated,true,"has150=false has1=true"
+restore_checker,true,"Object {'clean': Bool(true), 'dir_errors': Array [], 'dir_warnings': Array [], 'engine_errors': Array [], 'engine_warnings': Array [], 'warning_count': Number(0)}"
+restore_manifest,true,""
+live_writer_backup_documented,true,"docs=913 consistent=true writers_wrote=736"

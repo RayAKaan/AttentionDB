@@ -1,0 +1,10 @@
+run_or_check,logged_ops,expected_docs,observed_docs,state_equivalence,verdict
+PH3D-STATE-001,926,144,144,EQUAL,PASS
+PH3D-STATE-002,936,154,154,EQUAL,PASS
+PH3D-STATE-003,925,135,135,EQUAL,PASS
+fm_insert_matching,,,,n/a,TRUE
+fm_update_leaves,,,,n/a,TRUE
+fm_update_enters,,,,n/a,TRUE
+fm_delete_matching,,,,n/a,TRUE
+fm_delete_nonmatching,,,,n/a,TRUE
+fm_reinsert,,,,n/a,TRUE

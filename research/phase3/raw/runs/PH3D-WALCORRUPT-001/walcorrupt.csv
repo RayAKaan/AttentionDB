@@ -1,0 +1,5 @@
+truncate_torn,truncate_torn,OPENED,n_docs=23,store_issues=0,checker_clean=true
+garbage_tail,garbage_tail,ERROR_ON_OPEN,,
+flip_byte,flip_byte,ERROR_ON_OPEN,,
+delete_segment,delete_segment,OPENED,n_docs=0,store_issues=0,checker_clean=true
+duplicate_segment_gap,duplicate_segment_gap,ERROR_ON_OPEN,,

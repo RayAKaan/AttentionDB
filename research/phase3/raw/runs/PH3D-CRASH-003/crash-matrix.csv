@@ -1,0 +1,7 @@
+sync,after_acks,after_acks,ALL_ACKED,40/40,0,pre_existing=0,txn=0/10 marker= ABSENT
+sync,after_flush,after_flush,ALL_ACKED,40/40,0,pre_existing=0,txn=0/10 marker= ABSENT
+sync,after_checkpoint,after_checkpoint,ALL_ACKED,40/40,0,pre_existing=0,txn=0/10 marker= ABSENT
+sync,mid_inserts,mid_inserts,ALL_ACKED,21/21,0,pre_existing=0,txn=0/10 marker= ABSENT
+sync,mid_flush,mid_flush,ALL_ACKED,40/40,0,pre_existing=0,txn=0/10 marker= ABSENT
+sync,during_commit_txn,during_commit_txn,ALL_ACKED,40/40,0,pre_existing=0,txn=10/10 marker=committed COMMITTED_DURABLE
+sync,after_compact,after_compact,ALL_ACKED,40/40,0,pre_existing=0,txn=0/10 marker= ABSENT

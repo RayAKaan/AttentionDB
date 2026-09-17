@@ -67,7 +67,9 @@ def main():
     # 5. every COMPLETED experiment has config + dataset hash + commit
     #    (analysis runs PH3B-BM25-001 / PH3B-HYBRID-001 carry run_info +
     #     copied analysis artifacts instead of config.json)
-    ANALYSIS = {"PH3B-BM25-001", "PH3B-HYBRID-001", "PH3C-MEM-003", "PH3C-HEAD-002"}
+    ANALYSIS = {"PH3B-BM25-001", "PH3B-HYBRID-001", "PH3C-MEM-003", "PH3C-HEAD-002",
+                "PH3D-MUTATION-001", "PH3D-RECOVERY-001", "PH3D-COMPACTION-001",
+                "PH3D-CONCURRENCY-001"}
     for e in idx["experiments"]:
         if e.get("status", "").startswith("COMPLETED"):
             d = os.path.join(run, e["experiment_id"])
@@ -158,6 +160,237 @@ def main():
              and r["arm"] == "trained_gating" and r["seed"] == "agg"]
         if not g or g[0]["R@10"] != "0.6448":
             ERR.append("PH3B-COMP-001 gating headline row altered or missing (Phase 3B must remain unchanged)")
+
+    # 11. Phase 3D: every PH3D run dir registered, with run_info; COMPLETED
+    #     non-analysis runs carry config.json; PH3D raw runs immutable markers
+    #     (ANALYSIS = analysis/child runs: run_info + parent-map.json instead
+    #     of a workload config)
+    PH3D_RUNS = ["PH3D-STATE-001", "PH3D-STATE-002", "PH3D-STATE-003", "PH3D-STATE-004",
+                 "PH3D-FILTER-001", "PH3D-TX-001", "PH3D-CRASH-001", "PH3D-CRASH-002",
+                 "PH3D-CRASH-003", "PH3D-WALCORRUPT-001", "PH3D-COMPACT-001",
+                 "PH3D-COMPACT-002", "PH3D-CONC-001", "PH3D-CONC-002", "PH3D-CONC-003",
+                 "PH3D-BACKUP-001", "PH3D-BACKUP-002", "PH3D-INTEGRATION-001",
+                 "PH3D-MUTATION-001", "PH3D-RECOVERY-001", "PH3D-COMPACTION-001",
+                 "PH3D-CONCURRENCY-001"]
+    for eid in PH3D_RUNS:
+        d = os.path.join(run, eid)
+        if eid not in ids:
+            ERR.append(f"PH3D run {eid} missing from registry")
+            continue
+        if not os.path.isdir(d):
+            ERR.append(f"PH3D run {eid} registered but raw dir missing")
+        elif not os.path.exists(os.path.join(d, "run_info.txt")):
+            ERR.append(f"PH3D run {eid}: no run_info.txt")
+    for eid in PH3D_RUNS:
+        d = os.path.join(run, eid)
+        if eid in ANALYSIS:
+            if not os.path.exists(os.path.join(d, "parent-map.json")):
+                ERR.append(f"PH3D child run {eid}: no parent-map.json")
+            continue
+        exp = next((x for x in idx["experiments"] if x["experiment_id"] == eid), None)
+        if exp and exp.get("status", "").startswith("COMPLETED") and \
+                not os.path.exists(os.path.join(d, "config.json")):
+            ERR.append(f"{eid}: COMPLETED but no config.json")
+
+    # 12. Phase 3D: canonical PH3D results CSVs exist and only reference
+    #     registered runs
+    for f in ("database-guarantees", "filtering", "mutations", "durability", "wal-replay",
+              "crash-recovery", "transactions", "compaction", "concurrency",
+              "backup-restore", "state-machine", "memory-optimization",
+              "production-readiness"):
+        if not os.path.exists(os.path.join(RES, f + ".csv")):
+            ERR.append(f"missing PH3D results CSV {f}.csv")
+    for f in ("crash-recovery", "state-machine", "transactions", "concurrency",
+              "compaction", "backup-restore", "filtering"):
+        pth = os.path.join(RES, f + ".csv")
+        if not os.path.exists(pth):
+            continue
+        for row in rd(pth):
+            for rid in (row.get("run"), row.get("run_or_check")):
+                if rid and rid.startswith("PH3D-") and rid not in ids:
+                    ERR.append(f"{f}.csv references unregistered {rid}")
+
+    # 13. Phase 3D: crash-recovery.csv ↔ raw metrics drift (verdicts immutable)
+    cr = os.path.join(RES, "crash-recovery.csv")
+    if os.path.exists(cr):
+        for row in rd(cr):
+            d = os.path.join(run, row["run"])
+            try:
+                m = json.load(open(os.path.join(d, "metrics.json")))
+            except OSError:
+                ERR.append(f"crash-recovery.csv row for missing {row['run']}")
+                continue
+            raw = {p["crash_point"]: p for p in m["points"]}
+            rp = raw.get(row["crash_point"])
+            if rp is None:
+                ERR.append(f"{row['run']}: raw metrics lack crash point {row['crash_point']}")
+            elif rp["verdict"] != row["verdict"]:
+                ERR.append(f"{row['run']}/{row['crash_point']}: verdict drift "
+                           f"{rp['verdict']} vs {row['verdict']}")
+            if row["unacked_present"] not in ("0", ""):
+                ERR.append(f"{row['run']}/{row['crash_point']}: unacked docs present "
+                           f"({row['unacked_present']}) — resurrection")
+        if len(rd(cr)) != 21:
+            ERR.append(f"crash-recovery.csv must hold 21 points (got {len(rd(cr))})")
+
+    # 14. Phase 3D: state-machine verdicts must be PASS in both CSV and registry
+    sm = os.path.join(RES, "state-machine.csv")
+    if os.path.exists(sm):
+        for row in rd(sm):
+            exp = next((x for x in idx["experiments"] if x["experiment_id"] == row["run"]), None)
+            if exp is None:
+                ERR.append(f"state-machine.csv references unregistered {row['run']}")
+            elif row["verdict"] == "PASS" and row["checks_failed"] != "0":
+                ERR.append(f"{row['run']}: PASS verdict with {row['checks_failed']} failed checks")
+
+    # 15. Phase 3D: production readiness is a multidimensional matrix — never
+    #     a single score; statuses from the fixed vocabulary only
+    pr = os.path.join(RES, "production-readiness.csv")
+    if os.path.exists(pr):
+        rows = rd(pr)
+        hdr = list(rows[0].keys()) if rows else []
+        if any("score" in h.lower() for h in hdr):
+            ERR.append("production-readiness.csv must not contain a score column (§45)")
+        allowed = {"VERIFIED", "PARTIAL", "NOT VERIFIED", "UNSUPPORTED", "BLOCKED",
+                   "NOT ATTEMPTED IN PH3D", "VERIFIED (PH3C)"}
+        subsys = set()
+        for row in rows:
+            subsys.add(row["subsystem"])
+            st = row["status"]
+            if not any(st == a or st.startswith(a.split(" (")[0]) for a in allowed):
+                ERR.append(f"production-readiness.csv: non-vocabulary status '{st}'")
+        need = {"Storage", "Durability", "Recovery", "Transactions", "Concurrency",
+                "Backup", "Retrieval", "Memory"}
+        if not need.issubset(subsys):
+            ERR.append(f"production-readiness.csv missing subsystems: {need - subsys}")
+
+    # 16. Phase 3D tables 1-8 + figures 10-12 with provenance; §42 memory/
+    #     scaling figures must NOT exist without a PH3D-MEM-OPT run
+    for i, f in enumerate(("table-1-database-guarantees", "table-2-mutation-correctness",
+                           "table-3-crash-recovery", "table-4-transaction-atomicity",
+                           "table-5-compaction-equivalence", "table-6-concurrency",
+                           "table-7-backup-restore", "table-8-memory-optimization",
+                           "table-9-state-machine", "table-10-filtering",
+                           "table-11-wal-corruption"), 1):
+        pth = os.path.join(TAB, f + ".md")
+        if not os.path.exists(pth):
+            ERR.append(f"missing PH3D {f}.md")
+    # §17 shape: crash table must carry the expected/observed/status columns and
+    # zero MISMATCH statuses
+    t3 = os.path.join(TAB, "table-3-crash-recovery.md")
+    if os.path.exists(t3):
+        t3s = open(t3).read()
+        for col in ("crash point", "ack state", "expected", "observed", "status"):
+            if col not in t3s:
+                ERR.append(f"table-3 missing §17 column '{col}'")
+        if "MISMATCH" in t3s:
+            ERR.append("table-3 crash matrix contains MISMATCH statuses")
+    # §44 vocabulary
+    pr2 = os.path.join(RES, "production-readiness.csv")
+    if os.path.exists(pr2):
+        for row in rd(pr2):
+            if row["status"] == "PARTIAL" or row["status"] == "PARTIALLY":
+                ERR.append(f"production-readiness.csv: legacy status 'PARTIAL' (use PARTIALLY VERIFIED): {row['capability']}")
+    for f in ("figure-ph3d-1-crash-recovery", "figure-ph3d-2-concurrent-throughput",
+              "figure-ph3d-3-mixed-latency"):
+        pth = os.path.join(HERE, "figures", f + ".svg")
+        if not os.path.exists(pth):
+            ERR.append(f"missing PH3D {f}.svg")
+        elif "PH3D-" not in open(pth).read():
+            ERR.append(f"{f}.svg missing PH3D experiment-ID provenance")
+    # deviations doc + §48 claim-ledger token check
+    if not os.path.exists(os.path.join(HERE, "methodology", "ph3d-spec-deviations.md")):
+        ERR.append("methodology/ph3d-spec-deviations.md missing")
+    ledger_p = os.path.join(HERE, "..", "phase2", "findings", "claim-ledger.md")
+    if os.path.exists(ledger_p):
+        import re as _re
+        toks = set(_re.findall(r"PH3D-[A-Z]+-\d+", open(ledger_p).read()))
+        for t in sorted(toks):
+            if t not in ids:
+                ERR.append(f"claim-ledger references unregistered experiment {t}")
+    mem_opt = next((x for x in idx["experiments"] if x["experiment_id"] == "PH3D-MEM-OPT-001"), None)
+    for f in ("figure-13-memory-before-after-opt", "figure-14-scaling-after-opt"):
+        pth = os.path.join(HERE, "figures", f + ".svg")
+        if os.path.exists(pth) and mem_opt is None:
+            ERR.append(f"{f}.svg exists but PH3D-MEM-OPT-001 was never run (no data backing)")
+
+    # 17. Phase 2 must remain untouched (standing rule) except the append-only
+    #     claim ledger (addenda are the sanctioned correction mechanism);
+    #     the 3C report intact
+    import subprocess
+    st = subprocess.run(["git", "status", "--porcelain", "--", "research/phase2"],
+                        capture_output=True, text=True)
+    for line in st.stdout.splitlines():
+        path = line[3:].strip()
+        if path != "research/phase2/findings/claim-ledger.md":
+            ERR.append(f"research/phase2 modified outside the claim ledger: {path}")
+    if st.stdout.strip():
+        ld = subprocess.run(
+            ["git", "diff", "--", "research/phase2/findings/claim-ledger.md"],
+            capture_output=True, text=True).stdout
+        removed = [l for l in ld.splitlines() if l.startswith("-") and not l.startswith("---")]
+        if removed:
+            ERR.append("claim-ledger.md diff removes existing lines (append-only violated)")
+    if not os.path.exists(os.path.join(HERE, "phase3c-final-report.md")):
+        ERR.append("phase3c-final-report.md missing (Phase 3C record)")
+    if not os.path.exists(os.path.join(HERE, "methodology", "database-guarantees.md")):
+        ERR.append("methodology/database-guarantees.md missing (Phase 3D §2 contract)")
+    # 18. Phase 3E (E1): WAL-integrity evidence — run registered with artifacts,
+    #     generated results CSV matches the raw run, expectation gate holds,
+    #     regression run present (no false refusals of legitimate states)
+    PH3E_RUNS = ["PH3E-WAL-001", "PH3E-REG-001"]
+    for eid in PH3E_RUNS:
+        if eid not in ids:
+            ERR.append(f"PH3E run {eid} missing from registry")
+        d = os.path.join(run, eid)
+        if not os.path.isdir(d):
+            ERR.append(f"PH3E run {eid} registered but raw dir missing")
+        elif not os.path.exists(os.path.join(d, "run_info.txt")) or \
+                not os.path.exists(os.path.join(d, "config.json")):
+            ERR.append(f"PH3E run {eid}: missing run_info.txt/config.json")
+    wal_raw = os.path.join(run, "PH3E-WAL-001", "wal-integrity.csv")
+    wal_res = os.path.join(RES, "wal-integrity-e1.csv")
+    if not os.path.exists(wal_raw):
+        ERR.append("PH3E-WAL-001: raw wal-integrity.csv missing")
+    elif not os.path.exists(wal_res):
+        ERR.append("results/wal-integrity-e1.csv missing (run generate_results_ph3e.py)")
+    else:
+        raw_rows = list(rd(wal_raw))
+        res_rows = list(rd(wal_res))
+        if len(raw_rows) != 11 or len(res_rows) != 11:
+            ERR.append(f"wal-integrity matrix must hold 11 cases "
+                       f"(raw {len(raw_rows)}, results {len(res_rows)})")
+        for rr, sr in zip(raw_rows, res_rows):
+            if rr["case"] != sr["case"] or rr["verdict"] != sr["verdict"]:
+                ERR.append(f"wal-integrity-e1.csv drift for {rr['case']}: "
+                           f"results vs raw {sr['verdict']}/{rr['verdict']}")
+            if sr["match"] != "MATCH":
+                ERR.append(f"wal-integrity-e1.csv: {sr['case']} expectation "
+                           f"MISMATCH ({sr['observed']} vs {sr['expected']})")
+        exp = next((x for x in idx["experiments"]
+                    if x["experiment_id"] == "PH3E-WAL-001"), None)
+        if exp:
+            m = exp["metrics"]
+            refused = sum(1 for r in raw_rows if r["verdict"] == "REFUSED")
+            if m.get("cases") != len(raw_rows) or m.get("refused") != refused:
+                ERR.append("registry metrics drift for PH3E-WAL-001 "
+                           "(cases/refused vs raw)")
+    reg = os.path.join(run, "PH3E-REG-001")
+    if os.path.isdir(reg):
+        for f in ("metrics.json", "crash-regression-group.csv"):
+            if not os.path.exists(os.path.join(reg, f)):
+                ERR.append(f"PH3E-REG-001: missing {f}")
+        for ln in open(os.path.join(reg, "crash-regression-group.csv")):
+            ln = ln.strip()
+            if not ln:
+                continue
+            if "ALL_ACKED" not in ln and "prefix" not in ln:
+                ERR.append(f"PH3E-REG-001 crash leg: unexpected verdict ({ln[:80]})")
+    if not os.path.exists(os.path.join(HERE, "phase3e-evidence-e0-e1.md")):
+        ERR.append("phase3e-evidence-e0-e1.md missing (E0+E1 evidence gate)")
+    if not os.path.exists(os.path.join(HERE, "methodology", "production-contract.md")):
+        ERR.append("methodology/production-contract.md missing (E0 frozen contract)")
+
     if ERR:
         print("PHASE 3 CONSISTENCY CHECK FAILED:")
         for e in ERR:

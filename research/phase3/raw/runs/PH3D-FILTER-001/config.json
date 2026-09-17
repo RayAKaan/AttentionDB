@@ -1,0 +1,1 @@
+{"docs": 120, "shapes": ["eq","gt-selective","zero-match","and","filter+topk","mutation-lifecycle x6","restart","compact"], "k": 500}

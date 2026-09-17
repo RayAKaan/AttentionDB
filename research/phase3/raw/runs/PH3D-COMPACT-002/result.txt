@@ -1,0 +1,1 @@
+compactlive,COMPACTED_WHILE_OPEN,merged=3,out_entries=80 (NOT cleaning up; engine holds the dir)

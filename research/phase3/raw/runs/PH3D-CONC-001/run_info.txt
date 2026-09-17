@@ -1,0 +1,7 @@
+run_id=PH3D-CONC-001
+experiment=concurrent read ladder (§22): 1..32 readers, latency percentiles + QPS + checker gate
+date=2026-09-17
+method=benchmarks/phase3/src/dbtest.rs via 'phase3-bench dbtest <subcommand>' (deterministic; DIM=32, head h)
+config=see config.json
+status=COMPLETED — 6 ladder points; QPS 13518-22534; errors=0; all checker_clean=True
+notes=p99 tail grows with reader count (contention); zero query errors; zero checker errors

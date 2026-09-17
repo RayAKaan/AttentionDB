@@ -1,0 +1,7 @@
+run_id=PH3D-FILTER-001
+experiment=filter semantics (§4–6): soundness/determinism gates + measured recall; filter x mutation lifecycle; restart/compact persistence
+date=2026-09-17
+method=benchmarks/phase3/src/dbtest.rs via 'phase3-bench dbtest <subcommand>' (deterministic; DIM=32, head h)
+config=see config.json
+status=COMPLETED — filterx: 14 passed, 0 FAILED
+notes=oracle: got⊆eligible (soundness, hard), rerun-identical (determinism, hard), recall=|got∩elig|/|elig| (metric; candidate-bound by design)

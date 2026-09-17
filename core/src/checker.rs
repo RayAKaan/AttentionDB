@@ -281,15 +281,114 @@ pub fn check_db_dir(db_dir: &std::path::Path) -> Result<Vec<CheckIssue>, crate::
                         ),
                     ));
                 }
-                if outcome.last_seq < catalog.checkpoint_seq {
-                    issues.push(CheckIssue::error(
-                        "WAL_SEQ_INVALID",
-                        "-",
-                        format!(
-                            "checkpoint claims seq {} but WAL ends at {} (segments trimmed too far?)",
-                            catalog.checkpoint_seq, outcome.last_seq
-                        ),
-                    ));
+                // WAL-integrity invariant (Phase 3E E1) — mirrors
+                // engine::enforce_wal_integrity so the checker and the open
+                // path can never disagree.
+                let ws = match attentiondb_storage::read_wal_state(&wal_dir) {
+                    Ok(ws) => ws,
+                    Err(e) => {
+                        issues.push(CheckIssue::error(
+                            "WAL_STATE_CORRUPT",
+                            "-",
+                            format!("durable WAL watermark record unreadable: {e}"),
+                        ));
+                        None
+                    }
+                };
+                let wal_files = std::fs::read_dir(&wal_dir)
+                    .map(|d| {
+                        d.flatten()
+                            .filter(|e| {
+                                e.path().extension().and_then(|s| s.to_str()) == Some("wal")
+                            })
+                            .count()
+                    })
+                    .unwrap_or(0);
+                if let Some(ws) = &ws {
+                    if wal_files == 0 {
+                        issues.push(CheckIssue::error(
+                            "WAL_LOST_SEGMENT",
+                            "-",
+                            format!(
+                                "durable WAL watermark exists (high_watermark={}, active_start={}) but no WAL segments remain",
+                                ws.high_watermark, ws.active_start
+                            ),
+                        ));
+                    } else if !wal_dir
+                        .join(format!("{:020}.wal", ws.active_start))
+                        .exists()
+                    {
+                        let newer = std::fs::read_dir(&wal_dir)
+                            .map(|d| {
+                                d.flatten().any(|e| {
+                                    e.path()
+                                        .file_stem()
+                                        .and_then(|s| s.to_str())
+                                        .and_then(|s| s.parse::<u64>().ok())
+                                        .map(|n| n > ws.active_start)
+                                        .unwrap_or(false)
+                                })
+                            })
+                            .unwrap_or(false);
+                        if !newer {
+                            issues.push(CheckIssue::error(
+                                "WAL_LOST_SEGMENT",
+                                "-",
+                                format!(
+                                    "active WAL segment (start seq {}) recorded by the durable watermark is missing",
+                                    ws.active_start
+                                ),
+                            ));
+                        }
+                    }
+                    let w = ws.high_watermark.max(catalog.checkpoint_seq);
+                    if w > catalog.checkpoint_seq
+                        && (outcome.first_seq == 0 || outcome.last_seq < w)
+                    {
+                        issues.push(CheckIssue::error(
+                            "WAL_LOST_SEGMENT",
+                            "-",
+                            format!(
+                                "WAL covers seqs {}..{} but the durable watermark is {} (checkpoint_seq={}) — required history above the checkpoint is missing",
+                                outcome.first_seq, outcome.last_seq, ws.high_watermark, catalog.checkpoint_seq
+                            ),
+                        ));
+                    }
+                } else if outcome.first_seq == 0 {
+                    // legacy (no watermark record): empty WAL is legitimate only
+                    // while segment files exist or no checkpoint ever happened
+                    if catalog.checkpoint_seq > 0 && wal_files == 0 {
+                        issues.push(CheckIssue::error(
+                            "WAL_MISSING",
+                            "-",
+                            "catalog references WAL state but no WAL segments remain",
+                        ));
+                    }
+                }
+                if outcome.first_seq != 0 {
+                    if outcome.first_seq > catalog.checkpoint_seq + 1 {
+                        issues.push(CheckIssue::error(
+                            "WAL_SEQ_INVALID",
+                            "-",
+                            format!(
+                                "oldest WAL record has seq {} but checkpoint covers through {}: seqs {}..{} are missing (segments trimmed too far?)",
+                                outcome.first_seq,
+                                catalog.checkpoint_seq,
+                                catalog.checkpoint_seq + 1,
+                                outcome.first_seq - 1
+                            ),
+                        ));
+                    }
+                    if outcome.last_seq < catalog.checkpoint_seq {
+                        issues.push(CheckIssue::error(
+                            "WAL_SEQ_INVALID",
+                            "-",
+                            format!(
+                                "checkpoint claims seq {} but WAL ends at {} (newest segments truncated?)",
+                                catalog.checkpoint_seq, outcome.last_seq
+                            ),
+                        ));
+                    }
                 }
             }
             Err(e) => {

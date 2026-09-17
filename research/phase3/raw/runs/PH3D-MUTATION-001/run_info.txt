@@ -1,0 +1,7 @@
+run_id=PH3D-MUTATION-001
+experiment=mutation correctness family (§7-10): insert/update/upsert/delete lifecycle, ID mapping, update v1->v4 semantics (child run; evidence lives in the parent runs)
+date=2026-09-17
+method=benchmarks/phase3/src/dbtest.rs via 'phase3-bench dbtest <subcommand>' (deterministic; DIM=32, head h)
+config=see config.json
+status=COMPLETED (child)
+notes=parent-map.json lists the exact parent runs; no separate workload executed

@@ -1,0 +1,6 @@
+check,ok,detail
+before_checker,true,"[]"
+after_state_equal,true,"docs=310"
+after_checker,true,""
+updated_content_survives,true,""
+deleted_stay_deleted,true,""

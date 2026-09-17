@@ -1,0 +1,7 @@
+run_id=PH3E-WAL-001
+experiment=Phase 3E E1 WAL-integrity matrix: required-WAL loss must refuse to open (WAL_LOST_SEGMENT/WAL_SEQ_GAP/WAL_STATE_CORRUPT), never open as an apparently-valid partial DB
+date=2026-09-17
+method=phase3-bench dbtest walintegrity (isolated 20-doc DB per case, Sync durability; driver-side file surgery; open_dir verdict + checker on opened cases)
+config=see config.json
+status=COMPLETED — 11 cases: 6 REFUSED for designed reasons; 5 OPENED all legitimate (legacy sidecar-less, torn-tail intact prefix, manifest-generation fallback, fresh reopen, post-checkpoint trimmed reopen); opened cases checker_clean=true
+notes=extends PH3D-WALCORRUPT-001: the delete-segment OPEN hole from 3D is now CLOSED (refusal); legacy boundary documented in production-contract A1

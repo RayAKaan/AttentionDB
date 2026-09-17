@@ -1,0 +1,1 @@
+{"txn_ops": ["Insert","Delete"], "probes": ["commit-visible","rollback-invisible","unstaged-after-rollback","multi-op-matrix","commit-failure-atomic (wrong-dim inject)","delete-missing-noop","checker"]}
