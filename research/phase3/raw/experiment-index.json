@@ -2,7 +2,7 @@
  "format": "attentiondb-experiment-index",
  "version": 1,
  "updated": "2026-09-17",
- "code_commit": "615407cb5977696d0c75f258c9ecd8b94a9b2701",
+ "code_commit": "5c56ffef5977dacde4c7e47fdfc87de7ac2e13b2",
  "experiments": [
   {
    "experiment_id": "PH3-QUAL-FM-S",
@@ -3865,6 +3865,72 @@
      "restarts_equal": "27/27 across 2 cycles",
      "restart_checker_clean": "27/27"
     }
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3E-E3-001",
+   "date": "2026-09-17",
+   "git_commit": "5c56ffef5977dacde4c7e47fdfc87de7ac2e13b2",
+   "corpus": "synthetic: deterministic doc records (DIM=32, head 'h')",
+   "seed": "deterministic",
+   "model": "no learned model",
+   "objective": "E3 machine-crash (F2E environment-termination-equivalent) durability matrix: 210 cells across workload classes A-E + F0 control",
+   "metrics": {
+    "cells": 210,
+    "failure_model": "F2E-GROUPKILL (process-group SIGKILL at fsynced in-engine window marker); F3/F4 BLOCKED",
+    "classifications": {
+     "RECOVERED_EXPECTED": 177,
+     "DATA_LOSS_ALLOWED_BY_CONTRACT": 21,
+     "NOT_REACHED": 12,
+     "REFUSED_SAFELY": 0,
+     "CORRUPTION_DETECTED": 0,
+     "UNEXPECTED_PARTIAL_STATE": 0,
+     "UNSAFE_OPEN": 0
+    },
+    "key_results": {
+     "sync_after_fsync": "fsynced-but-unacked record SURVIVES group SIGKILL (3/3)",
+     "group_after_flush": "page-cache frame survives group SIGKILL (3/3)",
+     "async": "acked loss at after_ack (0/10 baseline; txn ABSENT) \u2014 per E2 contract",
+     "ckpt_windows": "16/16 all modes at ALL 9 mid-checkpoint windows (ckpt-start fsync)",
+     "manifest_windows": "16/16 incl. orphan tmp fallback (gen1+full WAL replay)",
+     "rotate_windows": "acked 3/3 all modes; in-flight absent (rotation precedes frame write); E1 watermark consistent",
+     "restarts": "state fixed point across 2 cycles in all restart-checked cells"
+    }
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3E-WAL-003",
+   "date": "2026-09-17",
+   "git_commit": "5c56ffef5977dacde4c7e47fdfc87de7ac2e13b2",
+   "corpus": "synthetic: deterministic doc records (DIM=32, head 'h')",
+   "seed": "deterministic",
+   "model": "no learned model",
+   "objective": "E3 regression: E1 WAL-integrity matrix after E3 gates",
+   "metrics": {
+    "cases": 11,
+    "refused": 6,
+    "opened": 5,
+    "identical_to": "PH3E-WAL-001"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3E-DUR-007",
+   "date": "2026-09-17",
+   "git_commit": "5c56ffef5977dacde4c7e47fdfc87de7ac2e13b2",
+   "corpus": "synthetic: deterministic doc records (DIM=32, head 'h')",
+   "seed": "deterministic",
+   "model": "no learned model",
+   "objective": "E3 regression: complete E2 durability suites after E3 gates",
+   "metrics": {
+    "cells": "81+63+27",
+    "identical_to": [
+     "PH3E-DUR-001",
+     "PH3E-DUR-002",
+     "PH3E-DUR-006"
+    ]
    },
    "status": "COMPLETED"
   }

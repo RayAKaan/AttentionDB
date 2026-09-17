@@ -331,6 +331,9 @@ impl DocumentStore {
                 w.append(id.as_bytes().to_vec(), rec.to_msgpack()?)?;
             }
             w.flush()?;
+            // E3 window: SST fully written at its FINAL name (no tmp->rename
+            // in this path — audit finding F-A), not yet installed.
+            crate::crashgate::GATE_SST_AFTER_WRITE.hit();
             self.sstables.push(SSTableReader::open(&p)?);
             let config = crate::compaction::CompactionConfig::default();
             match crate::compaction::compact(dir, &config) {

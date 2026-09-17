@@ -6,6 +6,7 @@ description = "Phase 3: real-world validation benchmarks for the frozen Phase 2 
 publish = false
 
 [dependencies]
+libc = "0.2"
 attentiondb-core = { path = "../../core" }
 attentiondb-storage = { path = "../../storage" }
 attentiondb-learned = { path = "../../learned" }

@@ -545,6 +545,8 @@ impl Wal {
                 active_start: start_seq,
             },
         )?;
+        // E3 window: durable watermark record written for this segment.
+        crate::crashgate::GATE_ROTATE_AFTER_STATE_WRITE.hit();
         Ok(())
     }
 
@@ -555,6 +557,9 @@ impl Wal {
             w.flush()?;
             w.get_ref().sync_all()?;
             self.last_synced_seq = self.next_seq - 1;
+            // E3 window: completed segment durable; new segment + in-flight
+            // frame not yet written (rotation precedes the frame write).
+            crate::crashgate::GATE_ROTATE_AFTER_OLD_FSYNC.hit();
         }
         let next_start = self.next_seq;
         self.open_segment(next_start)

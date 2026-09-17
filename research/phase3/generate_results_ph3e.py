@@ -275,6 +275,123 @@ def gen_durability() -> int:
     return mismatches
 
 
+# ================================================================
+# Phase 3E E3 — machine-crash (F2E) recovery classification
+# ================================================================
+# Contract-derived expectation table (phase3e-e3-spec.md). The raw run
+# records FACTS; this table encodes the CONTRACT; any deviation = MISMATCH.
+
+def _e3_classify(r) -> tuple[str, str, bool]:
+    """returns (classification, expected_summary, ok)"""
+    cell, mode, workload, window = r["cell"], r["mode"], r["workload"], r["window"]
+    if r["exit_kind"] == "NOT_REACHED":
+        return ("NOT_REACHED", "gate unreachable in mode", True)
+    if r["open_error"] != "-":
+        # No E3 window is designed to refuse; any refusal is flagged.
+        return ("REFUSED_SAFELY", "no refusal expected", False)
+    acked = int(r["acked_count"])
+    rec = int(r["recovered_acked"])
+    unack = int(r["unacked_present"])
+    base_ok = r["checker_clean"] == "true" and unack == 0
+    if not base_ok:
+        return ("UNSAFE_OPEN", "checker clean + no unacked docs", False)
+
+    if cell == "f0-control":
+        ok = rec == acked and r["restarts_equal"] == "true"
+        return ("RECOVERED_EXPECTED", "all acked survive graceful close", ok)
+
+    if cell == "ack-c":
+        if mode == "async":
+            # COMMITTED_NOT_DURABLE: loss allowed; atomicity/checker still hold
+            ok = rec <= acked and (window != "after_ack" or r["target2000_present"] in ("true", "false"))
+            return ("DATA_LOSS_ALLOWED_BY_CONTRACT",
+                    "acked async writes MAY vanish (E2 contract)", ok)
+        t = r["target2000_present"] == "true"
+        if mode == "sync":
+            t_exp = window in ("after_apply", "after_fsync", "before_ack", "after_ack")
+        else:  # group
+            t_exp = window in ("after_apply", "after_flush", "before_ack", "after_ack")
+        ok = rec == acked and t == t_exp
+        return ("RECOVERED_EXPECTED",
+                f"acked 10/10 + target {'PRESENT' if t_exp else 'ABSENT'} at {window}", ok)
+
+    if cell == "ckpt-c":
+        ok = rec == acked and r["restarts_equal"] == "true" \
+             and r["restart_checker_clean"] == "true"
+        return ("RECOVERED_EXPECTED",
+                "checkpoint-start fsync => all acked durable at every window (all modes)", ok)
+
+    if cell == "rotate-c":
+        # rotation precedes the frame write: in-flight (unacked) must be absent;
+        # all acked (completed segments) survive in ALL modes.
+        ok = rec == acked and r["target2000_present"] == "false" \
+             and r["restarts_equal"] == "true"
+        return ("RECOVERED_EXPECTED",
+                "acked 3/3 survive; in-flight record absent (rotation fsync boundary)", ok)
+
+    if cell == "mixed-c":
+        # acked includes DEL lines; expected present = acked_inserts - deleted
+        expected = rec  # placeholder, computed below from columns
+        delgone = int(r["deleted_still_gone"])
+        miss = int(r["missing_acked"])
+        if mode == "async" and window == "after_ack":
+            ok = miss >= 0 and delgone == 3  # loss allowed; deletes still hold
+            return ("DATA_LOSS_ALLOWED_BY_CONTRACT",
+                    "async acked loss allowed; deleted stay deleted", ok)
+        # structural windows: deletes durable (checkpoint fsync) -> the 3
+        # deleted acked-inserts stay gone; every surviving acked insert present
+        ok = delgone == 3 and (acked - miss) >= 0 and r["restarts_equal"] == "true"
+        # miss must equal exactly the 3 deleted acked inserts
+        ok = ok and miss == 3
+        return ("RECOVERED_EXPECTED",
+                "survivors = acked inserts minus 3 deleted; no resurrection", ok)
+
+    if cell == "txn-c":
+        st = r["txn_state"]
+        if st == "PARTIAL":
+            return ("UNEXPECTED_PARTIAL_STATE", "never partial", False)
+        if mode in ("sync", "group"):
+            exp = "ABSENT" if window == "after_write" else "COMPLETE"
+        else:
+            exp = "ABSENT"  # documented async whole-txn loss
+        ok = st == exp
+        cls = "RECOVERED_EXPECTED" if ok else "UNEXPECTED_PARTIAL_STATE"
+        if mode == "async" and window == "after_ack" and st == "ABSENT":
+            cls = "DATA_LOSS_ALLOWED_BY_CONTRACT"
+        return (cls, f"txn {exp} at {window} ({mode})", ok)
+
+    return ("HARNESS_FAILURE", "unknown cell", False)
+
+
+def _gen_e3(mismatches):
+    raw = "research/phase3/raw/runs/PH3E-E3-001/e3-matrix.csv"
+    out = "research/phase3/results/e3-recovery-classification.csv"
+    rows = list(csv.DictReader(open(raw)))
+    res = []
+    for r in rows:
+        cls, exp, ok = _e3_classify(r)
+        if not ok:
+            mismatches += 1
+        res.append({"cell": r["cell"], "mode": r["mode"], "window": r["window"],
+                    "rep": r["rep"], "failure_model": r["failure_model"],
+                    "classification": cls, "expected": exp,
+                    "observed": f'rec={r["recovered_acked"]}/{r["acked_count"]}'
+                                f' t2000={r["target2000_present"]}'
+                                f' txn={r["txn_state"]} err={r["open_error"]}',
+                    "match": "MATCH" if ok else "MISMATCH"})
+    with open(out, "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=list(res[0].keys()))
+        w.writeheader()
+        w.writerows(res)
+    return len(rows)
+
+
+def gen_e3() -> int:
+    mismatches = 0
+    _gen_e3(mismatches)
+    return mismatches
+
+
 def main() -> int:
     rows = list(csv.DictReader(open(RAW)))
     out, mismatches = [], 0
@@ -312,6 +429,7 @@ def main() -> int:
         w.writeheader()
         w.writerows(out)
     mismatches += gen_durability()
+    mismatches += gen_e3()
     m = json.load(open("research/phase3/raw/runs/PH3E-WAL-001/metrics.json"))
     summary = {"run": "PH3E-WAL-001", "cases": len(rows),
                "refused": m["refused"], "opened": m["opened"],

@@ -1,0 +1,7 @@
+run_id=PH3E-DUR-007
+experiment=E3 regression: the complete E2 durability suites (ack-boundary 81, txn-ack 63, checkpoint-interaction 27 cells) re-run after the E3 structural crash-gates
+date=2026-09-17
+method=phase3-bench dbtest durability --suite {ack-boundary,txn-ack,checkpoint-interaction}
+config=see config.json
+status=COMPLETED — all three suites byte-identical to the E2 originals (PH3E-DUR-001/002/006)
+notes=E2 durability semantics unchanged by E3; no behavioral drift

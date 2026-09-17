@@ -39,6 +39,42 @@ pub static GATE_AFTER_APPLY: Gate = Gate::new("after_apply");
 /// before ACK).
 pub static GATE_BEFORE_ACK: Gate = Gate::new("before_ack");
 
+// ---- E3 structural windows ----
+/// Wal::rotate: the COMPLETED segment was flushed + fsynced, the new segment
+/// does not exist yet (the in-flight frame has NOT been written — rotation
+/// precedes the frame write in Wal::append).
+pub static GATE_ROTATE_AFTER_OLD_FSYNC: Gate = Gate::new("rotate_after_old_fsync");
+/// Wal::open_segment: the durable watermark record (wal-state.json) was
+/// written for the newly created segment.
+pub static GATE_ROTATE_AFTER_STATE_WRITE: Gate = Gate::new("rotate_after_state_write");
+/// checkpoint_locked: WAL fsynced (everything so far machine-boundary durable
+/// in ALL modes), nothing else done yet.
+pub static GATE_CKPT_AFTER_WAL_FSYNC: Gate = Gate::new("ckpt_after_wal_fsync");
+/// checkpoint_locked: memtable flushed to SSTable(s) (written at FINAL names),
+/// manifest not yet updated.
+pub static GATE_CKPT_AFTER_SST: Gate = Gate::new("ckpt_after_sst");
+/// checkpoint_locked: idmap snapshot saved, manifest not yet updated.
+pub static GATE_CKPT_AFTER_IDMAP: Gate = Gate::new("ckpt_after_idmap");
+/// Catalog::save: manifest-N.tmp fully written + sync_all'd, not renamed.
+pub static GATE_MANIFEST_AFTER_TMP_WRITE: Gate = Gate::new("manifest_after_tmp_write");
+/// Catalog::save: manifest-N installed + MANIFEST dir fsynced; CURRENT still old.
+pub static GATE_MANIFEST_AFTER_MANIFEST_DIRSYNC: Gate =
+    Gate::new("manifest_after_manifest_dirsync");
+/// Catalog::save: CURRENT.tmp written + sync_all'd; CURRENT still old.
+pub static GATE_MANIFEST_AFTER_CURRENT_TMP_WRITE: Gate =
+    Gate::new("manifest_after_current_tmp_write");
+/// Catalog::save: CURRENT renamed + db dir fsynced — manifest replacement
+/// complete.
+pub static GATE_MANIFEST_AFTER_CURRENT_RENAME: Gate = Gate::new("manifest_after_current_rename");
+/// DocumentStore::flush_memtable: the SSTable was fully written (final name),
+/// not yet installed into the reader set.
+pub static GATE_SST_AFTER_WRITE: Gate = Gate::new("sst_after_write");
+/// checkpoint_locked: manifest installed AND WAL rotated; trim not yet run.
+pub static GATE_CKPT_AFTER_ROTATE: Gate = Gate::new("ckpt_after_rotate");
+/// checkpoint_locked: trim done — checkpoint fully complete except manifest
+/// generation cleanup.
+pub static GATE_CKPT_AFTER_TRIM: Gate = Gate::new("ckpt_after_trim");
+
 pub struct Gate {
     name: &'static str,
     hit: AtomicUsize,
@@ -58,12 +94,44 @@ impl Gate {
             if want == self.name {
                 let h = self.hit.fetch_add(1, Ordering::SeqCst) + 1;
                 if h == n {
-                    // Sudden death: like SIGKILL, nothing is flushed or dropped.
-                    std::process::abort();
+                    match crash_model() {
+                        // F2-equivalent: announce the window durably, then park.
+                        // The controller SIGKILLs the whole process group —
+                        // no destructors, no flushes, nothing cleans up.
+                        "groupkill" => {
+                            if let Some(m) = std::env::var_os("PH3E_CRASH_MARKER") {
+                                use std::io::Write;
+                                if let Ok(mut f) = std::fs::OpenOptions::new()
+                                    .create(true)
+                                    .write(true)
+                                    .truncate(true)
+                                    .open(m)
+                                {
+                                    let _ = writeln!(f, "{} hit {}", self.name, h);
+                                    let _ = f.sync_all();
+                                }
+                            }
+                            loop {
+                                std::thread::sleep(std::time::Duration::from_secs(3600));
+                            }
+                        }
+                        // F1: sudden death, like SIGKILL, nothing flushed/dropped.
+                        _ => std::process::abort(),
+                    }
                 }
             }
         }
     }
+}
+
+/// Crash model: "abort" (F1, default) or "groupkill" (F2-equivalent: park at
+/// the window; the controller kills the whole process group).
+fn crash_model() -> &'static str {
+    static M: OnceLock<&'static str> = OnceLock::new();
+    M.get_or_init(|| match std::env::var("PH3E_CRASH_MODEL").as_deref() {
+        Ok("groupkill") => "groupkill",
+        _ => "abort",
+    })
 }
 
 /// Parse (`gate_name`, `hit_number`) once per process; `None` disables all gates.
@@ -80,6 +148,19 @@ fn crash_cfg() -> Option<(&'static str, usize)> {
             "after_wal_append",
             "after_apply",
             "before_ack",
+            // E3 structural windows
+            "rotate_after_old_fsync",
+            "rotate_after_state_write",
+            "ckpt_after_wal_fsync",
+            "ckpt_after_sst",
+            "ckpt_after_idmap",
+            "manifest_after_tmp_write",
+            "manifest_after_manifest_dirsync",
+            "manifest_after_current_tmp_write",
+            "manifest_after_current_rename",
+            "sst_after_write",
+            "ckpt_after_rotate",
+            "ckpt_after_trim",
         ];
         let name = NAMES.iter().find(|c| **c == name.as_str())?;
         Some((*name, n.max(1)))

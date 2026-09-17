@@ -212,3 +212,33 @@ build, mutations, restart, replay, crash-recovery, compaction, concurrency, and 
     - N5 is superseded by this amendment: Async acknowledged loss is no longer merely
       "unsupported by design" — it is OBSERVED and characterized (single writes, whole
       transactions, buffer-tail batches). The guidance stands: use GroupCommit/Sync.
+
+- **A3 (2026-09-17, E3) — Machine-crash durability semantics (failure-model boundary).**
+  - *Old wording:* G3/N6/Q3: process-crash axis VERIFIED per mode; "Machine/power-loss
+    durability: PARTIALLY VERIFIED (implemented via fsync in Sync ...)" and "Power loss?
+    NOT TESTED." E2 left every machine-axis claim NOT VERIFIED.
+  - *New wording:* durability claims are indexed by failure model:
+    - **F0 graceful close / F1 process crash** — VERIFIED (E2 + E3 regression, unchanged).
+    - **F2E environment-termination-equivalent** (process-group SIGKILL at exactly
+      instrumented in-engine windows; single-process engine; no cleanup) — VERIFIED for
+      the process-death-semantics axis: Sync fsync-before-ack boundary holds at
+      C2..C7 windows (fsynced-but-unacked record SURVIVES: PH3E-E3-001 ack-c sync
+      after_fsync 3/3); GroupCommit flush boundary holds (after_flush 3/3); structural
+      points (checkpoint 9 windows incl. manifest-tmp orphan fallback; WAL rotation 2
+      windows; mixed-mutation checkpoint) recover all acked state in ALL modes with
+      checker-clean fixed-point restarts; zero refusals, zero corruption, zero partial
+      transactions in 210 cells.
+    - **F3 filesystem/cache disruption** — BLOCKED (no root / block-device tooling).
+    - **F4 physical power loss** — BLOCKED (no power mechanism). NEVER simulated.
+    - Consequently: "machine-crash durability" beyond process-death semantics remains
+      **NOT VERIFIED** for every mode; the E2 boundary sentence stands unchanged. The
+      strongest true statement is: *all acknowledged Sync/GroupCommit state survives
+      abrupt termination of every process holding database state, at every instrumented
+      commit-path and structural window, on ext4 (VM disk), with the page cache intact.*
+  - *Environment:* Linux 6.1.158 container on VM, 2 vCPU Xeon, 2 GB RAM, ext4
+    (rw,relatime,discard). Results MUST NOT be generalized to physical power loss on
+    enterprise storage.
+  - *Experiments:* PH3E-E3-001 (210 cells) + regressions PH3E-WAL-003, PH3E-DUR-007
+    (byte-identical to E1/E2 originals).
+  - *Limitations:* F2E ≠ VM kill ≠ power loss; mid-SST-write window NOT_INSTRUMENTED
+    (refuses per corruption-fatal contract); ext4/VM-disk only.

@@ -1,0 +1,211 @@
+cell,mode,window,rep,failure_model,classification,expected,observed,match
+ack-c,sync,before_wal_append,0,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target ABSENT at before_wal_append,rec=10/10 t2000=false txn=- err=-,MATCH
+ack-c,sync,before_wal_append,1,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target ABSENT at before_wal_append,rec=10/10 t2000=false txn=- err=-,MATCH
+ack-c,sync,before_wal_append,2,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target ABSENT at before_wal_append,rec=10/10 t2000=false txn=- err=-,MATCH
+ack-c,sync,after_write,0,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target ABSENT at after_write,rec=10/10 t2000=false txn=- err=-,MATCH
+ack-c,sync,after_write,1,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target ABSENT at after_write,rec=10/10 t2000=false txn=- err=-,MATCH
+ack-c,sync,after_write,2,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target ABSENT at after_write,rec=10/10 t2000=false txn=- err=-,MATCH
+ack-c,sync,after_apply,0,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target PRESENT at after_apply,rec=10/10 t2000=true txn=- err=-,MATCH
+ack-c,sync,after_apply,1,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target PRESENT at after_apply,rec=10/10 t2000=true txn=- err=-,MATCH
+ack-c,sync,after_apply,2,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target PRESENT at after_apply,rec=10/10 t2000=true txn=- err=-,MATCH
+ack-c,sync,after_flush,0,F2E-GROUPKILL,NOT_REACHED,gate unreachable in mode,rec=-/- t2000=- txn=- err=-,MATCH
+ack-c,sync,after_flush,1,F2E-GROUPKILL,NOT_REACHED,gate unreachable in mode,rec=-/- t2000=- txn=- err=-,MATCH
+ack-c,sync,after_flush,2,F2E-GROUPKILL,NOT_REACHED,gate unreachable in mode,rec=-/- t2000=- txn=- err=-,MATCH
+ack-c,sync,after_fsync,0,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target PRESENT at after_fsync,rec=10/10 t2000=true txn=- err=-,MATCH
+ack-c,sync,after_fsync,1,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target PRESENT at after_fsync,rec=10/10 t2000=true txn=- err=-,MATCH
+ack-c,sync,after_fsync,2,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target PRESENT at after_fsync,rec=10/10 t2000=true txn=- err=-,MATCH
+ack-c,sync,before_ack,0,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target PRESENT at before_ack,rec=10/10 t2000=true txn=- err=-,MATCH
+ack-c,sync,before_ack,1,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target PRESENT at before_ack,rec=10/10 t2000=true txn=- err=-,MATCH
+ack-c,sync,before_ack,2,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target PRESENT at before_ack,rec=10/10 t2000=true txn=- err=-,MATCH
+ack-c,sync,after_ack,0,F2E-GROUPKILL-HARNESS,RECOVERED_EXPECTED,acked 10/10 + target PRESENT at after_ack,rec=11/11 t2000=true txn=- err=-,MATCH
+ack-c,sync,after_ack,1,F2E-GROUPKILL-HARNESS,RECOVERED_EXPECTED,acked 10/10 + target PRESENT at after_ack,rec=11/11 t2000=true txn=- err=-,MATCH
+ack-c,sync,after_ack,2,F2E-GROUPKILL-HARNESS,RECOVERED_EXPECTED,acked 10/10 + target PRESENT at after_ack,rec=11/11 t2000=true txn=- err=-,MATCH
+ack-c,group,before_wal_append,0,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target ABSENT at before_wal_append,rec=10/10 t2000=false txn=- err=-,MATCH
+ack-c,group,before_wal_append,1,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target ABSENT at before_wal_append,rec=10/10 t2000=false txn=- err=-,MATCH
+ack-c,group,before_wal_append,2,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target ABSENT at before_wal_append,rec=10/10 t2000=false txn=- err=-,MATCH
+ack-c,group,after_write,0,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target ABSENT at after_write,rec=10/10 t2000=false txn=- err=-,MATCH
+ack-c,group,after_write,1,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target ABSENT at after_write,rec=10/10 t2000=false txn=- err=-,MATCH
+ack-c,group,after_write,2,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target ABSENT at after_write,rec=10/10 t2000=false txn=- err=-,MATCH
+ack-c,group,after_apply,0,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target PRESENT at after_apply,rec=10/10 t2000=true txn=- err=-,MATCH
+ack-c,group,after_apply,1,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target PRESENT at after_apply,rec=10/10 t2000=true txn=- err=-,MATCH
+ack-c,group,after_apply,2,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target PRESENT at after_apply,rec=10/10 t2000=true txn=- err=-,MATCH
+ack-c,group,after_flush,0,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target PRESENT at after_flush,rec=10/10 t2000=true txn=- err=-,MATCH
+ack-c,group,after_flush,1,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target PRESENT at after_flush,rec=10/10 t2000=true txn=- err=-,MATCH
+ack-c,group,after_flush,2,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target PRESENT at after_flush,rec=10/10 t2000=true txn=- err=-,MATCH
+ack-c,group,after_fsync,0,F2E-GROUPKILL,NOT_REACHED,gate unreachable in mode,rec=-/- t2000=- txn=- err=-,MATCH
+ack-c,group,after_fsync,1,F2E-GROUPKILL,NOT_REACHED,gate unreachable in mode,rec=-/- t2000=- txn=- err=-,MATCH
+ack-c,group,after_fsync,2,F2E-GROUPKILL,NOT_REACHED,gate unreachable in mode,rec=-/- t2000=- txn=- err=-,MATCH
+ack-c,group,before_ack,0,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target PRESENT at before_ack,rec=10/10 t2000=true txn=- err=-,MATCH
+ack-c,group,before_ack,1,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target PRESENT at before_ack,rec=10/10 t2000=true txn=- err=-,MATCH
+ack-c,group,before_ack,2,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 10/10 + target PRESENT at before_ack,rec=10/10 t2000=true txn=- err=-,MATCH
+ack-c,group,after_ack,0,F2E-GROUPKILL-HARNESS,RECOVERED_EXPECTED,acked 10/10 + target PRESENT at after_ack,rec=11/11 t2000=true txn=- err=-,MATCH
+ack-c,group,after_ack,1,F2E-GROUPKILL-HARNESS,RECOVERED_EXPECTED,acked 10/10 + target PRESENT at after_ack,rec=11/11 t2000=true txn=- err=-,MATCH
+ack-c,group,after_ack,2,F2E-GROUPKILL-HARNESS,RECOVERED_EXPECTED,acked 10/10 + target PRESENT at after_ack,rec=11/11 t2000=true txn=- err=-,MATCH
+ack-c,async,before_wal_append,0,F2E-GROUPKILL,DATA_LOSS_ALLOWED_BY_CONTRACT,acked async writes MAY vanish (E2 contract),rec=0/10 t2000=false txn=- err=-,MATCH
+ack-c,async,before_wal_append,1,F2E-GROUPKILL,DATA_LOSS_ALLOWED_BY_CONTRACT,acked async writes MAY vanish (E2 contract),rec=0/10 t2000=false txn=- err=-,MATCH
+ack-c,async,before_wal_append,2,F2E-GROUPKILL,DATA_LOSS_ALLOWED_BY_CONTRACT,acked async writes MAY vanish (E2 contract),rec=0/10 t2000=false txn=- err=-,MATCH
+ack-c,async,after_write,0,F2E-GROUPKILL,DATA_LOSS_ALLOWED_BY_CONTRACT,acked async writes MAY vanish (E2 contract),rec=0/10 t2000=false txn=- err=-,MATCH
+ack-c,async,after_write,1,F2E-GROUPKILL,DATA_LOSS_ALLOWED_BY_CONTRACT,acked async writes MAY vanish (E2 contract),rec=0/10 t2000=false txn=- err=-,MATCH
+ack-c,async,after_write,2,F2E-GROUPKILL,DATA_LOSS_ALLOWED_BY_CONTRACT,acked async writes MAY vanish (E2 contract),rec=0/10 t2000=false txn=- err=-,MATCH
+ack-c,async,after_apply,0,F2E-GROUPKILL,DATA_LOSS_ALLOWED_BY_CONTRACT,acked async writes MAY vanish (E2 contract),rec=0/10 t2000=false txn=- err=-,MATCH
+ack-c,async,after_apply,1,F2E-GROUPKILL,DATA_LOSS_ALLOWED_BY_CONTRACT,acked async writes MAY vanish (E2 contract),rec=0/10 t2000=false txn=- err=-,MATCH
+ack-c,async,after_apply,2,F2E-GROUPKILL,DATA_LOSS_ALLOWED_BY_CONTRACT,acked async writes MAY vanish (E2 contract),rec=0/10 t2000=false txn=- err=-,MATCH
+ack-c,async,after_flush,0,F2E-GROUPKILL,NOT_REACHED,gate unreachable in mode,rec=-/- t2000=- txn=- err=-,MATCH
+ack-c,async,after_flush,1,F2E-GROUPKILL,NOT_REACHED,gate unreachable in mode,rec=-/- t2000=- txn=- err=-,MATCH
+ack-c,async,after_flush,2,F2E-GROUPKILL,NOT_REACHED,gate unreachable in mode,rec=-/- t2000=- txn=- err=-,MATCH
+ack-c,async,after_fsync,0,F2E-GROUPKILL,NOT_REACHED,gate unreachable in mode,rec=-/- t2000=- txn=- err=-,MATCH
+ack-c,async,after_fsync,1,F2E-GROUPKILL,NOT_REACHED,gate unreachable in mode,rec=-/- t2000=- txn=- err=-,MATCH
+ack-c,async,after_fsync,2,F2E-GROUPKILL,NOT_REACHED,gate unreachable in mode,rec=-/- t2000=- txn=- err=-,MATCH
+ack-c,async,before_ack,0,F2E-GROUPKILL,DATA_LOSS_ALLOWED_BY_CONTRACT,acked async writes MAY vanish (E2 contract),rec=0/10 t2000=false txn=- err=-,MATCH
+ack-c,async,before_ack,1,F2E-GROUPKILL,DATA_LOSS_ALLOWED_BY_CONTRACT,acked async writes MAY vanish (E2 contract),rec=0/10 t2000=false txn=- err=-,MATCH
+ack-c,async,before_ack,2,F2E-GROUPKILL,DATA_LOSS_ALLOWED_BY_CONTRACT,acked async writes MAY vanish (E2 contract),rec=0/10 t2000=false txn=- err=-,MATCH
+ack-c,async,after_ack,0,F2E-GROUPKILL-HARNESS,DATA_LOSS_ALLOWED_BY_CONTRACT,acked async writes MAY vanish (E2 contract),rec=0/11 t2000=false txn=- err=-,MATCH
+ack-c,async,after_ack,1,F2E-GROUPKILL-HARNESS,DATA_LOSS_ALLOWED_BY_CONTRACT,acked async writes MAY vanish (E2 contract),rec=0/11 t2000=false txn=- err=-,MATCH
+ack-c,async,after_ack,2,F2E-GROUPKILL-HARNESS,DATA_LOSS_ALLOWED_BY_CONTRACT,acked async writes MAY vanish (E2 contract),rec=0/11 t2000=false txn=- err=-,MATCH
+ckpt-c,sync,ckpt_after_wal_fsync,0,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,sync,ckpt_after_wal_fsync,1,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,sync,ckpt_after_wal_fsync,2,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,sync,ckpt_after_sst,0,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,sync,ckpt_after_sst,1,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,sync,ckpt_after_sst,2,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,sync,ckpt_after_idmap,0,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,sync,ckpt_after_idmap,1,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,sync,ckpt_after_idmap,2,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,sync,manifest_after_tmp_write,0,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,sync,manifest_after_tmp_write,1,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,sync,manifest_after_tmp_write,2,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,sync,manifest_after_manifest_dirsync,0,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,sync,manifest_after_manifest_dirsync,1,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,sync,manifest_after_manifest_dirsync,2,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,sync,manifest_after_current_tmp_write,0,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,sync,manifest_after_current_tmp_write,1,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,sync,manifest_after_current_tmp_write,2,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,sync,manifest_after_current_rename,0,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,sync,manifest_after_current_rename,1,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,sync,manifest_after_current_rename,2,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,sync,ckpt_after_rotate,0,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,sync,ckpt_after_rotate,1,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,sync,ckpt_after_rotate,2,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,sync,ckpt_after_trim,0,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,sync,ckpt_after_trim,1,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,sync,ckpt_after_trim,2,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,group,ckpt_after_wal_fsync,0,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,group,ckpt_after_wal_fsync,1,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,group,ckpt_after_wal_fsync,2,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,group,ckpt_after_sst,0,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,group,ckpt_after_sst,1,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,group,ckpt_after_sst,2,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,group,ckpt_after_idmap,0,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,group,ckpt_after_idmap,1,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,group,ckpt_after_idmap,2,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,group,manifest_after_tmp_write,0,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,group,manifest_after_tmp_write,1,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,group,manifest_after_tmp_write,2,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,group,manifest_after_manifest_dirsync,0,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,group,manifest_after_manifest_dirsync,1,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,group,manifest_after_manifest_dirsync,2,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,group,manifest_after_current_tmp_write,0,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,group,manifest_after_current_tmp_write,1,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,group,manifest_after_current_tmp_write,2,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,group,manifest_after_current_rename,0,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,group,manifest_after_current_rename,1,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,group,manifest_after_current_rename,2,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,group,ckpt_after_rotate,0,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,group,ckpt_after_rotate,1,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,group,ckpt_after_rotate,2,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,group,ckpt_after_trim,0,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,group,ckpt_after_trim,1,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,group,ckpt_after_trim,2,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,async,ckpt_after_wal_fsync,0,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,async,ckpt_after_wal_fsync,1,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,async,ckpt_after_wal_fsync,2,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,async,ckpt_after_sst,0,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,async,ckpt_after_sst,1,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,async,ckpt_after_sst,2,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,async,ckpt_after_idmap,0,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,async,ckpt_after_idmap,1,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,async,ckpt_after_idmap,2,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,async,manifest_after_tmp_write,0,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,async,manifest_after_tmp_write,1,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,async,manifest_after_tmp_write,2,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,async,manifest_after_manifest_dirsync,0,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,async,manifest_after_manifest_dirsync,1,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,async,manifest_after_manifest_dirsync,2,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,async,manifest_after_current_tmp_write,0,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,async,manifest_after_current_tmp_write,1,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,async,manifest_after_current_tmp_write,2,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,async,manifest_after_current_rename,0,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,async,manifest_after_current_rename,1,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,async,manifest_after_current_rename,2,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,async,ckpt_after_rotate,0,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,async,ckpt_after_rotate,1,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,async,ckpt_after_rotate,2,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,async,ckpt_after_trim,0,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,async,ckpt_after_trim,1,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+ckpt-c,async,ckpt_after_trim,2,F2E-GROUPKILL,RECOVERED_EXPECTED,checkpoint-start fsync => all acked durable at every window (all modes),rec=16/16 t2000=false txn=- err=-,MATCH
+rotate-c,sync,rotate_after_old_fsync,0,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 3/3 survive; in-flight record absent (rotation fsync boundary),rec=3/3 t2000=false txn=- err=-,MATCH
+rotate-c,sync,rotate_after_old_fsync,1,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 3/3 survive; in-flight record absent (rotation fsync boundary),rec=3/3 t2000=false txn=- err=-,MATCH
+rotate-c,sync,rotate_after_old_fsync,2,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 3/3 survive; in-flight record absent (rotation fsync boundary),rec=3/3 t2000=false txn=- err=-,MATCH
+rotate-c,sync,rotate_after_state_write,0,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 3/3 survive; in-flight record absent (rotation fsync boundary),rec=3/3 t2000=false txn=- err=-,MATCH
+rotate-c,sync,rotate_after_state_write,1,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 3/3 survive; in-flight record absent (rotation fsync boundary),rec=3/3 t2000=false txn=- err=-,MATCH
+rotate-c,sync,rotate_after_state_write,2,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 3/3 survive; in-flight record absent (rotation fsync boundary),rec=3/3 t2000=false txn=- err=-,MATCH
+rotate-c,group,rotate_after_old_fsync,0,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 3/3 survive; in-flight record absent (rotation fsync boundary),rec=3/3 t2000=false txn=- err=-,MATCH
+rotate-c,group,rotate_after_old_fsync,1,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 3/3 survive; in-flight record absent (rotation fsync boundary),rec=3/3 t2000=false txn=- err=-,MATCH
+rotate-c,group,rotate_after_old_fsync,2,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 3/3 survive; in-flight record absent (rotation fsync boundary),rec=3/3 t2000=false txn=- err=-,MATCH
+rotate-c,group,rotate_after_state_write,0,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 3/3 survive; in-flight record absent (rotation fsync boundary),rec=3/3 t2000=false txn=- err=-,MATCH
+rotate-c,group,rotate_after_state_write,1,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 3/3 survive; in-flight record absent (rotation fsync boundary),rec=3/3 t2000=false txn=- err=-,MATCH
+rotate-c,group,rotate_after_state_write,2,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 3/3 survive; in-flight record absent (rotation fsync boundary),rec=3/3 t2000=false txn=- err=-,MATCH
+rotate-c,async,rotate_after_old_fsync,0,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 3/3 survive; in-flight record absent (rotation fsync boundary),rec=3/3 t2000=false txn=- err=-,MATCH
+rotate-c,async,rotate_after_old_fsync,1,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 3/3 survive; in-flight record absent (rotation fsync boundary),rec=3/3 t2000=false txn=- err=-,MATCH
+rotate-c,async,rotate_after_old_fsync,2,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 3/3 survive; in-flight record absent (rotation fsync boundary),rec=3/3 t2000=false txn=- err=-,MATCH
+rotate-c,async,rotate_after_state_write,0,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 3/3 survive; in-flight record absent (rotation fsync boundary),rec=3/3 t2000=false txn=- err=-,MATCH
+rotate-c,async,rotate_after_state_write,1,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 3/3 survive; in-flight record absent (rotation fsync boundary),rec=3/3 t2000=false txn=- err=-,MATCH
+rotate-c,async,rotate_after_state_write,2,F2E-GROUPKILL,RECOVERED_EXPECTED,acked 3/3 survive; in-flight record absent (rotation fsync boundary),rec=3/3 t2000=false txn=- err=-,MATCH
+mixed-c,sync,manifest_after_current_rename,0,F2E-GROUPKILL,RECOVERED_EXPECTED,survivors = acked inserts minus 3 deleted; no resurrection,rec=9/12 t2000=false txn=- err=-,MATCH
+mixed-c,sync,manifest_after_current_rename,1,F2E-GROUPKILL,RECOVERED_EXPECTED,survivors = acked inserts minus 3 deleted; no resurrection,rec=9/12 t2000=false txn=- err=-,MATCH
+mixed-c,sync,manifest_after_current_rename,2,F2E-GROUPKILL,RECOVERED_EXPECTED,survivors = acked inserts minus 3 deleted; no resurrection,rec=9/12 t2000=false txn=- err=-,MATCH
+mixed-c,sync,after_ack,0,F2E-GROUPKILL,RECOVERED_EXPECTED,survivors = acked inserts minus 3 deleted; no resurrection,rec=10/13 t2000=true txn=- err=-,MATCH
+mixed-c,sync,after_ack,1,F2E-GROUPKILL,RECOVERED_EXPECTED,survivors = acked inserts minus 3 deleted; no resurrection,rec=10/13 t2000=true txn=- err=-,MATCH
+mixed-c,sync,after_ack,2,F2E-GROUPKILL,RECOVERED_EXPECTED,survivors = acked inserts minus 3 deleted; no resurrection,rec=10/13 t2000=true txn=- err=-,MATCH
+mixed-c,group,manifest_after_current_rename,0,F2E-GROUPKILL,RECOVERED_EXPECTED,survivors = acked inserts minus 3 deleted; no resurrection,rec=9/12 t2000=false txn=- err=-,MATCH
+mixed-c,group,manifest_after_current_rename,1,F2E-GROUPKILL,RECOVERED_EXPECTED,survivors = acked inserts minus 3 deleted; no resurrection,rec=9/12 t2000=false txn=- err=-,MATCH
+mixed-c,group,manifest_after_current_rename,2,F2E-GROUPKILL,RECOVERED_EXPECTED,survivors = acked inserts minus 3 deleted; no resurrection,rec=9/12 t2000=false txn=- err=-,MATCH
+mixed-c,group,after_ack,0,F2E-GROUPKILL,RECOVERED_EXPECTED,survivors = acked inserts minus 3 deleted; no resurrection,rec=10/13 t2000=true txn=- err=-,MATCH
+mixed-c,group,after_ack,1,F2E-GROUPKILL,RECOVERED_EXPECTED,survivors = acked inserts minus 3 deleted; no resurrection,rec=10/13 t2000=true txn=- err=-,MATCH
+mixed-c,group,after_ack,2,F2E-GROUPKILL,RECOVERED_EXPECTED,survivors = acked inserts minus 3 deleted; no resurrection,rec=10/13 t2000=true txn=- err=-,MATCH
+mixed-c,async,manifest_after_current_rename,0,F2E-GROUPKILL,RECOVERED_EXPECTED,survivors = acked inserts minus 3 deleted; no resurrection,rec=9/12 t2000=false txn=- err=-,MATCH
+mixed-c,async,manifest_after_current_rename,1,F2E-GROUPKILL,RECOVERED_EXPECTED,survivors = acked inserts minus 3 deleted; no resurrection,rec=9/12 t2000=false txn=- err=-,MATCH
+mixed-c,async,manifest_after_current_rename,2,F2E-GROUPKILL,RECOVERED_EXPECTED,survivors = acked inserts minus 3 deleted; no resurrection,rec=9/12 t2000=false txn=- err=-,MATCH
+mixed-c,async,after_ack,0,F2E-GROUPKILL,DATA_LOSS_ALLOWED_BY_CONTRACT,async acked loss allowed; deleted stay deleted,rec=8/13 t2000=false txn=- err=-,MATCH
+mixed-c,async,after_ack,1,F2E-GROUPKILL,DATA_LOSS_ALLOWED_BY_CONTRACT,async acked loss allowed; deleted stay deleted,rec=8/13 t2000=false txn=- err=-,MATCH
+mixed-c,async,after_ack,2,F2E-GROUPKILL,DATA_LOSS_ALLOWED_BY_CONTRACT,async acked loss allowed; deleted stay deleted,rec=8/13 t2000=false txn=- err=-,MATCH
+txn-c,sync,after_write,0,F2E-GROUPKILL,RECOVERED_EXPECTED,txn ABSENT at after_write (sync),rec=5/5 t2000=false txn=ABSENT err=-,MATCH
+txn-c,sync,after_write,1,F2E-GROUPKILL,RECOVERED_EXPECTED,txn ABSENT at after_write (sync),rec=5/5 t2000=false txn=ABSENT err=-,MATCH
+txn-c,sync,after_write,2,F2E-GROUPKILL,RECOVERED_EXPECTED,txn ABSENT at after_write (sync),rec=5/5 t2000=false txn=ABSENT err=-,MATCH
+txn-c,sync,before_ack,0,F2E-GROUPKILL,RECOVERED_EXPECTED,txn COMPLETE at before_ack (sync),rec=3/5 t2000=true txn=COMPLETE err=-,MATCH
+txn-c,sync,before_ack,1,F2E-GROUPKILL,RECOVERED_EXPECTED,txn COMPLETE at before_ack (sync),rec=3/5 t2000=true txn=COMPLETE err=-,MATCH
+txn-c,sync,before_ack,2,F2E-GROUPKILL,RECOVERED_EXPECTED,txn COMPLETE at before_ack (sync),rec=3/5 t2000=true txn=COMPLETE err=-,MATCH
+txn-c,sync,after_ack,0,F2E-GROUPKILL,RECOVERED_EXPECTED,txn COMPLETE at after_ack (sync),rec=3/5 t2000=true txn=COMPLETE err=-,MATCH
+txn-c,sync,after_ack,1,F2E-GROUPKILL,RECOVERED_EXPECTED,txn COMPLETE at after_ack (sync),rec=3/5 t2000=true txn=COMPLETE err=-,MATCH
+txn-c,sync,after_ack,2,F2E-GROUPKILL,RECOVERED_EXPECTED,txn COMPLETE at after_ack (sync),rec=3/5 t2000=true txn=COMPLETE err=-,MATCH
+txn-c,group,after_write,0,F2E-GROUPKILL,RECOVERED_EXPECTED,txn ABSENT at after_write (group),rec=5/5 t2000=false txn=ABSENT err=-,MATCH
+txn-c,group,after_write,1,F2E-GROUPKILL,RECOVERED_EXPECTED,txn ABSENT at after_write (group),rec=5/5 t2000=false txn=ABSENT err=-,MATCH
+txn-c,group,after_write,2,F2E-GROUPKILL,RECOVERED_EXPECTED,txn ABSENT at after_write (group),rec=5/5 t2000=false txn=ABSENT err=-,MATCH
+txn-c,group,before_ack,0,F2E-GROUPKILL,RECOVERED_EXPECTED,txn COMPLETE at before_ack (group),rec=3/5 t2000=true txn=COMPLETE err=-,MATCH
+txn-c,group,before_ack,1,F2E-GROUPKILL,RECOVERED_EXPECTED,txn COMPLETE at before_ack (group),rec=3/5 t2000=true txn=COMPLETE err=-,MATCH
+txn-c,group,before_ack,2,F2E-GROUPKILL,RECOVERED_EXPECTED,txn COMPLETE at before_ack (group),rec=3/5 t2000=true txn=COMPLETE err=-,MATCH
+txn-c,group,after_ack,0,F2E-GROUPKILL,RECOVERED_EXPECTED,txn COMPLETE at after_ack (group),rec=3/5 t2000=true txn=COMPLETE err=-,MATCH
+txn-c,group,after_ack,1,F2E-GROUPKILL,RECOVERED_EXPECTED,txn COMPLETE at after_ack (group),rec=3/5 t2000=true txn=COMPLETE err=-,MATCH
+txn-c,group,after_ack,2,F2E-GROUPKILL,RECOVERED_EXPECTED,txn COMPLETE at after_ack (group),rec=3/5 t2000=true txn=COMPLETE err=-,MATCH
+txn-c,async,after_write,0,F2E-GROUPKILL,RECOVERED_EXPECTED,txn ABSENT at after_write (async),rec=5/5 t2000=false txn=ABSENT err=-,MATCH
+txn-c,async,after_write,1,F2E-GROUPKILL,RECOVERED_EXPECTED,txn ABSENT at after_write (async),rec=5/5 t2000=false txn=ABSENT err=-,MATCH
+txn-c,async,after_write,2,F2E-GROUPKILL,RECOVERED_EXPECTED,txn ABSENT at after_write (async),rec=5/5 t2000=false txn=ABSENT err=-,MATCH
+txn-c,async,before_ack,0,F2E-GROUPKILL,RECOVERED_EXPECTED,txn ABSENT at before_ack (async),rec=5/5 t2000=false txn=ABSENT err=-,MATCH
+txn-c,async,before_ack,1,F2E-GROUPKILL,RECOVERED_EXPECTED,txn ABSENT at before_ack (async),rec=5/5 t2000=false txn=ABSENT err=-,MATCH
+txn-c,async,before_ack,2,F2E-GROUPKILL,RECOVERED_EXPECTED,txn ABSENT at before_ack (async),rec=5/5 t2000=false txn=ABSENT err=-,MATCH
+txn-c,async,after_ack,0,F2E-GROUPKILL,DATA_LOSS_ALLOWED_BY_CONTRACT,txn ABSENT at after_ack (async),rec=5/5 t2000=false txn=ABSENT err=-,MATCH
+txn-c,async,after_ack,1,F2E-GROUPKILL,DATA_LOSS_ALLOWED_BY_CONTRACT,txn ABSENT at after_ack (async),rec=5/5 t2000=false txn=ABSENT err=-,MATCH
+txn-c,async,after_ack,2,F2E-GROUPKILL,DATA_LOSS_ALLOWED_BY_CONTRACT,txn ABSENT at after_ack (async),rec=5/5 t2000=false txn=ABSENT err=-,MATCH
+f0-control,sync,graceful_close,0,F0-CLOSE,RECOVERED_EXPECTED,all acked survive graceful close,rec=10/10 t2000=false txn=- err=-,MATCH
+f0-control,group,graceful_close,0,F0-CLOSE,RECOVERED_EXPECTED,all acked survive graceful close,rec=10/10 t2000=false txn=- err=-,MATCH
+f0-control,async,graceful_close,0,F0-CLOSE,RECOVERED_EXPECTED,all acked survive graceful close,rec=10/10 t2000=false txn=- err=-,MATCH

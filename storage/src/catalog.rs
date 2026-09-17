@@ -198,8 +198,12 @@ impl Catalog {
             f.write_all(&bytes)?;
             f.sync_all()?;
         }
+        // E3 window: manifest-N.tmp fully durable; CURRENT still old.
+        crate::crashgate::GATE_MANIFEST_AFTER_TMP_WRITE.hit();
         std::fs::rename(&tmp_path, &final_path)?;
         fsync_dir(&manifest_dir)?;
+        // E3 window: manifest-N installed; CURRENT still points at gen N-1.
+        crate::crashgate::GATE_MANIFEST_AFTER_MANIFEST_DIRSYNC.hit();
 
         // Now repoint CURRENT (same crash-safe protocol).
         let cur_tmp = db_dir.join(format!("{CURRENT_NAME}.tmp"));
@@ -213,8 +217,12 @@ impl Catalog {
             writeln!(f, "{name}")?;
             f.sync_all()?;
         }
+        // E3 window: CURRENT.tmp durable; CURRENT still old.
+        crate::crashgate::GATE_MANIFEST_AFTER_CURRENT_TMP_WRITE.hit();
         std::fs::rename(&cur_tmp, Self::current_path(db_dir))?;
         fsync_dir(db_dir)?;
+        // E3 window: manifest replacement complete (CURRENT + dir durable).
+        crate::crashgate::GATE_MANIFEST_AFTER_CURRENT_RENAME.hit();
         Ok(generation)
     }
 

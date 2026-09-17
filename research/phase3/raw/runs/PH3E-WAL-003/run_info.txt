@@ -1,0 +1,7 @@
+run_id=PH3E-WAL-003
+experiment=E3 regression: E1 WAL-integrity matrix re-run after the E3 structural crash-gates — invariants unchanged
+date=2026-09-17
+method=phase3-bench dbtest walintegrity (11 cases)
+config=see config.json
+status=COMPLETED — byte-identical to PH3E-WAL-001/002 (6 REFUSED / 5 legitimate opens)
+notes=E1 intact under E3 instrumentation

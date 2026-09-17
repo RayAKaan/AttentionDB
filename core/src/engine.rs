@@ -1555,13 +1555,19 @@ impl AttentionEngine {
             wal.fsync()?;
             seq
         };
+        // E3 window: everything appended so far is fsynced (ALL modes);
+        // checkpoint not yet installed.
+        use attentiondb_storage::crashgate;
+        crashgate::GATE_CKPT_AFTER_WAL_FSYNC.hit();
 
         // 2) Flush memtable → atomic SSTables.
         self.document_store.write().flush()?;
+        crashgate::GATE_CKPT_AFTER_SST.hit();
 
         // 3) Idmap snapshot (exact allocator + retired ids — INV-6).
         let snap = self.id_mapper.read().snapshot();
         snap.save(&db_dir)?;
+        crashgate::GATE_CKPT_AFTER_IDMAP.hit();
 
         // 4) Manifest: point at the new state (crash-safe install).
         let info = {
@@ -1577,13 +1583,17 @@ impl AttentionEngine {
                 duration_ms: started.elapsed().as_secs_f64() * 1000.0,
             }
         };
+        // E3 window: manifest + CURRENT installed (both dir-fsynced).
+        crashgate::GATE_MANIFEST_AFTER_CURRENT_RENAME.hit();
 
         // 5) Rotate + trim segments fully covered by the checkpoint.
         {
             let mut wal_guard = self.wal.lock();
             let wal = wal_guard.as_mut().expect("persistent engine");
             wal.rotate()?;
+            crashgate::GATE_CKPT_AFTER_ROTATE.hit();
             let removed = wal.retain_from(seq)?;
+            crashgate::GATE_CKPT_AFTER_TRIM.hit();
             if removed > 0 {
                 tracing::info!(
                     segments_removed = removed,

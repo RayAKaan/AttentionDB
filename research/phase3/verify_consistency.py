@@ -437,6 +437,58 @@ def main():
         ERR.append("results/durability-modes.csv missing (mode contract summary)")
     if not os.path.exists(os.path.join(HERE, "phase3e-e2-final-report.md")):
         ERR.append("phase3e-e2-final-report.md missing (E2 final report)")
+
+    # 20. Phase 3E (E3): machine-crash durability — failure-model column
+    #     mandatory; POWER_LOSS rows must be BLOCKED-classified; classification
+    #     gate must hold; E1/E2 regressions byte-identical; report + deviations
+    e3_raw = os.path.join(run, "PH3E-E3-001", "e3-matrix.csv")
+    e3_res = os.path.join(RES, "e3-recovery-classification.csv")
+    for eid in ("PH3E-E3-001", "PH3E-WAL-003", "PH3E-DUR-007"):
+        if eid not in ids:
+            ERR.append(f"PH3E E3 run {eid} missing from registry")
+        dd = os.path.join(run, eid)
+        if not os.path.isdir(dd):
+            ERR.append(f"PH3E E3 run {eid} registered but raw dir missing")
+        elif not os.path.exists(os.path.join(dd, "run_info.txt")) or \
+                not os.path.exists(os.path.join(dd, "config.json")):
+            ERR.append(f"PH3E E3 run {eid}: missing run_info.txt/config.json")
+    if not os.path.exists(e3_raw):
+        ERR.append("PH3E-E3-001: raw e3-matrix.csv missing")
+    elif not os.path.exists(e3_res):
+        ERR.append("results/e3-recovery-classification.csv missing (generator)")
+    else:
+        raw_rows = list(rd(e3_raw))
+        res_rows = list(rd(e3_res))
+        if len(raw_rows) != len(res_rows):
+            ERR.append(f"e3 classification row drift raw {len(raw_rows)} vs results {len(res_rows)}")
+        if raw_rows and "failure_model" not in raw_rows[0]:
+            ERR.append("e3-matrix.csv lacks failure_model column (claim boundary rule)")
+        for sr in res_rows:
+            if sr.get("match") == "MISMATCH":
+                ERR.append(f"e3 classification MISMATCH: {sr['cell']}/{sr['mode']}/{sr['window']} rep {sr['rep']}")
+            if sr.get("classification") in ("UNSAFE_OPEN", "UNEXPECTED_PARTIAL_STATE",
+                                            "CORRUPTION_DETECTED", "UNEXPECTED_DATA_LOSS"):
+                ERR.append(f"e3 unsafe classification present: {sr['classification']} "
+                           f"({sr['cell']}/{sr['mode']}/{sr['window']})")
+        for rr in raw_rows:
+            if "POWER_LOSS" in rr.get("failure_model", ""):
+                ERR.append("POWER-LOSS failure model present in raw run — physical power "
+                           "loss is BLOCKED in this environment; such rows must not exist")
+    w3 = os.path.join(run, "PH3E-WAL-003", "wal-integrity.csv")
+    if os.path.exists(w1) and os.path.exists(w3):
+        if sorted(open(w1).read().splitlines()[1:]) != sorted(open(w3).read().splitlines()[1:]):
+            ERR.append("PH3E-WAL-003 (E1 regression under E3) differs from PH3E-WAL-001")
+    for f, orig in (("ack-boundary", os.path.join(run, "PH3E-DUR-001", "ack-boundary.csv")),
+                    ("txn-ack", os.path.join(run, "PH3E-DUR-002", "txn-ack.csv")),
+                    ("checkpoint-interaction", os.path.join(run, "PH3E-DUR-006", "checkpoint-interaction.csv"))):
+        n = os.path.join(run, "PH3E-DUR-007", f + ".csv")
+        if os.path.exists(orig) and os.path.exists(n):
+            if sorted(open(orig).read().splitlines()[1:]) != sorted(open(n).read().splitlines()[1:]):
+                ERR.append(f"PH3E-DUR-007/{f} differs from its E2 original")
+    if not os.path.exists(os.path.join(HERE, "phase3e-e3-final-report.md")):
+        ERR.append("phase3e-e3-final-report.md missing (E3 final report)")
+    if not os.path.exists(os.path.join(HERE, "methodology", "ph3e-e3-deviations.md")):
+        ERR.append("methodology/ph3e-e3-deviations.md missing (E3 deviations)")
     if not os.path.exists(os.path.join(HERE, "methodology", "ph3e-spec-deviations.md")):
         ERR.append("methodology/ph3e-spec-deviations.md missing (E2 deviations)")
     if not os.path.exists(os.path.join(HERE, "phase3e-evidence-e0-e1.md")):

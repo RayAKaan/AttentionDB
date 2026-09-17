@@ -2385,6 +2385,468 @@ fn run_durability(suite: &str, out: &str) -> String {
     format!("durability[{suite}]: {cells} cells -> {csv}")
 }
 
+
+// ================================================================
+// Phase 3E E3 — machine-crash / power-loss durability validation
+// ================================================================
+//
+// Failure models (phase3e-e3-spec.md §3):
+//   F0  graceful close (control)
+//   F1  process crash                     -> E2 evidence, NOT re-run as E3
+//   F2E environment-termination-EQUIVALENT: the child runs in its own process
+//       group and PARKS at the exact in-engine window gate (marker file
+//       fsynced first); the controller then SIGKILLs the entire group. No
+//       destructors, no flushes, no cleanup of anything holding DB state.
+//       The engine is single-process, so the group covers every DB-state
+//       holder. This is the STRONGEST mechanism available in this sandbox —
+//       it is NOT a VM kill, NOT a filesystem disruption, NOT power loss.
+//   F3  filesystem/cache disruption       -> BLOCKED (no root, no dm tools)
+//   F4  physical power loss               -> BLOCKED (no power mechanism)
+//
+// The controller independently records the ACK sidecar (fsynced by the
+// child), the crash marker, and after recovery: the fact set + checker.
+// Expected-state judgement is applied ONLY by generate_results_ph3e.py.
+
+fn e3_park_with_marker(dir: &std::path::Path, label: &str) -> ! {
+    let m = std::path::PathBuf::from(format!("{}.e3gate", dir.display()));
+    use std::io::Write;
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).write(true).truncate(true).open(&m) {
+        let _ = writeln!(f, "{label}");
+        let _ = f.sync_all();
+    }
+    loop {
+        std::thread::sleep(std::time::Duration::from_secs(3600));
+    }
+}
+
+/// Child for one E3 cell: deterministic workload; parks at the requested
+/// window (engine gate or harness-level point) until the controller kills
+/// the process group.
+fn run_e3child(dir: &std::path::Path, workload: &str, gate: &str) -> ! {
+    let e = open_db(dir);
+    e.create_collection("bench", DIM, &[HEAD]).unwrap();
+    let side = std::path::PathBuf::from(format!("{}.e3sidecar", dir.display()));
+    let mut sc = std::fs::OpenOptions::new().create(true).append(true).open(&side).unwrap();
+    let mut ack = |line: String| {
+        use std::io::Write;
+        let _ = writeln!(sc, "{line}");
+        let _ = sc.flush();
+        let _ = sc.sync_all();
+    };
+    match workload {
+        "ack" => {
+            for i in 0..10u32 {
+                e.insert_document("bench", doc_record(1000 + i, 1, "c", i as i64)).unwrap();
+                ack(format!("ACK {}", 1000 + i));
+            }
+            if gate == "after_ack" {
+                // C7 harness-level park (no engine gate fires)
+                e.insert_document("bench", doc_record(2000, 1, "t", 0)).unwrap();
+                ack(String::from("ACK 2000"));
+                e3_park_with_marker(dir, "after_ack");
+            }
+            // env-gated park fires inside this insert
+            e.insert_document("bench", doc_record(2000, 1, "t", 0)).unwrap();
+            ack(String::from("ACK 2000"));
+            e3_park_with_marker(dir, "post-window-fallback");
+        }
+        "mixed" => {
+            for i in 0..9u32 {
+                e.insert_document("bench", doc_record(1000 + i, 1, "c", i as i64)).unwrap();
+                ack(format!("ACK {}", 1000 + i));
+            }
+            for i in [0u32, 2, 4] {
+                e.delete_document("bench", &uuid_for(1000 + i, 1).to_string()).unwrap();
+                ack(format!("DEL {}", 1000 + i));
+            }
+            for i in 0..3u32 {
+                e.insert_document("bench", doc_record(3000 + i, 1, "c2", i as i64)).unwrap();
+                ack(format!("ACK {}", 3000 + i));
+            }
+            if gate == "after_ack" {
+                e.insert_document("bench", doc_record(2000, 1, "t", 0)).unwrap();
+                ack(String::from("ACK 2000"));
+                e3_park_with_marker(dir, "after_ack");
+            }
+            // structural window (fires inside checkpoint)
+            e.checkpoint().unwrap();
+            e3_park_with_marker(dir, "post-window-fallback");
+        }
+        "txn" => {
+            for i in 0..5u32 {
+                e.insert_document("bench", doc_record(1000 + i, 1, "c", i as i64)).unwrap();
+                ack(format!("ACK {}", 1000 + i));
+            }
+            use attentiondb_core::transaction::TxnOp;
+            let t = e.txn_manager.begin_transaction("bench");
+            for i in 2000..2008u32 {
+                e.txn_manager.record_operation(t, TxnOp::Insert(doc_record(i, 1, "txn", i as i64))).unwrap();
+            }
+            e.txn_manager.record_operation(t, TxnOp::Delete(uuid_for(1001, 1))).unwrap();
+            e.txn_manager.record_operation(t, TxnOp::Delete(uuid_for(1003, 1))).unwrap();
+            if gate == "after_ack" {
+                e.commit_transaction(t).unwrap();
+                ack(String::from("TXNACK"));
+                e3_park_with_marker(dir, "after_ack");
+            }
+            // env-gated park fires inside commit (e.g. after_write@18 = COMMIT frame written)
+            e.commit_transaction(t).unwrap();
+            ack(String::from("TXNACK"));
+            e3_park_with_marker(dir, "post-window-fallback");
+        }
+        "ckpt" => {
+            for i in 0..16u32 {
+                e.insert_document("bench", doc_record(1000 + i, 1, "c", i as i64)).unwrap();
+                ack(format!("ACK {}", 1000 + i));
+            }
+            // env-gated park fires inside checkpoint at the structural window
+            e.checkpoint().unwrap();
+            e3_park_with_marker(dir, "post-window-fallback");
+        }
+        "rotate" => {
+            // small segments via ATTENTIONDB_WAL_SEGMENT_BYTES; 7 acked docs
+            // fill segment 1 (collection + 7 records); the NEXT insert
+            // triggers the rotation the gate parks in.
+            for i in 0..7u32 {
+                e.insert_document("bench", doc_record(1000 + i, 1, "c", i as i64)).unwrap();
+                ack(format!("ACK {}", 1000 + i));
+            }
+            // env-gated park fires inside this insert's rotation
+            e.insert_document("bench", doc_record(2000, 1, "t", 0)).unwrap();
+            ack(String::from("ACK 2000"));
+            e3_park_with_marker(dir, "post-window-fallback");
+        }
+        "close" => {
+            for i in 0..10u32 {
+                e.insert_document("bench", doc_record(1000 + i, 1, "c", i as i64)).unwrap();
+                ack(format!("ACK {}", 1000 + i));
+            }
+            e.close().unwrap(); // F0 control: graceful, no crash
+            std::process::exit(0);
+        }
+        _ => panic!("unknown e3 workload {workload}"),
+    }
+}
+
+/// Controller: spawn child in its own process group, wait for the durable
+/// window marker, SIGKILL the WHOLE group (F2E), reopen + record facts.
+struct E3Facts {
+    marker_reached: bool,
+    exit_kind: &'static str,
+    open_error: Option<String>,
+    recovered_keys: Vec<u32>,
+    checker_clean: bool,
+    high_watermark: String,
+    restarts_equal: bool,
+    restart_checker_clean: bool,
+}
+
+// A matrix cell is one row of the driver table; the parameters ARE the cell
+// descriptor (window/hit/mode/segment-size/crash/restarts) — a struct would
+// only relocate the count.
+#[allow(clippy::too_many_arguments)]
+fn e3_run_cell(
+    dir: &std::path::Path,
+    workload: &str,
+    gate: &str,
+    gathit: usize,
+    mode: &str,
+    seg_bytes: Option<u64>,
+    crash: bool,
+    restarts: bool,
+) -> E3Facts {
+    let _ = std::fs::remove_dir_all(dir);
+    for suffix in [".e3sidecar", ".e3gate"] {
+        let _ = std::fs::remove_file(format!("{}{suffix}", dir.display()));
+    }
+    let mut cmd = std::process::Command::new(std::env::current_exe().unwrap());
+    cmd.args(["dbtest", "e3child", "--dir", dir.to_str().unwrap(),
+              "--workload", workload, "--gate", gate])
+        .env("PH3D_DURABILITY", mode)
+        .env("PH3E_CRASH_MODEL", "groupkill")
+        .env("PH3E_CRASH_MARKER", format!("{}.e3gate", dir.display()));
+    if crash {
+        cmd.env("PH3E_CRASH_AT", gate).env("PH3E_CRASH_HIT", gathit.to_string());
+    }
+    if let Some(b) = seg_bytes {
+        cmd.env("ATTENTIONDB_WAL_SEGMENT_BYTES", b.to_string());
+    }
+    #[cfg(unix)]
+    use std::os::unix::process::CommandExt;
+    #[cfg(unix)]
+    cmd.process_group(0);
+    let mut child = cmd.spawn().unwrap();
+    let marker = format!("{}.e3gate", dir.display());
+    let mut marker_reached = false;
+    if crash {
+        for _ in 0..2000 {
+            if std::path::Path::new(&marker).exists() {
+                marker_reached = true;
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        // F2E: kill the ENTIRE process group — nothing cleans up.
+        #[cfg(unix)]
+        {
+            let pgid = child.id() as i32;
+            unsafe { libc::kill(-pgid, libc::SIGKILL); }
+        }
+        #[cfg(not(unix))]
+        let _ = child.kill();
+    }
+    let exit_kind = match child.wait() {
+        Ok(st) => {
+            use std::os::unix::process::ExitStatusExt;
+            if !crash && st.success() { "EXIT0" }
+            else if let Some(9) = st.signal() { "SIGKILL" }
+            else if let Some(6) = st.signal() { "SIGABRT" }
+            else if st.success() { "EXIT0" }
+            else { "OTHER" }
+        }
+        Err(_) => "WAIT_ERROR",
+    };
+    // Recovery + independent facts
+    std::env::set_var("PH3D_DURABILITY", mode);
+    let (open_error, recovered_keys, checker_clean, high_watermark) =
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| open_db(dir))) {
+            Err(e) => {
+                let msg = if let Some(m) = e.downcast_ref::<String>() {
+                    m.clone()
+                } else if let Some(m) = e.downcast_ref::<&str>() {
+                    m.to_string()
+                } else {
+                    "panic".into()
+                };
+                let class = if msg.contains("WAL_LOST_SEGMENT") {
+                    "WAL_LOST_SEGMENT"
+                } else if msg.contains("WAL_SEQ_GAP") {
+                    "WAL_SEQ_GAP"
+                } else if msg.contains("WAL integrity record") {
+                    "WAL_STATE_CORRUPT"
+                } else if msg.contains("WAL replay failed") {
+                    "WAL_REPLAY"
+                } else if msg.contains("none are valid") {
+                    "MANIFEST_NONE_VALID"
+                } else if msg.contains("CURRENT manifest unreadable") || msg.contains("catalog recovered") {
+                    "CATALOG_FALLBACK"
+                } else {
+                    "OPEN_ERROR"
+                };
+                (Some(class.into()), Vec::new(), false, "-".into())
+            }
+            Ok(e) => {
+                let (obs, _) = export_state(&e);
+                let keys: Vec<u32> = obs.keys().copied().collect();
+                let clean = checker_report(&e, dir)["clean"].as_bool().unwrap_or(false);
+                let wm = attentiondb_storage::read_wal_state(&dir.join("WAL"))
+                    .ok().flatten()
+                    .map(|w| w.high_watermark.to_string())
+                    .unwrap_or_else(|| "-".into());
+                (None, keys, clean, wm)
+            }
+        };
+    // Multiple-restart stability (F0-style close/open cycles) where requested
+    let (restarts_equal, restart_checker_clean) = if restarts && open_error.is_none() {
+        let mut eq = true;
+        let mut all_clean = true;
+        let mut prev = recovered_keys.clone();
+        let mut handle = open_db(dir);
+        for _ in 0..2 {
+            handle.close().unwrap();
+            let e2 = open_db(dir);
+            let (obs2, _) = export_state(&e2);
+            let keys2: Vec<u32> = obs2.keys().copied().collect();
+            if keys2 != prev { eq = false; }
+            if !checker_report(&e2, dir)["clean"].as_bool().unwrap_or(false) { all_clean = false; }
+            prev = keys2;
+            handle = e2;
+        }
+        handle.close().unwrap();
+        (eq, all_clean)
+    } else {
+        (true, checker_clean)
+    };
+    E3Facts {
+        marker_reached, exit_kind, open_error, recovered_keys,
+        checker_clean, high_watermark, restarts_equal, restart_checker_clean,
+    }
+}
+
+fn e3_sidecar_acked(dir: &std::path::Path) -> (Vec<u32>, Vec<u32>, bool) {
+    let mut acked = Vec::new();
+    let mut deleted = Vec::new();
+    let mut txn = false;
+    if let Ok(s) = std::fs::read_to_string(format!("{}.e3sidecar", dir.display())) {
+        for l in s.lines() {
+            if let Some(v) = l.strip_prefix("ACK ") { if let Ok(n) = v.parse() { acked.push(n); } }
+            else if let Some(v) = l.strip_prefix("DEL ") { if let Ok(n) = v.parse() { deleted.push(n); } }
+            else if l == "TXNACK" { txn = true; }
+        }
+    }
+    (acked, deleted, txn)
+}
+
+/// Driver: one CSV with every E3 cell (facts only; classification happens in
+/// generate_results_ph3e.py against the contract table).
+fn run_e3(out: &str) -> String {
+    std::fs::create_dir_all(out).unwrap();
+    let mut rows = String::from(
+        "cell,mode,workload,window,hit,rep,failure_model,marker_reached,exit_kind,open_error,acked_count,recovered_acked,missing_acked,unacked_present,deleted_still_gone,txn_state,target2000_present,checker_clean,restarts_equal,restart_checker_clean,high_watermark\n");
+    let mut cells = 0usize;
+    #[allow(unused_mut)]
+    let mut record = |rows: &mut String, cells: &mut usize,
+                      cell: String, mode: &str, workload: &str, window: &str, hit: usize,
+                      rep: usize, fm: &str, f: &E3Facts, dir: &std::path::Path| {
+        let (acked, deleted, _txn_acked) = e3_sidecar_acked(dir);
+        let recovered_acked = acked.iter().filter(|i| f.recovered_keys.contains(i)).count();
+        let missing: Vec<u32> = acked.iter().filter(|i| !f.recovered_keys.contains(i)).copied().collect();
+        let universe: std::collections::HashSet<u32> = acked.iter().copied()
+            .chain(deleted.iter().copied())
+            .chain([2000u32]).chain(2000..2008).collect();
+        let unacked_present = f.recovered_keys.iter().filter(|k| !universe.contains(k)).count();
+        let deleted_still_gone = deleted.iter().filter(|i| !f.recovered_keys.contains(i)).count();
+        let txn_state = if workload == "txn" {
+            let n = (2000..2008u32).filter(|i| f.recovered_keys.contains(i)).count();
+            match n { 8 => "COMPLETE", 0 => "ABSENT", _ => "PARTIAL" }
+        } else { "-" };
+        let target_present = f.recovered_keys.contains(&2000);
+        rows.push_str(&format!(
+            "{cell},{mode},{workload},{window},{hit},{rep},{fm},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n",
+            f.marker_reached, f.exit_kind,
+            f.open_error.as_deref().unwrap_or("-"),
+            acked.len(), recovered_acked, missing.len(),
+            unacked_present, deleted_still_gone, txn_state, target_present,
+            f.checker_clean, f.restarts_equal, f.restart_checker_clean, f.high_watermark));
+        *cells += 1;
+    };
+
+    // ---- Workload A: ack-inserts x C1..C7 (F2E) ----
+    let gates_a: Vec<(&str, usize, bool, &str)> = vec![
+        ("before_wal_append", 11, true, "engine"),
+        ("after_write", 12, true, "wal"),
+        ("after_apply", 11, true, "engine"),
+        ("after_flush", 12, true, "wal"),      // reachable in GroupCommit branch only
+        ("after_fsync", 12, true, "wal"),      // reachable in Sync branch only
+        ("before_ack", 11, true, "engine"),
+        ("after_ack", 0, true, "harness"),
+    ];
+    for mode in ["sync", "group", "async"] {
+        for (gate, hit, crash, kind) in &gates_a {
+            let reachable = match *gate {
+                "after_flush" => mode == "group",
+                "after_fsync" => mode == "sync",
+                _ => true,
+            };
+            if !reachable {
+                for rep in 0..3 {
+                    rows.push_str(&format!("ack-c,{mode},ack,{gate},{hit},{rep},F2E-GROUPKILL,false,NOT_REACHED,-,-,-,-,-,-,-,-,-,-,-\n"));
+                    cells += 1;
+                }
+                continue;
+            }
+            for rep in 0..3 {
+                let dir = std::path::PathBuf::from(format!("/tmp/ph3e-e3/ack-{mode}-{gate}-{rep}"));
+                let f = e3_run_cell(&dir, "ack", gate, *hit, mode, None, *crash, false);
+                record(&mut rows, &mut cells, "ack-c".into(), mode, "ack", gate, *hit, rep,
+                       if *kind == "harness" { "F2E-GROUPKILL-HARNESS" } else { "F2E-GROUPKILL" }, &f, &dir);
+                let _ = std::fs::remove_dir_all(&dir);
+                let _ = std::fs::remove_file(format!("{}.e3sidecar", dir.display()));
+                let _ = std::fs::remove_file(format!("{}.e3gate", dir.display()));
+            }
+        }
+    }
+
+    // ---- Workload D: checkpoint boundary x 9 structural windows ----
+    // NOTE: manifest_* gates fire inside Catalog::save — hit 1 is
+    // create_collection's persist_catalog, hit 2 is the checkpoint's save.
+    let gates_d = [
+        ("ckpt_after_wal_fsync", 1), ("ckpt_after_sst", 1), ("ckpt_after_idmap", 1),
+        ("manifest_after_tmp_write", 2), ("manifest_after_manifest_dirsync", 2),
+        ("manifest_after_current_tmp_write", 2), ("manifest_after_current_rename", 2),
+        ("ckpt_after_rotate", 1), ("ckpt_after_trim", 1),
+    ];
+    for mode in ["sync", "group", "async"] {
+        for (gate, hit) in gates_d {
+            for rep in 0..3 {
+                let dir = std::path::PathBuf::from(format!("/tmp/ph3e-e3/ckpt-{mode}-{gate}-{rep}"));
+                let f = e3_run_cell(&dir, "ckpt", gate, hit, mode, None, true, true);
+                record(&mut rows, &mut cells, "ckpt-c".into(), mode, "ckpt", gate, hit, rep, "F2E-GROUPKILL", &f, &dir);
+                let _ = std::fs::remove_dir_all(&dir);
+                let _ = std::fs::remove_file(format!("{}.e3sidecar", dir.display()));
+                let _ = std::fs::remove_file(format!("{}.e3gate", dir.display()));
+            }
+        }
+    }
+
+    // ---- Workload E: WAL-rotation boundary (2 KiB segments) ----
+    let gates_e = [("rotate_after_old_fsync", 1usize), ("rotate_after_state_write", 2)];
+    for mode in ["sync", "group", "async"] {
+        for (gate, hit) in gates_e {
+            for rep in 0..3 {
+                let dir = std::path::PathBuf::from(format!("/tmp/ph3e-e3/rot-{mode}-{gate}-{rep}"));
+                let f = e3_run_cell(&dir, "rotate", gate, hit, mode, Some(2048), true, true);
+                record(&mut rows, &mut cells, "rotate-c".into(), mode, "rotate", gate, hit, rep, "F2E-GROUPKILL", &f, &dir);
+                let _ = std::fs::remove_dir_all(&dir);
+                let _ = std::fs::remove_file(format!("{}.e3sidecar", dir.display()));
+                let _ = std::fs::remove_file(format!("{}.e3gate", dir.display()));
+            }
+        }
+    }
+
+    // ---- Workload B: mixed mutations (checkpoint window + after-ack) ----
+    let gates_b: Vec<(&str, usize, bool)> = vec![
+        ("manifest_after_current_rename", 2, true), // hit 2 = checkpoint's save
+        ("after_ack", 0, true),
+    ];
+    for mode in ["sync", "group", "async"] {
+        for (gate, hit, crash) in gates_b.iter().copied() {
+            for rep in 0..3 {
+                let dir = std::path::PathBuf::from(format!("/tmp/ph3e-e3/mix-{mode}-{gate}-{rep}"));
+                let f = e3_run_cell(&dir, "mixed", gate, hit, mode, None, crash, true);
+                record(&mut rows, &mut cells, "mixed-c".into(), mode, "mixed", gate, hit, rep, "F2E-GROUPKILL", &f, &dir);
+                let _ = std::fs::remove_dir_all(&dir);
+                let _ = std::fs::remove_file(format!("{}.e3sidecar", dir.display()));
+                let _ = std::fs::remove_file(format!("{}.e3gate", dir.display()));
+            }
+        }
+    }
+
+    // ---- Workload C: transactions (COMMIT-buffered / pre-ACK / post-ACK) ----
+    let gates_c: Vec<(&str, usize, bool)> = vec![
+        ("after_write", 18, true),   // COMMIT frame written (userspace buffer)
+        ("before_ack", 6, true),     // engine: last engine-level instant
+        ("after_ack", 0, true),      // harness: TXNACK durably recorded
+    ];
+    for mode in ["sync", "group", "async"] {
+        for (gate, hit, crash) in gates_c.iter().copied() {
+            for rep in 0..3 {
+                let dir = std::path::PathBuf::from(format!("/tmp/ph3e-e3/txn-{mode}-{gate}-{rep}"));
+                let f = e3_run_cell(&dir, "txn", gate, hit, mode, None, crash, false);
+                record(&mut rows, &mut cells, "txn-c".into(), mode, "txn", gate, hit, rep, "F2E-GROUPKILL", &f, &dir);
+                let _ = std::fs::remove_dir_all(&dir);
+                let _ = std::fs::remove_file(format!("{}.e3sidecar", dir.display()));
+                let _ = std::fs::remove_file(format!("{}.e3gate", dir.display()));
+            }
+        }
+    }
+
+    // ---- F0 control: graceful close ----
+    for mode in ["sync", "group", "async"] {
+        let dir = std::path::PathBuf::from(format!("/tmp/ph3e-e3/f0-{mode}"));
+        let f = e3_run_cell(&dir, "close", "", 0, mode, None, false, true);
+        record(&mut rows, &mut cells, "f0-control".into(), mode, "close", "graceful_close", 0, 0, "F0-CLOSE", &f, &dir);
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_file(format!("{}.e3sidecar", dir.display()));
+    }
+
+    std::fs::write(format!("{out}/e3-matrix.csv"), &rows).unwrap();
+    write_json(&format!("{out}/metrics.json"),
+        &serde_json::json!({"cells": cells, "failure_models": ["F0-CLOSE", "F2E-GROUPKILL"],
+                            "blocked": ["F3-FS-DISRUPTION", "F4-POWER-LOSS"]}));
+    format!("e3: {cells} cells -> {out}/e3-matrix.csv")
+}
+
 // ---------------------------------------------------------------- dispatch
 
 pub fn run(args: &[String]) -> String {
@@ -2419,6 +2881,8 @@ pub fn run(args: &[String]) -> String {
         "walintegrity" => run_walintegrity(&out),
         "durability" => run_durability(&get("--suite", "ack-boundary"), &out),
         "gatechild" => run_gatechild(&dir, &get("--scenario", "ack"), &get("--gate", "")),
+        "e3child" => run_e3child(&dir, &get("--workload", "ack"), &get("--gate", "")),
+        "e3run" => run_e3(&out),
         "compactlive" => run_compact_live(&dir),
         other => format!("unknown dbtest subcommand {other}"),
     }

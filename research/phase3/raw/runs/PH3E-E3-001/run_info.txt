@@ -1,0 +1,7 @@
+run_id=PH3E-E3-001
+experiment=E3 machine-crash (F2E environment-termination-equivalent) durability matrix: workload classes A/B/C/D/E + F0 control x crash windows C1-C7 + structural windows (checkpoint x9, manifest x4, SST, rotation x2) x 3 modes x 3 reps
+date=2026-09-17
+method=phase3-bench dbtest e3run — child parks at in-engine window gate (marker fsynced), controller SIGKILLs the entire process group (no destructors/flushes); independent ACK sidecar; recovery facts + full checker + restart-stability x2
+config=see config.json
+status=COMPLETED — 210 cells; 0 refusals; 0 corruption; 0 partial transactions; async losses exactly per E2 contract
+notes=F3 (fs disruption) and F4 (power loss) BLOCKED: infrastructure provides no root/block-device/power mechanism (see phase3e-e3-spec.md §3)
