@@ -1,0 +1,16 @@
+case,mode,expected_count,restored_count,classification,expected,observed,match
+b1-quiescent,sync,30,30,SNAPSHOT_MATCH,restored state == independent reference model at backup boundary,MATCH,MATCH
+b2-readers,group,40,40,SNAPSHOT_MATCH,restored state == independent reference model at backup boundary,MATCH,MATCH
+b3-single-writer,sync,300,300,SNAPSHOT_MATCH,restored state == independent reference model at backup boundary,MATCH,MATCH
+b4-multi-writer,group,300,300,SNAPSHOT_MATCH,restored state == independent reference model at backup boundary,MATCH,MATCH
+b5-writer-ckpt,sync,200,200,SNAPSHOT_MATCH,restored state == independent reference model at backup boundary,MATCH,MATCH
+b6-writer-rotation,group,200,200,SNAPSHOT_MATCH,restored state == independent reference model at backup boundary,MATCH,MATCH
+b7-writer-ckpt-rotation,async,200,200,SNAPSHOT_MATCH,restored state == independent reference model at backup boundary,MATCH,MATCH
+snapshot-transition,sync,6,6,SNAPSHOT_MATCH,restored state == independent reference model at backup boundary,MATCH,MATCH
+delete-reinsert,sync,13,13,SNAPSHOT_MATCH,restored state == independent reference model at backup boundary,MATCH,MATCH
+collections,group,-,-,SNAPSHOT_MATCH,restored state == independent reference model at backup boundary,MATCH,MATCH
+multi-backup,sync,-,-,SNAPSHOT_MATCH,restored state == independent reference model at backup boundary,MATCH,MATCH
+modes-sync,sync,300,300,SNAPSHOT_MATCH,restored state == independent reference model at backup boundary,MATCH,MATCH
+modes-group,group,300,300,SNAPSHOT_MATCH,restored state == independent reference model at backup boundary,MATCH,MATCH
+modes-async,async,300,300,SNAPSHOT_MATCH,restored state == independent reference model at backup boundary,MATCH,MATCH
+crash-during-backup,sync,20000,20000,CRASH_PROPERTIES_HOLD,SOURCE_OK + partial REFUSED + early restores + checker clean,SOURCE_OK,MATCH

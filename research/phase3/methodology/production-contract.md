@@ -242,3 +242,51 @@ build, mutations, restart, replay, crash-recovery, compaction, concurrency, and 
     (byte-identical to E1/E2 originals).
   - *Limitations:* F2E ≠ VM kill ≠ power loss; mid-SST-write window NOT_INSTRUMENTED
     (refuses per corruption-fatal contract); ext4/VM-disk only.
+
+- **A4 (2026-09-17, E4) — Backup / restore: coordinated snapshot semantics and restore
+  validation.**
+  - *Old wording:* backup existed (`Engine::backup_to` → directory copy: CURRENT,
+    MANIFEST, sst/, META/, WAL/) but the contract made no backup claim; `restore_backup`
+    silently synthesized a default meta when `backup-meta.json` was missing and accepted
+    any `backup_format_version` (restore-integrity gap, fixed in E4, see §1.13 of
+    `phase3e-e4-spec.md`).
+  - *New wording (exactly as verified, no stronger):*
+    - **Snapshot boundary.** `backup_to` acquires the engine mutation gate for the
+      duration of the copy and runs a checkpoint inside that critical section, then
+      copies CURRENT + MANIFEST + sst/ + META/ + WAL/ and writes `backup-meta.json`
+      LAST (fsynced directory). The backup therefore represents exactly the logical
+      state in which every operation acknowledged **before** the backup acquired the
+      gate is present and no operation acknowledged **after** backup return is present.
+      Operations concurrent with the backup are serialized against it (they pause for
+      the backup's duration, measured 0.36–1.54 ms at the tested sizes).
+    - **Coordination class: COORDINATED, not non-blocking.** Verified with concurrent
+      readers (0 errors) and concurrent writers (single, 3-way, checkpoint, WAL
+      rotation): every restored backup matched an independent fsynced reference model
+      read at backup return (PH3E-BACKUP-004, 15/15 cells). A **fully online
+      (zero-writer-pause) backup is NOT supported and NOT claimed**; writers colliding
+      with a backup pause until it completes (measured: checkpoint waited 257 µs).
+    - **Async durability composition.** A backup's internal checkpoint fsyncs the WAL;
+      therefore every write ACKNOWLEDGED before the backup began is contained in the
+      backup even under the Async mode (verified: modes-async 300/300 against the
+      reference model). This does NOT change A2/A3: an Async ack still only implies
+      "committed"; it is the backup's checkpoint — not the ack — that establishes
+      durability of the captured state inside the backup.
+    - **Restore validation (E4 gates).** `restore_backup` now REFUSES: (1) a backup
+      directory without `backup-meta.json` (completion marker ⇒ crash-truncated or
+      in-progress backups are never restorable: group-SIGKILL mid-copy produced a
+      partial directory that was refused while the pre-crash backup still restored);
+      (2) `backup_format_version != 1`; (3) a non-empty destination. Restore remains
+      into an EMPTY destination only. Restoring a corrupt backup fails or recovers per
+      the E1 documented corruption policy (torn-tail WAL accepted with intact prefix;
+      damaged SST / `wal-state.json` / CURRENT refused via catalog fallback rules).
+    - **Format.** `backup_format_version = 1`; unknown versions are refused, never
+      mis-parsed. No correctness-necessary manifest fields were added in E4; the
+      marker + version gate are validation-only.
+  - *Evidence:* PH3E-BACKUP-004 (15/15 snapshot cells + 10/10 integrity cases),
+    superseding PH3E-BACKUP-003 (harness defect, behavior identical); regressions
+    PH3E-WAL-005 ≡ WAL-001, PH3E-DUR-008 ≡ DUR-001/002/003/004/006/007 (byte-identical),
+    PH3E-E3-002 ≡ E3-001 (byte-identical). Report:
+    `research/phase3/phase3e-e4-final-report.md`.
+  - *Boundary:* claims hold for single-process local backups on ext4/VM at the tested
+    sizes (≤ 20 000 docs). No incremental/remote/concurrent-backup-pairs claims; no
+    machine-durability claim is derived from backup tests (A3 boundary unchanged).

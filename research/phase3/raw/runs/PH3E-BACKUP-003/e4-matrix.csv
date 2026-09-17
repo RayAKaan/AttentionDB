@@ -1,0 +1,16 @@
+case,mode,expected_count,restored_count,match,source_final,reader_errors,ops_overlapping_backup,max_op_latency_us,backup_us,restore_us,checker_clean,early_backup_still_restores,partial_backup_refused,notes
+b1-quiescent,sync,30,30,MATCH,"30",0,0,0,378,1880,true,-,-,control
+b2-readers,group,40,40,MATCH,-,0,0,0,367,1411,true,-,-,readers ran during backup
+b3-single-writer,sync,300,300,MATCH,"400",0,0,238,1489,23019,true,-,-,writer paused by gate during backup; post-backup +100 inserts excluded
+b4-multi-writer,group,300,300,MATCH,"300",0,0,0,0,24622,true,-,-,3 writers
+b5-writer-ckpt,sync,200,200,MATCH,"250",0,0,0,0,11681,true,-,-,checkpoint blocked until backup done (waited 299us)
+b6-writer-rotation,group,200,200,MATCH,-,0,0,0,0,12417,true,-,-,2KiB segments: rotations before/during(ckpt)/after backup
+b7-writer-ckpt-rotation,async,200,200,MATCH,-,0,0,0,0,10862,true,-,-,async: backup checkpoint captures buffered acks
+snapshot-transition,sync,6,6,MATCH,-,0,0,0,0,-,530,true,-,-,
+delete-reinsert,sync,13,13,MATCH,-,0,0,0,0,666,true,-,-,boundary=33 sidecar lines
+collections,group,-,-,MATCH,-,0,0,0,-,-,true,-,-,alpha=80/80 bench=80/80 beta=80/80
+multi-backup,sync,-,-,MATCH,-,0,0,0,-,4327,-,-,B1=20/20 B2=40/40 B3=60/60
+modes-sync,sync,300,300,MATCH,-,0,0,0,0,22992,true,-,-,acked writes all captured (ckpt fsync)
+modes-group,group,300,300,MATCH,-,0,0,0,0,23214,true,-,-,acked writes all captured (ckpt fsync)
+modes-async,async,300,300,MATCH,-,0,0,0,0,22093,true,-,-,acked writes all captured (ckpt fsync)
+crash-during-backup,sync,20000,20000,SOURCE_OK,-,0,0,0,-,-,true,true,REFUSED,killed_mid_backup done=false (Corruption detected: backup manifest /tmp/ph3e-e4/crash-backup/backup-meta.json missing — incomplete/invalid backup; refusing restore)

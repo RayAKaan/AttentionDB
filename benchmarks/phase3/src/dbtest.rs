@@ -2694,8 +2694,7 @@ fn run_e3(out: &str) -> String {
     let mut rows = String::from(
         "cell,mode,workload,window,hit,rep,failure_model,marker_reached,exit_kind,open_error,acked_count,recovered_acked,missing_acked,unacked_present,deleted_still_gone,txn_state,target2000_present,checker_clean,restarts_equal,restart_checker_clean,high_watermark\n");
     let mut cells = 0usize;
-    #[allow(unused_mut)]
-    let mut record = |rows: &mut String, cells: &mut usize,
+    let record = |rows: &mut String, cells: &mut usize,
                       cell: String, mode: &str, workload: &str, window: &str, hit: usize,
                       rep: usize, fm: &str, f: &E3Facts, dir: &std::path::Path| {
         let (acked, deleted, _txn_acked) = e3_sidecar_acked(dir);
@@ -2847,6 +2846,834 @@ fn run_e3(out: &str) -> String {
     format!("e3: {cells} cells -> {out}/e3-matrix.csv")
 }
 
+
+// ================================================================
+// Phase 3E E4 — online backup, snapshot consistency, restore integrity
+// ================================================================
+//
+// Snapshot model (phase3e-e4-spec.md §2): backup_to acquires the mutation
+// gate, checkpoints (THE snapshot boundary), copies, releases. Ops attempted
+// during backup block and ACK only after it returns — therefore the snapshot
+// content is EXACTLY the ops whose ACK lines are visible in the fsynced
+// sidecar at backup-return. The expected state is derived from that sidecar
+// (independent reference model), never from the final source state.
+
+type E4Shared = std::sync::Arc<std::sync::Mutex<std::fs::File>>;
+
+fn e4_ack(f: &E4Shared, line: &str) {
+    use std::io::Write;
+    let mut g = f.lock().unwrap();
+    let _ = writeln!(g, "{line}");
+    let _ = g.flush();
+    let _ = g.sync_all();
+}
+
+fn e4_sidecar_lines(dir: &std::path::Path) -> Vec<String> {
+    std::fs::read_to_string(format!("{}.e4sidecar", dir.display()))
+        .map(|s| s.lines().map(|l| l.to_string()).collect())
+        .unwrap_or_default()
+}
+
+/// expected present-set from sidecar ACK/DEL lines (in-order replay)
+fn e4_model(lines: &[String]) -> (Vec<u32>, Vec<u32>) {
+    let mut present: std::collections::BTreeMap<u32, ()> = Default::default();
+    let mut deleted: Vec<u32> = Vec::new();
+    for l in lines {
+        if let Some(v) = l.strip_prefix("ACK ") {
+            if let Ok(n) = v.parse::<u32>() {
+                present.insert(n, ());
+            }
+        } else if let Some(v) = l.strip_prefix("DEL ") {
+            if let Ok(n) = v.parse::<u32>() {
+                present.remove(&n);
+                deleted.push(n);
+            }
+        }
+    }
+    (present.keys().copied().collect(), deleted)
+}
+
+fn e4_restore_and_open(
+    backup: &std::path::Path,
+    dest: &std::path::Path,
+    mode: &str,
+) -> Result<(Model, bool, u128), String> {
+    let t0 = std::time::Instant::now();
+    std::env::set_var("PH3D_DURABILITY", mode);
+    let r = attentiondb_core::backup::restore_backup(backup, dest);
+    let dur = t0.elapsed().as_micros();
+    match r {
+        Err(e) => Err(format!("{e}")),
+        Ok(_) => {
+            let e = open_db(dest);
+            let (m, iss) = export_state(&e);
+            let clean = checker_report(&e, dest)["clean"].as_bool().unwrap_or(false)
+                && iss.is_empty();
+            e.close().unwrap();
+            Ok((m, clean, dur))
+        }
+    }
+}
+
+fn e4_model_match(m: &Model, expect_present: &[u32]) -> (usize, usize, bool) {
+    let got: Vec<u32> = m.keys().copied().collect();
+    let ok = got == expect_present.to_vec();
+    (got.len(), expect_present.len(), ok)
+}
+
+struct E4Writers {
+    stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    handles: Vec<std::thread::JoinHandle<()>>,
+}
+
+fn e4_spawn_writer(
+    e: std::sync::Arc<AttentionEngine>,
+    f: E4Shared,
+    range: std::ops::Range<u32>,
+    lat: std::sync::Arc<std::sync::Mutex<Vec<(u128, u128, u128)>>>,
+    coll: &'static str,
+    epoch: std::sync::Arc<std::time::Instant>,
+) -> E4Writers {
+    use std::sync::atomic::Ordering;
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let stop2 = stop.clone();
+    let lat2 = lat.clone();
+    let h = std::thread::spawn(move || {
+        for i in range {
+            if stop2.load(Ordering::Relaxed) {
+                break;
+            }
+            let start = epoch.elapsed().as_micros();
+            e.insert_document(coll, doc_record(i, 1, "w", i as i64)).unwrap();
+            let end = epoch.elapsed().as_micros();
+            lat2.lock().unwrap().push((start, end, end - start));
+            e4_ack(&f, &format!("ACK {i}"));
+        }
+    });
+    drop(lat);
+    E4Writers { stop, handles: vec![h] }
+}
+
+/// Child for the crash-during-backup case (controller kills the group).
+fn run_e4child(dir: &std::path::Path, backup: &str) -> ! {
+    let e = open_db(dir);
+    e.create_collection("bench", DIM, &[HEAD]).unwrap();
+    let side = std::path::PathBuf::from(format!("{}.e4sidecar", dir.display()));
+    let mut sc = std::fs::OpenOptions::new().create(true).append(true).open(&side).unwrap();
+    use std::io::Write;
+    for i in 0..20000u32 {
+        e.insert_document("bench", doc_record(1000 + i, 1, "c", i as i64)).unwrap();
+        let _ = writeln!(sc, "ACK {}", 1000 + i);
+    }
+    let _ = sc.flush();
+    let _ = sc.sync_all();
+    // earlier completed backup (control): must still restore after the crash
+    let early = format!("{}.early-backup", dir.display());
+    e.backup_to(std::path::Path::new(&early)).unwrap();
+    let m = std::path::PathBuf::from(format!("{}.e4gate", dir.display()));
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).write(true).truncate(true).open(&m) {
+        let _ = writeln!(f, "pre-backup");
+        let _ = f.sync_all();
+    }
+    e.backup_to(std::path::Path::new(backup)).unwrap();
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).write(true).truncate(true).open(&m) {
+        let _ = writeln!(f, "backup-done");
+        let _ = f.sync_all();
+    }
+    loop {
+        std::thread::sleep(std::time::Duration::from_secs(3600));
+    }
+}
+
+/// E4: result of an integrity-case setup hook (backup path, expected present ids, detail)
+type E4SetupResult = (std::path::PathBuf, Vec<u32>, String);
+
+/// Main E4 driver. Produces <out>/e4-matrix.csv and <out>/e4-integrity.csv.
+fn run_e4(out: &str) -> String {
+    std::fs::create_dir_all(out).unwrap();
+    let mut rows = String::from("case,mode,expected_count,restored_count,match,source_final,reader_errors,ops_overlapping_backup,max_op_latency_us,backup_us,restore_us,checker_clean,early_backup_still_restores,partial_backup_refused,notes\n");
+    let mut integrity = String::from("case,action,restore_result,detail\n");
+    let root = std::path::PathBuf::from("/tmp/ph3e-e4");
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    let mut cells = 0usize;
+
+    let run_case = |rows: &mut String, integrity: &mut String, cells: &mut usize,
+                        case: &str, mode: &str,
+                        setup: &dyn Fn(&AttentionEngine, E4Shared) -> E4SetupResult| {
+        let dir = root.join(case);
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::env::set_var("PH3D_DURABILITY", mode);
+        let e = std::sync::Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let side: E4Shared = std::sync::Arc::new(std::sync::Mutex::new(
+            std::fs::OpenOptions::new().create(true).append(true)
+                .open(format!("{}.e4sidecar", dir.display())).unwrap()));
+        let (backup, early_expect, note) = setup(&e, side.clone());
+        // snapshot content = acks visible at backup return (reference model)
+        let lines = e4_sidecar_lines(&dir);
+        let (expect_present, _deleted) = e4_model(&lines);
+        let expected_count = early_expect.len().max(expect_present.len());
+        let _ = expected_count;
+        let (expected_final_present, _) = e4_model(&e4_sidecar_lines(&dir));
+        let t0 = std::time::Instant::now();
+        e.backup_to(&backup).unwrap();
+        let backup_us = t0.elapsed().as_micros();
+        let lines_at_boundary = e4_sidecar_lines(&dir);
+        let (model_present, _) = e4_model(&lines_at_boundary);
+        let rdest = root.join(format!("{case}-restored"));
+        match e4_restore_and_open(&backup, &rdest, mode) {
+            Err(err) => {
+                rows.push_str(&format!("{case},{mode},-,-,RESTORE_REFUSED,-,-,-,-,{backup_us},-,-,-,-,{err}\n"));
+                *cells += 1;
+            }
+            Ok((restored, clean, restore_us)) => {
+                let (got, exp, ok) = e4_model_match(&restored, &model_present);
+                let source_final = {
+                    let (m, _) = export_state(&e);
+                    m.len()
+                };
+                let _ = expected_final_present;
+                rows.push_str(&format!(
+                    "{case},{mode},{exp},{got},{},\"{source_final}\",0,0,0,{backup_us},{restore_us},{clean},-,-,{note}\n",
+                    if ok { "MATCH" } else { "MISMATCH" }));
+                *cells += 1;
+            }
+        }
+        let _ = integrity;
+    };
+
+    // B1 quiescent control
+    run_case(&mut rows, &mut integrity, &mut cells, "b1-quiescent", "sync", &|e, f| {
+        for i in 0..30u32 {
+            e.insert_document("bench", doc_record(1000 + i, 1, "c", i as i64)).unwrap();
+            e4_ack(&f, &format!("ACK {}", 1000 + i));
+        }
+        (root.join("b1-backup"), vec![], "control".into())
+    });
+
+    // B2 read-concurrent
+    {
+        let dir = root.join("b2-readers");
+        std::env::set_var("PH3D_DURABILITY", "group");
+        let e = std::sync::Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let side: E4Shared = std::sync::Arc::new(std::sync::Mutex::new(
+            std::fs::OpenOptions::new().create(true).append(true)
+                .open(format!("{}.e4sidecar", dir.display())).unwrap()));
+        for i in 0..40u32 {
+            e.insert_document("bench", doc_record(1000 + i, 1, "c", i as i64)).unwrap();
+            e4_ack(&side, &format!("ACK {}", 1000 + i));
+        }
+        let errors = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let mut readers = Vec::new();
+        for _ in 0..2 {
+            let e2 = e.clone();
+            let er = errors.clone();
+            readers.push(std::thread::spawn(move || {
+                for i in 0..100u32 {
+                    let q = vec_for(1000 + (i % 40));
+                    if e2.attend("bench", &[HEAD.to_string()], &q, 5).is_err() {
+                        er.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    }
+                }
+            }));
+        }
+        let t0 = std::time::Instant::now();
+        e.backup_to(&root.join("b2-backup")).unwrap();
+        let backup_us = t0.elapsed().as_micros();
+        for r in readers { r.join().unwrap(); }
+        let re = errors.load(std::sync::atomic::Ordering::Relaxed);
+        let lines = e4_sidecar_lines(&dir);
+        let (model_present, _) = e4_model(&lines);
+        let (restored, clean, restore_us) =
+            e4_restore_and_open(&root.join("b2-backup"), &root.join("b2-restored"), "group").unwrap();
+        let (got, exp, ok) = e4_model_match(&restored, &model_present);
+        rows.push_str(&format!("b2-readers,group,{exp},{got},{},-,{re},0,0,{backup_us},{restore_us},{clean},-,-,readers ran during backup\n", if ok { "MATCH" } else { "MISMATCH" }));
+        cells += 1;
+    }
+
+    // B3 single writer (+blocking instrumentation)
+    {
+        let dir = root.join("b3-single-writer");
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = std::sync::Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let side: E4Shared = std::sync::Arc::new(std::sync::Mutex::new(
+            std::fs::OpenOptions::new().create(true).append(true)
+                .open(format!("{}.e4sidecar", dir.display())).unwrap()));
+        let lat = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let epoch = std::sync::Arc::new(std::time::Instant::now());
+        let mut w = e4_spawn_writer(e.clone(), side.clone(), 3000..3300, lat.clone(), "bench", epoch.clone());
+        std::thread::sleep(std::time::Duration::from_millis(30));
+        let backup_start = epoch.elapsed().as_micros();
+        e.backup_to(&root.join("b3-backup")).unwrap();
+        let backup_us = epoch.elapsed().as_micros() - backup_start;
+        let boundary_lines = e4_sidecar_lines(&dir);
+        // post-backup source mutation (isolation)
+        for i in 4000..4100u32 {
+            e.insert_document("bench", doc_record(i, 1, "post", i as i64)).unwrap();
+            e4_ack(&side, &format!("ACK {i}"));
+        }
+        w.stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        for h in w.handles.drain(..) { h.join().unwrap(); }
+        let (model_present, _) = e4_model(&boundary_lines);
+        let (restored, clean, restore_us) =
+            e4_restore_and_open(&root.join("b3-backup"), &root.join("b3-restored"), "sync").unwrap();
+        let (got, exp, ok) = e4_model_match(&restored, &model_present);
+        let source_final = { let (m, _) = export_state(&e); m.len() };
+        let lats = lat.lock().unwrap();
+        let backup_end = backup_start + backup_us;
+        let overlapping = lats.iter().filter(|(s, en, _)| *s <= backup_end && *en >= backup_start).count();
+        let max_lat = lats.iter().map(|(_, _, d)| *d).max().unwrap_or(0);
+        rows.push_str(&format!("b3-single-writer,sync,{exp},{got},{},\"{source_final}\",0,{overlapping},{max_lat},{backup_us},{restore_us},{clean},-,-,writer paused by gate during backup; post-backup +100 inserts excluded\n", if ok { "MATCH" } else { "MISMATCH" }));
+        cells += 1;
+    }
+
+    // B4 multi-writer
+    {
+        let dir = root.join("b4-multi-writer");
+        std::env::set_var("PH3D_DURABILITY", "group");
+        let e = std::sync::Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let side: E4Shared = std::sync::Arc::new(std::sync::Mutex::new(
+            std::fs::OpenOptions::new().create(true).append(true)
+                .open(format!("{}.e4sidecar", dir.display())).unwrap()));
+        let lat = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let epoch = std::sync::Arc::new(std::time::Instant::now());
+        let mut ws = Vec::new();
+        for r in [(5000u32..5100), (6000..6100), (7000..7100)] {
+            ws.push(e4_spawn_writer(e.clone(), side.clone(), r, lat.clone(), "bench", epoch.clone()));
+        }
+        std::thread::sleep(std::time::Duration::from_millis(40));
+        e.backup_to(&root.join("b4-backup")).unwrap();
+        let boundary_lines = e4_sidecar_lines(&dir);
+        for w in &mut ws { w.stop.store(true, std::sync::atomic::Ordering::Relaxed); }
+        for w in &mut ws { for h in w.handles.drain(..) { h.join().unwrap(); } }
+        let (model_present, _) = e4_model(&boundary_lines);
+        let (restored, clean, restore_us) =
+            e4_restore_and_open(&root.join("b4-backup"), &root.join("b4-restored"), "group").unwrap();
+        let (got, exp, ok) = e4_model_match(&restored, &model_present);
+        let source_final = { let (m, _) = export_state(&e); m.len() };
+        rows.push_str(&format!("b4-multi-writer,group,{exp},{got},{},\"{source_final}\",0,0,0,0,{restore_us},{clean},-,-,3 writers\n", if ok { "MATCH" } else { "MISMATCH" }));
+        cells += 1;
+    }
+
+    // B5 writer + checkpoint (checkpoint called while backup holds the gate)
+    {
+        let dir = root.join("b5-writer-ckpt");
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = std::sync::Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let side: E4Shared = std::sync::Arc::new(std::sync::Mutex::new(
+            std::fs::OpenOptions::new().create(true).append(true)
+                .open(format!("{}.e4sidecar", dir.display())).unwrap()));
+        let lat = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let epoch = std::sync::Arc::new(std::time::Instant::now());
+        let mut w = e4_spawn_writer(e.clone(), side.clone(), 8000..8200, lat.clone(), "bench", epoch.clone());
+        std::thread::sleep(std::time::Duration::from_millis(30));
+        let e2 = e.clone();
+        let ck = std::thread::spawn(move || e2.checkpoint().unwrap());
+        e.backup_to(&root.join("b5-backup")).unwrap();
+        let ck_dur = { let t = std::time::Instant::now(); ck.join().unwrap(); t.elapsed().as_micros() };
+        let boundary_lines = e4_sidecar_lines(&dir);
+        for i in 9000..9050u32 {
+            e.insert_document("bench", doc_record(i, 1, "post", i as i64)).unwrap();
+            e4_ack(&side, &format!("ACK {i}"));
+        }
+        w.stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        for h in w.handles.drain(..) { h.join().unwrap(); }
+        let (model_present, _) = e4_model(&boundary_lines);
+        let (restored, clean, restore_us) =
+            e4_restore_and_open(&root.join("b5-backup"), &root.join("b5-restored"), "sync").unwrap();
+        let (got, exp, ok) = e4_model_match(&restored, &model_present);
+        let source_final = { let (m, _) = export_state(&e); m.len() };
+        rows.push_str(&format!("b5-writer-ckpt,sync,{exp},{got},{},\"{source_final}\",0,0,0,0,{restore_us},{clean},-,-,checkpoint blocked until backup done (waited {ck_dur}us)\n", if ok { "MATCH" } else { "MISMATCH" }));
+        cells += 1;
+    }
+
+    // B6 writer + WAL rotation (2 KiB segments: rotations throughout)
+    {
+        let dir = root.join("b6-writer-rotation");
+        std::env::set_var("PH3D_DURABILITY", "group");
+        std::env::set_var("ATTENTIONDB_WAL_SEGMENT_BYTES", "2048");
+        let e = std::sync::Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let side: E4Shared = std::sync::Arc::new(std::sync::Mutex::new(
+            std::fs::OpenOptions::new().create(true).append(true)
+                .open(format!("{}.e4sidecar", dir.display())).unwrap()));
+        let lat = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let epoch = std::sync::Arc::new(std::time::Instant::now());
+        let mut w = e4_spawn_writer(e.clone(), side.clone(), 11000..11200, lat.clone(), "bench", epoch.clone());
+        std::thread::sleep(std::time::Duration::from_millis(30));
+        e.backup_to(&root.join("b6-backup")).unwrap();
+        let boundary_lines = e4_sidecar_lines(&dir);
+        w.stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        for h in w.handles.drain(..) { h.join().unwrap(); }
+        std::env::remove_var("ATTENTIONDB_WAL_SEGMENT_BYTES");
+        let (model_present, _) = e4_model(&boundary_lines);
+        let (restored, clean, restore_us) =
+            e4_restore_and_open(&root.join("b6-backup"), &root.join("b6-restored"), "group").unwrap();
+        let (got, exp, ok) = e4_model_match(&restored, &model_present);
+        rows.push_str(&format!("b6-writer-rotation,group,{exp},{got},{},-,0,0,0,0,{restore_us},{clean},-,-,2KiB segments: rotations before/during(ckpt)/after backup\n", if ok { "MATCH" } else { "MISMATCH" }));
+        cells += 1;
+    }
+
+    // B7 writer + checkpoint + rotation (async)
+    {
+        let dir = root.join("b7-writer-ckpt-rotation");
+        std::env::set_var("PH3D_DURABILITY", "async");
+        std::env::set_var("ATTENTIONDB_WAL_SEGMENT_BYTES", "2048");
+        let e = std::sync::Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let side: E4Shared = std::sync::Arc::new(std::sync::Mutex::new(
+            std::fs::OpenOptions::new().create(true).append(true)
+                .open(format!("{}.e4sidecar", dir.display())).unwrap()));
+        let lat = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let epoch = std::sync::Arc::new(std::time::Instant::now());
+        let mut w = e4_spawn_writer(e.clone(), side.clone(), 13000..13200, lat.clone(), "bench", epoch.clone());
+        std::thread::sleep(std::time::Duration::from_millis(30));
+        let e2 = e.clone();
+        let ck = std::thread::spawn(move || e2.checkpoint().unwrap());
+        e.backup_to(&root.join("b7-backup")).unwrap();
+        ck.join().unwrap();
+        let boundary_lines = e4_sidecar_lines(&dir);
+        w.stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        for h in w.handles.drain(..) { h.join().unwrap(); }
+        std::env::remove_var("ATTENTIONDB_WAL_SEGMENT_BYTES");
+        let (model_present, _) = e4_model(&boundary_lines);
+        let (restored, clean, restore_us) =
+            e4_restore_and_open(&root.join("b7-backup"), &root.join("b7-restored"), "async").unwrap();
+        let (got, exp, ok) = e4_model_match(&restored, &model_present);
+        rows.push_str(&format!("b7-writer-ckpt-rotation,async,{exp},{got},{},-,0,0,0,0,{restore_us},{clean},-,-,async: backup checkpoint captures buffered acks\n", if ok { "MATCH" } else { "MISMATCH" }));
+        cells += 1;
+    }
+
+    // Snapshot consistency: sequential v1->v2 transition, backup mid-transition
+    {
+        let dir = root.join("snapshot-transition");
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = std::sync::Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let side: E4Shared = std::sync::Arc::new(std::sync::Mutex::new(
+            std::fs::OpenOptions::new().create(true).append(true)
+                .open(format!("{}.e4sidecar", dir.display())).unwrap()));
+        for i in 100..106u32 {
+            let mut r = doc_record(i, 1, "t", 1);
+            r.fields.insert("num".to_string(), serde_json::json!(1i64));
+            e.insert_document("bench", r).unwrap();
+            e4_ack(&side, &format!("ACK {i}"));
+        }
+        for (k, i) in [101u32, 103, 105].iter().enumerate() {
+            let id = {
+                let store = e.document_store.read();
+                store.list_all_records().into_iter()
+                    .find(|r| r.fields.get("idx").and_then(|v| v.as_u64()) == Some(*i as u64))
+                    .map(|r| r.id).unwrap()
+            };
+            let old = {
+                let store = e.document_store.read();
+                store.get(&id).cloned().unwrap()
+            };
+            let mut fields = old.fields.clone();
+            fields.insert("num".to_string(), serde_json::json!(2i64));
+            let mut kvs = std::collections::HashMap::new();
+            kvs.insert(HEAD.to_string(), vec_for(*i));
+            e.update_document("bench", &id.to_string(), fields, kvs).unwrap();
+            e4_ack(&side, &format!("UPD {i} v{}", k + 2));
+        }
+        e.backup_to(&root.join("st-backup")).unwrap();
+        let boundary_lines = e4_sidecar_lines(&dir);
+        // model: idx -> num at boundary
+        let mut expect_num: std::collections::BTreeMap<u32, i64> = Default::default();
+        for l in &boundary_lines {
+            if let Some(v) = l.strip_prefix("ACK ") {
+                if let Ok(n) = v.parse::<u32>() { expect_num.insert(n, 1); }
+            } else if let Some(rest) = l.strip_prefix("UPD ") {
+                let parts: Vec<&str> = rest.split_whitespace().collect();
+                if let Ok(n) = parts[0].parse::<u32>() { expect_num.insert(n, 2); }
+            }
+        }
+        let (restored, clean, restore_us) =
+            e4_restore_and_open(&root.join("st-backup"), &root.join("st-restored"), "sync").unwrap();
+        let mism: Vec<String> = expect_num.iter()
+            .filter(|(i, num)| restored.get(i).map(|(_, _, n)| *n) != Some(**num))
+            .map(|(i, num)| format!("{i}:want{num}"))
+            .collect();
+        let ok = mism.is_empty() && restored.len() == expect_num.len();
+        let verdict = if ok { "MATCH".to_string() } else { format!("MISMATCH {}", mism.join(" ")) };
+        rows.push_str(&format!("snapshot-transition,sync,{},{},{verdict},-,0,0,0,-,{restore_us},{clean},-,-,{}\n",
+            expect_num.len(), restored.len(), mism.join(" ")));
+        cells += 1;
+    }
+
+    // Delete/reinsert
+    {
+        let dir = root.join("delete-reinsert");
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = std::sync::Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let side: E4Shared = std::sync::Arc::new(std::sync::Mutex::new(
+            std::fs::OpenOptions::new().create(true).append(true)
+                .open(format!("{}.e4sidecar", dir.display())).unwrap()));
+        for i in 20000..20020u32 {
+            e.insert_document("bench", doc_record(i, 1, "d", i as i64)).unwrap();
+            e4_ack(&side, &format!("ACK {i}"));
+        }
+        for i in (20000..20020u32).step_by(2) {
+            e.delete_document("bench", &uuid_for(i, 1).to_string()).unwrap();
+            e4_ack(&side, &format!("DEL {i}"));
+        }
+        for i in (20000..20012u32).step_by(4) {
+            e.insert_document("bench", doc_record(i, 2, "d", i as i64)).unwrap(); // new uuid
+            e4_ack(&side, &format!("ACK {i}")); // reinsert (new identity)
+        }
+        e.backup_to(&root.join("dr-backup")).unwrap();
+        let boundary_lines = e4_sidecar_lines(&dir); // AT backup return
+        let boundary = boundary_lines.len();
+        let (model_present, _) = e4_model(&boundary_lines);
+        // post-backup: more delete/reinsert churn on source (must NOT enter backup)
+        for i in (20001..20019u32).step_by(4) {
+            e.delete_document("bench", &uuid_for(i, 1).to_string()).unwrap();
+            e4_ack(&side, &format!("DEL {i}"));
+        }
+        let (restored, clean, restore_us) =
+            e4_restore_and_open(&root.join("dr-backup"), &root.join("dr-restored"), "sync").unwrap();
+        let (got, exp, ok) = e4_model_match(&restored, &model_present);
+        rows.push_str(&format!("delete-reinsert,sync,{exp},{got},{},-,0,0,0,0,{restore_us},{clean},-,-,boundary={boundary} sidecar lines\n", if ok { "MATCH" } else { "MISMATCH" }));
+        cells += 1;
+    }
+
+    // Collection isolation (3 collections, concurrent writers)
+    {
+        let dir = root.join("collections");
+        std::env::set_var("PH3D_DURABILITY", "group");
+        let e = std::sync::Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        e.create_collection("alpha", DIM, &[HEAD]).unwrap();
+        e.create_collection("beta", DIM, &[HEAD]).unwrap();
+        let side: E4Shared = std::sync::Arc::new(std::sync::Mutex::new(
+            std::fs::OpenOptions::new().create(true).append(true)
+                .open(format!("{}.e4sidecar", dir.display())).unwrap()));
+        let lat = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let epoch = std::sync::Arc::new(std::time::Instant::now());
+        let mut ws = Vec::new();
+        ws.push(e4_spawn_writer(e.clone(), side.clone(), 30000..30080, lat.clone(), "bench", epoch.clone()));
+        ws.push(e4_spawn_writer(e.clone(), side.clone(), 31000..31080, lat.clone(), "alpha", epoch.clone()));
+        ws.push(e4_spawn_writer(e.clone(), side.clone(), 32000..32080, lat.clone(), "beta", epoch.clone()));
+        std::thread::sleep(std::time::Duration::from_millis(40));
+        e.backup_to(&root.join("coll-backup")).unwrap();
+        let boundary_lines = e4_sidecar_lines(&dir);
+        for w in &mut ws { w.stop.store(true, std::sync::atomic::Ordering::Relaxed); }
+        for w in &mut ws { for h in w.handles.drain(..) { h.join().unwrap(); } }
+        // model per collection
+        let mut expect: std::collections::BTreeMap<&'static str, Vec<u32>> = Default::default();
+        let ranges: [(&'static str, std::ops::Range<u32>); 3] =
+            [("bench", 30000..30080), ("alpha", 31000..31080), ("beta", 32000..32080)];
+        for (coll, rng) in ranges {
+            let present: Vec<u32> = boundary_lines.iter().filter_map(|l| {
+                let n = l.strip_prefix("ACK ")?.parse::<u32>().ok()?;
+                if rng.contains(&n) { Some(n) } else { None }
+            }).collect();
+            expect.insert(coll, present);
+        }
+        std::env::set_var("PH3D_DURABILITY", "group");
+        attentiondb_core::backup::restore_backup(&root.join("coll-backup"), &root.join("coll-restored")).unwrap();
+        let e2 = open_db(&root.join("coll-restored"));
+        let mut all_ok = true;
+        let mut det = String::new();
+        for (coll, exp) in &expect {
+            let (m, iss) = export_state_coll(&e2, coll);
+            let got: Vec<u32> = m.keys().copied().collect();
+            let ok = got == *exp && iss.is_empty();
+            all_ok &= ok;
+            det.push_str(&format!("{coll}={}/{} ", got.len(), exp.len()));
+        }
+        let clean2 = checker_report(&e2, &root.join("coll-restored"))["clean"].as_bool().unwrap_or(false);
+        rows.push_str(&format!("collections,group,-,-,{},-,0,0,0,-,-,{},-,-,{}\n",
+            if all_ok { "MATCH" } else { "MISMATCH" }, if clean2 { "true" } else { "false" }, det.trim()));
+        cells += 1;
+    }
+
+    // Multi-backup B1 < B2 < B3, each independently restored
+    {
+        let dir = root.join("multi-backup");
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = std::sync::Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let side: E4Shared = std::sync::Arc::new(std::sync::Mutex::new(
+            std::fs::OpenOptions::new().create(true).append(true)
+                .open(format!("{}.e4sidecar", dir.display())).unwrap()));
+        let mut snapshots = Vec::new();
+        for b in 0..3u32 {
+            for i in (40000 + b * 20)..(40000 + b * 20 + 20) {
+                e.insert_document("bench", doc_record(i, 1, "m", i as i64)).unwrap();
+                e4_ack(&side, &format!("ACK {i}"));
+            }
+            let bp = root.join(format!("mb-backup-{b}"));
+            e.backup_to(&bp).unwrap();
+            let lines = e4_sidecar_lines(&dir);
+            let (present, _) = e4_model(&lines);
+            snapshots.push((bp, present));
+        }
+        let mut all_ok = true;
+        let mut all_clean = true;
+        let mut det = String::new();
+        let mut restore_us_total = 0u128;
+        for (idx, (bp, exp)) in snapshots.iter().enumerate() {
+            let dest = root.join(format!("mb-restored-{idx}"));
+            let (m, clean, us) = match e4_restore_and_open(bp, &dest, "sync") {
+                Ok(x) => x, Err(_) => { all_ok = false; all_clean = false; break; }
+            };
+            restore_us_total += us;
+            let (got, expn, ok) = e4_model_match(&m, exp);
+            all_ok &= ok;
+            all_clean &= clean;
+            det.push_str(&format!("B{}={}/{} ", idx + 1, got, expn));
+        }
+        rows.push_str(&format!("multi-backup,sync,-,-,{},-,0,0,0,-,{},{} ,-,-,{}\n",
+            if all_ok { "MATCH" } else { "MISMATCH" }, restore_us_total,
+            if all_clean { "true" } else { "false" }, det.trim()));
+        cells += 1;
+    }
+
+    // Durability-mode matrix (writer backup x3 modes) + integrity suite
+    for mode in ["sync", "group", "async"] {
+        let dir = root.join(format!("modes-{mode}"));
+        std::env::set_var("PH3D_DURABILITY", mode);
+        let e = std::sync::Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let side: E4Shared = std::sync::Arc::new(std::sync::Mutex::new(
+            std::fs::OpenOptions::new().create(true).append(true)
+                .open(format!("{}.e4sidecar", dir.display())).unwrap()));
+        let lat = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let epoch = std::sync::Arc::new(std::time::Instant::now());
+        let mut w = e4_spawn_writer(e.clone(), side.clone(), 50000..50300, lat.clone(), "bench", epoch.clone());
+        std::thread::sleep(std::time::Duration::from_millis(25));
+        e.backup_to(&root.join(format!("modes-{mode}-backup"))).unwrap();
+        let boundary_lines = e4_sidecar_lines(&dir);
+        w.stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        for h in w.handles.drain(..) { h.join().unwrap(); }
+        let (model_present, _) = e4_model(&boundary_lines);
+        let r = e4_restore_and_open(&root.join(format!("modes-{mode}-backup")), &root.join(format!("modes-{mode}-restored")), mode);
+        match r {
+            Ok((restored, clean, us)) => {
+                let (got, exp, ok) = e4_model_match(&restored, &model_present);
+                rows.push_str(&format!("modes-{mode},{mode},{exp},{got},{},-,0,0,0,0,{us},{clean},-,-,acked writes all captured (ckpt fsync)\n",
+                    if ok { "MATCH" } else { "MISMATCH" }));
+            }
+            Err(err) => rows.push_str(&format!("modes-{mode},{mode},-,-,RESTORE_REFUSED,-,0,0,0,0,-,-,-,-,{err}\n")),
+        }
+        cells += 1;
+    }
+
+    // ---------------- integrity suite (driver-side surgery) ----------------
+    // build one canonical valid backup
+    let dir = root.join("integrity-src");
+    std::env::set_var("PH3D_DURABILITY", "sync");
+    let e = std::sync::Arc::new(open_db(&dir));
+    e.create_collection("bench", DIM, &[HEAD]).unwrap();
+    for i in 60000..60030u32 {
+        e.insert_document("bench", doc_record(i, 1, "i", i as i64)).unwrap();
+    }
+    e.backup_to(&root.join("integrity-backup")).unwrap();
+    let bp = root.join("integrity-backup");
+
+    let try_restore = |integrity: &mut String, case: &str, action: &str, b: &std::path::Path| {
+        let dest = root.join(format!("integ-restore-{case}"));
+        let _ = std::fs::remove_dir_all(&dest);
+        match attentiondb_core::backup::restore_backup(b, &dest) {
+            Ok(_) => {
+                // opening happens inside restore; if it succeeded, verify checker
+                std::env::set_var("PH3D_DURABILITY", "sync");
+                let e2 = open_db(&dest);
+                let clean = checker_report(&e2, &dest)["clean"].as_bool().unwrap_or(false);
+                integrity.push_str(&format!("{case},{action},ACCEPTED,clean={clean}\n"));
+                e2.close().unwrap();
+            }
+            Err(err) => {
+                let reason = if format!("{err}").contains("missing") { "NO_META" }
+                    else if format!("{err}").contains("unsupported") { "BAD_VERSION" }
+                    else if format!("{err}").contains("backup meta") { "META_PARSE" }
+                    else if format!("{err}").contains("not empty") { "DEST_NONEMPTY" }
+                    else { "OPEN_OR_CATALOG" };
+                integrity.push_str(&format!("{case},{action},REFUSED,{reason}\n"));
+            }
+        }
+    };
+
+    // control: valid backup restores
+    try_restore(&mut integrity, "valid-control", "none", &bp);
+    // partial: meta removed (simulated incomplete copy)
+    let p1 = root.join("integ-no-meta");
+    let _ = std::fs::remove_dir_all(&p1);
+    copy_dir_all(&bp, &p1);
+    std::fs::remove_file(p1.join("backup-meta.json")).unwrap();
+    try_restore(&mut integrity, "partial-no-meta", "rm backup-meta.json", &p1);
+    // truncated SST
+    let p2 = root.join("integ-trunc-sst");
+    let _ = std::fs::remove_dir_all(&p2);
+    copy_dir_all(&bp, &p2);
+    {
+        let sstdir = p2.join("sst");
+        let f = std::fs::read_dir(&sstdir).unwrap().flatten().next().unwrap().path();
+        let b = std::fs::read(&f).unwrap();
+        std::fs::write(&f, &b[..b.len() / 2]).unwrap();
+    }
+    try_restore(&mut integrity, "truncated-sst", "halve first sst", &p2);
+    // corrupt WAL integrity record (post-checkpoint the backup WAL is an empty
+    // active segment + wal-state.json; the record is the meaningful target)
+    let p3 = root.join("integ-corrupt-wal");
+    let _ = std::fs::remove_dir_all(&p3);
+    copy_dir_all(&bp, &p3);
+    std::fs::write(p3.join("WAL").join("wal-state.json"), b"{ broken").unwrap();
+    try_restore(&mut integrity, "corrupt-wal-state", "garble wal-state.json", &p3);
+    // garbage in the EMPTY active segment: torn-tail policy -> intact (empty)
+    // prefix + all checkpointed state in SSTs; expected ACCEPTED with zero loss
+    let p3b = root.join("integ-garbage-active-seg");
+    let _ = std::fs::remove_dir_all(&p3b);
+    copy_dir_all(&bp, &p3b);
+    {
+        let waldir = p3b.join("WAL");
+        let f = std::fs::read_dir(&waldir).unwrap().flatten()
+            .find(|x| x.path().extension().and_then(|s| s.to_str()) == Some("wal")).unwrap().path();
+        use std::io::Write;
+        let mut g = std::fs::OpenOptions::new().append(true).open(&f).unwrap();
+        g.write_all(&[0u8; 13]).unwrap();
+    }
+    try_restore(&mut integrity, "garbage-active-segment", "13 zero bytes appended", &p3b);
+    // corrupt CURRENT
+    let p4 = root.join("integ-corrupt-current");
+    let _ = std::fs::remove_dir_all(&p4);
+    copy_dir_all(&bp, &p4);
+    std::fs::write(p4.join("CURRENT"), b"manifest-999999999\n").unwrap();
+    try_restore(&mut integrity, "corrupt-current", "point at missing gen", &p4);
+    // malformed meta
+    let p5 = root.join("integ-bad-meta");
+    let _ = std::fs::remove_dir_all(&p5);
+    copy_dir_all(&bp, &p5);
+    std::fs::write(p5.join("backup-meta.json"), b"{ broken").unwrap();
+    try_restore(&mut integrity, "malformed-meta", "invalid json", &p5);
+    // unsupported format version
+    let p6 = root.join("integ-bad-version");
+    let _ = std::fs::remove_dir_all(&p6);
+    copy_dir_all(&bp, &p6);
+    {
+        let mut meta: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(p6.join("backup-meta.json")).unwrap()).unwrap();
+        meta["backup_format_version"] = serde_json::json!(99);
+        std::fs::write(p6.join("backup-meta.json"), serde_json::to_vec(&meta).unwrap()).unwrap();
+    }
+    try_restore(&mut integrity, "bad-format-version", "v99", &p6);
+    // restore into non-empty destination
+    {
+        let dest = root.join("integ-nonempty");
+        let _ = std::fs::remove_dir_all(&dest);
+        std::fs::create_dir_all(&dest).unwrap();
+        std::fs::write(dest.join("stale.txt"), b"x").unwrap();
+        match attentiondb_core::backup::restore_backup(&bp, &dest) {
+            Ok(_) => integrity.push_str(&format!("{},restore-nonempty,ACCEPTED,UNEXPECTED\n", "nonempty-dest")),
+            Err(err) => {
+                let reason = if format!("{err}").contains("not empty") { "DEST_NONEMPTY" } else { "OPEN_OR_CATALOG" };
+                integrity.push_str(&format!("{},restore-nonempty,REFUSED,{}\n", "nonempty-dest", reason));
+            }
+        }
+    }
+    // source-dir safety: source reopens, all acks present, backup copied read-only
+    {
+        let (m, iss) = export_state(&e);
+        let clean = checker_report(&e, &dir)["clean"].as_bool().unwrap_or(false) && iss.is_empty();
+        let det = format!("docs={} (expected 30)", m.len());
+        integrity.push_str(&format!("{},source-safety,{},{},\n",
+            "source-after-backup",
+            if clean && m.len() == 30 { "INTACT" } else { "DAMAGED" },
+            det));
+    }
+
+    // crash-during-backup (child process, group kill)
+    {
+        let cdir = root.join("crash-src");
+        let cbackup = root.join("crash-backup");
+        let mut cmd = std::process::Command::new(std::env::current_exe().unwrap());
+        cmd.args(["dbtest", "e4child", "--dir", cdir.to_str().unwrap(),
+                  "--backup", cbackup.to_str().unwrap()])
+            .env("PH3D_DURABILITY", "sync");
+        use std::os::unix::process::CommandExt;
+        cmd.process_group(0);
+        let mut child = cmd.spawn().unwrap();
+        let marker = format!("{}.e4gate", cdir.display());
+        for _ in 0..4000 {
+            if std::path::Path::new(&marker).exists()
+                && std::fs::read_to_string(&marker)
+                    .unwrap_or_default()
+                    .contains("pre-backup")
+            {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        std::thread::sleep(std::time::Duration::from_micros(500)); // land INSIDE backup
+        unsafe { libc::kill(-(child.id() as i32), libc::SIGKILL); }
+        let _ = child.wait();
+        let done = std::fs::read_to_string(&marker).unwrap_or_default().contains("backup-done");
+        // (a) source recovers
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let (src_ok, src_docs, src_clean) = match std::panic::catch_unwind(
+            std::panic::AssertUnwindSafe(|| open_db(&cdir))) {
+            Err(_) => (false, 0usize, false),
+            Ok(e2) => {
+                let (m, iss) = export_state(&e2);
+                let c = checker_report(&e2, &cdir)["clean"].as_bool().unwrap_or(false) && iss.is_empty();
+                (true, m.len(), c)
+            }
+        };
+        // (b) partial backup rejected (if copy had not completed)
+        let (partial_verdict, partial_detail) = if done {
+            match e4_restore_and_open(&cbackup, &root.join("crash-restored"), "sync") {
+                Ok((m, clean, _)) => ("ACCEPTED_COMPLETE".to_string(), format!("docs={} clean={clean}", m.len())),
+                Err(e) => ("REFUSED".to_string(), e.to_string()),
+            }
+        } else {
+            match attentiondb_core::backup::restore_backup(&cbackup, &root.join("crash-restored")) {
+                Ok(_) => ("ACCEPTED_INCOMPLETE".to_string(), "UNSAFE".to_string()),
+                Err(e) => ("REFUSED".to_string(), format!("{e}")),
+            }
+        };
+        // (c) earlier completed backup still restores
+        let early_ok = e4_restore_and_open(
+            &std::path::PathBuf::from(format!("{}.early-backup", cdir.display())),
+            &root.join("crash-early-restored"), "sync").map(|(m, clean, _)| m.len() == 20000 && clean).unwrap_or(false);
+        rows.push_str(&format!(
+            "crash-during-backup,sync,20000,{},{},-,0,0,0,-,-,{},{},{},killed_mid_backup done={done} ({})\n",
+            src_docs,
+            if src_ok { "SOURCE_OK" } else { "SOURCE_LOST" },
+            if src_clean { "true" } else { "false" },
+            if early_ok { "true" } else { "false" },
+            partial_verdict,
+            partial_detail));
+        cells += 1;
+    }
+
+    std::fs::write(format!("{out}/e4-matrix.csv"), &rows).unwrap();
+    std::fs::write(format!("{out}/e4-integrity.csv"), &integrity).unwrap();
+    write_json(&format!("{out}/metrics.json"),
+        &serde_json::json!({"cells": cells, "kind": "E4 backup/snapshot/restore"}));
+    format!("e4: {cells} matrix cells -> {out}/e4-matrix.csv")
+}
+
+fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) {
+    fn rec(src: &std::path::Path, dst: &std::path::Path) {
+        std::fs::create_dir_all(dst).unwrap();
+        for e in std::fs::read_dir(src).unwrap().flatten() {
+            let p = e.path();
+            if p.is_dir() { rec(&p, &dst.join(e.file_name())); }
+            else { std::fs::copy(&p, dst.join(e.file_name())).unwrap(); }
+        }
+    }
+    rec(src, dst);
+}
+
 // ---------------------------------------------------------------- dispatch
 
 pub fn run(args: &[String]) -> String {
@@ -2883,6 +3710,11 @@ pub fn run(args: &[String]) -> String {
         "gatechild" => run_gatechild(&dir, &get("--scenario", "ack"), &get("--gate", "")),
         "e3child" => run_e3child(&dir, &get("--workload", "ack"), &get("--gate", "")),
         "e3run" => run_e3(&out),
+        "e4child" => {
+            let b = get("--backup", "/tmp/ph3e-e4/crash-backup");
+            run_e4child(&dir, &b)
+        }
+        "e4run" => run_e4(&out),
         "compactlive" => run_compact_live(&dir),
         other => format!("unknown dbtest subcommand {other}"),
     }

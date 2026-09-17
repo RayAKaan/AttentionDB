@@ -1,0 +1,8 @@
+run_id=PH3E-BACKUP-004
+experiment=E4 online backup / snapshot consistency / restore integrity: B1 quiescent, B2 read-concurrent, B3 single-writer, B4 multi-writer, B5 writer+checkpoint, B6 writer+WAL-rotation, B7 writer+ckpt+rotation(async), snapshot v1->v2 transition, delete/reinsert, 3-collection isolation, multi-backup B1<B2<B3, durability-mode matrix, crash-during-backup (group kill mid-copy) + integrity suite (partial/meta/version/corruption/dest-safety)
+date=2026-09-17
+method=phase3-bench dbtest e4run — in-process controller; independent reference model = fsynced per-op ACK sidecar read AT backup return (expected snapshot), never the final source state; restore into fresh dirs; full checker per restore
+config=see config.json
+status=COMPLETED — 15/15 matrix MATCH; integrity: 4 REFUSED (no-meta/truncated-sst/wal-state/bad-version/meta-parse/nonempty-dest), 2 ACCEPTED-by-policy (corrupt-current fallback w/ both gens intact; garbage empty active segment = torn-tail, zero loss); crash mid-copy: source OK, partial backup REFUSED, early backup restored
+notes=E4 code change: restore_backup now REQUIRES backup-meta.json (completion marker) and enforces backup_format_version==1 (ph3e-e4-spec.md §4)
+supersedes=PH3E-BACKUP-003 (harness column-shift defect in snapshot-transition/multi-backup rows; behavior identical)

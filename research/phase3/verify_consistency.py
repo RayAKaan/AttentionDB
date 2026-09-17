@@ -487,6 +487,43 @@ def main():
                 ERR.append(f"PH3E-DUR-007/{f} differs from its E2 original")
     if not os.path.exists(os.path.join(HERE, "phase3e-e3-final-report.md")):
         ERR.append("phase3e-e3-final-report.md missing (E3 final report)")
+
+    # 21. Phase 3E (E4): backup/snapshot/restore — reference-model match,
+    #     integrity expectations, online claims only from concurrent cells
+    if "PH3E-BACKUP-004" not in ids:
+        ERR.append("PH3E-BACKUP-004 missing from registry")
+    d4 = os.path.join(run, "PH3E-BACKUP-004")
+    if not os.path.isdir(d4):
+        ERR.append("PH3E-BACKUP-004 registered but raw dir missing")
+    else:
+        for f in ("run_info.txt", "config.json", "e4-matrix.csv", "e4-integrity.csv"):
+            if not os.path.exists(os.path.join(d4, f)):
+                ERR.append(f"PH3E-BACKUP-004: missing {f}")
+    e4_res = os.path.join(RES, "e4-backup-matrix.csv")
+    e4_ires = os.path.join(RES, "e4-backup-integrity.csv")
+    if not os.path.exists(e4_res) or not os.path.exists(e4_ires):
+        ERR.append("results/e4-backup-*.csv missing (run generate_results_ph3e.py)")
+    else:
+        for sr in rd(e4_res):
+            if sr["match"] != "MATCH":
+                ERR.append(f"e4 matrix violation: {sr['case']} {sr['classification']}")
+            # 'online backup' style claims require concurrent cells: the matrix
+            # must CONTAIN writer-concurrent classes (b3/b4/b5/b6/b7) — a
+            # quiescent-only run can never back an online claim.
+        names = {r["case"] for r in rd(e4_res)}
+        for req in ("b3-single-writer", "b4-multi-writer", "b5-writer-ckpt",
+                    "b6-writer-rotation", "b7-writer-ckpt-rotation"):
+            if req not in names:
+                ERR.append(f"e4 matrix lacks concurrent-backup class {req} "
+                           "(online claims unsupported without it)")
+        for sr in rd(e4_ires):
+            if sr["match"] != "MATCH":
+                ERR.append(f"e4 integrity violation: {sr['case']} "
+                           f"observed {sr['observed']} expected {sr['expected']}")
+    if not os.path.exists(os.path.join(HERE, "phase3e-e4-final-report.md")):
+        ERR.append("phase3e-e4-final-report.md missing (E4 final report)")
+    if not os.path.exists(os.path.join(HERE, "methodology", "ph3e-e4-deviations.md")):
+        ERR.append("methodology/ph3e-e4-deviations.md missing (E4 deviations)")
     if not os.path.exists(os.path.join(HERE, "methodology", "ph3e-e3-deviations.md")):
         ERR.append("methodology/ph3e-e3-deviations.md missing (E3 deviations)")
     if not os.path.exists(os.path.join(HERE, "methodology", "ph3e-spec-deviations.md")):

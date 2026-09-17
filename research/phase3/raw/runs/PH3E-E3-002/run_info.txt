@@ -1,0 +1,6 @@
+run_id=PH3E-E3-002
+experiment=E3 crash-recovery matrix regression after E4 backup.rs change (restore gates)
+date=2026-09-17
+method=identical to PH3E-E3-001
+status=COMPLETED — e3-matrix.csv + metrics.json BYTE-IDENTICAL to PH3E-E3-001 (E3 unchanged)
+commit=2be1faf4ea919fa474df4bcff78f80f7a41c3705

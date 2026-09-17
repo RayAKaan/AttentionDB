@@ -2,7 +2,7 @@
  "format": "attentiondb-experiment-index",
  "version": 1,
  "updated": "2026-09-17",
- "code_commit": "5c56ffef5977dacde4c7e47fdfc87de7ac2e13b2",
+ "code_commit": "2be1faf4ea919fa474df4bcff78f80f7a41c3705",
  "experiments": [
   {
    "experiment_id": "PH3-QUAL-FM-S",
@@ -3931,6 +3931,108 @@
      "PH3E-DUR-002",
      "PH3E-DUR-006"
     ]
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3E-BACKUP-003",
+   "date": "2026-09-17",
+   "git_commit": "2be1faf4ea919fa474df4bcff78f80f7a41c3705",
+   "corpus": "synthetic: deterministic doc records (DIM=32, head 'h'); 3 collections in the isolation class",
+   "seed": "deterministic",
+   "model": "no learned model",
+   "objective": "E4: online backup / snapshot consistency / restore integrity \u2014 coordinated backup (mutation gate + checkpoint boundary) under concurrent workloads; independent reference model; integrity + crash-during-backup",
+   "metrics": {
+    "matrix_cells": 15,
+    "matrix_match": "15/15",
+    "integrity_cases": 10,
+    "integrity_match": "10/10 (incl. 2 ACCEPTED-by-policy: corrupt-current fallback w/ intact gens; garbage empty active segment = torn-tail zero loss)",
+    "key_results": {
+     "snapshot_boundary": "mutation-gate acquisition; sidecar-at-backup-return model matched in every class",
+     "readers": "0 errors during backup",
+     "writers": "paused for backup duration (b5 measured 354us checkpoint wait)",
+     "checkpoint_overlap": "checkpoint blocks until backup completes; both succeed",
+     "rotation_overlap": "2KiB segments: rotations before/during(internal ckpt)/after \u2014 exact snapshot",
+     "async": "backup captures ALL acked writes (internal checkpoint fsync) \u2014 modes-async 300/300",
+     "crash_mid_copy": "source OK 20000/20000, partial backup REFUSED (no meta), early backup restored",
+     "post_backups": "B1<B2<B3 restored independently; source mutation isolation verified"
+    },
+    "e4_code_change": "restore_backup requires backup-meta.json + enforces backup_format_version==1"
+   },
+   "status": "SUPERSEDED",
+   "superseded_by": "PH3E-BACKUP-004",
+   "supersede_reason": "harness column-shift in snapshot-transition/multi-backup rows (checker_clean misplaced); backup behavior itself matched"
+  },
+  {
+   "experiment_id": "PH3E-BACKUP-004",
+   "date": "2026-09-17",
+   "git_commit": "2be1faf4ea919fa474df4bcff78f80f7a41c3705",
+   "corpus": "synthetic: deterministic doc records (DIM=32); 3 collections in isolation class",
+   "seed": "deterministic",
+   "model": "no learned model",
+   "objective": "E4: online backup / snapshot consistency / restore integrity (supersedes PH3E-BACKUP-003)",
+   "metrics": {
+    "matrix_cells": 15,
+    "matrix_match": "15/15",
+    "integrity_cases": 10,
+    "integrity_match": "10/10",
+    "key_results": {
+     "snapshot_boundary": "mutation-gate acquisition; fsynced ACK-sidecar model read AT backup return matched in every class",
+     "concurrency": "readers 0 errors; single/multi writers exact; checkpoint waits on gate (354us) then succeeds; WAL rotation overlaps exact",
+     "async": "backup captures ALL acked writes via its internal checkpoint fsync (300/300)",
+     "delete_reinsert": "boundary model 13/13; post-backup +5 churn excluded (source isolation)",
+     "snapshot_transition": "6/6 states each a pure v1-or-v2 snapshot; no mixtures",
+     "collections": "3 collections 80/80 each, no cross-contamination",
+     "multi_backup": "B1=20 B2=40 B3=60 - monotone capture, independent restores",
+     "modes": "sync 292 group 267 async 300 all captured (ckpt fsync)",
+     "crash_mid_copy": "group SIGKILL inside copy: source OK 20000/20000, partial REFUSED (no meta), pre-crash backup restored",
+     "integrity": "refusals: no-meta, truncated-sst, wal-state, meta-parse, bad-version(v99), nonempty-dest; accepted-by-policy: corrupt-current (fallback gen intact), garbage empty active segment (torn-tail, zero loss); source-after-backup INTACT"
+    }
+   },
+   "e4_code_change": "restore_backup requires backup-meta.json + enforces backup_format_version==1 (ph3e-e4-spec.md section 4)",
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3E-WAL-005",
+   "date": "2026-09-17",
+   "git_commit": "2be1faf4ea919fa474df4bcff78f80f7a41c3705",
+   "corpus": "synthetic",
+   "seed": "deterministic",
+   "model": "no learned model",
+   "objective": "E1 WAL-integrity regression after E4 backup.rs restore gates",
+   "metrics": {
+    "cases": 11,
+    "refused": 6,
+    "opened": 5,
+    "equivalence": "wal-integrity.csv + metrics.json byte-identical to PH3E-WAL-001"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3E-DUR-008",
+   "date": "2026-09-17",
+   "git_commit": "2be1faf4ea919fa474df4bcff78f80f7a41c3705",
+   "corpus": "synthetic",
+   "seed": "deterministic",
+   "model": "no learned model",
+   "objective": "E2 durability regression after E4 backup.rs restore gates",
+   "metrics": {
+    "cells": 192,
+    "equivalence": "ack-boundary=DUR-001/007, txn-ack=DUR-002/007, checkpoint-interaction=DUR-003/006/007, group-boundary=DUR-004 (byte-identical); mode-latency timing-only differences"
+   },
+   "status": "COMPLETED"
+  },
+  {
+   "experiment_id": "PH3E-E3-002",
+   "date": "2026-09-17",
+   "git_commit": "2be1faf4ea919fa474df4bcff78f80f7a41c3705",
+   "corpus": "synthetic",
+   "seed": "deterministic",
+   "model": "no learned model",
+   "objective": "E3 crash-recovery matrix regression after E4 backup.rs restore gates",
+   "metrics": {
+    "cells": 210,
+    "equivalence": "e3-matrix.csv + metrics.json byte-identical to PH3E-E3-001"
    },
    "status": "COMPLETED"
   }

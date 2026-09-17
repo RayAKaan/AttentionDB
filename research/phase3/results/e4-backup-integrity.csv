@@ -1,0 +1,11 @@
+case,action,observed,expected,match
+valid-control,none,ACCEPTED,ACCEPTED,MATCH
+partial-no-meta,rm backup-meta.json,REFUSED,REFUSED:NO_META,MATCH
+truncated-sst,halve first sst,REFUSED,REFUSED:OPEN_OR_CATALOG,MATCH
+corrupt-wal-state,garble wal-state.json,REFUSED,REFUSED:OPEN_OR_CATALOG,MATCH
+garbage-active-segment,13 zero bytes appended,ACCEPTED,ACCEPTED,MATCH
+corrupt-current,point at missing gen,ACCEPTED,ACCEPTED,MATCH
+malformed-meta,invalid json,REFUSED,REFUSED:META_PARSE,MATCH
+bad-format-version,v99,REFUSED,REFUSED:BAD_VERSION,MATCH
+nonempty-dest,restore-nonempty,REFUSED,REFUSED:DEST_NONEMPTY,MATCH
+source-after-backup,source-safety,INTACT,INTACT,MATCH

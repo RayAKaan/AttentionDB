@@ -392,6 +392,93 @@ def gen_e3() -> int:
     return mismatches
 
 
+# ================================================================
+# Phase 3E E4 — backup / snapshot / restore expectations
+# ================================================================
+
+E4_INTEGRITY_EXPECT = {
+    "valid-control": ("ACCEPTED", "-"),
+    "partial-no-meta": ("REFUSED", "NO_META"),          # completion marker (E4 rule)
+    "truncated-sst": ("REFUSED", "OPEN_OR_CATALOG"),    # SST CRC
+    "corrupt-wal-state": ("REFUSED", "OPEN_OR_CATALOG"),# E1 WAL_STATE_CORRUPT
+    "garbage-active-segment": ("ACCEPTED", "-"),        # torn-tail policy; state in SSTs
+    "corrupt-current": ("ACCEPTED", "-"),               # fallback gen intact (self-healing)
+    "malformed-meta": ("REFUSED", "META_PARSE"),
+    "bad-format-version": ("REFUSED", "BAD_VERSION"),   # format gate (E4 rule)
+    "nonempty-dest": ("REFUSED", "DEST_NONEMPTY"),
+    "source-after-backup": ("INTACT", "-"),
+}
+
+E4_CRASH_EXPECT = ("SOURCE_OK", "REFUSED", "true")  # source ok, partial refused, early ok
+
+
+def _gen_e4(mismatches):
+    raw = "research/phase3/raw/runs/PH3E-BACKUP-004/e4-matrix.csv"
+    out = "research/phase3/results/e4-backup-matrix.csv"
+    rows = list(csv.DictReader(open(raw)))
+    res = []
+    for r in rows:
+        r = {k: (v.strip() if isinstance(v, str) else v) for k, v in r.items()}  # defensive strip (skip restkey lists)
+        ok = True
+        if r["case"] == "crash-during-backup":
+            ok = (r["match"] == "SOURCE_OK"
+                  and r["partial_backup_refused"].startswith("REFUSED")
+                  and r["early_backup_still_restores"] == "true"
+                  and r["checker_clean"] == "true")
+            cls = "CRASH_PROPERTIES_HOLD" if ok else "CRASH_PROPERTY_VIOLATION"
+            expected = "SOURCE_OK + partial REFUSED + early restores + checker clean"
+        else:
+            ok = (r["match"] == "MATCH" and r["checker_clean"] == "true"
+                  and r["reader_errors"] == "0")
+            cls = "SNAPSHOT_MATCH" if ok else "SNAPSHOT_VIOLATION"
+            expected = "restored state == independent reference model at backup boundary"
+        if not ok:
+            mismatches += 1
+        res.append({"case": r["case"], "mode": r["mode"],
+                    "expected_count": r["expected_count"],
+                    "restored_count": r["restored_count"],
+                    "classification": cls, "expected": expected,
+                    "observed": r["match"], "match": "MATCH" if ok else "MISMATCH"})
+    with open(out, "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=list(res[0].keys()))
+        w.writeheader()
+        w.writerows(res)
+
+    raw2 = "research/phase3/raw/runs/PH3E-BACKUP-004/e4-integrity.csv"
+    out2 = "research/phase3/results/e4-backup-integrity.csv"
+    rows2 = list(csv.DictReader(open(raw2)))
+    res2 = []
+    for r in rows2:
+        r = {k: (v.strip() if isinstance(v, str) else v) for k, v in r.items()}  # defensive strip (skip restkey lists)
+        case = r["case"]
+        exp = E4_INTEGRITY_EXPECT.get(case)
+        if exp is None:
+            mismatches += 1
+            res2.append({"case": case, "action": r["action"], "observed": r["restore_result"],
+                         "expected": "UNEXPECTED-CASE", "match": "MISMATCH"})
+            continue
+        exp_res, exp_reason = exp
+        ok = r["restore_result"] == exp_res
+        if exp_reason != "-" and r["restore_result"] == "REFUSED":
+            ok = ok and r["detail"] == exp_reason
+        if not ok:
+            mismatches += 1
+        res2.append({"case": case, "action": r["action"], "observed": r["restore_result"],
+                     "expected": f"{exp_res}" + (f":{exp_reason}" if exp_reason != "-" else ""),
+                     "match": "MATCH" if ok else "MISMATCH"})
+    with open(out2, "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=["case", "action", "observed", "expected", "match"])
+        w.writeheader()
+        w.writerows(res2)
+    return len(rows) + len(rows2)
+
+
+def gen_e4() -> int:
+    mismatches = 0
+    _gen_e4(mismatches)
+    return mismatches
+
+
 def main() -> int:
     rows = list(csv.DictReader(open(RAW)))
     out, mismatches = [], 0
@@ -430,6 +517,7 @@ def main() -> int:
         w.writerows(out)
     mismatches += gen_durability()
     mismatches += gen_e3()
+    mismatches += gen_e4()
     m = json.load(open("research/phase3/raw/runs/PH3E-WAL-001/metrics.json"))
     summary = {"run": "PH3E-WAL-001", "cases": len(rows),
                "refused": m["refused"], "opened": m["opened"],

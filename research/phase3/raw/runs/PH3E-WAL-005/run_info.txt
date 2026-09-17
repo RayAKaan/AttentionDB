@@ -1,0 +1,6 @@
+run_id=PH3E-WAL-005
+experiment=E1 WAL-integrity regression after E4 backup.rs change (restore gates)
+date=2026-09-17
+method=identical to PH3E-WAL-001
+status=COMPLETED — wal-integrity.csv + metrics.json BYTE-IDENTICAL to PH3E-WAL-001 (E1 unchanged)
+commit=2be1faf4ea919fa474df4bcff78f80f7a41c3705

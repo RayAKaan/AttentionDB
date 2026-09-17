@@ -1,0 +1,11 @@
+case,action,restore_result,detail
+valid-control,none,ACCEPTED,clean=true
+partial-no-meta,rm backup-meta.json,REFUSED,NO_META
+truncated-sst,halve first sst,REFUSED,OPEN_OR_CATALOG
+corrupt-wal-state,garble wal-state.json,REFUSED,OPEN_OR_CATALOG
+garbage-active-segment,13 zero bytes appended,ACCEPTED,clean=true
+corrupt-current,point at missing gen,ACCEPTED,clean=true
+malformed-meta,invalid json,REFUSED,META_PARSE
+bad-format-version,v99,REFUSED,BAD_VERSION
+nonempty-dest,restore-nonempty,REFUSED,DEST_NONEMPTY
+source-after-backup,source-safety,INTACT,docs=30 (expected 30),

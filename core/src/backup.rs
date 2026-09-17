@@ -102,20 +102,26 @@ pub fn restore_backup(src: &Path, dest_db_dir: &Path) -> Result<BackupManifest, 
     }
     std::fs::create_dir_all(dest_db_dir)?;
 
+    // E4: backup-meta.json is written LAST by copy_database_dir (after the
+    // copy validates as an openable catalog) — it IS the completion marker.
+    // A directory without it is a partially copied backup; restoring it could
+    // silently mix an arbitrary prefix of files into a plausible-looking DB.
     let meta_path = src.join(BACKUP_META_FILE);
-    let meta: BackupManifest = if meta_path.exists() {
-        serde_json::from_slice(&std::fs::read(&meta_path)?)
-            .map_err(|e| CoreError::Corruption(format!("backup meta: {e}")))?
-    } else {
-        BackupManifest {
-            backup_format_version: BACKUP_FORMAT_VERSION,
-            database_format_version: 0,
-            created_at: String::new(),
-            checkpoint_seq: 0,
-            collections: Vec::new(),
-            source_dir: src.display().to_string(),
-        }
-    };
+    if !meta_path.exists() {
+        return Err(CoreError::Corruption(format!(
+            "backup manifest {} missing — incomplete/invalid backup; refusing restore",
+            meta_path.display()
+        )));
+    }
+    let meta: BackupManifest = serde_json::from_slice(&std::fs::read(&meta_path)?)
+        .map_err(|e| CoreError::Corruption(format!("backup meta: {e}")))?;
+    // E4: never silently reinterpret an unknown backup format.
+    if meta.backup_format_version != BACKUP_FORMAT_VERSION {
+        return Err(CoreError::Corruption(format!(
+            "backup format v{} unsupported (supported v{}) — refusing restore",
+            meta.backup_format_version, BACKUP_FORMAT_VERSION
+        )));
+    }
 
     for item in [
         "CURRENT",
