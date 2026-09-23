@@ -1,0 +1,19 @@
+{
+ "run_id": "PH3E-FAULT-032",
+ "family": "F07A",
+ "scenario": "hygiene_multihead_fresh_ckpt",
+ "durability": "sync",
+ "fault_planned": "clean",
+ "fault_reached": false,
+ "recovery_verdict": "FAIL",
+ "classification": "INVALIDATED",
+ "entry": {
+  "run_id": "PH3E-FAULT-032",
+  "family": "F07A",
+  "scenario": "hygiene_multihead_fresh_ckpt",
+  "mode": "sync",
+  "n_docs": 800,
+  "fault": null,
+  "stage": null
+ }
+}

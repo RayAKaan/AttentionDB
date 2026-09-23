@@ -1,0 +1,27 @@
+{
+ "run_id": "PH3E-FAULT-043",
+ "family": "F09",
+ "scenario": "integrated_40k_lifecycle_v2",
+ "durability": "sync",
+ "fault_planned": {
+  "gate": "ckpt_after_sst",
+  "hit": 3,
+  "model": "abort"
+ },
+ "fault_reached": true,
+ "recovery_verdict": "PASS",
+ "classification": "VERIFIED",
+ "entry": {
+  "run_id": "PH3E-FAULT-043",
+  "family": "F09",
+  "scenario": "integrated_40k_lifecycle_v2",
+  "mode": "sync",
+  "n_docs": 40000,
+  "fault": {
+   "gate": "ckpt_after_sst",
+   "hit": 3,
+   "model": "abort"
+  },
+  "stage": null
+ }
+}

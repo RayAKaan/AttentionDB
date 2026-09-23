@@ -1,0 +1,13 @@
+{
+ "run_id": "PH3E-FAULT-031",
+ "family": "F06",
+ "scenario": "compact_clean",
+ "mode": "sync",
+ "n_docs": 400,
+ "fault": null,
+ "stage": null,
+ "n_extra": 150,
+ "db_dir": "research/phase3/raw/runs/PH3E-FAULT-031/db",
+ "retrieval_samples": 0,
+ "expect_open": "open"
+}

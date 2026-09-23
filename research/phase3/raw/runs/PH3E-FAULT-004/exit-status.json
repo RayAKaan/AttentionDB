@@ -1,0 +1,7 @@
+{
+ "role": "tamper",
+ "returncode": 0,
+ "killed_by_controller": false,
+ "seconds": 0.01,
+ "fault_reached": true
+}

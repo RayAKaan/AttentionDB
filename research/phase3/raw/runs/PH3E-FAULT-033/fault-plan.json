@@ -1,0 +1,6 @@
+{
+ "requested_fault": null,
+ "requested_stage": null,
+ "mechanism": "tamper/clean",
+ "reach_proof_required": true
+}

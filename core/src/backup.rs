@@ -42,7 +42,9 @@ pub fn copy_database_dir(db_dir: &Path, dest: &Path) -> Result<(), CoreError> {
         db_dir.join(attentiondb_storage::WAL_DIR_NAME),
     ] {
         copy_recursive(&item, &dest.join(item.file_name().unwrap_or_default()))?;
+        attentiondb_storage::crashgate::GATE_BACKUP_MID_COPY.hit();
     }
+    attentiondb_storage::crashgate::GATE_BACKUP_AFTER_COPY.hit();
 
     // Validate the copy actually forms an openable database before declaring success.
     let (catalog, _) = Catalog::load(dest)?;
@@ -133,6 +135,7 @@ pub fn restore_backup(src: &Path, dest_db_dir: &Path) -> Result<BackupManifest, 
         let s = src.join(item);
         if s.exists() {
             copy_recursive(&s, &dest_db_dir.join(item))?;
+            attentiondb_storage::crashgate::GATE_RESTORE_MID_COPY.hit();
         }
     }
 

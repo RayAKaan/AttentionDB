@@ -1,0 +1,180 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="1028" font-family="monospace" font-size="10">
+<rect width="760" height="1028" fill="white"/>
+<text x="8" y="14">E11: acknowledged vs recovered operations per fault run</text>
+<text x="8" y="39" font-size="8">001 wal_control                sync </text>
+<rect x="215" y="30" width="1.0" height="7" fill="#bbb"/>
+<rect x="215" y="30" width="1.0" height="7" fill="#2ca02c"/>
+<text x="645" y="39" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="61" font-size="8">002 wal_trunc_tail             sync </text>
+<rect x="215" y="52" width="1.0" height="7" fill="#bbb"/>
+<rect x="215" y="52" width="1.0" height="7" fill="#2ca02c"/>
+<text x="645" y="61" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="83" font-size="8">003 wal_corrupt_body           sync </text>
+<rect x="215" y="74" width="1.0" height="7" fill="#bbb"/>
+<rect x="215" y="74" width="1.0" height="7" fill="#2ca02c"/>
+<text x="645" y="83" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="105" font-size="8">004 wal_bad_magic              sync </text>
+<rect x="215" y="96" width="1.0" height="7" fill="#bbb"/>
+<rect x="215" y="96" width="1.0" height="7" fill="#2ca02c"/>
+<text x="645" y="105" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="127" font-size="8">005 wal_seq_gap                sync </text>
+<rect x="215" y="118" width="1.0" height="7" fill="#bbb"/>
+<rect x="215" y="118" width="1.0" height="7" fill="#2ca02c"/>
+<text x="645" y="127" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="149" font-size="8">006 wal_missing_segment        sync </text>
+<rect x="215" y="140" width="1.0" height="7" fill="#bbb"/>
+<rect x="215" y="140" width="1.0" height="7" fill="#2ca02c"/>
+<text x="645" y="149" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="171" font-size="8">007 wal_sidecar_regress        sync </text>
+<rect x="215" y="162" width="1.0" height="7" fill="#bbb"/>
+<rect x="215" y="162" width="1.0" height="7" fill="#d62728"/>
+<text x="645" y="171" font-size="8" fill="#d62728">INVALIDATE</text>
+<text x="8" y="193" font-size="8">008 wal_sidecar_absent         sync </text>
+<rect x="215" y="184" width="1.0" height="7" fill="#bbb"/>
+<rect x="215" y="184" width="1.0" height="7" fill="#2ca02c"/>
+<text x="645" y="193" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="215" font-size="8">009 sync_after_fsync           sync </text>
+<rect x="215" y="206" width="1.0" height="7" fill="#bbb"/>
+<rect x="215" y="206" width="1.0" height="7" fill="#2ca02c"/>
+<text x="645" y="215" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="237" font-size="8">010 sync_after_write           sync </text>
+<rect x="215" y="228" width="1.0" height="7" fill="#bbb"/>
+<rect x="215" y="228" width="1.0" height="7" fill="#2ca02c"/>
+<text x="645" y="237" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="259" font-size="8">011 sync_before_ack            sync </text>
+<rect x="215" y="250" width="1.0" height="7" fill="#bbb"/>
+<rect x="215" y="250" width="1.1" height="7" fill="#2ca02c"/>
+<text x="645" y="259" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="281" font-size="8">012 group_after_flush          group</text>
+<rect x="215" y="272" width="1.0" height="7" fill="#bbb"/>
+<rect x="215" y="272" width="1.0" height="7" fill="#2ca02c"/>
+<text x="645" y="281" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="303" font-size="8">013 async_after_write          async</text>
+<rect x="215" y="294" width="1.0" height="7" fill="#bbb"/>
+<rect x="215" y="294" width="1.0" height="7" fill="#1f77b4"/>
+<text x="645" y="303" font-size="8" fill="#1f77b4">SUPPORTED</text>
+<text x="8" y="325" font-size="8">014 async_after_write_promote  async</text>
+<rect x="215" y="316" width="1.6" height="7" fill="#bbb"/>
+<rect x="215" y="316" width="1.6" height="7" fill="#1f77b4"/>
+<text x="645" y="325" font-size="8" fill="#1f77b4">SUPPORTED</text>
+<text x="8" y="347" font-size="8">015 txn_tx_before_commit_wal   sync </text>
+<rect x="215" y="338" width="1.0" height="7" fill="#bbb"/>
+<rect x="215" y="338" width="1.0" height="7" fill="#2ca02c"/>
+<text x="645" y="347" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="369" font-size="8">016 txn_tx_after_commit_wal    sync </text>
+<rect x="215" y="360" width="1.0" height="7" fill="#bbb"/>
+<rect x="215" y="360" width="1.0" height="7" fill="#2ca02c"/>
+<text x="645" y="369" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="391" font-size="8">017 txn_pre_commit_park        sync </text>
+<rect x="215" y="382" width="1.0" height="7" fill="#bbb"/>
+<rect x="215" y="382" width="1.0" height="7" fill="#2ca02c"/>
+<text x="645" y="391" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="413" font-size="8">018 txn_rollback_then_park     sync </text>
+<rect x="215" y="404" width="1.0" height="7" fill="#bbb"/>
+<rect x="215" y="404" width="1.0" height="7" fill="#2ca02c"/>
+<text x="645" y="413" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="435" font-size="8">019 ckpt_ckpt_after_sst        sync </text>
+<rect x="215" y="426" width="3.1" height="7" fill="#bbb"/>
+<rect x="215" y="426" width="3.1" height="7" fill="#2ca02c"/>
+<text x="645" y="435" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="457" font-size="8">020 ckpt_ckpt_after_trim       sync </text>
+<rect x="215" y="448" width="3.1" height="7" fill="#bbb"/>
+<rect x="215" y="448" width="3.1" height="7" fill="#2ca02c"/>
+<text x="645" y="457" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="479" font-size="8">021 ckpt_ckpt_after_rotate     sync </text>
+<rect x="215" y="470" width="3.1" height="7" fill="#bbb"/>
+<rect x="215" y="470" width="3.1" height="7" fill="#2ca02c"/>
+<text x="645" y="479" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="501" font-size="8">022 ckpt_manifest_after_curren sync </text>
+<rect x="215" y="492" width="1.0" height="7" fill="#bbb"/>
+<rect x="215" y="492" width="1.0" height="7" fill="#d62728"/>
+<text x="645" y="501" font-size="8" fill="#d62728">INVALIDATE</text>
+<text x="8" y="523" font-size="8">023 ckpt_sst_after_write       sync </text>
+<rect x="215" y="514" width="3.1" height="7" fill="#bbb"/>
+<rect x="215" y="514" width="3.1" height="7" fill="#2ca02c"/>
+<text x="645" y="523" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="545" font-size="8">024 backup_mid_copy            sync </text>
+<rect x="215" y="536" width="5.2" height="7" fill="#bbb"/>
+<rect x="215" y="536" width="5.2" height="7" fill="#d62728"/>
+<text x="645" y="545" font-size="8" fill="#d62728">INVALIDATE</text>
+<text x="8" y="567" font-size="8">025 backup_after_copy          sync </text>
+<rect x="215" y="558" width="5.2" height="7" fill="#bbb"/>
+<rect x="215" y="558" width="5.2" height="7" fill="#2ca02c"/>
+<text x="645" y="567" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="589" font-size="8">026 backup_clean_restore       sync </text>
+<rect x="215" y="580" width="5.2" height="7" fill="#bbb"/>
+<rect x="215" y="580" width="5.2" height="7" fill="#2ca02c"/>
+<text x="645" y="589" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="611" font-size="8">027 compact_compact_before_mer sync </text>
+<rect x="215" y="602" width="2.6" height="7" fill="#bbb"/>
+<rect x="215" y="602" width="2.6" height="7" fill="#2ca02c"/>
+<text x="645" y="611" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="633" font-size="8">028 compact_compact_after_outp sync </text>
+<rect x="215" y="624" width="2.6" height="7" fill="#bbb"/>
+<rect x="215" y="624" width="2.6" height="7" fill="#2ca02c"/>
+<text x="645" y="633" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="655" font-size="8">029 compact_compact_after_clea sync </text>
+<rect x="215" y="646" width="2.6" height="7" fill="#bbb"/>
+<rect x="215" y="646" width="2.6" height="7" fill="#2ca02c"/>
+<text x="645" y="655" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="677" font-size="8">030 compact_compact_after_inst sync </text>
+<rect x="215" y="668" width="2.6" height="7" fill="#bbb"/>
+<rect x="215" y="668" width="2.6" height="7" fill="#2ca02c"/>
+<text x="645" y="677" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="699" font-size="8">031 compact_clean              sync </text>
+<rect x="215" y="690" width="2.6" height="7" fill="#bbb"/>
+<rect x="215" y="690" width="2.6" height="7" fill="#2ca02c"/>
+<text x="645" y="699" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="721" font-size="8">032 hygiene_multihead_fresh_ck sync </text>
+<rect x="215" y="712" width="8.4" height="7" fill="#bbb"/>
+<rect x="215" y="712" width="8.4" height="7" fill="#d62728"/>
+<text x="645" y="721" font-size="8" fill="#d62728">INVALIDATE</text>
+<text x="8" y="743" font-size="8">033 hygiene_dead_dominated_reb sync </text>
+<rect x="215" y="734" width="10.5" height="7" fill="#bbb"/>
+<rect x="215" y="734" width="10.5" height="7" fill="#2ca02c"/>
+<text x="645" y="743" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="765" font-size="8">034 recovery_rebuild_interrupt sync </text>
+<rect x="215" y="756" width="1.0" height="7" fill="#bbb"/>
+<rect x="215" y="756" width="1.0" height="7" fill="#d62728"/>
+<text x="645" y="765" font-size="8" fill="#d62728">INVALIDATE</text>
+<text x="8" y="787" font-size="8">035 hygiene_ckpt_interrupted   sync </text>
+<rect x="215" y="778" width="262.5" height="7" fill="#bbb"/>
+<rect x="215" y="778" width="10.5" height="7" fill="#d62728"/>
+<text x="645" y="787" font-size="8" fill="#d62728">INVALIDATE</text>
+<text x="8" y="809" font-size="8">036 conc_fault_before_ack      sync </text>
+<rect x="215" y="800" width="1.6" height="7" fill="#bbb"/>
+<rect x="215" y="800" width="1.6" height="7" fill="#1f77b4"/>
+<text x="645" y="809" font-size="8" fill="#1f77b4">SUPPORTED</text>
+<text x="8" y="831" font-size="8">037 integrated_40k_lifecycle   sync </text>
+<rect x="215" y="822" width="420.0" height="7" fill="#bbb"/>
+<rect x="215" y="822" width="401.1" height="7" fill="#d62728"/>
+<text x="645" y="831" font-size="8" fill="#d62728">INVALIDATE</text>
+<text x="8" y="853" font-size="8">038 wal_sidecar_regress_correc sync </text>
+<rect x="215" y="844" width="1.0" height="7" fill="#bbb"/>
+<rect x="215" y="844" width="1.0" height="7" fill="#2ca02c"/>
+<text x="645" y="853" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="875" font-size="8">039 ckpt_manifest_after_curren sync </text>
+<rect x="215" y="866" width="3.1" height="7" fill="#bbb"/>
+<rect x="215" y="866" width="3.1" height="7" fill="#2ca02c"/>
+<text x="645" y="875" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="897" font-size="8">040 backup_mid_copy_corrective sync </text>
+<rect x="215" y="888" width="5.2" height="7" fill="#bbb"/>
+<rect x="215" y="888" width="5.2" height="7" fill="#2ca02c"/>
+<text x="645" y="897" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="919" font-size="8">041 recovery_rebuild_interrupt sync </text>
+<rect x="215" y="910" width="262.5" height="7" fill="#bbb"/>
+<rect x="215" y="910" width="262.5" height="7" fill="#2ca02c"/>
+<text x="645" y="919" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="941" font-size="8">042 hygiene_multihead_fresh_ck sync </text>
+<rect x="215" y="932" width="8.4" height="7" fill="#bbb"/>
+<rect x="215" y="932" width="8.4" height="7" fill="#2ca02c"/>
+<text x="645" y="941" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="963" font-size="8">043 integrated_40k_lifecycle_v sync </text>
+<rect x="215" y="954" width="396.9" height="7" fill="#bbb"/>
+<rect x="215" y="954" width="401.1" height="7" fill="#2ca02c"/>
+<text x="645" y="963" font-size="8" fill="#2ca02c">VERIFIED</text>
+<text x="8" y="985" font-size="8">044 hygiene_ckpt_interrupted_v sync </text>
+<rect x="215" y="976" width="10.5" height="7" fill="#bbb"/>
+<rect x="215" y="976" width="10.5" height="7" fill="#2ca02c"/>
+<text x="645" y="985" font-size="8" fill="#2ca02c">VERIFIED</text>
+</svg>

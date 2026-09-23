@@ -1,0 +1,13 @@
+{
+ "role": "writer",
+ "returncode": -9,
+ "signal": "SIGKILL",
+ "killed_by_controller": true,
+ "seconds": 600.06,
+ "fault_planned": {
+  "gate": "backup_mid_copy",
+  "hit": 1,
+  "model": "abort"
+ },
+ "fault_reached": true
+}

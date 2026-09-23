@@ -1,0 +1,16 @@
+{
+ "run_id": "PH3E-FAULT-031",
+ "family": "F06",
+ "scenario": "compact_clean",
+ "durability": "sync",
+ "collection": "bench",
+ "dim": 32,
+ "n_docs": 400,
+ "n_extra": 150,
+ "fault": null,
+ "stage": null,
+ "tamper_case": null,
+ "fault_in_recovery": false,
+ "dataset": "e11-deterministic-fnv (spec M5)",
+ "model": "harness-side independent (M6)"
+}

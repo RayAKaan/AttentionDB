@@ -1,0 +1,13 @@
+{
+ "run_id": "PH3E-FAULT-003",
+ "family": "F01",
+ "scenario": "wal_corrupt_body",
+ "mode": "sync",
+ "n_docs": 20,
+ "fault": null,
+ "stage": null,
+ "tamper_case": "corrupt_body",
+ "expect_open": "refuse",
+ "db_dir": "research/phase3/raw/runs/PH3E-FAULT-003/db",
+ "retrieval_samples": 0
+}

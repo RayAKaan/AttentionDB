@@ -292,6 +292,7 @@ impl Collection {
                         new_manager.add_head_with_config(head, HNSWConfig::default());
                     }
                     new_manager.insert(head, *numeric_id, vec)?;
+                    attentiondb_storage::crashgate::GATE_REBUILD_MID.hit();
                 }
             }
         }

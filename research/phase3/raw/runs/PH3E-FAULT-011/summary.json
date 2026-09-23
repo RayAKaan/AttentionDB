@@ -1,0 +1,27 @@
+{
+ "run_id": "PH3E-FAULT-011",
+ "family": "F02",
+ "scenario": "sync_before_ack",
+ "durability": "sync",
+ "fault_planned": {
+  "gate": "before_ack",
+  "hit": 100,
+  "model": "abort"
+ },
+ "fault_reached": true,
+ "recovery_verdict": "PASS",
+ "classification": "VERIFIED",
+ "entry": {
+  "run_id": "PH3E-FAULT-011",
+  "family": "F02",
+  "scenario": "sync_before_ack",
+  "mode": "sync",
+  "n_docs": 200,
+  "fault": {
+   "gate": "before_ack",
+   "hit": 100,
+   "model": "abort"
+  },
+  "stage": null
+ }
+}

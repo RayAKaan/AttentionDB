@@ -1,0 +1,20 @@
+{
+ "run_id": "PH3E-FAULT-033",
+ "family": "F07B",
+ "scenario": "hygiene_dead_dominated_rebuild",
+ "durability": "sync",
+ "fault_planned": "clean",
+ "fault_reached": false,
+ "recovery_verdict": "PASS",
+ "classification": "INVALIDATED",
+ "entry": {
+  "run_id": "PH3E-FAULT-033",
+  "family": "F07B",
+  "scenario": "hygiene_dead_dominated_rebuild",
+  "mode": "sync",
+  "n_docs": 25000,
+  "fault": null,
+  "stage": null,
+  "n_extra": 24000
+ }
+}

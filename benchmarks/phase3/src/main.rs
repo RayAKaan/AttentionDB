@@ -21,6 +21,7 @@ use attentiondb_storage::{Durability, Record};
 
 mod dbtest;
 mod e10;
+mod e11;
 mod e9;
 mod headsqual;
 mod memprobe;

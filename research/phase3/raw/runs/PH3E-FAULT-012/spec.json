@@ -1,0 +1,16 @@
+{
+ "run_id": "PH3E-FAULT-012",
+ "family": "F02",
+ "scenario": "group_after_flush",
+ "mode": "group",
+ "n_docs": 200,
+ "fault": {
+  "gate": "after_flush",
+  "hit": 100,
+  "model": "abort"
+ },
+ "stage": null,
+ "db_dir": "research/phase3/raw/runs/PH3E-FAULT-012/db",
+ "retrieval_samples": 0,
+ "expect_open": "open"
+}

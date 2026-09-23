@@ -1,0 +1,8 @@
+{
+  "expected": "refuse",
+  "leg": 1,
+  "open_error": "Recovery failed: WAL_LOST_SEGMENT: the active WAL segment (start seq 1) recorded by the durable watermark is missing — WAL history was deleted or renamed; refusing to open (checkpoint_seq=0)",
+  "opened": false,
+  "run_id": "PH3E-FAULT-006",
+  "verdict": "REFUSED-AS-EXPECTED"
+}

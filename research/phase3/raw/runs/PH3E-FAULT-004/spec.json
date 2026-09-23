@@ -1,0 +1,13 @@
+{
+ "run_id": "PH3E-FAULT-004",
+ "family": "F01",
+ "scenario": "wal_bad_magic",
+ "mode": "sync",
+ "n_docs": 20,
+ "fault": null,
+ "stage": null,
+ "tamper_case": "bad_magic",
+ "expect_open": "refuse",
+ "db_dir": "research/phase3/raw/runs/PH3E-FAULT-004/db",
+ "retrieval_samples": 0
+}

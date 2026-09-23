@@ -1,0 +1,18 @@
+{
+ "run_id": "PH3E-FAULT-040",
+ "family": "F05",
+ "scenario": "backup_mid_copy_corrective",
+ "mode": "sync",
+ "n_docs": 500,
+ "fault": {
+  "gate": "backup_mid_copy",
+  "hit": 1,
+  "model": "abort"
+ },
+ "stage": null,
+ "db_dir": "research/phase3/raw/runs/PH3E-FAULT-040/db",
+ "backup_dir": "research/phase3/raw/runs/PH3E-FAULT-040/backup",
+ "restored_dir": "research/phase3/raw/runs/PH3E-FAULT-040/restored",
+ "retrieval_samples": 0,
+ "expect_open": "open"
+}

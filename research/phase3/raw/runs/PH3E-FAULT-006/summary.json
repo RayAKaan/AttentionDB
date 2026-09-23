@@ -1,0 +1,20 @@
+{
+ "run_id": "PH3E-FAULT-006",
+ "family": "F01",
+ "scenario": "wal_missing_segment",
+ "durability": "sync",
+ "fault_reached": true,
+ "recovery_verdict": "REFUSED-AS-EXPECTED",
+ "classification": "VERIFIED",
+ "entry": {
+  "run_id": "PH3E-FAULT-006",
+  "family": "F01",
+  "scenario": "wal_missing_segment",
+  "mode": "sync",
+  "n_docs": 20,
+  "fault": null,
+  "stage": null,
+  "tamper_case": "missing_segment",
+  "expect_open": "refuse"
+ }
+}

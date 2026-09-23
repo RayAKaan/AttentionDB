@@ -1,0 +1,76 @@
+{
+  "checks": [
+    {
+      "content_mismatch": 0,
+      "durable_unacked_extra": 0,
+      "extra": 0,
+      "extra_sample": [],
+      "missing": 0,
+      "missing_sample": [],
+      "mode_shape": "equal",
+      "name": "exact_live_state",
+      "ok": true
+    },
+    {
+      "acked": 37800,
+      "async_promoted": 0,
+      "missing_acked": 0,
+      "mode": "sync",
+      "name": "acked_durability",
+      "note": "",
+      "ok": true,
+      "torn_tail_loss": 0
+    },
+    {
+      "durable_unacked": 0,
+      "extra_total": 0,
+      "leaked": 0,
+      "name": "no_unacked_leakage",
+      "ok": true
+    },
+    {
+      "dupes": 0,
+      "name": "no_duplicate_live_ids",
+      "ok": true
+    },
+    {
+      "name": "consistency_checker",
+      "ok": true
+    },
+    {
+      "hits": 48,
+      "name": "retrieval_self_hit",
+      "of": 50,
+      "ok": true
+    },
+    {
+      "checkpoint_seq": 55001,
+      "name": "restore_equals_source",
+      "ok": true,
+      "restored": 38200,
+      "source": 38200
+    },
+    {
+      "name": "restore_checker",
+      "ok": true
+    },
+    {
+      "hashes": [
+        15217124508959736021,
+        15217124508959736021,
+        15217124508959736021
+      ],
+      "name": "repeat_restart_determinism",
+      "ok": true
+    }
+  ],
+  "expected_count": 38200,
+  "fault_in_recovery_leg": false,
+  "leg": 1,
+  "opened": true,
+  "recovered_count": 38200,
+  "run_id": "PH3E-FAULT-043",
+  "state_hash": 15217124508959736021,
+  "total_records": 38200,
+  "verdict": "PASS"
+}

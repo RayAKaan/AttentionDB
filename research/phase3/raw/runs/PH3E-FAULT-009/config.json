@@ -1,0 +1,20 @@
+{
+ "run_id": "PH3E-FAULT-009",
+ "family": "F02",
+ "scenario": "sync_after_fsync",
+ "durability": "sync",
+ "collection": "bench",
+ "dim": 32,
+ "n_docs": 200,
+ "n_extra": 0,
+ "fault": {
+  "gate": "after_fsync",
+  "hit": 100,
+  "model": "abort"
+ },
+ "stage": null,
+ "tamper_case": null,
+ "fault_in_recovery": false,
+ "dataset": "e11-deterministic-fnv (spec M5)",
+ "model": "harness-side independent (M6)"
+}

@@ -190,7 +190,7 @@ fn issue_lines(issues: &[attentiondb_core::checker::CheckIssue]) -> (Vec<String>
 /// Gate semantics: `clean` = zero ERROR-severity issues (engine or dir level).
 /// WARNING-severity issues (e.g. INDEX_RETIRED_VECTOR: retired vectors awaiting
 /// purge — the documented lazy-tombstone behavior) are reported but non-fatal.
-fn checker_report(e: &AttentionEngine, dir: &std::path::Path) -> serde_json::Value {
+pub(crate) fn checker_report(e: &AttentionEngine, dir: &std::path::Path) -> serde_json::Value {
     let issues = check_engine(e);
     let dir_issues = attentiondb_core::checker::check_db_dir(dir).unwrap_or_default();
     let (e_err, e_warn) = issue_lines(&issues);
@@ -7072,6 +7072,7 @@ pub fn run(args: &[String]) -> String {
         "e5run" => run_e5(&out),
         "e5child" => run_e5child(&dir),
         "e6run" => run_e6(&out),
+        "e11" => crate::e11::run(&args[1..]),
         "e7run" => run_e7(&out),
         "e7dbg" => {
             // debug: dump WAL records first (investigation only)

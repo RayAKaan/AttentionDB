@@ -1,0 +1,28 @@
+{
+ "run_id": "PH3E-FAULT-044",
+ "family": "F07D",
+ "scenario": "hygiene_ckpt_interrupted_v2",
+ "durability": "sync",
+ "fault_planned": {
+  "gate": "ckpt_after_sst",
+  "hit": 2,
+  "model": "abort"
+ },
+ "fault_reached": true,
+ "recovery_verdict": "PASS",
+ "classification": "VERIFIED",
+ "entry": {
+  "run_id": "PH3E-FAULT-044",
+  "family": "F07D",
+  "scenario": "hygiene_ckpt_interrupted_v2",
+  "mode": "sync",
+  "n_docs": 25000,
+  "fault": {
+   "gate": "ckpt_after_sst",
+   "hit": 2,
+   "model": "abort"
+  },
+  "stage": null,
+  "n_extra": 24000
+ }
+}

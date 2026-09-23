@@ -1,0 +1,13 @@
+{
+ "run_id": "PH3E-FAULT-033",
+ "family": "F07B",
+ "scenario": "hygiene_dead_dominated_rebuild",
+ "mode": "sync",
+ "n_docs": 25000,
+ "fault": null,
+ "stage": null,
+ "n_extra": 24000,
+ "db_dir": "research/phase3/raw/runs/PH3E-FAULT-033/db",
+ "retrieval_samples": 0,
+ "expect_open": "open"
+}

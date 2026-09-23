@@ -1,0 +1,10 @@
+{
+ "requested_fault": {
+  "gate": "ckpt_after_sst",
+  "hit": 3,
+  "model": "abort"
+ },
+ "requested_stage": null,
+ "mechanism": "crashgate env",
+ "reach_proof_required": true
+}

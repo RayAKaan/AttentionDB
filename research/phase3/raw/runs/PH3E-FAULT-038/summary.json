@@ -1,0 +1,20 @@
+{
+ "run_id": "PH3E-FAULT-038",
+ "family": "F01",
+ "scenario": "wal_sidecar_regress_corrective",
+ "durability": "sync",
+ "fault_reached": true,
+ "recovery_verdict": "PASS",
+ "classification": "VERIFIED",
+ "entry": {
+  "run_id": "PH3E-FAULT-038",
+  "family": "F01",
+  "scenario": "wal_sidecar_regress_corrective",
+  "mode": "sync",
+  "n_docs": 20,
+  "fault": null,
+  "stage": null,
+  "tamper_case": "sidecar_regress",
+  "expect_open": "open"
+ }
+}

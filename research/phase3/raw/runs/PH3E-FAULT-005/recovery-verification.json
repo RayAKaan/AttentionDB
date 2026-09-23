@@ -1,0 +1,8 @@
+{
+  "expected": "refuse",
+  "leg": 1,
+  "open_error": "Recovery failed: WAL replay failed: Corruption detected in research/phase3/raw/runs/PH3E-FAULT-005/db/WAL/00000000000000000008.wal: segment starts at seq=8 but first record has seq=1",
+  "opened": false,
+  "run_id": "PH3E-FAULT-005",
+  "verdict": "REFUSED-AS-EXPECTED"
+}

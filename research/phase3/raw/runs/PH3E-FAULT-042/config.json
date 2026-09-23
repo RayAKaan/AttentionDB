@@ -1,0 +1,16 @@
+{
+ "run_id": "PH3E-FAULT-042",
+ "family": "F07A",
+ "scenario": "hygiene_multihead_fresh_ckpt_v2",
+ "durability": "sync",
+ "collection": "bench",
+ "dim": 32,
+ "n_docs": 800,
+ "n_extra": 0,
+ "fault": null,
+ "stage": null,
+ "tamper_case": null,
+ "fault_in_recovery": false,
+ "dataset": "e11-deterministic-fnv (spec M5)",
+ "model": "harness-side independent (M6)"
+}

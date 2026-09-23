@@ -1,0 +1,20 @@
+{
+ "run_id": "PH3E-FAULT-019",
+ "family": "F04",
+ "scenario": "ckpt_ckpt_after_sst",
+ "durability": "sync",
+ "collection": "bench",
+ "dim": 32,
+ "n_docs": 300,
+ "n_extra": 0,
+ "fault": {
+  "gate": "ckpt_after_sst",
+  "hit": 1,
+  "model": "abort"
+ },
+ "stage": null,
+ "tamper_case": null,
+ "fault_in_recovery": false,
+ "dataset": "e11-deterministic-fnv (spec M5)",
+ "model": "harness-side independent (M6)"
+}

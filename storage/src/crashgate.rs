@@ -101,6 +101,19 @@ pub static GATE_COMPACT_AFTER_CLEANUP: Gate = Gate::new("compact_after_cleanup")
 /// Reader list swapped to the post-compaction (output-only) set — fully complete.
 pub static GATE_COMPACT_AFTER_INSTALL: Gate = Gate::new("compact_after_install");
 
+// ---- E11 fault-injection gates (same contract as above; test-only) ----
+/// Hit inside the backup copy loop after the first file copy completes
+/// (partial destination, no `backup-meta.json` completion marker).
+pub static GATE_BACKUP_MID_COPY: Gate = Gate::new("backup_mid_copy");
+/// Hit after the backup copy loop finished but BEFORE the copy is validated
+/// and `backup-meta.json` is written (complete-looking files, no marker).
+pub static GATE_BACKUP_AFTER_COPY: Gate = Gate::new("backup_after_copy");
+/// Hit inside the restore copy loop after the first item copies.
+pub static GATE_RESTORE_MID_COPY: Gate = Gate::new("restore_mid_copy");
+/// Hit inside the deterministic recovery index rebuild after the first
+/// record insert of the first collection.
+pub static GATE_REBUILD_MID: Gate = Gate::new("rebuild_mid");
+
 pub struct Gate {
     name: &'static str,
     hit: AtomicUsize,
@@ -195,6 +208,11 @@ fn crash_cfg() -> Option<(&'static str, usize)> {
             // E6 transaction commit windows
             "tx_before_commit_wal",
             "tx_after_commit_wal",
+            // E11 fault-injection windows (test-only, same contract)
+            "backup_mid_copy",
+            "backup_after_copy",
+            "restore_mid_copy",
+            "rebuild_mid",
         ];
         let name = NAMES.iter().find(|c| **c == name.as_str())?;
         Some((*name, n.max(1)))

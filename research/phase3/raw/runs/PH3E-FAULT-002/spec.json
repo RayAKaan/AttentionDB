@@ -1,0 +1,13 @@
+{
+ "run_id": "PH3E-FAULT-002",
+ "family": "F01",
+ "scenario": "wal_trunc_tail",
+ "mode": "sync",
+ "n_docs": 20,
+ "fault": null,
+ "stage": null,
+ "tamper_case": "trunc_tail",
+ "expect_open": "open",
+ "db_dir": "research/phase3/raw/runs/PH3E-FAULT-002/db",
+ "retrieval_samples": 0
+}

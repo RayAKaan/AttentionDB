@@ -1,0 +1,70 @@
+{
+  "checks": [
+    {
+      "content_mismatch": 0,
+      "durable_unacked_extra": 0,
+      "extra": 0,
+      "extra_sample": [],
+      "missing": 24000,
+      "missing_sample": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "mode_shape": "equal",
+      "name": "exact_live_state",
+      "ok": false
+    },
+    {
+      "acked": 25000,
+      "async_promoted": 0,
+      "missing_acked": 24000,
+      "mode": "sync",
+      "name": "acked_durability",
+      "note": "",
+      "ok": false,
+      "torn_tail_loss": 0
+    },
+    {
+      "durable_unacked": 0,
+      "extra_total": 0,
+      "leaked": 0,
+      "name": "no_unacked_leakage",
+      "ok": true
+    },
+    {
+      "dupes": 0,
+      "name": "no_duplicate_live_ids",
+      "ok": true
+    },
+    {
+      "name": "consistency_checker",
+      "ok": true
+    },
+    {
+      "hashes": [
+        8767481758925899877,
+        8767481758925899877,
+        8767481758925899877
+      ],
+      "name": "repeat_restart_determinism",
+      "ok": true
+    }
+  ],
+  "expected_count": 25000,
+  "fault_in_recovery_leg": false,
+  "leg": 1,
+  "opened": true,
+  "recovered_count": 1000,
+  "run_id": "PH3E-FAULT-035",
+  "state_hash": 8767481758925899877,
+  "total_records": 1000,
+  "verdict": "FAIL"
+}

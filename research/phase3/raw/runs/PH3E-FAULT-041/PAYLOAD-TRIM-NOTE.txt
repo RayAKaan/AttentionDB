@@ -1,0 +1,4 @@
+db payload removed post-registration: run VERIFIED (leg-1 rebuild_mid abort
+evidenced by SIGABRT + leg-2 full green verification); payload is
+deterministically regenerable (`e11_drive.py PH3E-FAULT-041`). Inventory +
+checksums retained (db-inventory.txt / db-checksums.sha256).

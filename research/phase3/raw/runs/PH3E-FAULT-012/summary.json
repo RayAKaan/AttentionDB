@@ -1,0 +1,27 @@
+{
+ "run_id": "PH3E-FAULT-012",
+ "family": "F02",
+ "scenario": "group_after_flush",
+ "durability": "group",
+ "fault_planned": {
+  "gate": "after_flush",
+  "hit": 100,
+  "model": "abort"
+ },
+ "fault_reached": true,
+ "recovery_verdict": "PASS",
+ "classification": "VERIFIED",
+ "entry": {
+  "run_id": "PH3E-FAULT-012",
+  "family": "F02",
+  "scenario": "group_after_flush",
+  "mode": "group",
+  "n_docs": 200,
+  "fault": {
+   "gate": "after_flush",
+   "hit": 100,
+   "model": "abort"
+  },
+  "stage": null
+ }
+}

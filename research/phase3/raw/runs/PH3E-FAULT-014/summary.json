@@ -1,0 +1,28 @@
+{
+ "run_id": "PH3E-FAULT-014",
+ "family": "F02",
+ "scenario": "async_after_write_promote",
+ "durability": "async",
+ "fault_planned": {
+  "gate": "after_write",
+  "hit": 150,
+  "model": "abort"
+ },
+ "fault_reached": true,
+ "recovery_verdict": "PASS",
+ "classification": "SUPPORTED",
+ "entry": {
+  "run_id": "PH3E-FAULT-014",
+  "family": "F02",
+  "scenario": "async_after_write_promote",
+  "mode": "async",
+  "n_docs": 200,
+  "fault": {
+   "gate": "after_write",
+   "hit": 150,
+   "model": "abort"
+  },
+  "stage": null,
+  "async_flush_at": 100
+ }
+}

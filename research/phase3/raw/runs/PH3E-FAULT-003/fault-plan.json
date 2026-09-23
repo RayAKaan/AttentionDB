@@ -1,0 +1,7 @@
+{
+  "applied": "flipped body byte at 13453-40",
+  "case": "corrupt_body",
+  "family": "F01",
+  "pre_last_bytes": 13453,
+  "segments": 1
+}

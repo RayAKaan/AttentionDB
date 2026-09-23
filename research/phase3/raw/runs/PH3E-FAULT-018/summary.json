@@ -1,0 +1,19 @@
+{
+ "run_id": "PH3E-FAULT-018",
+ "family": "F03",
+ "scenario": "txn_rollback_then_park",
+ "durability": "sync",
+ "fault_planned": "rollback_then_park",
+ "fault_reached": true,
+ "recovery_verdict": "PASS",
+ "classification": "VERIFIED",
+ "entry": {
+  "run_id": "PH3E-FAULT-018",
+  "family": "F03",
+  "scenario": "txn_rollback_then_park",
+  "mode": "sync",
+  "n_docs": 30,
+  "fault": null,
+  "stage": "rollback_then_park"
+ }
+}

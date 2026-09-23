@@ -1,0 +1,18 @@
+{
+ "run_id": "PH3E-FAULT-043",
+ "family": "F09",
+ "scenario": "integrated_40k_lifecycle_v2",
+ "mode": "sync",
+ "n_docs": 40000,
+ "fault": {
+  "gate": "ckpt_after_sst",
+  "hit": 3,
+  "model": "abort"
+ },
+ "stage": null,
+ "db_dir": "research/phase3/raw/runs/PH3E-FAULT-043/db",
+ "backup_dir": "research/phase3/raw/runs/PH3E-FAULT-043/backup",
+ "restored_dir": "research/phase3/raw/runs/PH3E-FAULT-043/restored",
+ "retrieval_samples": 50,
+ "expect_open": "open"
+}

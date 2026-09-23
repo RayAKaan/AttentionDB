@@ -997,6 +997,87 @@ def main():
             if token not in dtext10:
                 ERR.append(f"E10 deviations missing token {token}")
 
+    # 28. Phase 3E (E11): fault-injection evidence gates.
+    rep11 = os.path.join(HERE, "phase3e-e11-final-report.md")
+    verd = os.path.join(HERE, "phase3e-final-reliability-verdict.md")
+    dev11 = os.path.join(HERE, "methodology", "phase3e-e11-deviations.md")
+    spec11 = os.path.join(HERE, "methodology", "phase3e-e11-spec.md")
+    cmat = os.path.join(HERE, "methodology", "phase3e-e11-contract-matrix.md")
+    for need in (rep11, verd, dev11, spec11, cmat):
+        if not os.path.exists(need):
+            ERR.append(f"E11 required document missing: {os.path.basename(need)}")
+    if os.path.exists(dev11):
+        dt = open(dev11).read()
+        for tok in ("D49", "D50", "D51", "D52", "D53", "D54", "D55"):
+            if tok not in dt:
+                ERR.append(f"E11 deviations missing token {tok}")
+    runroot = os.path.join(HERE, "raw", "runs")
+    fault_dirs = sorted(d for d in os.listdir(runroot) if d.startswith("PH3E-FAULT-") and os.path.isdir(os.path.join(runroot, d)))
+    reg_ids = [e["experiment_id"] for e in idx["experiments"]]
+    if len(reg_ids) != len(set(reg_ids)):
+        ERR.append("duplicate experiment_ids in registry")
+    for rid in fault_dirs:
+        if rid not in reg_ids:
+            ERR.append(f"{rid} raw dir present but not registered")
+    fault_reg = [r for r in reg_ids if r.startswith("PH3E-FAULT-")]
+    for rid in fault_reg:
+        if rid not in fault_dirs:
+            ERR.append(f"{rid} registered but raw dir missing")
+        else:
+            rd_ = os.path.join(runroot, rid)
+            for art in ("config.json", "fault-plan.json", "exit-status.json", "summary.json", "checksums.sha256"):
+                if not os.path.exists(os.path.join(rd_, art)):
+                    ERR.append(f"{rid} missing required artifact {art}")
+            ssum = json.load(open(os.path.join(rd_, "summary.json")))
+            corr = os.path.join(rd_, "classification-correction.json")
+            cls = ssum.get("classification", "?")
+            if os.path.exists(corr):
+                cls = json.load(open(corr))["artifact_derived_classification"]
+            if cls not in ("VERIFIED", "SUPPORTED", "OBSERVED_LIMIT", "FAILED", "INVALIDATED", "BLOCKED", "UNSUPPORTED"):
+                ERR.append(f"{rid} has out-of-vocabulary classification {cls!r}")
+            if cls in ("VERIFIED", "SUPPORTED") and not os.path.exists(os.path.join(rd_, "recovery-verification.json")):
+                ERR.append(f"{rid} claims {cls} without recovery-verification.json")
+    corrective = {"PH3E-FAULT-007": "PH3E-FAULT-038", "PH3E-FAULT-022": "PH3E-FAULT-039",
+                  "PH3E-FAULT-024": "PH3E-FAULT-040", "PH3E-FAULT-032": "PH3E-FAULT-042",
+                  "PH3E-FAULT-034": "PH3E-FAULT-041"}
+    reg_set = set(reg_ids)
+    for orig, corr in corrective.items():
+        if orig in reg_set:
+            if corr not in reg_set:
+                ERR.append(f"INVALIDATED run {orig} lacks registered corrective {corr}")
+            else:
+                ccorr = os.path.join(runroot, corr, "classification-correction.json")
+                ccls = json.load(open(os.path.join(runroot, corr, "summary.json"))).get("classification")
+                if os.path.exists(ccorr):
+                    ccls = json.load(open(ccorr))["artifact_derived_classification"]
+                if ccls not in ("VERIFIED", "SUPPORTED"):
+                    ERR.append(f"corrective run {corr} did not succeed ({cs.get('classification')})")
+    e11res = os.path.join(HERE, "results", "e11-runs.csv")
+    if not os.path.exists(e11res):
+        ERR.append("results/e11-runs.csv missing (gen_e11 not run)")
+    else:
+        for t in ("table-e11-fault-coverage", "table-e11-ack-recovery", "table-e11-txn-atomicity",
+                  "table-e11-backup-restore", "table-e11-ckpt-compact", "table-e11-integrated",
+                  "table-e11-failure-register", "table-e11-evidence-coverage"):
+            if not os.path.exists(os.path.join(HERE, "tables", t + ".md")):
+                ERR.append(f"tables/{t}.md missing")
+        if not os.path.exists(os.path.join(HERE, "figures", "e11-ack-recovery.svg")):
+            ERR.append("figures/e11-ack-recovery.svg missing")
+    if os.path.exists(rep11):
+        r11 = open(rep11).read()
+        for h in range(1, 22):
+            if f"## {h}. " not in r11:
+                ERR.append(f"E11 final report missing heading {h}.")
+        if "PHASE 3E E11 COMPLETE — FINAL RELIABILITY VERDICT ISSUED" not in r11 and            "PHASE 3E E11 INCOMPLETE — BLOCKERS AND UNVERIFIED CONTRACTS DOCUMENTED" not in r11:
+            ERR.append("E11 final report missing the terminal status line")
+        if "power-loss" in r11.lower() and "UNSUPPORTED" not in r11:
+            ERR.append("E11 report mentions power-loss without the UNSUPPORTED qualifier")
+    contract11 = os.path.join(HERE, "methodology", "production-contract.md")
+    if not os.path.exists(contract11) or "A11 —" not in open(contract11).read():
+        ERR.append("production contract lacks A11 (E11 fault-model qualification)")
+    if not os.path.exists("/home/user/AttentionDB/core/tests/regression_e11_faults.rs"):
+        ERR.append("regression_e11_faults.rs missing (E11 seal)")
+
     if ERR:
         print("PHASE 3 CONSISTENCY CHECK FAILED:")
         for e in ERR:

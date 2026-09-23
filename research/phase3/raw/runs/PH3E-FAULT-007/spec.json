@@ -1,0 +1,13 @@
+{
+ "run_id": "PH3E-FAULT-007",
+ "family": "F01",
+ "scenario": "wal_sidecar_regress",
+ "mode": "sync",
+ "n_docs": 20,
+ "fault": null,
+ "stage": null,
+ "tamper_case": "sidecar_regress",
+ "expect_open": "refuse",
+ "db_dir": "research/phase3/raw/runs/PH3E-FAULT-007/db",
+ "retrieval_samples": 0
+}

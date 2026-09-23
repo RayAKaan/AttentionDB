@@ -1,0 +1,20 @@
+{
+ "run_id": "PH3E-FAULT-002",
+ "family": "F01",
+ "scenario": "wal_trunc_tail",
+ "durability": "sync",
+ "fault_reached": true,
+ "recovery_verdict": "PASS",
+ "classification": "VERIFIED",
+ "entry": {
+  "run_id": "PH3E-FAULT-002",
+  "family": "F01",
+  "scenario": "wal_trunc_tail",
+  "mode": "sync",
+  "n_docs": 20,
+  "fault": null,
+  "stage": null,
+  "tamper_case": "trunc_tail",
+  "expect_open": "open"
+ }
+}

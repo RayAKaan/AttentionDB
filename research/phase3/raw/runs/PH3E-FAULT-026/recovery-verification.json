@@ -1,0 +1,70 @@
+{
+  "checks": [
+    {
+      "content_mismatch": 0,
+      "durable_unacked_extra": 0,
+      "extra": 0,
+      "extra_sample": [],
+      "missing": 0,
+      "missing_sample": [],
+      "mode_shape": "equal",
+      "name": "exact_live_state",
+      "ok": true
+    },
+    {
+      "acked": 500,
+      "async_promoted": 0,
+      "missing_acked": 0,
+      "mode": "sync",
+      "name": "acked_durability",
+      "note": "",
+      "ok": true,
+      "torn_tail_loss": 0
+    },
+    {
+      "durable_unacked": 0,
+      "extra_total": 0,
+      "leaked": 0,
+      "name": "no_unacked_leakage",
+      "ok": true
+    },
+    {
+      "dupes": 0,
+      "name": "no_duplicate_live_ids",
+      "ok": true
+    },
+    {
+      "name": "consistency_checker",
+      "ok": true
+    },
+    {
+      "checkpoint_seq": 501,
+      "name": "restore_equals_source",
+      "ok": true,
+      "restored": 500,
+      "source": 500
+    },
+    {
+      "name": "restore_checker",
+      "ok": true
+    },
+    {
+      "hashes": [
+        5986659317567496413,
+        5986659317567496413,
+        5986659317567496413
+      ],
+      "name": "repeat_restart_determinism",
+      "ok": true
+    }
+  ],
+  "expected_count": 500,
+  "fault_in_recovery_leg": false,
+  "leg": 1,
+  "opened": true,
+  "recovered_count": 500,
+  "run_id": "PH3E-FAULT-026",
+  "state_hash": 5986659317567496413,
+  "total_records": 500,
+  "verdict": "PASS"
+}

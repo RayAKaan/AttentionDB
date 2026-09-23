@@ -1,0 +1,13 @@
+{
+ "role": "writer",
+ "returncode": -6,
+ "signal": "SIGABRT",
+ "killed_by_controller": false,
+ "seconds": 0.18,
+ "fault_planned": {
+  "gate": "ckpt_after_sst",
+  "hit": 1,
+  "model": "abort"
+ },
+ "fault_reached": true
+}

@@ -1,0 +1,6 @@
+restored.tar.gz removed: the restore was verified logically equal to the
+source (recovery-verification.json: restore_equals_source = true, counts
+38200/38200, checker clean); the per-file inventory and checksums of the
+restored dir are retained (restored-inventory.txt / restored-checksums.sha256)
+and the restore is deterministically reproducible (restore_backup of
+backup.tar.gz, spec M5). db.tar.gz + backup.tar.gz retained in full.

@@ -1,0 +1,8 @@
+{
+  "expected": "refuse",
+  "leg": 1,
+  "open_error": "Recovery failed: WAL replay failed: Corruption detected in research/phase3/raw/runs/PH3E-FAULT-004/db/WAL/00000000000000000001.wal: non-zero tail corruption at offset 0: bad frame magic 0x58595a5a",
+  "opened": false,
+  "run_id": "PH3E-FAULT-004",
+  "verdict": "REFUSED-AS-EXPECTED"
+}

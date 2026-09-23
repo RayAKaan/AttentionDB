@@ -1,0 +1,16 @@
+{
+ "run_id": "PH3E-FAULT-004",
+ "family": "F01",
+ "scenario": "wal_bad_magic",
+ "durability": "sync",
+ "collection": "bench",
+ "dim": 32,
+ "n_docs": 20,
+ "n_extra": 0,
+ "fault": null,
+ "stage": null,
+ "tamper_case": "bad_magic",
+ "fault_in_recovery": false,
+ "dataset": "e11-deterministic-fnv (spec M5)",
+ "model": "harness-side independent (M6)"
+}

@@ -1,0 +1,7 @@
+{
+  "expected": "refuse",
+  "leg": 1,
+  "opened": true,
+  "run_id": "PH3E-FAULT-007",
+  "verdict": "OPENED-UNEXPECTEDLY"
+}

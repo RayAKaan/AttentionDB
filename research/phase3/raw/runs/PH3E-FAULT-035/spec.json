@@ -1,0 +1,17 @@
+{
+ "run_id": "PH3E-FAULT-035",
+ "family": "F07D",
+ "scenario": "hygiene_ckpt_interrupted",
+ "mode": "sync",
+ "n_docs": 25000,
+ "fault": {
+  "gate": "ckpt_after_sst",
+  "hit": 2,
+  "model": "abort"
+ },
+ "stage": null,
+ "n_extra": 24000,
+ "db_dir": "research/phase3/raw/runs/PH3E-FAULT-035/db",
+ "retrieval_samples": 0,
+ "expect_open": "open"
+}

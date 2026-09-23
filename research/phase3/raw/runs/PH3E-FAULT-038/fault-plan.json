@@ -1,0 +1,7 @@
+{
+  "applied": "high_watermark 21 -> 11",
+  "case": "sidecar_regress",
+  "family": "F01",
+  "pre_last_bytes": 6560,
+  "segments": 1
+}

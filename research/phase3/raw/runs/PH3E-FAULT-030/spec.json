@@ -1,0 +1,17 @@
+{
+ "run_id": "PH3E-FAULT-030",
+ "family": "F06",
+ "scenario": "compact_compact_after_install",
+ "mode": "sync",
+ "n_docs": 400,
+ "fault": {
+  "gate": "compact_after_install",
+  "hit": 1,
+  "model": "abort"
+ },
+ "stage": null,
+ "n_extra": 150,
+ "db_dir": "research/phase3/raw/runs/PH3E-FAULT-030/db",
+ "retrieval_samples": 0,
+ "expect_open": "open"
+}

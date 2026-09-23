@@ -1,0 +1,13 @@
+{
+ "role": "writer",
+ "returncode": -6,
+ "signal": "SIGABRT",
+ "killed_by_controller": false,
+ "seconds": 0.03,
+ "fault_planned": {
+  "gate": "tx_before_commit_wal",
+  "hit": 1,
+  "model": "abort"
+ },
+ "fault_reached": true
+}

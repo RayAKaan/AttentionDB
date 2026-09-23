@@ -1,0 +1,8 @@
+{
+ "host": "e2b.local",
+ "kernel": "6.1.158+",
+ "machine": "x86_64",
+ "python": "3.13.14",
+ "cpus": 2,
+ "failure_model": "process death (SIGABRT/SIGKILL) at instrumented gates; power-loss UNSUPPORTED (A3)"
+}

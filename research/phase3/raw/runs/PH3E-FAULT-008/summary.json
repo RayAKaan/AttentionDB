@@ -1,0 +1,20 @@
+{
+ "run_id": "PH3E-FAULT-008",
+ "family": "F01",
+ "scenario": "wal_sidecar_absent",
+ "durability": "sync",
+ "fault_reached": true,
+ "recovery_verdict": "PASS",
+ "classification": "VERIFIED",
+ "entry": {
+  "run_id": "PH3E-FAULT-008",
+  "family": "F01",
+  "scenario": "wal_sidecar_absent",
+  "mode": "sync",
+  "n_docs": 20,
+  "fault": null,
+  "stage": null,
+  "tamper_case": "sidecar_absent",
+  "expect_open": "open"
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "run_id": "PH3E-FAULT-026",
+ "family": "F05",
+ "scenario": "backup_clean_restore",
+ "mode": "sync",
+ "n_docs": 500,
+ "fault": null,
+ "stage": null,
+ "db_dir": "research/phase3/raw/runs/PH3E-FAULT-026/db",
+ "backup_dir": "research/phase3/raw/runs/PH3E-FAULT-026/backup",
+ "restored_dir": "research/phase3/raw/runs/PH3E-FAULT-026/restored",
+ "retrieval_samples": 0,
+ "expect_open": "open"
+}

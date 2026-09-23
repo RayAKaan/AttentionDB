@@ -1,0 +1,7 @@
+db.tar.gz and backup.tar.gz removed after registration: the run is
+INVALIDATED for a harness model defect (D56) while the ENGINE state was
+verified exact (38,200/38,200, checker clean, zero leakage); the corrective
+run PH3E-FAULT-043 (VERIFIED) supersedes the workload, and every run is
+deterministically regenerable via `e11_drive.py PH3E-FAULT-037` (spec M5
+seeds). Per-file inventories + checksums retained (db-/backup-inventory.txt,
+*.sha256). RESTORED-PAYLOAD-NOTE covers the earlier restored.tar.gz drop.

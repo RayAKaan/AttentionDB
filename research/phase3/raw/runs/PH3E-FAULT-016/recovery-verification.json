@@ -1,0 +1,76 @@
+{
+  "checks": [
+    {
+      "content_mismatch": 0,
+      "durable_unacked_extra": 10,
+      "extra": 10,
+      "extra_sample": [
+        10000,
+        10001,
+        10002,
+        10003,
+        10004,
+        10005,
+        10006,
+        10007,
+        10008,
+        10009
+      ],
+      "missing": 0,
+      "missing_sample": [],
+      "mode_shape": "equal",
+      "name": "exact_live_state",
+      "ok": true
+    },
+    {
+      "acked": 30,
+      "async_promoted": 0,
+      "missing_acked": 0,
+      "mode": "sync",
+      "name": "acked_durability",
+      "note": "",
+      "ok": true,
+      "torn_tail_loss": 0
+    },
+    {
+      "durable_unacked": 10,
+      "extra_total": 10,
+      "leaked": 0,
+      "name": "no_unacked_leakage",
+      "ok": true
+    },
+    {
+      "name": "txn_atomicity_all_or_nothing",
+      "ok": true,
+      "present": 10,
+      "staged": 10
+    },
+    {
+      "dupes": 0,
+      "name": "no_duplicate_live_ids",
+      "ok": true
+    },
+    {
+      "name": "consistency_checker",
+      "ok": true
+    },
+    {
+      "hashes": [
+        17463240660784352317,
+        17463240660784352317,
+        17463240660784352317
+      ],
+      "name": "repeat_restart_determinism",
+      "ok": true
+    }
+  ],
+  "expected_count": 30,
+  "fault_in_recovery_leg": false,
+  "leg": 1,
+  "opened": true,
+  "recovered_count": 40,
+  "run_id": "PH3E-FAULT-016",
+  "state_hash": 17463240660784352317,
+  "total_records": 40,
+  "verdict": "PASS"
+}

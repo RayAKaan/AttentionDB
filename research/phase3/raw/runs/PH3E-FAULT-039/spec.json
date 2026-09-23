@@ -1,0 +1,16 @@
+{
+ "run_id": "PH3E-FAULT-039",
+ "family": "F04",
+ "scenario": "ckpt_manifest_after_current_rename_hit2",
+ "mode": "sync",
+ "n_docs": 300,
+ "fault": {
+  "gate": "manifest_after_current_rename",
+  "hit": 2,
+  "model": "abort"
+ },
+ "stage": null,
+ "db_dir": "research/phase3/raw/runs/PH3E-FAULT-039/db",
+ "retrieval_samples": 0,
+ "expect_open": "open"
+}

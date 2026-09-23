@@ -1,0 +1,7 @@
+{
+ "run_id": "PH3E-FAULT-024",
+ "summary_classification": "VERIFIED",
+ "artifact_derived_classification": "INVALIDATED",
+ "basis": "register strict rules (spec M10-M12): fault-position proof from raw artifacts; fault_in_recovery attribution; clean-run completion marker",
+ "reason": "driver attribution defect documented in deviations D52-D57"
+}

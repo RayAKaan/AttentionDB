@@ -1,0 +1,20 @@
+{
+ "run_id": "PH3E-FAULT-036",
+ "family": "F08",
+ "scenario": "conc_fault_before_ack",
+ "durability": "sync",
+ "collection": "bench",
+ "dim": 32,
+ "n_docs": 0,
+ "n_extra": 300,
+ "fault": {
+  "gate": "before_ack",
+  "hit": 150,
+  "model": "abort"
+ },
+ "stage": null,
+ "tamper_case": null,
+ "fault_in_recovery": false,
+ "dataset": "e11-deterministic-fnv (spec M5)",
+ "model": "harness-side independent (M6)"
+}

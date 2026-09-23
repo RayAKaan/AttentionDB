@@ -14,3 +14,4 @@ attentiondb-query = { path = "../../query" }
 uuid = { version = "1.7", features = ["v4"] }
 phase2b-bench = { path = "../phase2b" }
 serde_json = "1"
+serde = { version = "1", features = ["derive"] }

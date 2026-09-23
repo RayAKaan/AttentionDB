@@ -1,0 +1,16 @@
+{
+ "run_id": "PH3E-FAULT-017",
+ "family": "F03",
+ "scenario": "txn_pre_commit_park",
+ "durability": "sync",
+ "collection": "bench",
+ "dim": 32,
+ "n_docs": 30,
+ "n_extra": 0,
+ "fault": null,
+ "stage": "pre_commit_park",
+ "tamper_case": null,
+ "fault_in_recovery": false,
+ "dataset": "e11-deterministic-fnv (spec M5)",
+ "model": "harness-side independent (M6)"
+}

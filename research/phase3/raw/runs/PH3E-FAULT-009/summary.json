@@ -1,0 +1,27 @@
+{
+ "run_id": "PH3E-FAULT-009",
+ "family": "F02",
+ "scenario": "sync_after_fsync",
+ "durability": "sync",
+ "fault_planned": {
+  "gate": "after_fsync",
+  "hit": 100,
+  "model": "abort"
+ },
+ "fault_reached": true,
+ "recovery_verdict": "PASS",
+ "classification": "VERIFIED",
+ "entry": {
+  "run_id": "PH3E-FAULT-009",
+  "family": "F02",
+  "scenario": "sync_after_fsync",
+  "mode": "sync",
+  "n_docs": 200,
+  "fault": {
+   "gate": "after_fsync",
+   "hit": 100,
+   "model": "abort"
+  },
+  "stage": null
+ }
+}

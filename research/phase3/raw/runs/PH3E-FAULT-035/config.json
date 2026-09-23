@@ -1,0 +1,20 @@
+{
+ "run_id": "PH3E-FAULT-035",
+ "family": "F07D",
+ "scenario": "hygiene_ckpt_interrupted",
+ "durability": "sync",
+ "collection": "bench",
+ "dim": 32,
+ "n_docs": 25000,
+ "n_extra": 24000,
+ "fault": {
+  "gate": "ckpt_after_sst",
+  "hit": 2,
+  "model": "abort"
+ },
+ "stage": null,
+ "tamper_case": null,
+ "fault_in_recovery": false,
+ "dataset": "e11-deterministic-fnv (spec M5)",
+ "model": "harness-side independent (M6)"
+}

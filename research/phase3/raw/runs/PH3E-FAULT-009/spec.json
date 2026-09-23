@@ -1,0 +1,16 @@
+{
+ "run_id": "PH3E-FAULT-009",
+ "family": "F02",
+ "scenario": "sync_after_fsync",
+ "mode": "sync",
+ "n_docs": 200,
+ "fault": {
+  "gate": "after_fsync",
+  "hit": 100,
+  "model": "abort"
+ },
+ "stage": null,
+ "db_dir": "research/phase3/raw/runs/PH3E-FAULT-009/db",
+ "retrieval_samples": 0,
+ "expect_open": "open"
+}

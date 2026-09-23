@@ -1,0 +1,17 @@
+{
+ "run_id": "PH3E-FAULT-036",
+ "family": "F08",
+ "scenario": "conc_fault_before_ack",
+ "mode": "sync",
+ "n_docs": 0,
+ "fault": {
+  "gate": "before_ack",
+  "hit": 150,
+  "model": "abort"
+ },
+ "stage": null,
+ "n_extra": 300,
+ "db_dir": "research/phase3/raw/runs/PH3E-FAULT-036/db",
+ "retrieval_samples": 0,
+ "expect_open": "open"
+}

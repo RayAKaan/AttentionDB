@@ -1,0 +1,16 @@
+{
+ "run_id": "PH3E-FAULT-013",
+ "family": "F02",
+ "scenario": "async_after_write",
+ "mode": "async",
+ "n_docs": 200,
+ "fault": {
+  "gate": "after_write",
+  "hit": 100,
+  "model": "abort"
+ },
+ "stage": null,
+ "db_dir": "research/phase3/raw/runs/PH3E-FAULT-013/db",
+ "retrieval_samples": 0,
+ "expect_open": "open"
+}

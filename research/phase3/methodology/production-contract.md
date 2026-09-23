@@ -474,3 +474,37 @@ bytes. Known bottleneck at scale: concurrent scan-heavy readers contend
 write locks (writer ~24 ops/s vs ~700 solo at 60k). Explicitly NOT claimed:
 any scale beyond the tested tiers; production readiness; linearity beyond
 the measured rungs; multimillion-document capacity.
+
+## A11 — Fault-Model Qualification (E11 amendment; evidence: PH3E-FAULT-001..042)
+
+The sealed contracts above were re-verified under controlled fault injection
+at named persistence boundaries (the A3 process-death model: SIGABRT at
+instrumented gates or process-group SIGKILL at marker-parked stages):
+
+- **WAL integrity (C1):** corrupt frame, bad magic, sequence gap, missing
+  segment → open REFUSES (runs 003-006); torn tail → intact prefix recovers
+  with the loss bounded by destroyed bytes (002); absent sidecar (legacy) →
+  tolerated (008). MEASURED TOLERANCE: a regressed sidecar watermark opens
+  and fully recovers — WAL records are authoritative; the sidecar is derived
+  bookkeeping (007 preserved INVALIDATED as an expectation defect; 038
+  VERIFIED the corrected expectation).
+- **Durability acks (C3-C5):** every acknowledged Sync/GroupCommit write
+  survived process death at the after_write/after_flush/after_fsync/
+  before_ack boundaries; durable-but-unacked extras (≤1 op, the in-flight
+  call) were observed and are permitted; Async loss stayed within the
+  documented un-promoted tail with zero unacknowledged leakage.
+- **Transactions (C6/C7), checkpoints (C8), backup/restore (C9), compaction
+  (C10), hygiene/rebuild (C11):** interrupted at interior gate points, each
+  recovered to the contract state with clean checkers and byte-identical
+  repeat restarts; partial backups (no backup-meta.json) are refused at
+  restore; the fresh multi-head checkpoint performs NO spurious rebuild
+  (D40 e2e: 3.1 ms at 800 docs × 3 heads).
+- **Integrated lifecycle (C14, 40k docs, A10 tier):** build → churn → 200
+  transactions → checkpoint → compaction → coordinated backup → controlled
+  interruption → recovery verified against the independent harness model
+  with full-state comparison.
+
+**Explicit non-claims (unchanged and re-confirmed):** physical power-loss and
+machine-crash durability remain UNSUPPORTED (A3; no controlled source in the
+test environment); no isolation-level, linearizability, or distributed claim
+is implied by any E11 result; the E10 scale envelope is unchanged.

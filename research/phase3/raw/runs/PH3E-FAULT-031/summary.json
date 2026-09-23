@@ -1,0 +1,20 @@
+{
+ "run_id": "PH3E-FAULT-031",
+ "family": "F06",
+ "scenario": "compact_clean",
+ "durability": "sync",
+ "fault_planned": "clean",
+ "fault_reached": false,
+ "recovery_verdict": "PASS",
+ "classification": "INVALIDATED",
+ "entry": {
+  "run_id": "PH3E-FAULT-031",
+  "family": "F06",
+  "scenario": "compact_clean",
+  "mode": "sync",
+  "n_docs": 400,
+  "fault": null,
+  "stage": null,
+  "n_extra": 150
+ }
+}

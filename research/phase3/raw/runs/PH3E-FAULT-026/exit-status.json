@@ -1,0 +1,9 @@
+{
+ "role": "writer",
+ "returncode": -9,
+ "signal": "-9",
+ "killed_by_controller": true,
+ "seconds": 1.6,
+ "fault_planned": "clean",
+ "fault_reached": false
+}

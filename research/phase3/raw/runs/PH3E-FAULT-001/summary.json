@@ -1,0 +1,20 @@
+{
+ "run_id": "PH3E-FAULT-001",
+ "family": "F01",
+ "scenario": "wal_control",
+ "durability": "sync",
+ "fault_reached": true,
+ "recovery_verdict": "PASS",
+ "classification": "VERIFIED",
+ "entry": {
+  "run_id": "PH3E-FAULT-001",
+  "family": "F01",
+  "scenario": "wal_control",
+  "mode": "sync",
+  "n_docs": 20,
+  "fault": null,
+  "stage": null,
+  "tamper_case": "control",
+  "expect_open": "open"
+ }
+}

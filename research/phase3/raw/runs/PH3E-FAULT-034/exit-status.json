@@ -1,0 +1,9 @@
+{
+ "role": "writer+recover",
+ "writer_returncode": 101,
+ "writer_signal": "101",
+ "writer_fault_reached": false,
+ "recover_leg1_returncode": 101,
+ "recover_leg1_fault_reached": false,
+ "recover_leg2_returncode": 101
+}

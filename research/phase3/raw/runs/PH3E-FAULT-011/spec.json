@@ -1,0 +1,16 @@
+{
+ "run_id": "PH3E-FAULT-011",
+ "family": "F02",
+ "scenario": "sync_before_ack",
+ "mode": "sync",
+ "n_docs": 200,
+ "fault": {
+  "gate": "before_ack",
+  "hit": 100,
+  "model": "abort"
+ },
+ "stage": null,
+ "db_dir": "research/phase3/raw/runs/PH3E-FAULT-011/db",
+ "retrieval_samples": 0,
+ "expect_open": "open"
+}

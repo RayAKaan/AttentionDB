@@ -1,0 +1,3 @@
+CURRENT	19
+MANIFEST/manifest-000000001	304
+WAL/wal-state.json	69

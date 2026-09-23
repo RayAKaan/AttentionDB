@@ -1,0 +1,19 @@
+{
+ "run_id": "PH3E-FAULT-026",
+ "family": "F05",
+ "scenario": "backup_clean_restore",
+ "durability": "sync",
+ "fault_planned": "clean",
+ "fault_reached": false,
+ "recovery_verdict": "PASS",
+ "classification": "INVALIDATED",
+ "entry": {
+  "run_id": "PH3E-FAULT-026",
+  "family": "F05",
+  "scenario": "backup_clean_restore",
+  "mode": "sync",
+  "n_docs": 500,
+  "fault": null,
+  "stage": null
+ }
+}

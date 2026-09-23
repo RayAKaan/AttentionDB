@@ -1,0 +1,16 @@
+{
+ "run_id": "PH3E-FAULT-038",
+ "family": "F01",
+ "scenario": "wal_sidecar_regress_corrective",
+ "durability": "sync",
+ "collection": "bench",
+ "dim": 32,
+ "n_docs": 20,
+ "n_extra": 0,
+ "fault": null,
+ "stage": null,
+ "tamper_case": "sidecar_regress",
+ "fault_in_recovery": false,
+ "dataset": "e11-deterministic-fnv (spec M5)",
+ "model": "harness-side independent (M6)"
+}

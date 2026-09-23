@@ -1,0 +1,20 @@
+{
+ "run_id": "PH3E-FAULT-005",
+ "family": "F01",
+ "scenario": "wal_seq_gap",
+ "durability": "sync",
+ "fault_reached": true,
+ "recovery_verdict": "REFUSED-AS-EXPECTED",
+ "classification": "VERIFIED",
+ "entry": {
+  "run_id": "PH3E-FAULT-005",
+  "family": "F01",
+  "scenario": "wal_seq_gap",
+  "mode": "sync",
+  "n_docs": 20,
+  "fault": null,
+  "stage": null,
+  "tamper_case": "seq_gap",
+  "expect_open": "refuse"
+ }
+}

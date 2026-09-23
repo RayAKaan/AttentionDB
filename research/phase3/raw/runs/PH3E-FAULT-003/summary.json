@@ -1,0 +1,20 @@
+{
+ "run_id": "PH3E-FAULT-003",
+ "family": "F01",
+ "scenario": "wal_corrupt_body",
+ "durability": "sync",
+ "fault_reached": true,
+ "recovery_verdict": "REFUSED-AS-EXPECTED",
+ "classification": "VERIFIED",
+ "entry": {
+  "run_id": "PH3E-FAULT-003",
+  "family": "F01",
+  "scenario": "wal_corrupt_body",
+  "mode": "sync",
+  "n_docs": 20,
+  "fault": null,
+  "stage": null,
+  "tamper_case": "corrupt_body",
+  "expect_open": "refuse"
+ }
+}

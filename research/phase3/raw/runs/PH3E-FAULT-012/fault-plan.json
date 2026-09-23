@@ -1,0 +1,10 @@
+{
+ "requested_fault": {
+  "gate": "after_flush",
+  "hit": 100,
+  "model": "abort"
+ },
+ "requested_stage": null,
+ "mechanism": "crashgate env",
+ "reach_proof_required": true
+}
