@@ -1,0 +1,5 @@
+case,mode,txn_state,atomicity,checker,aborted_at_gate,expected,match
+t1-t2-before,sync,T1_PRESENT_T2_ABSENT,ATOMIC,clean,true,per-txn independent judgment; whole-txn presence only,MATCH
+t1-t2-before,group,T1_PRESENT_T2_ABSENT,ATOMIC,clean,true,per-txn independent judgment; whole-txn presence only,MATCH
+t1-t2-after,sync,T1_PRESENT_T2_PRESENT,ATOMIC,clean,true,per-txn independent judgment; whole-txn presence only,MATCH
+t1-t2-after,group,T1_PRESENT_T2_PRESENT,ATOMIC,clean,true,per-txn independent judgment; whole-txn presence only,MATCH

@@ -1,7 +1,7 @@
 {
  "format": "attentiondb-experiment-index",
  "version": 1,
- "updated": "2026-09-17",
+ "updated": "2026-09-23",
  "code_commit": "cf2be2700546198cfd799c47503013f3f8317d2d",
  "experiments": [
   {
@@ -4230,6 +4230,1341 @@
     "cells": 25,
     "equivalence": "e5-compaction.csv + e5-crash.csv classification-identical to PH3E-COMPACT-004 (25/25 MATCH)"
    }
+  },
+  {
+   "experiment_id": "PH3E-CONC-001",
+   "date": "2026-09-17",
+   "status": "SUPERSEDED-BY-PH3E-CONC-002",
+   "objective": "E7 concurrency/isolation first official run \u2014 superseded mid-session by an E7a instrument off-by-one (validity domain 0..119 vs mapper-minted 1..=120); all non-E7a families classification-identical to CONC-002",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (E7x 11/23/37/52/68/84; E7v 7/13)",
+   "model": "per-family independent reference models + engine checker + fresh-process recovery",
+   "corpus": "synthetic deterministic doc records (DIM=32)",
+   "metrics": {
+    "cells": 48,
+    "note": "42 MATCH + 2 UNSUPPORTED + 4 ATOMIC crash rows even with the instrument artifact; E7a rows carry spurious error counts (documented); preserved defect-#1 failing dir in bug-MISSING_MAPPING-preserved-dir/"
+   }
+  },
+  {
+   "experiment_id": "PH3E-CONC-002",
+   "date": "2026-09-17",
+   "status": "COMPLETED",
+   "objective": "E7 concurrency, isolation boundaries & transaction interleaving \u2014 OFFICIAL run (families E7a-E7y)",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (E7x 11/23/37/52/68/84; E7v 7/13)",
+   "model": "per-family independent reference models; ordered 3-barrier staged-window protocol; invoke/complete event-log interval classification; fresh-process recovery oracle (E7x replay, E7y crash)",
+   "corpus": "synthetic deterministic doc records (DIM=32)",
+   "metrics": {
+    "cells": 48,
+    "match": "42 MATCH + 2 UNSUPPORTED BY API (E7i write-skew, E7j phantom)",
+    "crash": "4/4 ATOMIC",
+    "events": 6042,
+    "headline": "commit serialization VERIFIED; per-doc atomic but NO per-txn snapshot (mixed pairs observed); lost update occurs undetected; NO conflict detection; visibility = apply point; single-op linearizable subset; NO formal isolation level; MVCC UNSUPPORTED"
+   }
+  },
+  {
+   "experiment_id": "PH3E-WAL-008",
+   "date": "2026-09-17",
+   "status": "COMPLETED",
+   "objective": "E1 WAL-integrity regression after E7 engine INV-FIX",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic",
+   "model": "refusal matrix",
+   "corpus": "engine dirs",
+   "metrics": {
+    "cases": 11,
+    "refused": 6,
+    "opened": 5,
+    "equivalence": "wal-integrity.csv BYTE-identical to PH3E-WAL-007"
+   }
+  },
+  {
+   "experiment_id": "PH3E-DUR-011",
+   "date": "2026-09-17",
+   "status": "COMPLETED",
+   "objective": "E2 durability regression after E7 engine INV-FIX",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic",
+   "model": "crash-state expectation tables",
+   "corpus": "engine dirs",
+   "metrics": {
+    "cells": 192,
+    "equivalence": "ack-boundary/txn-ack/checkpoint-interaction/group-boundary BYTE-identical to PH3E-DUR-010; mode-latency timing-only differences"
+   }
+  },
+  {
+   "experiment_id": "PH3E-E3-005",
+   "date": "2026-09-17",
+   "status": "COMPLETED",
+   "objective": "E3 machine-crash (F2E groupkill) regression after E7 engine INV-FIX",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic",
+   "model": "210-cell crash matrix",
+   "corpus": "engine dirs",
+   "metrics": {
+    "cells": 210,
+    "equivalence": "e3-matrix.csv BYTE-identical to PH3E-E3-004"
+   }
+  },
+  {
+   "experiment_id": "PH3E-BACKUP-007",
+   "date": "2026-09-17",
+   "status": "COMPLETED",
+   "objective": "E4 backup/restore regression after E7 engine INV-FIX",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic",
+   "model": "15-cell matrix + 10 integrity cases",
+   "corpus": "engine dirs",
+   "metrics": {
+    "cells": 25,
+    "equivalence": "e4-integrity.csv BYTE-identical; e4-matrix.csv classification-identical 15/15"
+   }
+  },
+  {
+   "experiment_id": "PH3E-COMPACT-006",
+   "date": "2026-09-17",
+   "status": "COMPLETED",
+   "objective": "E5 compaction regression after E7 engine INV-FIX",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic",
+   "model": "25-cell compaction matrix",
+   "corpus": "engine dirs",
+   "metrics": {
+    "cells": 25,
+    "equivalence": "e5-crash.csv BYTE-identical; e5-compaction.csv invariant columns identical, 8/294 timing-only cells differ"
+   }
+  },
+  {
+   "experiment_id": "PH3E-TXN-002",
+   "date": "2026-09-17",
+   "status": "COMPLETED",
+   "objective": "E6 transaction-semantics regression after E7 engine INV-FIX",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic",
+   "model": "transaction-aware reference model",
+   "corpus": "synthetic deterministic doc records (DIM=32)",
+   "metrics": {
+    "cells": 49,
+    "equivalence": "e6-txn.csv (30) + e6-crash.csv (19) BYTE-identical to PH3E-TXN-001"
+   }
+  },
+  {
+   "experiment_id": "PH3E-SOAK-001",
+   "date": "2026-09-17",
+   "status": "COMPLETED",
+   "objective": "E8a smoke soak: 30k mixed ops, 500 keys, 2 readers, maintenance cadence",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (family a; oplog+seed regenerate state)",
+   "model": "independent lock-step reference model (never read back)",
+   "corpus": "synthetic doc records (DIM=32, 3 collections in E8g/E8i)",
+   "metrics": {
+    "family": "a",
+    "ops": 30000,
+    "elapsed_s": 50,
+    "txns": 0,
+    "commits": 0,
+    "rollbacks": 0,
+    "checkpoints": 6,
+    "compactions": 3,
+    "backups": 1,
+    "restores": 1,
+    "restarts": 1,
+    "verifications": 12,
+    "verification_failures": 0
+   }
+  },
+  {
+   "experiment_id": "PH3E-SOAK-002",
+   "date": "2026-09-17",
+   "status": "COMPLETED",
+   "objective": "E8b mutation soak: 200k ops, 2000 keys + hot set, checkpoints/restarts",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (family b; oplog+seed regenerate state)",
+   "model": "independent lock-step reference model (never read back)",
+   "corpus": "synthetic doc records (DIM=32, 3 collections in E8g/E8i)",
+   "metrics": {
+    "family": "b",
+    "ops": 200000,
+    "elapsed_s": 246,
+    "txns": 0,
+    "commits": 0,
+    "rollbacks": 0,
+    "checkpoints": 8,
+    "compactions": 4,
+    "backups": 1,
+    "restores": 1,
+    "restarts": 2,
+    "verifications": 23,
+    "verification_failures": 0
+   }
+  },
+  {
+   "experiment_id": "PH3E-SOAK-003",
+   "date": "2026-09-17",
+   "status": "COMPLETED",
+   "objective": "E8c mixed rw: 120k writer ops + 3 hot readers, no maintenance (by design)",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (family c; oplog+seed regenerate state)",
+   "model": "independent lock-step reference model (never read back)",
+   "corpus": "synthetic doc records (DIM=32, 3 collections in E8g/E8i)",
+   "metrics": {
+    "family": "c",
+    "ops": 120000,
+    "elapsed_s": 589,
+    "txns": 0,
+    "commits": 0,
+    "rollbacks": 0,
+    "checkpoints": 0,
+    "compactions": 0,
+    "backups": 0,
+    "restores": 0,
+    "restarts": 0,
+    "verifications": 2,
+    "verification_failures": 0
+   }
+  },
+  {
+   "experiment_id": "PH3E-SOAK-004",
+   "date": "2026-09-17",
+   "status": "COMPLETED",
+   "objective": "E8d transaction soak: ladder 1..100 + 15000 txns (25% rollback) + E8d engine-defect fix cycle",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (family d; oplog+seed regenerate state)",
+   "model": "independent lock-step reference model (never read back)",
+   "corpus": "synthetic doc records (DIM=32, 3 collections in E8g/E8i)",
+   "metrics": {
+    "family": "d",
+    "ops": 58764,
+    "elapsed_s": 106,
+    "txns": 17280,
+    "commits": 13531,
+    "rollbacks": 3749,
+    "checkpoints": 7,
+    "compactions": 2,
+    "backups": 0,
+    "restores": 0,
+    "restarts": 1,
+    "verifications": 10,
+    "verification_failures": 0
+   }
+  },
+  {
+   "experiment_id": "PH3E-SOAK-005",
+   "date": "2026-09-17",
+   "status": "COMPLETED",
+   "objective": "E8e maintenance cadence soak: 12 cycles, 2KiB WAL segments",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (family e; oplog+seed regenerate state)",
+   "model": "independent lock-step reference model (never read back)",
+   "corpus": "synthetic doc records (DIM=32, 3 collections in E8g/E8i)",
+   "metrics": {
+    "family": "e",
+    "ops": 12000,
+    "elapsed_s": 22,
+    "txns": 0,
+    "commits": 0,
+    "rollbacks": 0,
+    "checkpoints": 12,
+    "compactions": 12,
+    "backups": 12,
+    "restores": 12,
+    "restarts": 12,
+    "verifications": 36,
+    "verification_failures": 0
+   }
+  },
+  {
+   "experiment_id": "PH3E-SOAK-006",
+   "date": "2026-09-17",
+   "status": "COMPLETED",
+   "objective": "E8f restart/recovery: 60 graceful + kill matrix R1-R7 x2 + async Case A/B",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (family f; oplog+seed regenerate state)",
+   "model": "independent lock-step reference model (never read back)",
+   "corpus": "synthetic doc records (DIM=32, 3 collections in E8g/E8i)",
+   "metrics": {
+    "family": "f",
+    "ops": 120000,
+    "elapsed_s": 169,
+    "txns": 0,
+    "commits": 0,
+    "rollbacks": 0,
+    "checkpoints": 60,
+    "compactions": 0,
+    "backups": 0,
+    "restores": 0,
+    "restarts": 76,
+    "verifications": 23,
+    "verification_failures": 0
+   }
+  },
+  {
+   "experiment_id": "PH3E-SOAK-007",
+   "date": "2026-09-17",
+   "status": "COMPLETED",
+   "objective": "E8g lifecycle: 25 cycles full pipeline, 3 collections",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (family g; oplog+seed regenerate state)",
+   "model": "independent lock-step reference model (never read back)",
+   "corpus": "synthetic doc records (DIM=32, 3 collections in E8g/E8i)",
+   "metrics": {
+    "family": "g",
+    "ops": 1143,
+    "elapsed_s": 6,
+    "txns": 50,
+    "commits": 50,
+    "rollbacks": 0,
+    "checkpoints": 25,
+    "compactions": 25,
+    "backups": 25,
+    "restores": 25,
+    "restarts": 25,
+    "verifications": 50,
+    "verification_failures": 0
+   }
+  },
+  {
+   "experiment_id": "PH3E-SOAK-008",
+   "date": "2026-09-17",
+   "status": "COMPLETED",
+   "objective": "E8h resource stability: 240s steady-state, 800 keys pinned ~600 live",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (family h; oplog+seed regenerate state)",
+   "model": "independent lock-step reference model (never read back)",
+   "corpus": "synthetic doc records (DIM=32, 3 collections in E8g/E8i)",
+   "metrics": {
+    "family": "h",
+    "ops": 150000,
+    "elapsed_s": 214,
+    "txns": 0,
+    "commits": 0,
+    "rollbacks": 0,
+    "checkpoints": 15,
+    "compactions": 5,
+    "backups": 0,
+    "restores": 0,
+    "restarts": 0,
+    "verifications": 2,
+    "verification_failures": 0
+   }
+  },
+  {
+   "experiment_id": "PH3E-SOAK-009",
+   "date": "2026-09-17",
+   "status": "INVALIDATED",
+   "objective": "E8i extended integrated 600s \u2014 INVALIDATED (harness: cadence modulo starvation + restart under live reader + cross-collection txn staging); preserved",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (family i; oplog+seed regenerate state)",
+   "model": "independent lock-step reference model (never read back)",
+   "corpus": "synthetic doc records (DIM=32, 3 collections in E8g/E8i)",
+   "metrics": {
+    "family": "i",
+    "ops": 125492,
+    "elapsed_s": 600,
+    "txns": 25098,
+    "commits": 25098,
+    "rollbacks": 0,
+    "checkpoints": 0,
+    "compactions": 0,
+    "backups": 0,
+    "restores": 0,
+    "restarts": 0,
+    "verifications": 0,
+    "verification_failures": 0
+   }
+  },
+  {
+   "experiment_id": "PH3E-SOAK-010",
+   "date": "2026-09-17",
+   "status": "INVALIDATED",
+   "objective": "E8i retry \u2014 INVALIDATED (harness: global-vs-bench scan window counter + txn duplicate-key model recompute); preserved",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (family i; oplog+seed regenerate state)",
+   "model": "independent lock-step reference model (never read back)",
+   "corpus": "synthetic doc records (DIM=32, 3 collections in E8g/E8i)",
+   "metrics": {
+    "family": "i",
+    "ops": 143477,
+    "elapsed_s": 601,
+    "txns": 28695,
+    "commits": 28695,
+    "rollbacks": 0,
+    "checkpoints": 47,
+    "compactions": 15,
+    "backups": 9,
+    "restores": 0,
+    "restarts": 1,
+    "verifications": 30,
+    "verification_failures": 30
+   }
+  },
+  {
+   "experiment_id": "PH3E-SOAK-011",
+   "date": "2026-09-17",
+   "status": "COMPLETED",
+   "objective": "E8i extended integrated: 150002 ops, 30000 txns, full maintenance cadence, concurrent reader \u2014 all green",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (family i; oplog+seed regenerate state)",
+   "model": "independent lock-step reference model (never read back)",
+   "corpus": "synthetic doc records (DIM=32, 3 collections in E8g/E8i)",
+   "metrics": {
+    "family": "i",
+    "ops": 150002,
+    "elapsed_s": 469,
+    "txns": 30000,
+    "commits": 30000,
+    "rollbacks": 0,
+    "checkpoints": 50,
+    "compactions": 16,
+    "backups": 10,
+    "restores": 0,
+    "restarts": 1,
+    "verifications": 32,
+    "verification_failures": 0
+   }
+  },
+  {
+   "experiment_id": "PH3E-SOAK-012",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E8 restoration execution of PH3E-SOAK-002 (E8b) \u2014 deterministic same-seed re-run after platform snapshot loss; counts match the original registry metrics exactly",
+   "restoration_for": "PH3E-SOAK-002",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (family E8b)",
+   "model": "independent lock-step reference model (never read back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 200000,
+    "elapsed_s": 260,
+    "checkpoints": 8,
+    "compactions": 4,
+    "backups": 1,
+    "restores": 1,
+    "restarts": 2,
+    "verifications": 23,
+    "verification_failures": 0
+   }
+  },
+  {
+   "experiment_id": "PH3E-SOAK-013",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E8 restoration execution of PH3E-SOAK-003 (E8c) \u2014 deterministic same-seed re-run after platform snapshot loss; counts match the original registry metrics exactly",
+   "restoration_for": "PH3E-SOAK-003",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (family E8c)",
+   "model": "independent lock-step reference model (never read back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 120000,
+    "elapsed_s": 555,
+    "checkpoints": 0,
+    "compactions": 0,
+    "backups": 0,
+    "restores": 0,
+    "restarts": 0,
+    "verifications": 2,
+    "verification_failures": 0
+   }
+  },
+  {
+   "experiment_id": "PH3E-SOAK-014",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E8 restoration execution of PH3E-SOAK-006 (E8f) \u2014 deterministic same-seed re-run after platform snapshot loss; counts match the original registry metrics exactly",
+   "restoration_for": "PH3E-SOAK-006",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (family E8f)",
+   "model": "independent lock-step reference model (never read back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 120000,
+    "elapsed_s": 137,
+    "checkpoints": 60,
+    "compactions": 0,
+    "backups": 0,
+    "restores": 0,
+    "restarts": 76,
+    "verifications": 23,
+    "verification_failures": 0
+   }
+  },
+  {
+   "experiment_id": "PH3E-SOAK-015",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E8 restoration execution of PH3E-SOAK-011 (E8i) \u2014 deterministic same-seed re-run after platform snapshot loss; counts match the original registry metrics exactly",
+   "restoration_for": "PH3E-SOAK-011",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (family E8i)",
+   "model": "independent lock-step reference model (never read back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 150002,
+    "elapsed_s": 446,
+    "txns": 30000,
+    "commits": 30000,
+    "checkpoints": 50,
+    "compactions": 16,
+    "backups": 10,
+    "restores": 0,
+    "restarts": 1,
+    "verifications": 32,
+    "verification_failures": 0
+   }
+  },
+  {
+   "experiment_id": "PH3E-SOAK-016",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E8 restoration execution of PH3E-SOAK-008 (E8h) \u2014 deterministic same-seed re-run after platform snapshot loss; counts match the original registry metrics exactly",
+   "restoration_for": "PH3E-SOAK-008",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (family E8h)",
+   "model": "independent lock-step reference model (never read back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 150000,
+    "elapsed_s": 190,
+    "checkpoints": 15,
+    "compactions": 5,
+    "backups": 0,
+    "restores": 0,
+    "restarts": 0,
+    "verifications": 2,
+    "verification_failures": 0
+   }
+  },
+  {
+   "experiment_id": "PH3E-SOAK-017",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E8 restoration execution of PH3E-SOAK-006 (E8f) and E9 family-f regression soak \u2014 full-artifact re-run after the documented oplog trim error",
+   "restoration_for": "PH3E-SOAK-006",
+   "e9_regression_soak": true,
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (family f)",
+   "model": "lock-step reference model (never read back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 120000,
+    "elapsed_s": 172,
+    "checkpoints": 60,
+    "restarts": 76,
+    "verifications": 23,
+    "verification_failures": 0
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-001",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9a: E8 memory-signal reproduction via the unchanged E8 family-h harness \u2014 signal reproduced (r=0.992, slope 660 vs 698 KB/1kops)",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 150000,
+    "elapsed_s": 182,
+    "checkpoints": 15,
+    "compactions": 5,
+    "verification_failures": 0
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-002",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9a/RSS-PSS: 150k-op churn repro with rich telemetry (RSS/PSS/anon/file/mallinfo+census) \u2014 growth is application-owned anonymous heap (PSS\u2248RSS\u2248anon)",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 150000,
+    "rss_peak_kb": 205368,
+    "live_docs": 601
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-016",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9c control A: fixed 2k-doc dataset, 40k read-only ops \u2014 RSS 26.0\u219228.7MB (read path does not drive growth)",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 40000,
+    "rss_first_kb": 26000,
+    "rss_last_kb": 28740
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-003",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9d control B: 10k fixed docs, 100k uuid-preserving updates \u2014 linear growth at FIXED cardinality (240MB peak); updates mint dead index entries",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 100000,
+    "rss_peak_kb": 240448,
+    "live_docs": 10000
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-004",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9e control C: 80k growing inserts \u2014 RSS tracks documents (494MB); doc-proportional component measured",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 80000,
+    "rss_peak_kb": 494412
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-005",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9f control D: 60k insert/delete churn at 1k keys, no maintenance \u2014 63MB at ~1k live (dead retention)",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 60000,
+    "rss_peak_kb": 63416
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-006",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9g control E: 60k updates with checkpoints only (no explicit compaction) \u2014 128MB; compaction absence is not the driver",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 60000,
+    "rss_peak_kb": 128032
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-007",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9h control F: 40k docs then 10 compactions + restart \u2014 compaction adds no retained memory; restart RSS dominated by doc-proportional rebuild",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 40000,
+    "rss_peak_kb": 323092
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-008",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9i control G: 30k updates with 2KiB WAL segments \u2014 79MB; WAL rotation is not a growth driver",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 30000,
+    "rss_peak_kb": 79192
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-009",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9j control H: 5k docs + 150 checkpoints \u2014 RSS flat before/after (48.1MB both); checkpoint hygiene added in E9",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 150,
+    "rss_before_kb": 48140,
+    "rss_after_kb": 48140
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-010",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9k control I: 25 backups \u2014 RSS flat 48.1MB before/after; backup buffers released",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 25,
+    "rss_before_kb": 48140,
+    "rss_after_kb": 48140
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-011",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9l control J: 15k committed + 3k rolled-back txns \u2014 staged txns return to 0; txn manager retains nothing (txn_staged_end=0)",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 15000,
+    "rss_peak_kb": 80040
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-012",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9m control K: query-path isolation (attend/get/scan phases) \u2014 +3MB over 45k queries; scratch is transient",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 45000,
+    "rss_peak_kb": 29012
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-013",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9n control L: 40k mapper churn \u2014 retired set grows with mutations and PERSISTS across restart (INV-6, by design)",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 40000
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-014",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9o/p control M+N: 1k/2k/5k/10k accounting ladder + restart \u2014 9.5KB/doc all-in at 10k; restart repopulates read cache from disk (by design)",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 10000,
+    "rss_peak_kb": 95092
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-015",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9q control O: restart-reset \u2014 dead vector entries purged at restart (54,378\u21925,095) but RSS stays elevated (allocator retention ~99MB ford); retired ids persist (INV-6)",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 85000,
+    "rss_peak_kb": 165632
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-017",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9r control P: 40s idle after churn \u2014 no decay (103.8MB stable); retained state is referenced, not transient",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 40000,
+    "rss_peak_kb": 103816
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-018",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9x optimization candidate O1 (purge-only at checkpoint): vector-store purge effective (vstore 54k\u21926k) but RSS peak unchanged (203MB) \u2014 graph-node retention unbounded; superseded by O1+O2",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 150000,
+    "rss_peak_kb": 203080
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-019",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9x O1 purge-only, update churn: 229MB peak \u2014 superseded by O1+O2",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 100000,
+    "rss_peak_kb": 229040
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-020",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9x O1 purge-only, restart-reset: superseded by O1+O2",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 85000,
+    "rss_peak_kb": 156660
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-021",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9x O1 purge-only, growing: 492MB (unchanged \u2014 doc-proportional, as expected)",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 80000,
+    "rss_peak_kb": 492172
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-022",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9x OPTIMIZED (INV-E9-HYGIENE purge+rebuild): repro 150k ops \u2014 peak RSS 85.6MB vs 205.4MB baseline (58% reduction); elapsed 85s vs 88.7s (faster)",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 150000,
+    "rss_peak_kb": 85600,
+    "elapsed_s": 85
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-023",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9x OPTIMIZED: update churn 100k \u2014 peak 202.9MB vs 240.4MB (16% reduction; 10k-doc load floor dominates)",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 100000,
+    "rss_peak_kb": 202856,
+    "elapsed_s": 123
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-024",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9x OPTIMIZED: restart-reset \u2014 peak 105.5MB vs 165.6MB (36% reduction)",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 85000,
+    "rss_peak_kb": 105496
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-025",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9x OPTIMIZED: growing 80k \u2014 496.9MB (unchanged within 1%: doc-proportional, correct behavior \u2014 no dead nodes to purge)",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 80000,
+    "rss_peak_kb": 496928
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-026",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9 regression soak, family h (sync): 150000 ops, ckpt=15 compact=5 verify=2 vfails=0 \u2014 count-identical to PH3E-SOAK-008/016; hygiene active",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 150000,
+    "elapsed_s": 222,
+    "checkpoints": 15,
+    "compactions": 5,
+    "verification_failures": 0
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-027",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9 regression soak, family d (sync): 58764 ops, txns 17280 (13531c/3749r), verify=10 vfails=0 \u2014 count-identical",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 58764,
+    "elapsed_s": 106,
+    "verification_failures": 0
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-028",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9 regression soak, family i (sync): 150002 ops, 30000 txns, verify=32 vfails=0, reader 0 violations \u2014 count-identical",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 150002,
+    "elapsed_s": 526,
+    "verification_failures": 0
+   }
+  },
+  {
+   "experiment_id": "PH3E-MEM-029",
+   "date": "2026-09-22",
+   "status": "COMPLETED",
+   "objective": "E9 regression soak, family f (sync): 120000 ops, 76 restarts, verify=23 vfails=0 (oplog lost to documented trim error; counts/verif/reader retained \u2014 superseded by PH3E-SOAK-017)",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "seed": "deterministic (e9 harness xorshift)",
+   "model": "read-only component census + /proc telemetry (no engine read-back)",
+   "corpus": "synthetic doc records (DIM=32)",
+   "metrics": {
+    "ops": 120000,
+    "elapsed_s": 149,
+    "restarts": 76,
+    "verification_failures": 0
+   }
+  },
+  {
+   "experiment_id": "PH3E-SCALE-001",
+   "date": "2026-09-23",
+   "status": "COMPLETED",
+   "objective": "E10-001 baseline reproduction: 80k-doc ladder rung of the E9-sealed scale (primary config)",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "tree_sha16_e10": "35ea3b7e5c7c0427",
+   "seed": "deterministic (e10 harness xorshift/fnv)",
+   "model": "harness-side lock-step model (never read back)",
+   "corpus": "e10 clustered+near-dup synthetic dataset (spec M8)",
+   "metrics": {
+    "ops": 80000,
+    "live_docs": 80000,
+    "build_s": 104.432679561,
+    "checkpoint_ms": 46,
+    "reopen_s": 83.728918561,
+    "rss_peak_kb": 1381616,
+    "per_doc_marginal_kb": 17.20405,
+    "note": "all correctness gates green (checker clean, 80000/80000, 5000/5000 samples, self-hit 97-99/100); M4 guard fired during the measurement phase (peak 1.32GB vs 85% avail 1.19GB)",
+    "classification": "OBSERVED_LIMIT"
+   }
+  },
+  {
+   "experiment_id": "PH3E-SCALE-002",
+   "date": "2026-09-23",
+   "status": "COMPLETED",
+   "objective": "E10-002 ladder tier 100000: M3 budget gate blocked the launch (projected peak from measured 17.2 KB/doc marginal)",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "tree_sha16_e10": "35ea3b7e5c7c0427",
+   "seed": "deterministic (e10 harness xorshift/fnv)",
+   "model": "harness-side lock-step model (never read back)",
+   "corpus": "e10 clustered+near-dup synthetic dataset (spec M8)",
+   "metrics": {
+    "docs": 100000,
+    "reason": "M3 budget gate: projected peak 1750000 KB > 80% of available 1455316 KB (per-doc marginal 17.2 KB) \u2014 launch forbidden by frozen spec",
+    "classification": "OBSERVED_LIMIT"
+   }
+  },
+  {
+   "experiment_id": "PH3E-SCALE-003",
+   "date": "2026-09-23",
+   "status": "COMPLETED",
+   "objective": "E10-002 ladder tier 150000: M3 budget gate blocked the launch (projected peak from measured 17.2 KB/doc marginal)",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "tree_sha16_e10": "35ea3b7e5c7c0427",
+   "seed": "deterministic (e10 harness xorshift/fnv)",
+   "model": "harness-side lock-step model (never read back)",
+   "corpus": "e10 clustered+near-dup synthetic dataset (spec M8)",
+   "metrics": {
+    "docs": 150000,
+    "reason": "M3 budget gate: projected peak 2610000 KB > 80% of available 1455484 KB (per-doc marginal 17.2 KB) \u2014 launch forbidden by frozen spec",
+    "classification": "OBSERVED_LIMIT"
+   }
+  },
+  {
+   "experiment_id": "PH3E-SCALE-004",
+   "date": "2026-09-23",
+   "status": "COMPLETED",
+   "objective": "E10-002 ladder tier 200000: M3 budget gate blocked the launch (projected peak from measured 17.2 KB/doc marginal)",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "tree_sha16_e10": "35ea3b7e5c7c0427",
+   "seed": "deterministic (e10 harness xorshift/fnv)",
+   "model": "harness-side lock-step model (never read back)",
+   "corpus": "e10 clustered+near-dup synthetic dataset (spec M8)",
+   "metrics": {
+    "docs": 200000,
+    "reason": "M3 budget gate: projected peak 3470000 KB > 80% of available 1455236 KB (per-doc marginal 17.2 KB) \u2014 launch forbidden by frozen spec",
+    "classification": "OBSERVED_LIMIT"
+   }
+  },
+  {
+   "experiment_id": "PH3E-SCALE-005",
+   "date": "2026-09-23",
+   "status": "COMPLETED",
+   "objective": "E10-002 ladder tier 40k (primary config) \u2014 the VERIFIED anchor of the primary ladder",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "tree_sha16_e10": "35ea3b7e5c7c0427",
+   "seed": "deterministic (e10 harness xorshift/fnv)",
+   "model": "harness-side lock-step model (never read back)",
+   "corpus": "e10 clustered+near-dup synthetic dataset (spec M8)",
+   "metrics": {
+    "ops": 40000,
+    "live_docs": 40000,
+    "build_s": 38.154925129,
+    "checkpoint_ms": 18,
+    "reopen_s": 32.074291867,
+    "rss_peak_kb": 699872,
+    "per_doc_marginal_kb": 17.3967,
+    "note": "all gates green incl retrieval self-hit",
+    "classification": "VERIFIED"
+   }
+  },
+  {
+   "experiment_id": "PH3E-SCALE-006",
+   "date": "2026-09-23",
+   "status": "COMPLETED",
+   "objective": "E10-002 slim-config 120k attempt \u2014 OOM-killed at ~100k docs (kernel OOM evidence captured)",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "tree_sha16_e10": "35ea3b7e5c7c0427",
+   "seed": "deterministic (e10 harness xorshift/fnv)",
+   "model": "harness-side lock-step model (never read back)",
+   "corpus": "e10 clustered+near-dup synthetic dataset (spec M8)",
+   "metrics": {
+    "note": "kernel log: 'Out of memory: Killed process ... anon-rss:1531396kB'; db state preserved; pre-flight used an unmeasured marginal (methodology deviation, corrected by SCALE-007)",
+    "classification": "OBSERVED_LIMIT"
+   }
+  },
+  {
+   "experiment_id": "PH3E-SCALE-007",
+   "date": "2026-09-23",
+   "status": "COMPLETED",
+   "objective": "E10-002 slim-config 60k rung \u2014 measures the slim per-doc marginal (16.5 KB: payload size is NOT the driver)",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "tree_sha16_e10": "35ea3b7e5c7c0427",
+   "seed": "deterministic (e10 harness xorshift/fnv)",
+   "model": "harness-side lock-step model (never read back)",
+   "corpus": "e10 clustered+near-dup synthetic dataset (spec M8)",
+   "metrics": {
+    "ops": 60000,
+    "live_docs": 60000,
+    "build_s": 73.915663951,
+    "reopen_s": 59.875653098,
+    "rss_peak_kb": 994568,
+    "per_doc_marginal_kb": 16.511066666666668,
+    "note": "self-hit 100/100; checker clean",
+    "classification": "VERIFIED"
+   }
+  },
+  {
+   "experiment_id": "PH3E-SCALE-008",
+   "date": "2026-09-23",
+   "status": "COMPLETED",
+   "objective": "E10-007 head-count scaling heads2 PRE-FIX (hygiene misfire measured: ckpt 77,809 ms) \u2014 exposed SCALE-DEFECT #1 (head-count-blind hygiene trigger)",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "tree_sha16_e10": "35ea3b7e5c7c0427",
+   "seed": "deterministic (e10 harness xorshift/fnv)",
+   "model": "harness-side lock-step model (never read back)",
+   "corpus": "e10 clustered+near-dup synthetic dataset (spec M8)",
+   "metrics": {
+    "heads": 2,
+    "ops": 40000,
+    "build_s": 89.128024055,
+    "checkpoint_ms": 77809,
+    "rss_peak_kb": 833324,
+    "classification": "VERIFIED"
+   }
+  },
+  {
+   "experiment_id": "PH3E-SCALE-009",
+   "date": "2026-09-23",
+   "status": "COMPLETED",
+   "objective": "E10-007 head-count scaling heads4 PRE-FIX (ckpt 157,232 ms) \u2014 exposed SCALE-DEFECT #1 (head-count-blind hygiene trigger)",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "tree_sha16_e10": "35ea3b7e5c7c0427",
+   "seed": "deterministic (e10 harness xorshift/fnv)",
+   "model": "harness-side lock-step model (never read back)",
+   "corpus": "e10 clustered+near-dup synthetic dataset (spec M8)",
+   "metrics": {
+    "heads": 4,
+    "ops": 40000,
+    "build_s": 172.236746973,
+    "checkpoint_ms": 157232,
+    "rss_peak_kb": 1371304,
+    "classification": "VERIFIED"
+   }
+  },
+  {
+   "experiment_id": "PH3E-SCALE-010",
+   "date": "2026-09-23",
+   "status": "COMPLETED",
+   "objective": "E10-008 dimension scaling dim128@20k",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "tree_sha16_e10": "35ea3b7e5c7c0427",
+   "seed": "deterministic (e10 harness xorshift/fnv)",
+   "model": "harness-side lock-step model (never read back)",
+   "corpus": "e10 clustered+near-dup synthetic dataset (spec M8)",
+   "metrics": {
+    "dim": 128,
+    "ops": 20000,
+    "build_s": 26.424419573,
+    "checkpoint_ms": 50,
+    "rss_peak_kb": 281228,
+    "classification": "VERIFIED"
+   }
+  },
+  {
+   "experiment_id": "PH3E-SCALE-011",
+   "date": "2026-09-23",
+   "status": "COMPLETED",
+   "objective": "E10-008 dimension scaling dim256@20k",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "tree_sha16_e10": "35ea3b7e5c7c0427",
+   "seed": "deterministic (e10 harness xorshift/fnv)",
+   "model": "harness-side lock-step model (never read back)",
+   "corpus": "e10 clustered+near-dup synthetic dataset (spec M8)",
+   "metrics": {
+    "dim": 256,
+    "ops": 20000,
+    "build_s": 40.377786577,
+    "checkpoint_ms": 24,
+    "rss_peak_kb": 353140,
+    "classification": "VERIFIED"
+   }
+  },
+  {
+   "experiment_id": "PH3E-SCALE-012",
+   "date": "2026-09-23",
+   "status": "COMPLETED",
+   "objective": "E10-007 head-count scaling heads2 POST-FIX (ckpt 32 ms; peak -33%) \u2014 rerun under new ID after the SCALE-DEFECT #1 fix",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "tree_sha16_e10": "35ea3b7e5c7c0427",
+   "seed": "deterministic (e10 harness xorshift/fnv)",
+   "model": "harness-side lock-step model (never read back)",
+   "corpus": "e10 clustered+near-dup synthetic dataset (spec M8)",
+   "metrics": {
+    "heads": 2,
+    "ops": 40000,
+    "build_s": 84.977261281,
+    "checkpoint_ms": 32,
+    "rss_peak_kb": 561076,
+    "classification": "VERIFIED"
+   }
+  },
+  {
+   "experiment_id": "PH3E-SCALE-013",
+   "date": "2026-09-23",
+   "status": "COMPLETED",
+   "objective": "E10-007 head-count scaling heads4 POST-FIX (ckpt 24 ms; peak -37%) \u2014 rerun under new ID after the SCALE-DEFECT #1 fix",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "tree_sha16_e10": "35ea3b7e5c7c0427",
+   "seed": "deterministic (e10 harness xorshift/fnv)",
+   "model": "harness-side lock-step model (never read back)",
+   "corpus": "e10 clustered+near-dup synthetic dataset (spec M8)",
+   "metrics": {
+    "heads": 4,
+    "ops": 40000,
+    "build_s": 166.442559355,
+    "checkpoint_ms": 24,
+    "rss_peak_kb": 862272,
+    "classification": "VERIFIED"
+   }
+  },
+  {
+   "experiment_id": "PH3E-SCALE-014",
+   "date": "2026-09-23",
+   "status": "INVALIDATED",
+   "objective": "E10-009 mutation-churn at 60k base \u2014 INVALIDATED: harness upsert defect minted duplicate live uuids (engine exonerated by probe; counts diverged)",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "tree_sha16_e10": "35ea3b7e5c7c0427",
+   "seed": "deterministic (e10 harness xorshift/fnv)",
+   "model": "harness-side lock-step model (never read back)",
+   "corpus": "e10 clustered+near-dup synthetic dataset (spec M8)",
+   "metrics": {
+    "ops": 260000,
+    "note": "preserved with INVALIDATED.md; engine probe (insert/delete/scan) clean; rerun as SCALE-018",
+    "classification": "INVALIDATED"
+   }
+  },
+  {
+   "experiment_id": "PH3E-SCALE-015",
+   "date": "2026-09-23",
+   "status": "COMPLETED",
+   "objective": "E10-013 bounded concurrency first attempt \u2014 OBSERVED LIMIT: 100k-base configuration error exceeded the M3 budget discipline; terminated at the wall clock",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "tree_sha16_e10": "35ea3b7e5c7c0427",
+   "seed": "deterministic (e10 harness xorshift/fnv)",
+   "model": "harness-side lock-step model (never read back)",
+   "corpus": "e10 clustered+near-dup synthetic dataset (spec M8)",
+   "metrics": {
+    "note": "partial telemetry + db preserved; redesigned as SCALE-019",
+    "classification": "OBSERVED_LIMIT"
+   }
+  },
+  {
+   "experiment_id": "PH3E-SCALE-016",
+   "date": "2026-09-23",
+   "status": "COMPLETED",
+   "objective": "E10-011 maintenance scaling at 60k (6k deletes): ckpt 50ms, compact 426ms (SST 3->1, 37.1->35.0MB), backup 32ms, reopen 44.6s",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "tree_sha16_e10": "35ea3b7e5c7c0427",
+   "seed": "deterministic (e10 harness xorshift/fnv)",
+   "model": "harness-side lock-step model (never read back)",
+   "corpus": "e10 clustered+near-dup synthetic dataset (spec M8)",
+   "metrics": {
+    "ops": 66000,
+    "checkpoint_ms": 50,
+    "compact_ms": 426,
+    "backup_ms": 32,
+    "reopen_s": 44.57572361,
+    "note": "counts exact 54000/54000; checker clean; self-hit 99/100",
+    "classification": "VERIFIED"
+   }
+  },
+  {
+   "experiment_id": "PH3E-SCALE-017",
+   "date": "2026-09-23",
+   "status": "COMPLETED",
+   "objective": "E10-006 retrieval at 80k (1000-query batch): p50 428us p95 817us p99 1428us QPS 2100; self-hit 93/100 below the M6(e) gate (classification logic gap documented in NOTE)",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "tree_sha16_e10": "35ea3b7e5c7c0427",
+   "seed": "deterministic (e10 harness xorshift/fnv)",
+   "model": "harness-side lock-step model (never read back)",
+   "corpus": "e10 clustered+near-dup synthetic dataset (spec M8)",
+   "metrics": {
+    "docs": 80000,
+    "queries": 1000,
+    "p50_us": 428.4,
+    "p95_us": 816.95,
+    "p99_us": 1428.176,
+    "qps": 2099.6131166787072,
+    "self_hits": 93,
+    "classification": "OBSERVED_LIMIT"
+   }
+  },
+  {
+   "experiment_id": "PH3E-SCALE-018",
+   "date": "2026-09-23",
+   "status": "COMPLETED",
+   "objective": "E10-009 mutation-churn rerun (260k ops, corrected upsert semantics): engine 48,148 == model 48,148, hygiene holds vstore == live, peak bounded 914,932 KB",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "tree_sha16_e10": "35ea3b7e5c7c0427",
+   "seed": "deterministic (e10 harness xorshift/fnv)",
+   "model": "harness-side lock-step model (never read back)",
+   "corpus": "e10 clustered+near-dup synthetic dataset (spec M8)",
+   "metrics": {
+    "ops": 260000,
+    "rss_peak_kb": 914932,
+    "live": 48148,
+    "retired": 169460,
+    "classification": "VERIFIED"
+   }
+  },
+  {
+   "experiment_id": "PH3E-SCALE-019",
+   "date": "2026-09-23",
+   "status": "COMPLETED",
+   "objective": "E10-013 bounded concurrency at 60k total (40k base + 20k writer + scan-heavy reader): counts exact, reader 4,581 checks p50 2.9ms p99 5.7ms; WRITER DEGRADATION measured (~24 ops/s under reader lock contention); async-WAL-tail loss (7 docs) confirmed and sealed by the final-checkpoint pattern",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "tree_sha16_e10": "35ea3b7e5c7c0427",
+   "seed": "deterministic (e10 harness xorshift/fnv)",
+   "model": "harness-side lock-step model (never read back)",
+   "corpus": "e10 clustered+near-dup synthetic dataset (spec M8)",
+   "metrics": {
+    "ops": 60000,
+    "rss_peak_kb": 1072544,
+    "reader_checks": 4581,
+    "classification": "VERIFIED"
+   }
+  },
+  {
+   "experiment_id": "PH3E-SCALE-020",
+   "date": "2026-09-23",
+   "status": "COMPLETED",
+   "objective": "E10-014 integrated scale validation at 60k: build 59.7s + 20k churn + 2,000/2,000 txns + ckpt 436ms + compact + backup 28ms + restart \u2014 counts exact 60,197/60,197, checker clean, self-hit 99/100",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "tree_sha16_e10": "35ea3b7e5c7c0427",
+   "seed": "deterministic (e10 harness xorshift/fnv)",
+   "model": "harness-side lock-step model (never read back)",
+   "corpus": "e10 clustered+near-dup synthetic dataset (spec M8)",
+   "metrics": {
+    "ops": 82000,
+    "txn_ok": 2000,
+    "checkpoint_ms": 436,
+    "backup_ms": 28,
+    "rss_peak_kb": 1082496,
+    "classification": "VERIFIED"
+   }
+  },
+  {
+   "experiment_id": "PH3E-SCALE-021",
+   "date": "2026-09-23",
+   "status": "COMPLETED",
+   "objective": "E10-006 retrieval at 80k with complete gate-honoring classification: self-hit 99/100 VERIFIED \u2014 vs 93/100 in SCALE-017: grown-graph recall at 80k is NONDETERMINISTIC at the boundary (93-99 across runs)",
+   "git_commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+   "tree_sha16_e10": "35ea3b7e5c7c0427",
+   "seed": "deterministic (e10 harness xorshift/fnv)",
+   "model": "harness-side lock-step model (never read back)",
+   "corpus": "e10 clustered+near-dup synthetic dataset (spec M8)",
+   "metrics": {
+    "docs": 80000,
+    "p50_us": 380.719,
+    "p95_us": 648.362,
+    "p99_us": 877.017,
+    "qps": 2459.4127177225237,
+    "self_hits": 99,
+    "classification": "VERIFIED"
+   }
   }
- ]
+ ],
+ "tree_sha16_e8": "1b524cf3e39dfc6b"
 }

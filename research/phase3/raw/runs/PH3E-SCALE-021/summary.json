@@ -1,0 +1,1 @@
+{"build_s":93.080729965,"classification":"VERIFIED","docs":80000,"experiment":"e10-retrieval","ops":80000,"p50_us":380.719,"p95_us":648.362,"p99_us":877.017,"qps":2459.4127177225237,"queries":1000,"self_hits":99,"self_queries":100}

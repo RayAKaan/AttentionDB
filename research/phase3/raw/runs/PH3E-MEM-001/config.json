@@ -1,0 +1,13 @@
+{
+ "run_id": "PH3E-MEM-001",
+ "family": "h (E8 harness reproduction)",
+ "budget": "150000 ops",
+ "durability": "sandbox default (async; see deviations D31)",
+ "commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+ "purpose": "E8 memory-signal reproduction (M1)",
+ "environment": {
+  "host": "2-vCPU sandbox e2b.local",
+  "rustc": "1.98.1"
+ },
+ "oplog": "gzipped post-run"
+}

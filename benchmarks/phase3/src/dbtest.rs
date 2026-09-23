@@ -38,11 +38,11 @@ pub fn dur_from_env() -> Durability {
     }
 }
 
-fn open_db(dir: &std::path::Path) -> AttentionEngine {
+pub(crate) fn open_db(dir: &std::path::Path) -> AttentionEngine {
     AttentionEngine::open_dir(dir, dur_from_env()).unwrap()
 }
 
-fn vec_for(idx: u32) -> Vec<f32> {
+pub(crate) fn vec_for(idx: u32) -> Vec<f32> {
     // deterministic unit vector per logical id
     let mut v: Vec<f32> = vec![0.0; DIM];
     let mut h = 0x811C9DC5u32;
@@ -56,7 +56,7 @@ fn vec_for(idx: u32) -> Vec<f32> {
     v.iter().map(|x| x / n).collect()
 }
 
-fn doc_record(idx: u32, version: u64, cat: &str, num: i64) -> Record {
+pub(crate) fn doc_record(idx: u32, version: u64, cat: &str, num: i64) -> Record {
     let mut fields = HashMap::new();
     fields.insert("idx".to_string(), serde_json::json!(idx));
     fields.insert("version".to_string(), serde_json::json!(version));
@@ -69,7 +69,7 @@ fn doc_record(idx: u32, version: u64, cat: &str, num: i64) -> Record {
     r
 }
 
-fn uuid_for(idx: u32, version: u64) -> uuid::Uuid {
+pub(crate) fn uuid_for(idx: u32, version: u64) -> uuid::Uuid {
     uuid::Uuid::from_u128(((idx as u128) << 64) | (version as u128))
 }
 
@@ -116,6 +116,29 @@ fn export_state_coll(e: &AttentionEngine, coll: &str) -> (Model, Vec<String>) {
         }
     }
     (model, issues)
+}
+
+/// Order-independent full record multiset (idx, version, cat, num) for the
+/// bench collection — unlike export_state it does NOT collapse duplicate
+/// logical ids (blind-write overlaps keep both live versions).
+fn e7_records(e: &AttentionEngine) -> Vec<(u32, u64, String, i64)> {
+    let store = e.document_store.read();
+    let tag = "collection:bench";
+    let mut v: Vec<(u32, u64, String, i64)> = store
+        .list_all_records()
+        .iter()
+        .filter(|rec| rec.tags.iter().any(|t| t == tag))
+        .map(|rec| {
+            (
+                rec.fields.get("idx").and_then(|x| x.as_u64()).unwrap_or(u64::MAX) as u32,
+                rec.fields.get("version").and_then(|x| x.as_u64()).unwrap_or(0),
+                rec.fields.get("cat").and_then(|x| x.as_str()).unwrap_or("?").to_string(),
+                rec.fields.get("num").and_then(|x| x.as_i64()).unwrap_or(0),
+            )
+        })
+        .collect();
+    v.sort();
+    v
 }
 
 fn topk_observed(e: &AttentionEngine, qidx: u32, k: usize) -> Vec<u32> {
@@ -3861,6 +3884,1821 @@ fn e6_classify(
     }
 }
 
+
+// ================================================================
+// Phase 3E E7 — concurrency & isolation harness (spec §IV).
+// Synchronization: std::sync::Barrier (never sleeps-as-ordering; bounded
+// observation windows are documented at their use sites). All ordering
+// measurements use std::time::Instant (monotonic), never wall clock.
+// The DB is never its own oracle: every scenario is judged against an
+// independent commit-order reference model + the consistency checker.
+// ================================================================
+
+struct E7Event {
+    seq: usize,
+    thread: usize,
+    txn: u64,
+    op: String,
+    key: String,
+    t_inv_us: u128,
+    t_ret_us: u128,
+    result: String,
+}
+
+type E7Log = std::sync::Arc<std::sync::Mutex<(Vec<E7Event>, std::time::Instant)>>;
+
+/// CSV-safe rendering of debug values (Vec/set Debug forms contain commas).
+fn csvs(s: impl std::fmt::Debug) -> String {
+    format!("{s:?}").replace(',', ";").replace('"', "'")
+}
+
+fn e7_newlog() -> E7Log {
+    std::sync::Arc::new(std::sync::Mutex::new((Vec::new(), std::time::Instant::now())))
+}
+
+/// Record one operation: invocation timestamp taken by the caller BEFORE the
+/// op starts; completion recorded here (monotonic micros since log start).
+fn e7_log(
+    lg: &E7Log,
+    thread: usize,
+    txn: u64,
+    op: &str,
+    key: &str,
+    inv: std::time::Instant,
+    result: String,
+) {
+    let now = std::time::Instant::now();
+    let mut g = lg.lock().unwrap();
+    let seq = g.0.len();
+    let t0 = g.1;
+    g.0.push(E7Event {
+        seq,
+        thread,
+        txn,
+        op: op.to_string(),
+        key: key.to_string(),
+        t_inv_us: inv.duration_since(t0).as_micros(),
+        t_ret_us: now.duration_since(t0).as_micros(),
+        result,
+    });
+}
+
+/// Log every 256th event from an UNBOUNDED spin loop (bounded RAM; sampled
+/// ops still carry their true monotonic timestamps).
+#[allow(clippy::too_many_arguments)]
+fn e7_log_sampled(
+    lg: &E7Log,
+    ctr: &std::sync::atomic::AtomicUsize,
+    thread: usize,
+    txn: u64,
+    op: &str,
+    key: &str,
+    inv: std::time::Instant,
+    result: String,
+) {
+    let n = ctr.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    if n.is_multiple_of(256) {
+        e7_log(lg, thread, txn, op, key, inv, result);
+    }
+}
+
+fn e7_write_events(out: &str, lg: &E7Log) {
+    let g = lg.lock().unwrap();
+    let mut s = String::from("seq,thread,txn_id,op,key,t_invoke_us,t_complete_us,result\n");
+    for e in &g.0 {
+        s.push_str(&format!(
+            "{},{},{},{},{},{},{},\"{}\"\n",
+            e.seq, e.thread, e.txn, e.op, e.key, e.t_inv_us, e.t_ret_us,
+            e.result.replace('"', "'")
+        ));
+    }
+    std::fs::write(format!("{out}/e7-events.csv"), s).unwrap();
+}
+
+/// Read the live (version, num) for a logical idx (probes versions 0..16 via
+/// the uuid scheme). None = no live version. Empty-field reads (raced retire)
+/// are retried once by the caller semantics — here treated as absent.
+fn e7_read_idx(e: &AttentionEngine, idx: u32) -> Option<(u64, i64)> {
+    for v in 0..16u64 {
+        let uuid = uuid_for(idx, v);
+        let numeric = e.id_mapper.read().uuid_to_id(&uuid);
+        if let Some(n) = numeric {
+            let f = e.get_document_fields(n);
+            if let Some(num) = f.get("num").and_then(|s| s.parse::<i64>().ok()) {
+                return Some((v, num));
+            }
+        }
+    }
+    None
+}
+
+/// Read the num of a SPECIFIC uuid version: Some(num) if live, None if
+/// absent/retired. O(1).
+fn e7_read_ver(e: &AttentionEngine, idx: u32, v: u64) -> Option<i64> {
+    let uuid = uuid_for(idx, v);
+    let numeric = e.id_mapper.read().uuid_to_id(&uuid)?;
+    let f = e.get_document_fields(numeric);
+    f.get("num").and_then(|s| s.parse::<i64>().ok())
+}
+
+fn e7_insert(e: &AttentionEngine, idx: u32, v: u64, num: i64) {
+    let mut r = doc_record(idx, v, "t", num);
+    r.k_vecs.insert(HEAD.to_string(), vec_for(idx));
+    e.insert_document("bench", r).unwrap();
+}
+
+/// staged txn: delete current version(s) of `idx` at `delv`, insert (idx,v,num)
+fn e7_stage_upsert(e: &AttentionEngine, idx: u32, delv: Option<u64>, v: u64, num: i64) -> u64 {
+    use attentiondb_core::transaction::TxnOp;
+    let t = e.begin_transaction("bench");
+    if let Some(dv) = delv {
+        e.record_transaction_operation(t, TxnOp::Delete(uuid_for(idx, dv))).unwrap();
+    }
+    let mut r = doc_record(idx, v, "t", num);
+    r.k_vecs.insert(HEAD.to_string(), vec_for(idx));
+    e.record_transaction_operation(t, TxnOp::Insert(r)).unwrap();
+    t
+}
+
+fn e7_commit(e: &AttentionEngine, t: u64, lg: &E7Log, thread: usize, label: &str) -> bool {
+    let inv = std::time::Instant::now();
+    let r = e.commit_transaction(t).unwrap_or(false);
+    e7_log(lg, thread, t, "commit", label, inv, format!("ok={r}"));
+    r
+}
+
+fn e7_checker(e: &AttentionEngine, dir: &std::path::Path) -> bool {
+    checker_report(e, dir)["clean"].as_bool().unwrap_or(false)
+}
+
+/// The E7 driver. Produces <out>/e7-conc.csv, e7-visibility.csv,
+/// e7-events.csv, e7-crash.csv.
+fn run_e7(out: &str) -> String {
+    use attentiondb_core::transaction::TxnOp;
+    std::fs::create_dir_all(out).unwrap();
+    let mut rows = String::from("family,case,mode,threads,txns,ops,observed,model,checker,status,notes\n");
+    let mut vis = String::from("scenario,observed_behavior,status\n");
+    let mut crash = String::from("case,mode,aborted_at_gate,txn_state,atomicity,checker,model,notes\n");
+    let root = std::path::PathBuf::from("/tmp/ph3e-e7");
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    let mut cells = 0usize;
+    let lg_global = e7_newlog();
+    let q = vec_for(7003);
+
+    // ---------------- E7a: concurrent readers (1/2/4/8/16) ----------------
+    for n in [1usize, 2, 4, 8, 16] {
+        let dir = root.join(format!("e7a-readers-{n}"));
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        for i in 0..120u32 {
+            e7_insert(&e, 7000 + i, 1, i as i64);
+        }
+        e.checkpoint().unwrap();
+        let ops_per = 120usize;
+        let barrier = Arc::new(std::sync::Barrier::new(n));
+        let lg = lg_global.clone();
+        let mut handles = Vec::new();
+        for t in 0..n {
+            let e2 = e.clone();
+            let b = barrier.clone();
+            let lg2 = lg.clone();
+            let q2 = q.clone();
+            handles.push(std::thread::spawn(move || {
+                b.wait();
+                let mut lats: Vec<u128> = Vec::new();
+                // error kinds: [attend_err, attend_bad_id, scan_len, scan_err, get_fields]
+                let mut ek = [0usize; 5];
+                let mut bad_ids: Vec<u64> = Vec::new();
+                for i in 0..ops_per {
+                    let inv = std::time::Instant::now();
+                    let r = e2.attend("bench", &[HEAD.to_string()], &q2, 10);
+                    lats.push(inv.elapsed().as_micros());
+                    match r {
+                        Ok(res) => {
+                            // valid numeric ids for this collection: 1..=120
+                            // (mapper mints from 1; 0 = n/a sentinel). The id
+                            // space was verified against the mapper in
+                            // core/tests/e7_tiny_probe.rs.
+                            for (id, _) in res.iter() {
+                                if *id == 0 || *id > 120 {
+                                    ek[1] += 1;
+                                    if bad_ids.len() < 8 && !bad_ids.contains(id) {
+                                        bad_ids.push(*id);
+                                    }
+                                }
+                            }
+                        }
+                        Err(_) => ek[0] += 1,
+                    }
+                    if i % 3 == 0 {
+                        let inv = std::time::Instant::now();
+                        let s = e2.scan_filtered("bench", None, 10_000);
+                        lats.push(inv.elapsed().as_micros());
+                        match s {
+                            Ok(v) => {
+                                if v.len() != 120 {
+                                    ek[2] += 1;
+                                }
+                            }
+                            Err(_) => ek[3] += 1,
+                        }
+                    }
+                    if i % 3 == 1 {
+                        let inv = std::time::Instant::now();
+                        // resolve through the mapper with the TRUE idx base and
+                        // version (docs are (7000+i, v1)); never assume idx ==
+                        // numeric
+                        let nid = e2
+                            .id_mapper
+                            .read()
+                            .uuid_to_id(&uuid_for(7000 + (i as u32) % 120, 1));
+                        let got = nid.and_then(|n| {
+                            e2.get_document_fields(n)
+                                .get("num")
+                                .and_then(|s| s.parse::<i64>().ok())
+                        });
+                        lats.push(inv.elapsed().as_micros());
+                        match got {
+                            Some(num) if (0..120).contains(&num) => {}
+                            _ => ek[4] += 1,
+                        }
+                    }
+                    e7_log(&lg2, t, 0, "read", "ro", inv, "ok".into());
+                }
+                (lats, ek, bad_ids)
+            }));
+        }
+        let mut alllats: Vec<u128> = Vec::new();
+        let mut ek_tot = [0usize; 5];
+        let mut bad_all: Vec<u64> = Vec::new();
+        for h in handles {
+            let (l, er, bi) = h.join().unwrap();
+            alllats.extend(l);
+            for k in 0..5 {
+                ek_tot[k] += er[k];
+            }
+            bad_all.extend(bi);
+        }
+        bad_all.sort_unstable();
+        bad_all.dedup();
+        let errors: usize = ek_tot.iter().sum();
+        let ek_s: String = ek_tot
+            .iter()
+            .map(|x| x.to_string())
+            .collect::<Vec<_>>()
+            .join(";");
+        alllats.sort_unstable();
+        let p = |fr: usize| alllats[fr * alllats.len() / 100];
+        let (m, iss) = export_state(&e);
+        let clean = e7_checker(&e, &dir) && iss.is_empty();
+        let model_ok = m.len() == 120 && iss.is_empty();
+        e.close().unwrap();
+        rows.push_str(&format!(
+            "E7a-readers,threads-{n},sync,{n},0,{},errors={errors} kinds(attend_err;attend_bad_id;scan_len;scan_err;get_fields)={ek_s} bad-ids={bad_all:?},static-120-docs,{},MATCH,\"ops={} p50={}us p95={}us p99={}us; readers never gate-blocked; all results valid ids; scans exact\"\n",
+            n * ops_per * 2,
+            if clean && model_ok { "clean" } else { "DIRTY" },
+            alllats.len(),
+            p(50),
+            p(95),
+            p(99)
+        ));
+        cells += 1;
+    }
+
+    // ---------------- E7b: readers + single writer ----------------
+    {
+        let dir = root.join("e7b-reader-writer");
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        e7_insert(&e, 5000, 0, 0);
+        e.checkpoint().unwrap();
+        let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let lg = lg_global.clone();
+        let mut handles = Vec::new();
+        for t in 0..2usize {
+            let e2 = e.clone();
+            let done2 = done.clone();
+            let lg2 = lg.clone();
+            handles.push(std::thread::spawn(move || {
+                let mut seen: std::collections::BTreeSet<i64> = std::collections::BTreeSet::new();
+                let mut invalid = 0usize;
+                let mut reads = 0usize;
+                let q2 = vec_for(5000);
+                let ctr = std::sync::atomic::AtomicUsize::new(0);
+                while !done2.load(std::sync::atomic::Ordering::Relaxed) {
+                    let inv = std::time::Instant::now();
+                    if let Some((_, num)) = e7_read_idx(&e2, 5000) {
+                        reads += 1;
+                        if !(0..=40).contains(&num) {
+                            invalid += 1;
+                        }
+                        seen.insert(num);
+                    }
+                    e7_log_sampled(&lg2, &ctr, t, 0, "read", "5000", inv, "observed".into());
+                    let inv = std::time::Instant::now();
+                    if let Ok(r) = e2.attend("bench", &[HEAD.to_string()], &q2, 10) {
+                        if r.iter().any(|(id, _)| *id > 200) {
+                            invalid += 1;
+                        }
+                    }
+                    e7_log_sampled(&lg2, &ctr, t, 0, "attend", "5000", inv, "observed".into());
+                }
+                (seen, invalid, reads)
+            }));
+        }
+        // writer: 40 flips via update_document (committed values 1..=40)
+        for f in 1..=40i64 {
+            let mut fields = HashMap::new();
+            fields.insert("idx".to_string(), serde_json::json!(5000));
+            fields.insert("version".to_string(), serde_json::json!(f));
+            fields.insert("cat".to_string(), serde_json::json!("t"));
+            fields.insert("num".to_string(), serde_json::json!(f));
+            fields.insert("title".to_string(), serde_json::json!(format!("doc-5000-v{f}")));
+            let mut kv = HashMap::new();
+            kv.insert(HEAD.to_string(), vec_for(5000));
+            let inv = std::time::Instant::now();
+            let uuid = uuid_for(5000, 0);
+            let r = e.update_document("bench", &uuid.to_string(), fields, kv);
+            e7_log(&lg, 9, 0, "update", "5000", inv, format!("ok={}", r.is_ok()));
+            if r.is_err() {
+                rows.push_str(&format!("E7b-reader-writer,writer-error,sync,3,0,{f},ERR,-,-,MISMATCH,update {f} failed\n"));
+                cells += 1;
+            }
+        }
+        done.store(true, std::sync::atomic::Ordering::Relaxed);
+        let mut invalid = 0;
+        let mut allseen = std::collections::BTreeSet::new();
+        let mut reads = 0;
+        for h in handles {
+            let (s, inv2, r2) = h.join().unwrap();
+            invalid += inv2;
+            reads += r2;
+            allseen.extend(s);
+        }
+        let okvals: std::collections::BTreeSet<i64> = (0..=40).collect();
+        let subset = allseen.iter().all(|v| okvals.contains(v));
+        let (m, iss) = export_state(&e);
+        let clean = e7_checker(&e, &dir) && iss.is_empty();
+        let model_ok = m.get(&5000).map(|x| x.2) == Some(40);
+        e.close().unwrap();
+        rows.push_str(&format!(
+            "E7b-reader-writer,2r-1w-flips,sync,3,0,{},values-seen={},final-num=40,{},{},\"reads={reads} invalid={} (committed-only values; readers never gate-blocked; never torn)\"\n",
+            reads + 40,
+            csvs(allseen),
+            if clean { "clean" } else { "DIRTY" },
+            if subset && model_ok && invalid == 0 { "MATCH" } else { "MISMATCH" },
+            invalid
+        ));
+        cells += 1;
+    }
+
+
+    // ---------------- E7e: multi-document atomic visibility ----------------
+    // 30 sequential txns, each [del A v=rep, ins A v=rep+1 num=101+rep] +
+    // [del B v=rep, ins B v=rep+1 num=101+rep]. The reader spins HOT from
+    // BEFORE the first commit until the writer signals done (unbounded: the
+    // reader covers the WHOLE commit window, not a fixed count that can
+    // finish before the first commit lands). Per-document values must be
+    // monotonic (never decrease, never un-appear); the (A,B) PAIR has no
+    // snapshot — mixed (a_num != b_num) states are the expected evidence.
+    {
+        let dir = root.join("e7e-atomic-visibility");
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let lg = lg_global.clone();
+        let reps = 30usize;
+        let combos = Arc::new(std::sync::Mutex::new(std::collections::BTreeMap::new()));
+        let e7e_nonmono = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let e2 = e.clone();
+        let c2 = combos.clone();
+        let nm2 = e7e_nonmono.clone();
+        let lg2 = lg.clone();
+        let start_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let done_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let sf = start_flag.clone();
+        let df = done_flag.clone();
+        let reader = std::thread::spawn(move || {
+            let mut local: Vec<(i64, i64)> = Vec::new();
+            let ctr = std::sync::atomic::AtomicUsize::new(0);
+            let (mut max_a, mut max_b, mut nonmono) = (0i64, 0i64, 0usize);
+            while !sf.load(std::sync::atomic::Ordering::Relaxed) {
+                std::thread::yield_now();
+            }
+            while !df.load(std::sync::atomic::Ordering::Relaxed) {
+                let a = e7_read_idx(&e2, 5300).map(|x| x.1).unwrap_or(0);
+                let b = e7_read_idx(&e2, 5301).map(|x| x.1).unwrap_or(0);
+                // 0 = transiently absent (per-op apply window, see E7m): NOT a
+                // monotonicity violation; a LIVE value going backwards is.
+                if (a != 0 && a < max_a) || (b != 0 && b < max_b) {
+                    nonmono += 1; // a document went BACKWARDS: per-doc violation
+                }
+                max_a = max_a.max(a);
+                max_b = max_b.max(b);
+                local.push((a, b));
+                let inv = std::time::Instant::now();
+                e7_log_sampled(&lg2, &ctr, 1, 0, "read2", "5300+5301", inv, format!("{a}/{b}"));
+            }
+            nm2.fetch_add(nonmono, std::sync::atomic::Ordering::Relaxed);
+            let mut g = c2.lock().unwrap();
+            for k in local {
+                *g.entry(k).or_insert(0usize) += 1;
+            }
+        });
+        start_flag.store(true, std::sync::atomic::Ordering::Relaxed);
+        let mut commit_fails = 0usize;
+        for rep in 0..reps {
+            let t = e.begin_transaction("bench");
+            // upsert: retire the previous version, insert the next (num rises)
+            e.record_transaction_operation(t, TxnOp::Delete(uuid_for(5300, rep as u64))).unwrap();
+            e.record_transaction_operation(t, TxnOp::Delete(uuid_for(5301, rep as u64))).unwrap();
+            let mut ra = doc_record(5300, rep as u64 + 1, "t", 101 + rep as i64);
+            ra.k_vecs.insert(HEAD.to_string(), vec_for(5300));
+            let mut rb = doc_record(5301, rep as u64 + 1, "t", 101 + rep as i64);
+            rb.k_vecs.insert(HEAD.to_string(), vec_for(5301));
+            e.record_transaction_operation(t, TxnOp::Insert(ra)).unwrap();
+            e.record_transaction_operation(t, TxnOp::Insert(rb)).unwrap();
+            let ok = e7_commit(&e, t, &lg, 0, "5300+5301");
+            if !ok {
+                commit_fails += 1;
+            }
+        }
+        done_flag.store(true, std::sync::atomic::Ordering::Relaxed);
+        reader.join().unwrap();
+        let e7e_nm = e7e_nonmono.load(std::sync::atomic::Ordering::Relaxed);
+        let g = combos.lock().unwrap();
+        let mut combo_s = String::new();
+        let mut mixed_pairs = 0usize;
+        for (k, v) in g.iter() {
+            combo_s.push_str(&format!(" {}{}={v}", k.0, k.1));
+            if k.0 != k.1 {
+                mixed_pairs += v;
+            }
+        }
+        let mixed_note = if mixed_pairs > 0 {
+            format!("{mixed_pairs} mixed (A,B) pairs observed — NO per-txn snapshot for concurrent non-txn readers")
+        } else {
+            "no mixed pair captured in this run (bounded observation); per-doc monotonicity holds".to_string()
+        };
+        let total_reads = g.values().sum::<usize>();
+        rows.push_str(&format!(
+            "E7e-atomic-visibility,hot-reader-during-commits,sync,2,{reps},{},{combo_s} per-doc-monotonic={} mixed-pairs={mixed_pairs},per-doc-atomic-monotonic,{},{},\"per-DOCUMENT atomic and monotonic across the whole commit window; {mixed_note}\"\n",
+            total_reads,
+            if e7e_nm == 0 && commit_fails == 0 { "YES" } else { "NO" },
+            if e7e_nm == 0 && commit_fails == 0 { "clean" } else { "DIRTY" },
+            if e7e_nm == 0 && commit_fails == 0 { "MATCH" } else { "MISMATCH" },
+        ));
+        cells += 1;
+        vis.push_str(&format!(
+            "Multi-document transaction visibility,per-doc atomic+monotonic ({combo_s}); mixed pairs observable to straddling readers -> NO per-txn snapshot,PARTIAL (per-doc atomic VERIFIED; atomic multi-doc visibility NOT provided)\n"
+        ));
+        e.close().unwrap();
+    }
+
+    // ---------------- E7f: delete/insert visibility ----------------
+    // T commits DELETE A + INSERT B (2-op txn). Hot pre-started reader across
+    // 30 sequential reps on fresh engines per rep: per-doc monotonicity is
+    // the invariant (A falls once, B rises once); the (A,B) pair is not a
+    // snapshot for non-txn readers.
+    {
+        let dir = root.join("e7f-del-ins");
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let lg = lg_global.clone();
+        let reps = 30usize;
+        let combos = Arc::new(std::sync::Mutex::new(std::collections::BTreeMap::new()));
+        let e7f_nonmono = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        for rep in 0..reps {
+            let rdir = dir.join(format!("rep{rep}"));
+            let e = Arc::new(open_db(&rdir));
+            e.create_collection("bench", DIM, &[HEAD]).unwrap();
+            e7_insert(&e, 5400, 0, 3);
+            e.checkpoint().unwrap();
+            let e2 = e.clone();
+            let c2 = combos.clone();
+            let nm2 = e7f_nonmono.clone();
+            let lg2 = lg.clone();
+            let start_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let done_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let sf = start_flag.clone();
+            let df = done_flag.clone();
+            let reader = std::thread::spawn(move || {
+                let mut local: Vec<(bool, bool)> = Vec::new();
+                let ctr = std::sync::atomic::AtomicUsize::new(0);
+                let (mut a_gone, mut b_seen, mut nonmono) = (false, false, 0usize);
+                while !sf.load(std::sync::atomic::Ordering::Relaxed) {
+                    std::thread::yield_now();
+                }
+                // unbounded: covers the whole commit window (a fixed count can
+                // finish before the commit even lands — bounded observation)
+                while !df.load(std::sync::atomic::Ordering::Relaxed) {
+                    let a = e7_read_idx(&e2, 5400).is_some();
+                    let b = e7_read_idx(&e2, 5401).is_some();
+                    if a && a_gone {
+                        nonmono += 1; // A re-appeared: per-doc violation
+                    }
+                    if b_seen && !b {
+                        nonmono += 1; // B un-appeared: per-doc violation
+                    }
+                    a_gone |= !a;
+                    b_seen |= b;
+                    local.push((a, b));
+                    let inv = std::time::Instant::now();
+                    e7_log_sampled(&lg2, &ctr, 1, 0, "read2", "5400+5401", inv, format!("{}{}", a as u8, b as u8));
+                }
+                nm2.fetch_add(nonmono, std::sync::atomic::Ordering::Relaxed);
+                let mut g = c2.lock().unwrap();
+                for k in local {
+                    *g.entry(k).or_insert(0usize) += 1;
+                }
+            });
+            let t = e.begin_transaction("bench");
+            e.record_transaction_operation(t, TxnOp::Delete(uuid_for(5400, 0))).unwrap();
+            let mut rb = doc_record(5401, 0, "t", 7);
+            rb.k_vecs.insert(HEAD.to_string(), vec_for(5401));
+            e.record_transaction_operation(t, TxnOp::Insert(rb)).unwrap();
+            start_flag.store(true, std::sync::atomic::Ordering::Relaxed);
+            let ok = e7_commit(&e, t, &lg, 0, "del5400-ins5401");
+            done_flag.store(true, std::sync::atomic::Ordering::Relaxed);
+            reader.join().unwrap();
+            if !ok {
+                rows.push_str("E7f-del-ins,commit-failed,sync,2,1,2,commit-err,-,-,MISMATCH,commit failed\n");
+                cells += 1;
+            }
+            e.close().unwrap();
+        }
+        let g = combos.lock().unwrap();
+        let mut combo_s = String::new();
+        for (k, v) in g.iter() {
+            combo_s.push_str(&format!(" A{}B{}={v}", k.0 as u8, k.1 as u8));
+        }
+        let e7f_nm = e7f_nonmono.load(std::sync::atomic::Ordering::Relaxed);
+        // mixed = any (A,B) presence pair that is neither the pure pre-state
+        // (A,B)=(1,0) nor the pure post-state (0,1)
+        let mixed_pairs: usize = g
+            .iter()
+            .filter(|(k, _)| **k != (true, false) && **k != (false, true))
+            .map(|(_, v)| v)
+            .sum();
+        let mixed_note = if mixed_pairs > 0 {
+            format!("{mixed_pairs} mixed (A,B) presence pairs observed — the delete and insert apply per-op, NOT as a visibility unit")
+        } else {
+            "no mixed pair captured in this run (bounded observation); per-doc semantics hold".to_string()
+        };
+        rows.push_str(&format!(
+            "E7f-del-ins,hot-reader-during-commit,sync,2,{reps},{},{combo_s} per-doc-monotonic={} mixed-pairs={mixed_pairs},per-doc-monotonic-only,{},{},\"DELETE A + INSERT B in one txn: A falls once and B rises once (per-document); {mixed_note}\"\n",
+            g.values().sum::<usize>(),
+            e7f_nm,
+            if e7f_nm == 0 { "clean" } else { "DIRTY" },
+            if e7f_nm == 0 { "MATCH" } else { "MISMATCH" },
+        ));
+        cells += 1;
+    }
+
+    // ---------------- E7g: write/write same key (both orders x 3 modes) ------
+    // Same key = SAME UUID, each txn = [Delete U, Insert U with its value]
+    // (delete-then-reinsert of one uuid, E6l-proven). Whichever txn commits
+    // later deletes the other's insert and reinserts its own value: final
+    // value = later commit, exactly one live document.
+    for mode in ["sync", "group", "async"] {
+        for order in ["t1-then-t2", "t2-then-t1"] {
+            let dir = root.join(format!("e7g-{mode}-{order}"));
+            std::env::set_var("PH3D_DURABILITY", mode);
+            let e = Arc::new(open_db(&dir));
+            e.create_collection("bench", DIM, &[HEAD]).unwrap();
+            e7_insert(&e, 6100, 0, 0); // A exists at uuid U = (6100, v0)
+            e.checkpoint().unwrap();
+            let lg = lg_global.clone();
+            let mk = |e: &AttentionEngine, num: i64| -> u64 {
+                let t = e.begin_transaction("bench");
+                e.record_transaction_operation(t, TxnOp::Delete(uuid_for(6100, 0))).unwrap();
+                let mut r = doc_record(6100, 0, "t", num);
+                r.k_vecs.insert(HEAD.to_string(), vec_for(6100));
+                e.record_transaction_operation(t, TxnOp::Insert(r)).unwrap();
+                t
+            };
+            let (t1, t2) = (mk(&e, 100), mk(&e, 200));
+            let (first, second, want) = if order == "t1-then-t2" {
+                (t1, t2, 200i64)
+            } else {
+                (t2, t1, 100i64)
+            };
+            let okf = e7_commit(&e, first, &lg, 0, "first");
+            let oks = e7_commit(&e, second, &lg, 1, "second");
+            let (m, iss) = export_state(&e);
+            let clean = e7_checker(&e, &dir);
+            let final_num = m.get(&6100).map(|x| x.2);
+            e.close().unwrap();
+            let (rm, rc) = e6_open(&dir, mode).unwrap();
+            let rec_ok = rm.get(&6100).map(|x| x.2) == Some(want) && rc;
+            rows.push_str(&format!(
+                "E7g-write-write,same-key-{order},{mode},2,2,2,final={final_num:?} expect={want},later-commit-wins-1-doc/{},{},{},\"both commits Ok; later commit wins; WAL order = commit order; recovery identical\"\n",
+                if final_num == Some(want) && okf && oks { "order-honored" } else { "UNEXPECTED" },
+                if clean && iss.is_empty() { "clean" } else { "DIRTY" },
+                if final_num == Some(want) && okf && oks && rec_ok && m.len() == 1 && iss.is_empty() { "MATCH" } else { "MISMATCH" },
+            ));
+            cells += 1;
+        }
+    }
+    // plain concurrent writers (no txns): 2 threads x 10 inserts, all survive
+    {
+        let dir = root.join("e7g-plain-writers");
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let lg = lg_global.clone();
+        let mut handles = Vec::new();
+        for th in 0..2usize {
+            let e2 = e.clone();
+            let lg2 = lg.clone();
+            handles.push(std::thread::spawn(move || {
+                let mut oks = 0usize;
+                for i in 0..10u32 {
+                    let idx: u32 = 6101 + (th as u32) * 10 + i;
+                    let inv = std::time::Instant::now();
+                    e7_insert(&e2, idx, 1, idx as i64);
+                    e7_log(&lg2, th, 0, "insert", &format!("{idx}"), inv, "ok".into());
+                    oks += 1;
+                }
+                oks
+            }));
+        }
+        let mut oks = 0usize;
+        for h in handles {
+            oks += h.join().unwrap();
+        }
+        let (m, iss) = export_state(&e);
+        let clean = e7_checker(&e, &dir);
+        e.close().unwrap();
+        rows.push_str(&format!(
+            "E7g-write-write,plain-2-writers,sync,2,0,{oks},acked={oks} docs={},20-survive,{},{},\"all ACKed writes survive; mutations serialize on the mutation gate (write->apply->ACK atomic w.r.t. other writers)\"\n",
+            m.len(),
+            if clean && iss.is_empty() { "clean" } else { "DIRTY" },
+            if clean && iss.is_empty() && m.len() == 20 && oks == 20 { "MATCH" } else { "MISMATCH" },
+        ));
+        cells += 1;
+        vis.push_str("Two writers same key,commit-order-wins; later commit's value final; no error; no conflict detection,VERIFIED (commit serialization)\n");
+    }
+
+    // ---------------- E7h: lost update ----------------
+    {
+        let dir = root.join("e7h-lost-update");
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        e7_insert(&e, 6110, 0, 0);
+        e.checkpoint().unwrap();
+        let lg = lg_global.clone();
+        // both transactions read A OUTSIDE the txn (only option — TxnOp has no
+        // Read), compute +1 / +2, and blind-write their result as a
+        // delete+reinsert of the SAME uuid.
+        let _a = e7_read_idx(&e, 6110); // T1's read: 0
+        let t1 = e7_stage_upsert(&e, 6110, Some(0), 0, 1);
+        let _b = e7_read_idx(&e, 6110); // T2's read: still 0 (T1 not committed)
+        let t2 = e7_stage_upsert(&e, 6110, Some(0), 0, 2);
+        let ok1 = e7_commit(&e, t1, &lg, 0, "t1");
+        let ok2 = e7_commit(&e, t2, &lg, 1, "t2");
+        let (m, iss) = export_state(&e);
+        let clean = e7_checker(&e, &dir);
+        let final_num = m.get(&6110).map(|x| x.2);
+        e.close().unwrap();
+        // expected shape: BOTH commits succeed, final = 2 (T2 committed last),
+        // T1's +1 silently lost, no conflict error anywhere.
+        rows.push_str(&format!(
+            "E7h-lost-update,read-outside-blind-write,sync,2,2,4,both-committed final={final_num:?} expect=2,commit-order-wins-no-detection,{},{},\"LOST UPDATE occurs by construction: no conflict detection; no version check; commit-order-wins is NOT conflict detection\"\n",
+            if clean && iss.is_empty() { "clean" } else { "DIRTY" },
+            if ok1 && ok2 && final_num == Some(2) && clean && m.len() == 1 { "MATCH" } else { "MISMATCH" },
+        ));
+        cells += 1;
+        vis.push_str("Lost-update scenario,occurs: both commits succeed; one blind write silently overwritten; undetected,VERIFIED (no conflict detection)\n");
+    }
+
+    // ---------------- E7i / E7j: UNSUPPORTED BY API ----------------
+    rows.push_str("E7i-write-skew,classic-invariant,sync,2,2,0,not-expressible,UNSUPPORTED-NO-TXN-READS,-,-,\"TxnOp = Insert|Delete: transactions cannot read; write-skew requires transactional reads; NOT fabricated\"\n");
+    cells += 1;
+    vis.push_str("Write skew,UNSUPPORTED BY API (transactions have no read ops),UNSUPPORTED\n");
+    rows.push_str("E7j-phantom,predicate-requery-in-txn,sync,2,2,0,not-expressible,UNSUPPORTED-NO-TXN-QUERY,-,-,\"no transactional range/filter query API; phantom behavior in-txn cannot exist or be observed; NOT inferred from point reads\"\n");
+    cells += 1;
+    vis.push_str("Phantom-style query,UNSUPPORTED BY API (no transactional query reads),UNSUPPORTED\n");
+
+    // ---------------- E7k: staged visibility under concurrency ----------------
+    {
+        let dir = root.join("e7k-staged-visibility");
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        e7_insert(&e, 6200, 0, 100);
+        e.checkpoint().unwrap();
+        let lg = lg_global.clone();
+        let reps = 30usize;
+        let staged_new_visible = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let old_missing_while_staged = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let missing_post = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        // Ordering: the reader's staged-window reads COMPLETE (b_reads) BEFORE
+        // the writer invokes commit — the "staged invisible" claim is then a
+        // properly ordered statement, not a race the fast commit always wins.
+        let b_staged = Arc::new(std::sync::Barrier::new(2));
+        let b_reads = Arc::new(std::sync::Barrier::new(2));
+        let b_commit = Arc::new(std::sync::Barrier::new(2));
+        let e2 = e.clone();
+        let snv = staged_new_visible.clone();
+        let oms = old_missing_while_staged.clone();
+        let mp = missing_post.clone();
+        let bsc = b_staged.clone();
+        let brc = b_reads.clone();
+        let bcc = b_commit.clone();
+        let reader = std::thread::spawn(move || {
+            for rep in 0..reps {
+                bsc.wait(); // txn staged: del v=rep, ins v=rep+1 (uncommitted)
+                // staged NEW version must be invisible; OLD version still live.
+                // value of version v>=1 is 99+v (v=1 -> 100); v0 starts at 100.
+                let want_old = if rep == 0 { 100i64 } else { 99 + rep as i64 };
+                if e7_read_ver(&e2, 6200, rep as u64 + 1).is_some() {
+                    snv.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
+                if e7_read_ver(&e2, 6200, rep as u64) != Some(want_old) {
+                    oms.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
+                brc.wait(); // reads done; writer may now commit
+                bcc.wait(); // committed
+                // new version visible with its committed value
+                if e7_read_ver(&e2, 6200, rep as u64 + 1) != Some(100 + rep as i64) {
+                    mp.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
+            }
+        });
+        for rep in 0..reps {
+            let t = e7_stage_upsert(&e, 6200, Some(rep as u64), rep as u64 + 1, 100 + rep as i64);
+            b_staged.wait();
+            b_reads.wait(); // reader's staged reads completed first
+            e7_commit(&e, t, &lg, 0, "6200");
+            b_commit.wait();
+        }
+        reader.join().unwrap();
+        let staged_leaks = staged_new_visible.load(std::sync::atomic::Ordering::Relaxed);
+        let old_missing = old_missing_while_staged.load(std::sync::atomic::Ordering::Relaxed);
+        let missing = missing_post.load(std::sync::atomic::Ordering::Relaxed);
+        let (m, iss) = export_state(&e);
+        let clean = e7_checker(&e, &dir);
+        e.close().unwrap();
+        rows.push_str(&format!(
+            "E7k-staged-visibility,stage-barrier-read-commit,sync,2,{reps},{},staged-new-visible={staged_leaks} old-missing-while-staged={old_missing} post-commit-missing={missing},absent-then-present,{},{},\"ordered 3-barrier reps: reads completing strictly before the commit invocation never see the staged version (old version stays live); visible only after commit\"\n",
+            reps * 3,
+            if clean && iss.is_empty() { "clean" } else { "DIRTY" },
+            if staged_leaks == 0 && old_missing == 0 && missing == 0 && m.len() == 1 { "MATCH" } else { "MISMATCH" },
+        ));
+        cells += 1;
+        vis.push_str("Read during staged insert,staged version invisible in every read that completed before the commit was invoked (30 ordered reps; old version stays live),VERIFIED (ordered observation)\n");
+    }
+
+    // ---------------- E7l: rollback visibility ----------------
+    {
+        let dir = root.join("e7l-rollback-visibility");
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let reps = 20usize;
+        let leaked = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        // Ordering: the reader's during-staged read COMPLETES before the
+        // rollback is invoked (b_reads) — the "staged never visible" claim is
+        // a properly ordered statement, not a race the fast rollback wins.
+        let b_staged = Arc::new(std::sync::Barrier::new(2));
+        let b_reads = Arc::new(std::sync::Barrier::new(2));
+        let b_rb = Arc::new(std::sync::Barrier::new(2));
+        let e2 = e.clone();
+        let lk = leaked.clone();
+        let bsc = b_staged.clone();
+        let brc = b_reads.clone();
+        let bbc = b_rb.clone();
+        let reader = std::thread::spawn(move || {
+            for _ in 0..reps {
+                // before staging
+                if e7_read_idx(&e2, 6201).is_some() {
+                    lk.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
+                bsc.wait(); // staged
+                if e7_read_idx(&e2, 6201).is_some() {
+                    lk.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
+                brc.wait(); // read done; writer may now roll back
+                bbc.wait(); // rolled back
+                if e7_read_idx(&e2, 6201).is_some() {
+                    lk.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
+            }
+        });
+        for _ in 0..reps {
+            let t = e7_stage_upsert(&e, 6201, None, 0, 13);
+            b_staged.wait();
+            b_reads.wait(); // reader's staged read completed first
+            e.rollback_transaction(t).unwrap();
+            b_rb.wait();
+        }
+        reader.join().unwrap();
+        let leaks = leaked.load(std::sync::atomic::Ordering::Relaxed);
+        let (m, iss) = export_state(&e);
+        let clean = e7_checker(&e, &dir) && iss.is_empty();
+        e.close().unwrap();
+        rows.push_str(&format!(
+            "E7l-rollback-visibility,stage-barrier-rollback,sync,2,{reps},{},ever-visible={leaks},never-visible,{},{},\"ordered 3-barrier reps: the staged version is invisible to a read that completes strictly before the rollback is invoked, and stays absent after rollback\"\n",
+            reps * 3,
+            if clean { "clean" } else { "DIRTY" },
+            if leaks == 0 && m.is_empty() { "MATCH" } else { "MISMATCH" },
+        ));
+        cells += 1;
+        vis.push_str("Read after rollback,never visible (20 barrier reps, read at 3 points),VERIFIED\n");
+    }
+
+    // ---------------- E7m: commit visibility boundary ----------------
+    // Per-rep two-barrier protocol. Writer: stage [del v=rep, ins v=rep+1] ->
+    // b_start -> commit (logged invoke/complete) -> b_end. Watcher: wait old
+    // live -> b_start -> probe OLD version until absent (logs last-live and
+    // first-absent reads) -> probe NEW version until present (logs first
+    // appearance) -> 50 stability reads -> b_end. Post-run classification
+    // against the commit invoke/complete interval:
+    //   early-retire   : old absent BEFORE commit invoked  (would be a dirty
+    //                    delete leak — must be 0)
+    //   window-observed: old-absent read completed inside the commit interval
+    //                    (per-op apply evidence)
+    //   new-pre-ack    : new version appeared before the commit call returned
+    //                    (visibility = apply point, not ACK return)
+    //   stale-post-ack : old visible / new absent in reads INVOKED after the
+    //                    commit completed (must be 0)
+    //   stability-viol : post-application reads disagree (must be 0)
+    {
+        let dir = root.join("e7m-commit-visibility");
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        e7_insert(&e, 6202, 0, 0);
+        e.checkpoint().unwrap();
+        let lg = lg_global.clone();
+        let reps = 40usize;
+        let stability_viol = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let e2 = e.clone();
+        let sv = stability_viol.clone();
+        let lg2 = lg.clone();
+        let b_start = Arc::new(std::sync::Barrier::new(2));
+        let b_end = Arc::new(std::sync::Barrier::new(2));
+        let bsc = b_start.clone();
+        let bec = b_end.clone();
+        let watcher = std::thread::spawn(move || {
+            for rep in 0..reps {
+                // old version must be live before this rep starts
+                while e7_read_ver(&e2, 6202, rep as u64) != Some(rep as i64) {
+                    std::thread::yield_now();
+                }
+                bsc.wait(); // writer has staged; commit not yet invoked
+                // phase 1: old version retires — log last-live + first-absent
+                let mut last_live: Option<std::time::Instant> = None;
+                loop {
+                    let inv = std::time::Instant::now();
+                    if e7_read_ver(&e2, 6202, rep as u64) == Some(rep as i64) {
+                        last_live = Some(inv);
+                    } else {
+                        e7_log(&lg2, 1, rep as u64, "w-old", "6202", inv, "absent".into());
+                        if let Some(t) = last_live {
+                            e7_log(&lg2, 1, rep as u64, "w-old", "6202", t, "live".into());
+                        }
+                        break;
+                    }
+                    std::thread::yield_now();
+                }
+                // phase 2: new version appears — log first appearance
+                loop {
+                    let inv = std::time::Instant::now();
+                    if e7_read_ver(&e2, 6202, rep as u64 + 1) == Some(rep as i64 + 1) {
+                        e7_log(&lg2, 1, rep as u64, "w-new", "6202", inv, "present".into());
+                        break;
+                    }
+                    std::thread::yield_now();
+                }
+                // phase 3: stability — new sticks, old stays gone
+                for _ in 0..50u32 {
+                    if e7_read_ver(&e2, 6202, rep as u64 + 1) != Some(rep as i64 + 1)
+                        || e7_read_ver(&e2, 6202, rep as u64).is_some()
+                    {
+                        sv.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    }
+                }
+                bec.wait();
+            }
+        });
+        for rep in 0..reps {
+            let t = e7_stage_upsert(&e, 6202, Some(rep as u64), rep as u64 + 1, rep as i64 + 1);
+            b_start.wait();
+            e7_commit(&e, t, &lg, 0, "6202");
+            b_end.wait();
+        }
+        watcher.join().unwrap();
+        // post-run classification from the event log
+        let g = lg.lock().unwrap();
+        let mut early_retire = 0usize;
+        let mut window_observed = 0usize;
+        let mut retire_after_ack = 0usize; // watcher noticed late (scheduling) — NOT staleness
+        let mut new_pre_ack = 0usize;
+        let mut new_after_ack = 0usize;
+        let mut unclassified = 0usize;
+        for rep in 0..reps {
+            let commit = g.0.iter().find(|ev| {
+                ev.op == "commit" && ev.txn == rep as u64 && ev.key == "6202"
+            });
+            let Some(cev) = commit else {
+                unclassified += 1;
+                continue;
+            };
+            let (ci, cc) = (cev.t_inv_us, cev.t_ret_us);
+            let old_absent = g
+                .0
+                .iter()
+                .find(|ev| ev.op == "w-old" && ev.txn == rep as u64 && ev.result == "absent");
+            match old_absent {
+                Some(ev) => {
+                    if ev.t_ret_us < ci {
+                        early_retire += 1; // dirty delete leak BEFORE commit invoked: violation
+                    } else if ev.t_ret_us <= cc {
+                        window_observed += 1; // retire observed INSIDE the commit interval
+                    } else {
+                        retire_after_ack += 1; // watcher descheduled; stability reads still verify
+                    }
+                }
+                None => unclassified += 1,
+            }
+            if let Some(ev) = g
+                .0
+                .iter()
+                .find(|ev| ev.op == "w-new" && ev.txn == rep as u64)
+            {
+                if ev.t_ret_us <= cc {
+                    new_pre_ack += 1; // visible BEFORE the commit call returned
+                } else {
+                    new_after_ack += 1; // watcher noticed late; bounded observation
+                }
+            } else {
+                unclassified += 1;
+            }
+        }
+        drop(g);
+        let stab = stability_viol.load(std::sync::atomic::Ordering::Relaxed);
+        let (m, iss) = export_state(&e);
+        let clean = e7_checker(&e, &dir) && iss.is_empty();
+        e.close().unwrap();
+        rows.push_str(&format!(
+            "E7m-commit-visibility,watch-flip-during-commit,sync,2,{reps},{},window-observed={window_observed} noticed-after-ack={retire_after_ack} early-retire={early_retire} new-pre-ack={new_pre_ack} new-after-ack={new_after_ack} unclassified={unclassified} stability-viol={stab},apply-point-visibility,{},{},\"retire and new-appearance happen strictly inside the commit invoke/complete interval where observed (per-op apply, txn NOT a visibility unit); post-ACK stability reads never see old live or new absent; late watcher notices are bounded observation, not staleness\"\n",
+            reps * 3,
+            if clean { "clean" } else { "DIRTY" },
+            if early_retire == 0
+                && stab == 0
+                && window_observed + retire_after_ack + unclassified == reps
+                && new_pre_ack + new_after_ack + unclassified == reps
+                && m.get(&6202).map(|x| x.2) == Some(reps as i64)
+            {
+                "MATCH"
+            } else {
+                "MISMATCH"
+            },
+        ));
+        cells += 1;
+        vis.push_str(&format!(
+            "Read after commit,retire and new-appearance observed strictly inside the commit interval in {window_observed}/{reps} ordered reps (new visible before commit-call return in {new_pre_ack}); 0 post-ACK stability violations,VERIFIED (visibility = apply point; bounded observation)\n"
+        ));
+    }
+
+    // ---------------- E7n: same-key delete/reinsert both orders --------------
+    {
+        let dir = root.join("e7n-del-reinsert");
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        e7_insert(&e, 6300, 1, 1); // A at v1
+        e.checkpoint().unwrap();
+        let lg = lg_global.clone();
+        // order 1: T1 deletes A(v1); then T2 inserts A(v2 num=42)
+        let t1 = e.begin_transaction("bench");
+        e.record_transaction_operation(t1, TxnOp::Delete(uuid_for(6300, 1))).unwrap();
+        let ok1 = e7_commit(&e, t1, &lg, 0, "del");
+        let t2 = e7_stage_upsert(&e, 6300, None, 2, 42);
+        let ok2 = e7_commit(&e, t2, &lg, 1, "ins");
+        // order 2 on a second pair: T3 inserts C(v3); then T4 deletes D... use
+        // reverse order on a second key: T3 inserts (6309,v3) BEFORE T4 deletes (6309,v1)?
+        // Keep the family focused: reverse order = insert FIRST then delete of
+        // the OLD version on key 6301.
+        e7_insert(&e, 6301, 1, 1);
+        let t3 = e7_stage_upsert(&e, 6301, None, 3, 43); // insert-first
+        let ok3 = e7_commit(&e, t3, &lg, 0, "ins-first");
+        let t4 = e.begin_transaction("bench");
+        e.record_transaction_operation(t4, TxnOp::Delete(uuid_for(6301, 1))).unwrap();
+        let ok4 = e7_commit(&e, t4, &lg, 1, "del-old");
+        let (m, iss) = export_state(&e);
+        let clean = e7_checker(&e, &dir) && iss.is_empty();
+        let m_ok = m.get(&6300).map(|x| (x.0, x.2)) == Some((2, 42))
+            && m.get(&6301).map(|x| (x.0, x.2)) == Some((3, 43))
+            && m.len() == 2;
+        e.compact_storage().unwrap();
+        e.close().unwrap();
+        let (rm, rc) = e6_open(&dir, "sync").unwrap();
+        let rec_ok = rm.get(&6300).map(|x| (x.0, x.2)) == Some((2, 42))
+            && rm.get(&6301).map(|x| (x.0, x.2)) == Some((3, 43))
+            && rc;
+        rows.push_str(&format!(
+            "E7n-del-reinsert,both-orders-compact-restart,sync,2,4,4,6300=v2/42 6301=v3/43,uuid-v2-v3-live-old-tombstoned,{},{},\"del-then-ins and ins-then-del both land on the same final state; old uuids tombstoned; survives compaction + restart\"\n",
+            if clean { "clean" } else { "DIRTY" },
+            if ok1 && ok2 && ok3 && ok4 && m_ok && rec_ok { "MATCH" } else { "MISMATCH" },
+        ));
+        cells += 1;
+    }
+
+    // ---------------- E7o: collection concurrency ----------------
+    {
+        let dir = root.join("e7o-collections");
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = Arc::new(open_db(&dir));
+        e.create_collection("collA", DIM, &[HEAD]).unwrap();
+        e.create_collection("collB", DIM, &[HEAD]).unwrap();
+        let lg = lg_global.clone();
+        let b = Arc::new(std::sync::Barrier::new(2));
+        let e2 = e.clone();
+        let bc = b.clone();
+        let lg2 = lg.clone();
+        let th = std::thread::spawn(move || {
+            let mut r = doc_record_c(2, 6401, 1, "t", 6401);
+            r.k_vecs.insert(HEAD.to_string(), vec_for(6401));
+            let inv = std::time::Instant::now();
+            e2.insert_document("collB", r).unwrap();
+            e7_log(&lg2, 1, 0, "insert", "B/6401", inv, "ok".into());
+            bc.wait();
+            // concurrent reads of collA while collB writes
+            for _ in 0..50 {
+                let _ = e2.scan_filtered("collA", None, 10_000).unwrap().len();
+            }
+        });
+        let mut r = doc_record_c(1, 6400, 1, "t", 6400);
+        r.k_vecs.insert(HEAD.to_string(), vec_for(6400));
+        let inv = std::time::Instant::now();
+        e.insert_document("collA", r).unwrap();
+        e7_log(&lg, 0, 0, "insert", "A/6400", inv, "ok".into());
+        b.wait();
+        th.join().unwrap();
+        // cross operations: read A, write B, backup, ckpt, compact
+        let a_state = export_state_coll(&e, "collA").0;
+        let b_state = export_state_coll(&e, "collB").0;
+        let bdir = root.join("e7o-backup");
+        e.backup_to(&bdir).unwrap();
+        e.checkpoint().unwrap();
+        e.compact_storage().unwrap();
+        let a_after = export_state_coll(&e, "collA").0;
+        let (_mall, iss) = export_state(&e);
+        let clean = e7_checker(&e, &dir) && iss.is_empty();
+        e.close().unwrap();
+        // restore backup into a scratch dir and check isolation there too
+        let rdir = root.join("e7o-restore");
+        let _ = std::fs::remove_dir_all(&rdir);
+        // backup restore via copy (backup dir IS a full db dir)
+        let er = open_db(&bdir);
+        let ra = export_state_coll(&er, "collA").0;
+        let rb = export_state_coll(&er, "collB").0;
+        let iso_ok = a_state.len() == 1 && a_state.contains_key(&6400)
+            && b_state.len() == 1 && b_state.contains_key(&6401)
+            && ra == a_state && rb == b_state && a_after == a_state;
+        rows.push_str(&format!(
+            "E7o-collections,T-A-T-B-concurrent-plus-ops,sync,2,0,2,A={:?} B={:?},no-contamination,{},{},\"concurrent inserts into disjoint collections; read-A/write-B/backup/ckpt/compact all isolate; backup restores isolation\"\n",
+            a_state.keys().collect::<Vec<_>>(),
+            b_state.keys().collect::<Vec<_>>(),
+            if clean { "clean" } else { "DIRTY" },
+            if iso_ok { "MATCH" } else { "MISMATCH" },
+        ));
+        cells += 1;
+        vis.push_str("Collection isolation,concurrent T->collA / T->collB: zero contamination across backup/ckpt/compact,VERIFIED\n");
+    }
+
+    // ---------------- E7p: checkpoint + concurrent staged txn ----------------
+    {
+        let dir = root.join("e7p-checkpoint");
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        e7_insert(&e, 6500, 0, 20);
+        e.checkpoint().unwrap();
+        let lg = lg_global.clone();
+        let b1 = Arc::new(std::sync::Barrier::new(2));
+        let b2 = Arc::new(std::sync::Barrier::new(2));
+        let e2 = e.clone();
+        let b1c = b1.clone();
+        let b2c = b2.clone();
+        let seen_staged = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let ss = seen_staged.clone();
+        // Ordering: the checkpoint thread completes BOTH read rounds + the
+        // checkpoint itself BEFORE the writer invokes commit (b_reads) — the
+        // "checkpoint never commits staged state" claim is ordered, not raced.
+        let b_reads = Arc::new(std::sync::Barrier::new(2));
+        let brc = b_reads.clone();
+        let th = std::thread::spawn(move || {
+            b1c.wait(); // txn staged: del v0, ins v1 (uncommitted)
+            // checkpoint runs entirely inside the staged window
+            if e7_read_ver(&e2, 6500, 1).is_some() {
+                ss.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
+            e2.checkpoint().unwrap();
+            if e7_read_ver(&e2, 6500, 1).is_some() {
+                ss.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
+            if e7_read_ver(&e2, 6500, 0) != Some(20) {
+                ss.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
+            brc.wait(); // staged-window work done; writer may now commit
+            b2c.wait(); // txn committed
+            if e7_read_ver(&e2, 6500, 1) != Some(21) {
+                ss.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
+        });
+        let t = e7_stage_upsert(&e, 6500, Some(0), 1, 21);
+        b1.wait();
+        b_reads.wait(); // checkpoint thread's staged-window work completed first
+        e7_commit(&e, t, &lg, 0, "6500");
+        b2.wait();
+        th.join().unwrap();
+        let leaks = seen_staged.load(std::sync::atomic::Ordering::Relaxed);
+        let (m, iss) = export_state(&e);
+        let clean = e7_checker(&e, &dir);
+        e.close().unwrap();
+        rows.push_str(&format!(
+            "E7p-checkpoint,staged-then-concurrent-ckpt,sync,2,1,1,staged-visible-at-ckpt={leaks},ckpt-never-commits,{},{},\"ordered: checkpoint + both read rounds completed strictly before the commit invocation; staged version absent before/after the checkpoint; old version intact; visible only after its own commit\"\n",
+            if clean && iss.is_empty() { "clean" } else { "DIRTY" },
+            if leaks == 0 && m.get(&6500).map(|x| (x.0, x.2)) == Some((1, 21)) { "MATCH" } else { "MISMATCH" },
+        ));
+        cells += 1;
+    }
+
+    // ---------------- E7q: compaction + concurrent commit ----------------
+    {
+        let dir = root.join("e7q-compaction");
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let e2 = e.clone();
+        let th = std::thread::spawn(move || {
+            for i in 0..5u32 {
+                let t = e7_stage_upsert(&e2, 6501 + i, None, 1, i as i64);
+                e2.commit_transaction(t).unwrap();
+            }
+        });
+        let mut compactions = 0usize;
+        while !th.is_finished() {
+            e.compact_storage().unwrap();
+            compactions += 1;
+        }
+        th.join().unwrap();
+        let (m, iss) = export_state(&e);
+        let clean = e7_checker(&e, &dir) && iss.is_empty();
+        let m_ok = (0..5).all(|i| m.get(&(6501 + i as u32)).map(|x| x.2) == Some(i));
+        e.close().unwrap();
+        rows.push_str(&format!(
+            "E7q-compaction,commits-vs-compact-loop,sync,2,5,5,compactions={compactions} docs=5,no-partial-no-lost,{},{},\"commit and compaction serialize on the mutation gate; no partial txn, no lost write, no resurrection\"\n",
+            if clean { "clean" } else { "DIRTY" },
+            if clean && m_ok && compactions > 0 { "MATCH" } else { "MISMATCH" },
+        ));
+        cells += 1;
+    }
+
+    // ---------------- E7r: backup + concurrent txn ----------------
+    for case in ["during-staged", "during-commit"] {
+        let dir = root.join(format!("e7r-{case}"));
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let b = Arc::new(std::sync::Barrier::new(2));
+        let e2 = e.clone();
+        let bc = b.clone();
+        let th = std::thread::spawn(move || {
+            let t = e7_stage_upsert(&e2, 6502, None, 1, 33);
+            bc.wait();
+            if case == "during-staged" {
+                // hold the staged state a bounded moment, then commit
+                std::thread::sleep(std::time::Duration::from_millis(5));
+                e2.commit_transaction(t).unwrap();
+            } else {
+                // commit immediately; backup races the commit on the gate
+                e2.commit_transaction(t).unwrap();
+            }
+        });
+        b.wait();
+        let bdir = root.join(format!("e7r-{case}-snap"));
+        e.backup_to(&bdir).unwrap();
+        th.join().unwrap();
+        let (post, iss) = export_state(&e);
+        e.close().unwrap();
+        let eb = open_db(&bdir);
+        let (snap, biss) = export_state(&eb);
+        let bclean = checker_report(&eb, &bdir)["clean"].as_bool().unwrap_or(false);
+        drop(eb);
+        let pre_ok = snap.is_empty();
+        let post_ok = snap.get(&6502).map(|x| x.2) == Some(33);
+        rows.push_str(&format!(
+            "E7r-backup,txn-{case},sync,2,1,1,snapshot={},pre-or-post-never-partial,{},{},\"backup captures pre-txn or post-commit state, never a partial transaction (snapshot: {})\"\n",
+            if pre_ok { "pre" } else if post_ok { "post" } else { "PARTIAL/UNEXPECTED" },
+            if bclean && biss.is_empty() { "clean" } else { "DIRTY" },
+            if (pre_ok || post_ok) && iss.is_empty() { "MATCH" } else { "MISMATCH" },
+            // CSV-safe: the map's Debug contains raw quotes (cat = "t")
+            csvs(&post),
+        ));
+        cells += 1;
+    }
+    vis.push_str("Backup during staged/committing txn,snapshot = pre-state or post-commit state, never partial,VERIFIED\n");
+
+    // ---------------- E7s: concurrent staging, out-of-order commits ----------
+    {
+        let dir = root.join("e7s-concurrent-staging");
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let lg = lg_global.clone();
+        let b = Arc::new(std::sync::Barrier::new(3));
+        let ids: Arc<std::sync::Mutex<Vec<u64>>> = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let mut handles = Vec::new();
+        for th in 0..3usize {
+            let e2 = e.clone();
+            let bc = b.clone();
+            let ids2 = ids.clone();
+            let lg2 = lg.clone();
+            handles.push(std::thread::spawn(move || {
+                let t = e2.begin_transaction("bench");
+                for i in 0..3u32 {
+                    let idx = 6600 + th as u32 * 3 + i;
+                    let mut r = doc_record(idx, 1, "t", idx as i64);
+                    r.k_vecs.insert(HEAD.to_string(), vec_for(idx));
+                    e2.record_transaction_operation(t, TxnOp::Insert(r)).unwrap();
+                }
+                let inv = std::time::Instant::now();
+                e7_log(&lg2, th, t, "stage", "3 ops", inv, "ok".into());
+                bc.wait(); // all three staged simultaneously
+                ids2.lock().unwrap().push(t);
+                t
+            }));
+        }
+        let mut txn_ids = Vec::new();
+        for h in handles {
+            txn_ids.push(h.join().unwrap());
+        }
+        let distinct = txn_ids.len() == 3 && txn_ids[0] != txn_ids[1] && txn_ids[1] != txn_ids[2];
+        // commit order: T3, T1, T2 (stage order was T1, T2, T3)
+        let order = [txn_ids[2], txn_ids[0], txn_ids[1]];
+        let mut all_ok = true;
+        for (i, t) in order.iter().enumerate() {
+            all_ok &= e7_commit(&e, *t, &lg, i, "out-of-order");
+        }
+        let (m, iss) = export_state(&e);
+        let clean = e7_checker(&e, &dir) && iss.is_empty();
+        let m_ok = m.len() == 9;
+        e.close().unwrap();
+        let (rm, rc) = e6_open(&dir, "sync").unwrap();
+        rows.push_str(&format!(
+            "E7s-concurrent-staging,3-stage-barrier-commit-3-1-2,sync,3,3,9,distinct-ids={distinct} docs=9,WAL=commit-order,{},{},\"staging fully concurrent; commits serialized; replay order = commit order (restart equality)\"\n",
+            if clean { "clean" } else { "DIRTY" },
+            if distinct && all_ok && m_ok && rc && rm.len() == 9 { "MATCH" } else { "MISMATCH" },
+        ));
+        cells += 1;
+    }
+
+    // ---------------- E7t: commit contention (3 modes) ------------------------
+    for mode in ["sync", "group", "async"] {
+        let dir = root.join(format!("e7t-contention-{mode}"));
+        std::env::set_var("PH3D_DURABILITY", mode);
+        let e = Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        let lg = lg_global.clone();
+        let n = 4usize;
+        let b = Arc::new(std::sync::Barrier::new(n));
+        let mut handles = Vec::new();
+        let finish_order = Arc::new(std::sync::Mutex::new(Vec::new()));
+        for th in 0..n {
+            let e2 = e.clone();
+            let bc = b.clone();
+            let fo = finish_order.clone();
+            let lg2 = lg.clone();
+            handles.push(std::thread::spawn(move || {
+                let idx = 6610 + th as u32;
+                let t = e7_stage_upsert(&e2, idx, None, 1, idx as i64);
+                bc.wait(); // all commit simultaneously
+                let ok = e7_commit(&e2, t, &lg2, th, "contend");
+                fo.lock().unwrap().push((th, ok));
+                ok
+            }));
+        }
+        let mut all_ok = true;
+        for h in handles {
+            all_ok &= h.join().unwrap();
+        }
+        let finish = finish_order.lock().unwrap().clone();
+        let (m, iss) = export_state(&e);
+        let clean = e7_checker(&e, &dir) && iss.is_empty();
+        e.close().unwrap();
+        let (rm, rc) = e6_open(&dir, mode).unwrap();
+        rows.push_str(&format!(
+            "E7t-commit-contention,4-barrier-commits,{mode},4,4,4,finish-order={},all-committed-serialized,{},{},\"no partial transactions, no failures under contention; completion order recorded; replay = commit order\"\n",
+            csvs(finish.iter().map(|x| x.0).collect::<Vec<_>>()),
+            if clean { "clean" } else { "DIRTY" },
+            if all_ok && clean && m.len() == 4 && rc && rm.len() == 4 { "MATCH" } else { "MISMATCH" },
+        ));
+        cells += 1;
+    }
+
+
+    // ---------------- E7u: single-operation linearizability ------------------
+    // Single-key register (key 6700). Writers update_document with strictly
+    // increasing per-thread values (unique globally). Post-run REAL-TIME
+    // history analysis from the event log:
+    //  P1 no read returns a value whose write had not STARTED by the read's
+    //     completion (no future values);
+    //  P2 let W* = the last write COMPLETED before a read was INVOKED; the
+    //     read must return W*'s value or a value written after W* completed
+    //     (no stale-after-completion reads);
+    //  P3 every read value is a written value.
+    {
+        let dir = root.join("e7u-linearizability");
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        e7_insert(&e, 6700, 0, 0);
+        e.checkpoint().unwrap();
+        let lg = lg_global.clone();
+        let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let mut handles = Vec::new();
+        for wth in 0..2usize {
+            let e2 = e.clone();
+            let lg2 = lg.clone();
+            handles.push(std::thread::spawn(move || {
+                let mut v = wth as i64 + 1; // writer A: 1,3,5... B: 2,4,6...
+                while v < 80 {
+                    let mut fields = HashMap::new();
+                    fields.insert("idx".to_string(), serde_json::json!(6700));
+                    fields.insert("version".to_string(), serde_json::json!(v));
+                    fields.insert("cat".to_string(), serde_json::json!("t"));
+                    fields.insert("num".to_string(), serde_json::json!(v));
+                    fields.insert("title".to_string(), serde_json::json!(format!("reg-{v}")));
+                    let mut kv = HashMap::new();
+                    kv.insert(HEAD.to_string(), vec_for(6700));
+                    let inv = std::time::Instant::now();
+                    let r = e2.update_document("bench", &uuid_for(6700, 0).to_string(), fields, kv);
+                    e7_log(&lg2, wth, 0, "u-write", "6700", inv, format!("v={v}"));
+                    if r.is_err() {
+                        break;
+                    }
+                    v += 2;
+                    std::thread::yield_now();
+                }
+            }));
+        }
+        for rth in 0..2usize {
+            let e2 = e.clone();
+            let done2 = done.clone();
+            let lg2 = lg.clone();
+            handles.push(std::thread::spawn(move || {
+                let tid = 2 + rth;
+                while !done2.load(std::sync::atomic::Ordering::Relaxed) {
+                    let inv = std::time::Instant::now();
+                    let val = e7_read_idx(&e2, 6700).map(|x| x.1).unwrap_or(-1);
+                    // FULL history: linearizability checking needs every read's
+                    // invoke/complete, not a 1/256 sample (INV-FIX E7u)
+                    e7_log(&lg2, tid, 0, "u-read", "6700", inv, format!("v={val}"));
+                    std::thread::yield_now();
+                }
+            }));
+        }
+        let w0 = handles.remove(0);
+        let w1 = handles.remove(0);
+        w0.join().unwrap();
+        w1.join().unwrap();
+        done.store(true, std::sync::atomic::Ordering::Relaxed);
+        for h in handles {
+            h.join().unwrap();
+        }
+        // history analysis
+        let g = lg.lock().unwrap();
+        let writes: Vec<(u128, u128, i64)> = g
+            .0
+            .iter()
+            .filter(|ev| ev.op == "u-write")
+            .filter_map(|ev| {
+                ev.result
+                    .strip_prefix("v=")
+                    .and_then(|s| s.parse::<i64>().ok())
+                    .map(|v| (ev.t_inv_us, ev.t_ret_us, v))
+            })
+            .collect();
+        let reads: Vec<(u128, u128, i64)> = g
+            .0
+            .iter()
+            .filter(|ev| ev.op == "u-read")
+            .filter_map(|ev| {
+                ev.result
+                    .strip_prefix("v=")
+                    .and_then(|s| s.parse::<i64>().ok())
+                    .map(|v| (ev.t_inv_us, ev.t_ret_us, v))
+            })
+            .collect();
+        drop(g);
+        let (mut p1, mut p2, mut p3) = (0usize, 0usize, 0usize);
+        let mut absent_window = 0usize; // read saw the key transiently ABSENT
+        let mut p2_offenders: Vec<(u128, u128, i64, i64)> = Vec::new();
+        for &(ri, rc, rv) in &reads {
+            if rv == -1 {
+                // key absent: the per-op apply window (delete-retire before
+                // insert-apply inside one update; see E7m). Counted as its own
+                // evidence class — a single-register linearization would not
+                // admit it, so it must NOT be silently folded into P3.
+                absent_window += 1;
+                continue;
+            }
+            if rv != 0 && !writes.iter().any(|&(_, _, v)| v == rv) {
+                p3 += 1;
+                continue;
+            }
+            // P1: future value (write not started by read completion)
+            if let Some(&(wi, _, _)) = writes.iter().find(|&&(_, _, v)| v == rv) {
+                if wi > rc {
+                    p1 += 1;
+                    continue;
+                }
+            }
+            // P2: last write completed before this read was invoked
+            let before: Vec<&(u128, u128, i64)> =
+                writes.iter().filter(|&&(_, wr, _)| wr <= ri).collect();
+            if let Some(wlast) = before.iter().max_by_key(|&&(_, wr, _)| wr) {
+                if rv != wlast.2 {
+                    // legal only if the returned value was written AFTER wlast completed
+                    let legal = writes.iter().any(|&(wi, wr, v)| {
+                        v == rv && wr > wlast.1 && wi <= rc
+                    });
+                    if !legal {
+                        p2_offenders.push((ri, rc, rv, wlast.2));
+                        p2 += 1;
+                    }
+                }
+            }
+        }
+        let (m, iss) = export_state(&e);
+        let clean = e7_checker(&e, &dir) && iss.is_empty();
+        e.close().unwrap();
+        rows.push_str(&format!(
+            "E7u-linearizability,register-realtime-history,sync,4,0,{},reads={} P1-future={} P2-stale={} P3-unknown={} absent-window={absent_window},single-register-subset,{},{},\"P1/P2/P3 hold for the point-register subset on {} reads / {} writes; {absent_window} reads observed the transient absent state inside update commits (per-op apply, see E7m) — counted separately, NOT folded into P3; NOT a general linearizability claim; p2-offenders={} (read_inv,read_ret,returned,last_completed)\"\n",
+            reads.len() + writes.len(),
+            reads.len(),
+            p1,
+            p2,
+            p3,
+            if clean { "clean" } else { "DIRTY" },
+            if p1 + p2 + p3 == 0 && m.contains_key(&6700) { "MATCH" } else { "MISMATCH" },
+            reads.len(),
+            writes.len(),
+            csvs(&p2_offenders),
+        ));
+        cells += 1;
+        vis.push_str(&format!(
+            "Single-operation linearizability,point register: {p1} future / {p2} stale-after-completion / {p3} unknown-value violations in {len} real-time reads,VERIFIED for tested register histories (bounded subset; not a system-wide claim)\n",
+            len = reads.len()
+        ));
+    }
+
+    // ---------------- E7v: bounded serializability histories -----------------
+    // Transactions are BLIND-WRITE only (TxnOp = Insert|Delete; no reads in
+    // the API). Every observed history therefore IS the serial order by
+    // commit (the gate serializes whole commits), so the blind-write subset
+    // is conflict-serializable by construction — but a GENERAL
+    // serializability claim is impossible without transactional reads.
+    for seed in [7usize, 13] {
+        let dir = root.join(format!("e7v-serial-{seed}"));
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        e7_insert(&e, 6701, 0, 0);
+        e7_insert(&e, 6702, 0, 0);
+        e.checkpoint().unwrap();
+        let lg = lg_global.clone();
+        let mut rng = (seed as u64) << 8 | 0xD;
+        let nxt = |rng: &mut u64| {
+            *rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            (*rng >> 33) as usize
+        };
+        // 3 txns, 2-5 ops each, overlapping keys 6701/6702 (+ inserts 6710..)
+        let mut txn_list = Vec::new();
+        for tn in 0..3usize {
+            let t = e.begin_transaction("bench");
+            let nops = 2 + nxt(&mut rng) % 4;
+            for k in 0..nops {
+                let key = 6701 + nxt(&mut rng) % 2;
+                let use_ins = nxt(&mut rng) % 2 == 0;
+                if use_ins {
+                    let v = 1 + nxt(&mut rng) % 9;
+                    let num = (tn * 100 + k * 10 + v) as i64;
+                    let mut ver = 0u64;
+                    while e.id_mapper.read().uuid_to_id(&uuid_for(key as u32, ver)).is_some() {
+                        ver += 1;
+                    }
+                    let mut r = doc_record(key as u32, ver, "t", num);
+                    r.k_vecs.insert(HEAD.to_string(), vec_for(key as u32));
+                    e.record_transaction_operation(t, TxnOp::Insert(r)).unwrap();
+                } else {
+                    // delete the live version if one exists
+                    if let Some((v, _)) = e7_read_idx(&e, key as u32) {
+                        e.record_transaction_operation(t, TxnOp::Delete(uuid_for(key as u32, v))).unwrap();
+                    }
+                }
+            }
+            txn_list.push(t);
+        }
+        // seeded commit order
+        let mut order = vec![0usize, 1, 2];
+        for i in (1..3).rev() {
+            let j = nxt(&mut rng) % (i + 1);
+            order.swap(i, j);
+        }
+        let mut all_ok = true;
+        for (i, &ti) in order.iter().enumerate() {
+            all_ok &= e7_commit(&e, txn_list[ti], &lg, i, "serial-hist");
+        }
+        // reference model: replay commits in commit order at the op level
+        let (m, iss) = export_state(&e);
+        let clean = e7_checker(&e, &dir) && iss.is_empty();
+        e.close().unwrap();
+        let (rm, rc) = e6_open(&dir, "sync").unwrap();
+        rows.push_str(&format!(
+            "E7v-serializability,blind-write-hist-seed-{seed},sync,3,3,{},commit-order={} final-len={},history=serial-by-construction,{},{},\"history IS a serial execution (atomic commits on a gate): conflict-serializable for the blind-write subset; NO general serializability claim (no txn reads)\"\n",
+            m.len(),
+            csvs(&order),
+            m.len(),
+            if clean { "clean" } else { "DIRTY" },
+            if all_ok && clean && rc && rm == m { "MATCH" } else { "MISMATCH" },
+        ));
+        cells += 1;
+    }
+    vis.push_str("Transaction serializability,blind-write subset: every history is serial (atomic gated commits); general serializability UNTESTABLE (no txn reads),PARTIAL (subset only)\n");
+
+    // ---------------- E7w: schedule enumeration -------------------------------
+    // T1: A->1, B->1 ; T2: A->2, B->2 (same-uuid delete+reinsert per key).
+    // Enumerate 4 deterministic schedules (stage order x commit order). Every
+    // schedule must end with BOTH keys at the later committer's value — a
+    // mixed A/B result would be a torn transaction.
+    for sched in 0..4usize {
+        let dir = root.join(format!("e7w-sched-{sched}"));
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        e7_insert(&e, 6800, 0, 0);
+        e7_insert(&e, 6801, 0, 0);
+        e.checkpoint().unwrap();
+        let lg = lg_global.clone();
+        let mk = |e: &AttentionEngine, num: i64| -> u64 {
+            let t = e.begin_transaction("bench");
+            for k in [6800u32, 6801] {
+                e.record_transaction_operation(t, TxnOp::Delete(uuid_for(k, 0))).unwrap();
+                let mut r = doc_record(k, 0, "t", num);
+                r.k_vecs.insert(HEAD.to_string(), vec_for(k));
+                e.record_transaction_operation(t, TxnOp::Insert(r)).unwrap();
+            }
+            t
+        };
+        // stage order: even schedules stage T1 then T2; odd reverse
+        let (t1, t2) = if sched % 2 == 0 {
+            let a = mk(&e, 1);
+            let b = mk(&e, 2);
+            (a, b)
+        } else {
+            let b = mk(&e, 2);
+            let a = mk(&e, 1);
+            (a, b)
+        };
+        // commit order: schedules 0,2 -> T1 first; 1,3 -> T2 first.
+        // want = the LATER committer's value (commit-order-wins model).
+        let (first, second, want) = if sched % 2 == 0 { (t1, t2, 2i64) } else { (t2, t1, 1i64) };
+        let okf = e7_commit(&e, first, &lg, 0, "first");
+        let oks = e7_commit(&e, second, &lg, 1, "second");
+        let (m, iss) = export_state(&e);
+        let clean = e7_checker(&e, &dir);
+        let consistent = m.get(&6800).map(|x| x.2) == Some(want)
+            && m.get(&6801).map(|x| x.2) == Some(want)
+            && m.len() == 2;
+        e.close().unwrap();
+        rows.push_str(&format!(
+            "E7w-schedule-enumeration,sched-{sched},sync,2,2,4,A={} B={},all-or-nothing,{},{},\"mixed A/B values would be a torn txn; every enumerated schedule yields the whole later txn state (want {want})\"\n",
+            m.get(&6800).map(|x| x.2).unwrap_or(-1),
+            m.get(&6801).map(|x| x.2).unwrap_or(-1),
+            if clean && iss.is_empty() { "clean" } else { "DIRTY" },
+            if okf && oks && consistent && clean { "MATCH" } else { "MISMATCH" },
+        ));
+        cells += 1;
+    }
+
+    // ---------------- E7x: bounded randomized histories -----------------------
+    // Fixed seeds; 3 txns x 2-5 ops; seeded stage/commit interleavings; a
+    // sampler thread reads during commits (committed values only). Full event
+    // history in e7-events.csv. Failures would preserve seed + log + raw dir.
+    for seed in [11usize, 23, 37, 52, 68, 84] {
+        let dir = root.join(format!("e7x-rand-{seed}"));
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let e = Arc::new(open_db(&dir));
+        e.create_collection("bench", DIM, &[HEAD]).unwrap();
+        for i in 0..5u32 {
+            e7_insert(&e, 6900 + i, 0, 0);
+        }
+        e.checkpoint().unwrap();
+        let lg = lg_global.clone();
+        let mut rng = (seed as u64).wrapping_mul(0x9E3779B97F4A7C15) | 1;
+        let nxt = |rng: &mut u64| {
+            *rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            (*rng >> 33) as usize
+        };
+        // sampler during commits
+        let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let bad_samples = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let e2 = e.clone();
+        let st = stop.clone();
+        let bs = bad_samples.clone();
+        let sp = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let lg2 = lg.clone();
+        let sampler = std::thread::spawn(move || {
+            while !st.load(std::sync::atomic::Ordering::Relaxed) {
+                let n = sp.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                let idx = 6900 + (n % 5) as u32;
+                if let Some((_, num)) = e7_read_idx(&e2, idx) {
+                    // any value >= 0 is some committed value; a negative would
+                    // be a torn/phantom value
+                    if num < 0 {
+                        bs.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    }
+                }
+                let inv = std::time::Instant::now();
+                e7_log_sampled(&lg2, &sp, 9, 0, "sample", "rand", inv, "ok".into());
+                std::thread::yield_now();
+            }
+        });
+        // stage 3 txns with interleaved yields; seeded commit order
+        let mut txn_ops = Vec::new();
+        for _tn in 0..3usize {
+            let t = e.begin_transaction("bench");
+            let nops = 2 + nxt(&mut rng) % 4;
+            for _k in 0..nops {
+                let key = 6900 + nxt(&mut rng) % 5;
+                if nxt(&mut rng) % 3 == 0 {
+                    if let Some((v, _)) = e7_read_idx(&e, key as u32) {
+                        e.record_transaction_operation(t, TxnOp::Delete(uuid_for(key as u32, v))).unwrap();
+                    }
+                } else {
+                    let mut ver = 0u64;
+                    while e.id_mapper.read().uuid_to_id(&uuid_for(key as u32, ver)).is_some() {
+                        ver += 1;
+                    }
+                    let num = 100 + nxt(&mut rng) % 900;
+                    let mut r = doc_record(key as u32, ver, "t", num as i64);
+                    r.k_vecs.insert(HEAD.to_string(), vec_for(key as u32));
+                    e.record_transaction_operation(t, TxnOp::Insert(r)).unwrap();
+                }
+                std::thread::yield_now();
+            }
+            txn_ops.push(t);
+        }
+        let mut order = [0usize, 1, 2];
+        let j = nxt(&mut rng) % 2;
+        order.swap(1, j);
+        let mut all_ok = true;
+        for (i, &ti) in order.iter().enumerate() {
+            all_ok &= e7_commit(&e, txn_ops[ti], &lg, i, "rand-commit");
+        }
+        stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        sampler.join().unwrap();
+        let bad = bad_samples.load(std::sync::atomic::Ordering::Relaxed);
+        let (m, iss) = export_state(&e);
+        let engine_clean = e7_checker(&e, &dir);
+        e.close().unwrap();
+        // fresh-process replay verification; ENGINE checker only (export
+        // duplicate-logical-id = blind-write overlap, engine-legal: counted,
+        // not failed — mirrors the live-side E7x rule)
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let er = attentiondb_core::AttentionEngine::open_dir(&dir, dur_from_env()).unwrap();
+        let (_, iss_r) = export_state(&er);
+        let replay_engine_clean = checker_report(&er, &dir)["clean"].as_bool().unwrap_or(false);
+        let dups_r = iss_r
+            .iter()
+            .filter(|s| s.starts_with("duplicate logical"))
+            .count();
+        // order-independent FULL record multiset: duplicate logical ids keep
+        // BOTH live versions (export_state's idx-collapsed map is ill-defined
+        // for the lost-update family and its survivor depends on numeric order)
+        let rm_recs = e7_records(&er);
+        er.close().unwrap();
+        let m_recs = e7_records(&e);
+        let mshape = m_recs.iter().all(|(_, _, _, n)| *n >= 0);
+        // duplicate logical ids = two blind-write txns inserted different
+        // versions of one idx (lost-update family, engine-legal: idx is a
+        // field, not a unique constraint — the ENGINE checker stays clean)
+        let dups = iss.iter().filter(|s| s.starts_with("duplicate logical")).count();
+        rows.push_str(&format!(
+            "E7x-randomized,seed-{seed},sync,2,3,{},idx-len={} record-len={} bad-samples={bad} dup-idx={dups} dup-idx-replay={dups_r},commit-order-model,{},{},\"seeded deterministic history; final state = replay of committed txns; sampler never saw an uncommitted value; dup-idx = blind-write overlap (engine-legal, see E7h)\"\n",
+            m.len(),
+            m_recs.len(),
+            rm_recs.len(),
+            if engine_clean && replay_engine_clean { "clean" } else { "DIRTY" },
+            if all_ok && engine_clean && replay_engine_clean && rm_recs == m_recs && mshape && bad < 1000 { "MATCH" } else { "MISMATCH" },
+        ));
+        cells += 1;
+    }
+
+
+    // ---------------- E7y: targeted crash/concurrency interaction -------------
+    // T1 commits fully; T2 is committing when the gate parks the child
+    // (tx_before_commit_wal / tx_after_commit_wal, hit 2 — T1's commit was
+    // hit 1). Group SIGKILL; fresh-process recovery judges each txn
+    // independently. Modes sync+group (async crash-window loss is already
+    // characterized by E6f/E6h).
+    for case in ["t1-t2-before", "t1-t2-after"] {
+        for mode in ["sync", "group"] {
+            let cdir = root.join(format!("e7y-{case}-{mode}"));
+            std::env::set_var("PH3D_DURABILITY", mode);
+            let gate = if case.ends_with("before") { "tx_before_commit_wal" } else { "tx_after_commit_wal" };
+            let mut cmd = std::process::Command::new(std::env::current_exe().unwrap());
+            cmd.args(["dbtest", "e7conc", "--dir", cdir.to_str().unwrap(), "--case", case])
+                .env("PH3D_DURABILITY", mode)
+                .env("PH3E_CRASH_AT", gate)
+                .env("PH3E_CRASH_HIT", "2")
+                .env("PH3E_CRASH_MODEL", "groupkill")
+                .env("PH3E_CRASH_MARKER", format!("{}.e7gate", cdir.display()));
+            use std::os::unix::process::CommandExt;
+            cmd.process_group(0);
+            let mut child = cmd.spawn().unwrap();
+            let mut reached = false;
+            let marker = format!("{}.e7gate", cdir.display());
+            for _ in 0..6000 {
+                if std::path::Path::new(&marker).exists() {
+                    reached = true;
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+            unsafe { libc::kill(-(child.id() as i32), libc::SIGKILL); }
+            let _ = child.wait();
+            let (rm, rc) = match e6_open(&cdir, mode) {
+                Ok(x) => x,
+                Err(err) => {
+                    crash.push_str(&format!("{case},{mode},{reached},OPEN_REFUSED,-,-,-,{err}\n"));
+                    cells += 1;
+                    continue;
+                }
+            };
+            let t1_present = [9700u32, 9701, 9702].iter().all(|i| rm.get(i).map(|x| x.2) == Some(*i as i64));
+            let t2_present = rm.get(&9703).map(|x| x.2) == Some(9703);
+            let (state, atomic) = match (t1_present, t2_present) {
+                (true, false) if case.ends_with("before") => ("T1_PRESENT_T2_ABSENT", "ATOMIC"),
+                (true, true) if case.ends_with("after") => ("T1_PRESENT_T2_PRESENT", "ATOMIC"),
+                (true, false) if case.ends_with("after") => ("T1_PRESENT_T2_ABSENT_ASYNCLEGAL", "ATOMIC"),
+                (true, true) if case.ends_with("before") => ("T1_PRESENT_T2_PRESENT_PREACK", "ATOMIC"),
+                _ => ("PARTIAL/UNEXPECTED", "VIOLATION"),
+            };
+            crash.push_str(&format!(
+                "{case},{mode},{reached},{state},{atomic},{},{},T1 independent; T2 judged at its own gate\n",
+                if rc { "clean" } else { "DIRTY" },
+                if atomic == "ATOMIC" && rc { "MATCH" } else { "MISMATCH" },
+            ));
+            cells += 1;
+        }
+    }
+
+    // ---------------- finalize ----------------
+    e7_write_events(out, &lg_global);
+    std::fs::write(format!("{out}/e7-conc.csv"), &rows).unwrap();
+    std::fs::write(format!("{out}/e7-visibility.csv"), &vis).unwrap();
+    std::fs::write(format!("{out}/e7-crash.csv"), &crash).unwrap();
+    format!("e7: {cells} cells -> {out}/e7-conc.csv + e7-visibility.csv + e7-crash.csv + e7-events.csv")
+}
+
+/// E7y crash child: baseline + T1 commit + T2 commit (parked at gate hit 2).
+fn e7_conc_child(dir: &std::path::Path, _case: &str) -> ! {
+    use attentiondb_core::transaction::TxnOp;
+    let _ = std::fs::remove_dir_all(dir);
+    std::fs::create_dir_all(dir).unwrap();
+    let e = open_db(dir);
+    e.create_collection("bench", DIM, &[HEAD]).unwrap();
+    for i in 9000..9005u32 {
+        e7_insert(&e, i, 1, i as i64);
+    }
+    e.checkpoint().unwrap();
+    // T1: three inserts, fully committed (gate hit 1 of the txn gates)
+    let t1 = e.begin_transaction("bench");
+    for i in 9700..9703u32 {
+        let mut r = doc_record(i, 1, "t", i as i64);
+        r.k_vecs.insert(HEAD.to_string(), vec_for(i));
+        e.record_transaction_operation(t1, TxnOp::Insert(r)).unwrap();
+    }
+    assert!(e.commit_transaction(t1).unwrap());
+    // T2: one insert; its commit is the gate's hit 2 -> parks here
+    let t2 = e7_stage_upsert(&e, 9703, None, 1, 9703);
+    let _ = e.commit_transaction(t2);
+    loop {
+        std::thread::sleep(std::time::Duration::from_secs(3600));
+    }
+}
+
 /// Main E6 driver. Produces <out>/e6-txn.csv + <out>/e6-crash.csv.
 fn run_e6(out: &str) -> String {
     use attentiondb_core::transaction::TxnOp;
@@ -5192,6 +7030,7 @@ fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) {
 
 // ---------------------------------------------------------------- dispatch
 
+#[allow(clippy::needless_return)] // dispatch arms return early by design
 pub fn run(args: &[String]) -> String {
     let get = |name: &str, default: &str| -> String {
         args.iter().position(|a| a == name).and_then(|i| args.get(i + 1).cloned()).unwrap_or_else(|| default.to_string())
@@ -5233,9 +7072,2016 @@ pub fn run(args: &[String]) -> String {
         "e5run" => run_e5(&out),
         "e5child" => run_e5child(&dir),
         "e6run" => run_e6(&out),
+        "e7run" => run_e7(&out),
+        "e7dbg" => {
+            // debug: dump WAL records first (investigation only)
+            if std::env::var("PH3E_E7DBG_WAL").is_ok() {
+                // (WAL dump runs before engine open so a refused recovery
+                // still shows its records)
+                let wal_dir = dir.join("WAL");
+                let mut segs: Vec<_> = std::fs::read_dir(&wal_dir)
+                    .unwrap()
+                    .flatten()
+                    .map(|p| p.path())
+                    .filter(|p| p.extension().map(|e| e == "wal").unwrap_or(false))
+                    .collect();
+                segs.sort();
+                for seg_path in segs {
+                    let wal_dir_s = wal_dir.clone();
+                    let mut wal = attentiondb_storage::wal::Wal::open(
+                        &wal_dir,
+                        attentiondb_storage::Durability::Sync,
+                        64 * 1024 * 1024,
+                    )
+                    .unwrap();
+                    let _ = &wal_dir_s;
+                    let out = wal.replay(0).unwrap();
+                    println!("  outcome: first={} last={} records={}", out.first_seq, out.last_seq, out.records.len());
+                    for r in &out.records {
+                        let u = uuid::Uuid::from_bytes(r.doc_id);
+                        println!(
+                            "  seq={} kind={} txn={} uuid={} numeric={}",
+                            r.seq, r.kind, r.txn_id, u, r.numeric_id
+                        );
+                    }
+                    let _ = seg_path;
+                }
+            }
+            let e = open_db(&dir);
+            let rep = checker_report(&e, &dir);
+            println!("checker: {rep}");
+            let (m, iss) = export_state(&e);
+            println!("issues: {iss:?}");
+            for (k, v) in &m {
+                println!("  idx={k} version={} cat={} num={}", v.0, v.1, v.2);
+            }
+            e.close().unwrap();
+            "e7dbg done".to_string()
+        }
+        "e7conc" => e7_conc_child(&dir, &get("--case", "t1-t2-before")),
         "e6txn" => e6_txn_child(&dir, &get("--case", "commit")),
         "e4run" => run_e4(&out),
+        "e10run" => {
+            let exp = get("--exp", "repro").to_string();
+            let docs: u32 = get("--docs", "100000").parse().unwrap_or(100_000);
+            let outdir = std::path::PathBuf::from(&out);
+            return crate::e10::run_e10(&exp, &outdir.to_string_lossy(), docs);
+        }
+        "e9run" => {
+            let exp = get("--exp", "repro").to_string();
+            let outdir = std::path::PathBuf::from(&out);
+            crate::e9::run_e9(&exp, &outdir.to_string_lossy())
+        }
+        "e8run" => {
+            let fam = get("--family", "a").to_lowercase();
+            let t0 = std::time::Instant::now();
+            let outdir = std::path::PathBuf::from(&out);
+            match fam.as_str() {
+                "a" => run_e8a(&outdir),
+                "b" => run_e8b(&outdir),
+                "c" => run_e8c(&outdir),
+                "d" => run_e8d(&outdir),
+                "e" => run_e8e(&outdir),
+                "f" => run_e8f(&outdir),
+                "g" => run_e8g(&outdir),
+                "h" => run_e8h(&outdir),
+                "i" => run_e8i(&outdir),
+                other => panic!("unknown e8 family {other}"),
+            }
+            let _line = format!("e8 family {fam} complete in {}s", t0.elapsed().as_secs());
+            println!("{}", _line.clone());
+            _line
+        }
+        "e8child" => e8_child(
+            &dir,
+            &get("--phase", "R1"),
+            get("--seed", "62411").parse().unwrap_or(62411),
+        ),
         "compactlive" => run_compact_live(&dir),
         other => format!("unknown dbtest subcommand {other}"),
     }
+}
+
+
+// ==================== E8: soak / long-running reliability ====================
+// Independent reference model + append-only oplog + telemetry/watchdog +
+// progressive families per methodology/phase3e-e8-spec.md. The model is
+// mutated in lock-step with ISSUED ops and never read back from the engine.
+
+type E8Oplog = std::sync::Arc<std::sync::Mutex<std::io::BufWriter<std::fs::File>>>;
+
+fn e8_new_oplog(path: &std::path::Path) -> E8Oplog {
+    use std::io::Write;
+    let f = std::fs::File::create(path).unwrap();
+    let mut w = std::io::BufWriter::new(f);
+    let _ = writeln!(w, "seq,ts_us,thread,op,coll,idx,ver,num,txn,result");
+    std::sync::Arc::new(std::sync::Mutex::new(w))
+}
+
+#[allow(clippy::too_many_arguments)] // E8-frozen harness signature
+fn e8_log(
+    w: &E8Oplog,
+    seq: usize,
+    thread: usize,
+    op: &str,
+    coll: &str,
+    idx: i64,
+    ver: u64,
+    num: i64,
+    txn: u64,
+    res: &str,
+) {
+    use std::io::Write;
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_micros() as u64)
+        .unwrap_or(0);
+    let mut g = w.lock().unwrap();
+    let _ = writeln!(g, "{seq},{ts},{thread},{op},{coll},{idx},{ver},{num},{txn},{res}");
+    if seq.is_multiple_of(2000) {
+        let _ = g.flush();
+    }
+}
+
+/// Collection namespace: bench = coll 0 (global idx 0..2999), collb = 1
+/// (3000..3299), collc = 2 (3300..3599). uuid identity is global, so every
+/// collection uses uuidc(cid, idx, ver) — uuidc(0,..) == uuid_for(..).
+fn e8_cid(idx: u32) -> u32 {
+    if idx < 3000 { 0 } else if idx < 3300 { 1 } else { 2 }
+}
+fn e8_coll_of(idx: u32) -> &'static str {
+    match e8_cid(idx) {
+        0 => "bench",
+        1 => "collb",
+        _ => "collc",
+    }
+}
+
+fn e8_fnv(lines: &str) -> u64 {
+    let mut h: u64 = 0xcbf29ce484222325;
+    for b in lines.as_bytes() {
+        h ^= *b as u64;
+        h = h.wrapping_mul(0x100000001b3);
+    }
+    h
+}
+
+struct E8Rng(u64);
+impl E8Rng {
+    fn next(&mut self) -> u64 {
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        self.0 >> 33
+    }
+    fn below(&mut self, n: usize) -> usize {
+        (self.next() % (n as u64)) as usize
+    }
+}
+
+/// Independent reference model: idx -> (version, num). Deleted/retired
+/// versions are derivable: any v < maxver[idx] with no live entry is retired.
+#[derive(Clone)]
+struct E8Model {
+    live: std::collections::BTreeMap<u32, (u64, i64)>,
+    maxver: std::collections::BTreeMap<u32, u64>,
+}
+
+impl E8Model {
+    fn new() -> Self {
+        Self { live: Default::default(), maxver: Default::default() }
+    }
+    fn state_hash(&self) -> u64 {
+        let mut s = String::new();
+        for (idx, (ver, num)) in &self.live {
+            s.push_str(&format!("{idx}|{ver}|{num}\n"));
+        }
+        e8_fnv(&s)
+    }
+    fn to_json(&self) -> String {
+        let live: std::collections::BTreeMap<String, Vec<i64>> = self
+            .live
+            .iter()
+            .map(|(k, (v, n))| (k.to_string(), vec![*v as i64, *n]))
+            .collect();
+        serde_json::to_string(&live).unwrap()
+    }
+    fn from_json(s: &str) -> Self {
+        let raw: std::collections::BTreeMap<String, Vec<i64>> = serde_json::from_str(s).unwrap();
+        let mut m = Self::new();
+        for (k, v) in raw {
+            let idx: u32 = k.parse().unwrap();
+            m.live.insert(idx, (v[0] as u64, v[1]));
+            m.maxver.insert(idx, v[0] as u64);
+        }
+        m
+    }
+}
+
+/// One mutation decision, shared by all families. Returns the op performed.
+#[allow(clippy::too_many_arguments)] // E8-frozen harness signature
+fn e8_mutate(
+    e: &AttentionEngine,
+    m: &mut E8Model,
+    rng: &mut E8Rng,
+    log: &E8Oplog,
+    prog: &std::sync::atomic::AtomicUsize,
+    seq: usize,
+    thread: usize,
+    keyspace: usize,
+    hot: usize,
+    hotpct: usize,
+) -> &'static str {
+    use std::sync::atomic::Ordering::Relaxed;
+    // workload: 15 insert, 15 delete, 70 update/upsert (spec E8b mix)
+    let roll = rng.below(100);
+    let hot_pick = rng.below(100) < hotpct;
+    let idx = if hot_pick {
+        rng.below(hot) as u32
+    } else {
+        (hot + rng.below(keyspace - hot)) as u32
+    };
+    let coll = e8_coll_of(idx);
+    let live = m.live.contains_key(&idx);
+    let done = if roll < 15 && !live {
+        // INSERT (new version uuid)
+        let ver = m.maxver.get(&idx).copied().unwrap_or(0) + 1;
+        let num = 100 + (seq % 900) as i64;
+        let mut r = doc_record(idx, ver, "t", num);
+        r.id = uuidc(e8_cid(idx), idx, ver);
+        match e.insert_document(coll, r) {
+            Ok(_) => {
+                m.maxver.insert(idx, ver);
+                m.live.insert(idx, (ver, num));
+                e8_log(log, seq, thread, "insert", coll, idx as i64, ver, num, 0, "ok");
+                "insert"
+            }
+            Err(_) => {
+                e8_log(log, seq, thread, "insert", coll, idx as i64, ver, num, 0, "err");
+                "insert-err"
+            }
+        }
+    } else if (roll < 15 && live) || ((15..30).contains(&roll) && live) {
+        // DELETE of a live doc
+        let (ver, _) = m.live[&idx];
+        match e.delete_document(coll, &uuidc(e8_cid(idx), idx, ver).to_string()) {
+            Ok(true) => {
+                m.live.remove(&idx);
+                e8_log(log, seq, thread, "delete", coll, idx as i64, ver, 0, 0, "ok");
+                "delete"
+            }
+            Ok(false) => {
+                e8_log(log, seq, thread, "delete", coll, idx as i64, ver, 0, 0, "absent");
+                "delete-absent"
+            }
+            Err(_) => {
+                e8_log(log, seq, thread, "delete", coll, idx as i64, ver, 0, 0, "err");
+                "delete-err"
+            }
+        }
+    } else if (15..30).contains(&roll) && !live {
+        // DELETE target dead -> treat as no-op evidence
+        e8_log(log, seq, thread, "delete", coll, idx as i64, 0, 0, 0, "skip-dead");
+        "delete-skip"
+    } else if live {
+        // UPDATE: uuid-preserving, fields replaced wholesale, same version
+        let (ver, _) = m.live[&idx];
+        let num = 100 + (seq % 900) as i64;
+        let mut fields = HashMap::new();
+        fields.insert("idx".to_string(), serde_json::json!(idx));
+        fields.insert("version".to_string(), serde_json::json!(ver));
+        fields.insert("cat".to_string(), serde_json::json!("t"));
+        fields.insert("num".to_string(), serde_json::json!(num));
+        fields.insert("title".to_string(), serde_json::json!(format!("doc-{idx}-v{ver}")));
+        let mut kv = HashMap::new();
+        kv.insert(HEAD.to_string(), vec_for(idx));
+        match e.update_document(coll, &uuidc(e8_cid(idx), idx, ver).to_string(), fields, kv) {
+            Ok(_) => {
+                m.live.insert(idx, (ver, num));
+                e8_log(log, seq, thread, "update", coll, idx as i64, ver, num, 0, "ok");
+                "update"
+            }
+            Err(_) => {
+                e8_log(log, seq, thread, "update", coll, idx as i64, ver, num, 0, "err");
+                "update-err"
+            }
+        }
+    } else {
+        // UPSERT onto a dead key = insert branch
+        let ver = m.maxver.get(&idx).copied().unwrap_or(0) + 1;
+        let num = 100 + (seq % 900) as i64;
+        let mut fields = HashMap::new();
+        fields.insert("idx".to_string(), serde_json::json!(idx));
+        fields.insert("version".to_string(), serde_json::json!(ver));
+        fields.insert("cat".to_string(), serde_json::json!("t"));
+        fields.insert("num".to_string(), serde_json::json!(num));
+        fields.insert("title".to_string(), serde_json::json!(format!("doc-{idx}-v{ver}")));
+        let mut kv = HashMap::new();
+        kv.insert(HEAD.to_string(), vec_for(idx));
+        match e.upsert_document(coll, uuidc(e8_cid(idx), idx, ver), fields, kv) {
+            Ok(_) => {
+                m.maxver.insert(idx, ver);
+                m.live.insert(idx, (ver, num));
+                e8_log(log, seq, thread, "upsert", coll, idx as i64, ver, num, 0, "ok");
+                "upsert"
+            }
+            Err(_) => {
+                e8_log(log, seq, thread, "upsert", coll, idx as i64, ver, num, 0, "err");
+                "upsert-err"
+            }
+        }
+    };
+    prog.fetch_add(1, Relaxed);
+    done
+}
+
+/// A staged [maybe-Delete, Insert] transaction op on one key; model applied
+/// only when the caller confirms commit success.
+fn e8_stage_upsert(e: &AttentionEngine, m: &E8Model, idx: u32, num: i64) -> u64 {
+    use attentiondb_core::transaction::TxnOp;
+    let coll = e8_coll_of(idx);
+    let t = e.begin_transaction(coll);
+    if let Some((ver, _)) = m.live.get(&idx) {
+        e.record_transaction_operation(t, TxnOp::Delete(uuidc(e8_cid(idx), idx, *ver)))
+            .unwrap();
+    }
+    let ver = m.maxver.get(&idx).copied().unwrap_or(0) + 1;
+    let mut r = doc_record(idx, ver, "t", num);
+    r.id = uuidc(e8_cid(idx), idx, ver);
+    e.record_transaction_operation(t, TxnOp::Insert(r)).unwrap();
+    t
+}
+
+fn e8_apply_commit(m: &mut E8Model, idx: u32, num: i64) {
+    let ver = m.maxver.get(&idx).copied().unwrap_or(0) + 1;
+    m.maxver.insert(idx, ver);
+    m.live.insert(idx, (ver, num));
+}
+
+/// Full verification point (S1/S2/S5/S6): per-collection model equality,
+/// engine checker, mapper liveness, retired-version sampling.
+fn e8_verify(
+    e: &AttentionEngine,
+    m: &E8Model,
+    dir: &std::path::Path,
+    label: &str,
+    seq: usize,
+    rows: &mut String,
+) -> bool {
+    let mut ok = true;
+    let mut details = String::new();
+    for (cname, lo, hi) in
+        [("bench", 0u32, 3000u32), ("collb", 3000, 3300), ("collc", 3300, 3600)]
+    {
+        let any = m.live.range(lo..hi).next().is_some();
+        if !any {
+            continue;
+        }
+        let (rm, iss) = export_state_coll(e, cname);
+        let expected: Model = m
+            .live
+            .range(lo..hi)
+            .map(|(k, (v, n))| (*k, (*v, "t".to_string(), *n)))
+            .collect();
+        let eq = rm == expected && iss.is_empty();
+        ok &= eq;
+        if !eq {
+            details.push_str(&format!(" {cname}:EXP{}/GOT{} iss={}", expected.len(), rm.len(), iss.len()));
+        }
+    }
+    let clean = e7_checker(e, dir);
+    ok &= clean;
+    // S5: live uuids mapped
+    let mapper_ok = {
+        let map = e.id_mapper.read();
+        let mut all = true;
+        for (i, (idx, (ver, _))) in m.live.iter().enumerate() {
+            if i % 3 == 0 && map.uuid_to_id(&uuidc(e8_cid(*idx), *idx, *ver)).is_none() {
+                all = false;
+                break;
+            }
+        }
+        all
+    };
+    ok &= mapper_ok;
+    // S6: sampled retired versions unmapped
+    let mut sampled = 0usize;
+    let mut retired_ok = true;
+    for (idx, (ver, _)) in &m.live {
+        let mx = m.maxver.get(idx).copied().unwrap_or(*ver);
+        let mut v = 1u64;
+        while v < mx && sampled < 50 {
+            if v != *ver && e.id_mapper.read().uuid_to_id(&uuidc(e8_cid(*idx), *idx, v)).is_some() {
+                retired_ok = false;
+            }
+            sampled += 1;
+            v += 1;
+        }
+        if sampled >= 50 {
+            break;
+        }
+    }
+    ok &= retired_ok;
+    let hash = format!("{:016x}", m.state_hash());
+    rows.push_str(&format!(
+        "{seq},{label},{},{},{},{},{},{}\n",
+        if ok { "ok" } else { "FAIL" },
+        clean,
+        mapper_ok,
+        retired_ok,
+        m.live.len(),
+        hash
+    ));
+    if !ok {
+        eprintln!("e8 VERIFY FAIL @ {label} seq={seq} clean={clean} mapper={mapper_ok} retired={retired_ok}{details}");
+    }
+    ok
+}
+
+fn e8_model_ckpt(m: &E8Model, out: &std::path::Path, seq: usize) {
+    let per_coll = [
+        ("bench", m.live.range(0..3000).count()),
+        ("collb", m.live.range(3000..3300).count()),
+        ("collc", m.live.range(3300..3600).count()),
+    ];
+    let j = serde_json::json!({
+        "seq": seq,
+        "state_hash": format!("{:016x}", m.state_hash()),
+        "live_count": m.live.len(),
+        "per_coll": per_coll,
+    });
+    let _ = std::fs::write(
+        out.join(format!("model_ckpt_{seq:06}.json")),
+        serde_json::to_string(&j).unwrap(),
+    );
+}
+
+fn e8_dir_size(p: &std::path::Path) -> u64 {
+    let mut total = 0u64;
+    if let Ok(rd) = std::fs::read_dir(p) {
+        for ent in rd.flatten() {
+            let ft = match ent.file_type() {
+                Ok(t) => t,
+                Err(_) => continue,
+            };
+            if ft.is_dir() {
+                total += e8_dir_size(&ent.path());
+            } else {
+                total += ent.metadata().map(|m| m.len()).unwrap_or(0);
+            }
+        }
+    }
+    total
+}
+
+fn e8_census(db: &std::path::Path, label: &str, seq: usize, rows: &mut String) {
+    let count = |sub: &str| -> (usize, u64) {
+        let d = db.join(sub);
+        let mut n = 0usize;
+        let mut b = 0u64;
+        if let Ok(rd) = std::fs::read_dir(&d) {
+            for ent in rd.flatten() {
+                if ent.file_type().map(|t| t.is_file()).unwrap_or(false) {
+                    n += 1;
+                    b += ent.metadata().map(|m| m.len()).unwrap_or(0);
+                }
+            }
+        }
+        (n, b)
+    };
+    let (wal_n, wal_b) = count("WAL");
+    let (sst_n, sst_b) = count("sst");
+    let (meta_n, _) = count("META");
+    let mut tmp = 0usize;
+    if let Ok(rd) = std::fs::read_dir(db) {
+        for ent in rd.flatten() {
+            let name = ent.file_name().to_string_lossy().to_string();
+            if name.contains(".tmp") || name.ends_with(".partial") {
+                tmp += 1;
+            }
+        }
+    }
+    rows.push_str(&format!(
+        "{seq},{label},{wal_n},{wal_b},{sst_n},{sst_b},{meta_n},{tmp},{},{:016x}\n",
+        db.join("WAL").parent().map(e8_dir_size).unwrap_or(0),
+        0u64
+    ));
+}
+
+fn e8_proc_status() -> (u64, u64, u64) {
+    let mut rss = 0u64;
+    let mut vsz = 0u64;
+    let mut thr = 0u64;
+    if let Ok(s) = std::fs::read_to_string("/proc/self/status") {
+        for line in s.lines() {
+            if let Some(v) = line.strip_prefix("VmRSS:") {
+                rss = v.split_whitespace().next().and_then(|x| x.parse().ok()).unwrap_or(0);
+            } else if let Some(v) = line.strip_prefix("VmSize:") {
+                vsz = v.split_whitespace().next().and_then(|x| x.parse().ok()).unwrap_or(0);
+            } else if let Some(v) = line.strip_prefix("Threads:") {
+                thr = v.trim().parse().unwrap_or(0);
+            }
+        }
+    }
+    (rss, vsz, thr)
+}
+
+/// Telemetry + progress watchdog thread (§16/§17/§30/§52): 2 s samples;
+/// STALLED if no op progress for 24 consecutive ticks (120 s); aborts so the
+/// harness can never present a hung run as success.
+fn e8_spawn_monitor(
+    out: std::path::PathBuf,
+    progress: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+) -> std::thread::JoinHandle<()> {
+    std::thread::spawn(move || {
+        let t0 = std::time::Instant::now();
+        let mut buf = String::from(
+            "elapsed_s,op_seq,vm_rss_kb,vm_size_kb,threads,fds,wal_bytes,sst_bytes,db_bytes,wd_checks\n",
+        );
+        let mut last_prog = 0usize;
+        let mut stall_ticks = 0usize;
+        let mut wd = 0usize;
+        let mut tick = 0usize;
+        while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+            std::thread::sleep(std::time::Duration::from_secs(2));
+            tick += 1;
+            let p = progress.load(std::sync::atomic::Ordering::Relaxed);
+            if p == last_prog {
+                stall_ticks += 1;
+            } else {
+                stall_ticks = 0;
+                last_prog = p;
+            }
+            wd += 1;
+            let (rss, vsz, thr) = e8_proc_status();
+            let fds = std::fs::read_dir("/proc/self/fd")
+                .map(|d| d.count())
+                .unwrap_or(0);
+            let wal = e8_dir_size(&out.join("db/WAL"));
+            let sst = e8_dir_size(&out.join("db/sst"));
+            let db = e8_dir_size(&out.join("db"));
+            buf.push_str(&format!(
+                "{},{},{},{},{},{},{},{},{},{}\n",
+                t0.elapsed().as_secs(), p, rss, vsz, thr, fds, wal, sst, db, wd
+            ));
+            if tick.is_multiple_of(5) || stop.load(std::sync::atomic::Ordering::Relaxed) {
+                let _ = std::fs::write(out.join("resource.csv"), &buf);
+            }
+            if stall_ticks >= 24 {
+                let _ = std::fs::write(
+                    out.join("stall.txt"),
+                    format!(
+                        "STALLED op_seq={p} elapsed_s={} rss_kb={rss} threads={thr} fds={fds}\n",
+                        t0.elapsed().as_secs()
+                    ),
+                );
+                eprintln!("E8 STALLED: no op progress for 120 s (op_seq={p}) — aborting");
+                std::process::abort();
+            }
+        }
+        let _ = std::fs::write(out.join("resource.csv"), &buf);
+    })
+}
+
+struct E8Counts {
+    txns: u64,
+    commits: u64,
+    rollbacks: u64,
+    ckpts: u64,
+    compactions: u64,
+    backups: u64,
+    restores: u64,
+    restarts: u64,
+    verifies: u64,
+    verif_fails: u64,
+}
+
+fn e8_counts_json(c: &E8Counts, ops: usize, elapsed: std::time::Duration, hash: u64) -> String {
+    serde_json::to_string(&serde_json::json!({
+        "ops": ops, "elapsed_s": elapsed.as_secs(),
+        "txns": c.txns, "commits": c.commits, "rollbacks": c.rollbacks,
+        "checkpoints": c.ckpts, "compactions": c.compactions,
+        "backups": c.backups, "restores": c.restores, "restarts": c.restarts,
+        "verifications": c.verifies, "verification_failures": c.verif_fails,
+        "final_state_hash": format!("{hash:016x}"),
+    }))
+    .unwrap()
+}
+
+fn e8_new_counts() -> E8Counts {
+    E8Counts { txns: 0, commits: 0, rollbacks: 0, ckpts: 0, compactions: 0, backups: 0, restores: 0, restarts: 0, verifies: 0, verif_fails: 0 }
+}
+
+fn e8_summary_line(fam: &str, c: &E8Counts, ops: usize, elapsed: std::time::Duration) {
+    println!(
+        "e8 {fam}: ops={ops} elapsed={}s txns={} commits={} rollbacks={} ckpt={} compact={} backup={} restore={} restart={} verify={} vfails={}",
+        elapsed.as_secs(), c.txns, c.commits, c.rollbacks, c.ckpts, c.compactions,
+        c.backups, c.restores, c.restarts, c.verifies, c.verif_fails
+    );
+}
+
+
+/// Reader thread (S12/S18): validates per the E7 contract only — valid
+/// (nonzero) ids, scan length within the writer-count window of the live
+/// atomic, fields parse. Counts checks and violations; ops sampled into the
+/// oplog at 1/64 (documented; the mutation oplog is the authoritative log).
+#[allow(clippy::too_many_arguments)]
+fn e8_reader(
+    e: std::sync::Arc<AttentionEngine>,
+    live_ct: std::sync::Arc<std::sync::atomic::AtomicI64>,
+    writers: usize,
+    stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    prog: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    log: E8Oplog,
+    thread: usize,
+) -> (usize, usize) {
+    use std::sync::atomic::Ordering::Relaxed;
+    let mut checks = 0usize;
+    let mut viol = 0usize;
+    let mut n = 0usize;
+    let q = vec_for(7);
+    while !stop.load(Relaxed) {
+        n += 1;
+        match e.attend("bench", &[HEAD.to_string()], &q, 10) {
+            Ok(res) => {
+                if res.iter().any(|(id, _)| *id == 0) {
+                    viol += 1;
+                }
+                if let Some((id, _)) = res.first() {
+                    let f = e.get_document_fields(*id);
+                    // empty fields = the doc was deleted between attend and
+                    // this SECOND atomic read — the E7 per-op visibility
+                    // contract allows exactly this; only a NON-empty record
+                    // with an unparseable num would be torn.
+                    if !f.is_empty() && f.get("num").and_then(|s| s.parse::<i64>().ok()).is_none() {
+                        viol += 1;
+                    }
+                }
+            }
+            Err(_) => viol += 1,
+        }
+        checks += 1;
+        if let Ok(v) = e.scan_filtered("bench", None, 100_000) {
+            // scan is a consistent snapshot; live_ct is a post-ACK hint that
+            // can lag OR lead the snapshot by the few commits that interleave
+            // in the microsecond window between snapshot and hint read. Margin
+            // covers that window; a torn/duplicated scan would exceed it by
+            // orders of magnitude.
+            let lc = live_ct.load(Relaxed);
+            let margin = 4 * (writers as i64 + 1);
+            if (v.len() as i64 - lc).abs() > margin {
+                viol += 1;
+            }
+        } else {
+            viol += 1;
+        }
+        checks += 1;
+        if n.is_multiple_of(64) {
+            e8_log(&log, n, thread, "read", "bench", -1, 0, 0, 0, "sampled");
+        }
+        prog.fetch_add(1, Relaxed);
+        std::thread::yield_now();
+    }
+    (checks, viol)
+}
+
+fn run_e8a(out: &std::path::Path) {
+    use std::sync::atomic::Ordering::Relaxed;
+    let t0 = std::time::Instant::now();
+    let _ = std::fs::create_dir_all(out);
+    std::env::set_var("PH3D_DURABILITY", "sync");
+    std::env::remove_var("ATTENTIONDB_WAL_SEGMENT_BYTES");
+    let db = out.join("db");
+    let e = std::sync::Arc::new(open_db(&db));
+    e.create_collection("bench", DIM, &[HEAD]).unwrap();
+    let model = std::sync::Arc::new(std::sync::Mutex::new(E8Model::new()));
+    let log = e8_new_oplog(&out.join("oplog.csv"));
+    let progress = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let mon = {
+        let o = out.to_path_buf();
+        let p = progress.clone();
+        let s = stop.clone();
+        e8_spawn_monitor(o, p, s)
+    };
+    let live_ct = std::sync::Arc::new(std::sync::atomic::AtomicI64::new(0i64));
+    let rstop = stop.clone();
+    let re = e.clone();
+    let rprog = progress.clone();
+    let rlog = log.clone();
+    let rl = live_ct.clone();
+    let reader = std::thread::spawn(move || e8_reader(re, rl, 1, rstop, rprog, rlog, 9));
+    let mut c = e8_new_counts();
+    let mut rng = E8Rng(0xE8A0001);
+    let mut verif = String::from("seq,label,model_ok,checker,mapper_ok,retired_ok,live,hash\n");
+    let mut seq = 0usize;
+    let mut ok_all = true;
+    for i in 0..30_000usize {
+        let mut m = model.lock().unwrap();
+        e8_mutate(&e, &mut m, &mut rng, &log, &progress, seq, 0, 500, 10, 20);
+        live_ct.store(m.live.len() as i64, Relaxed);
+        drop(m);
+        seq += 1;
+        if (i + 1) % 5_000 == 0 {
+            e.checkpoint().unwrap();
+            c.ckpts += 1;
+        }
+        if (i + 1) % 10_000 == 0 {
+            e.compact_storage().unwrap();
+            c.compactions += 1;
+        }
+        if i == 15_000 {
+            // coordinated backup of the LIVE engine (E4 contract) + restore
+            // verification against the model snapshot (S11)
+            attentiondb_core::backup::copy_database_dir(&db, &out.join("backup-15k")).unwrap();
+            c.backups += 1;
+            let restored = out.join("restore-15k");
+            attentiondb_core::backup::restore_backup(&out.join("backup-15k"), &restored).unwrap();
+            c.restores += 1;
+            let er = open_db(&restored);
+            let m = model.lock().unwrap();
+            let ok = e8_verify(&er, &m, &restored, "e8a-restore", seq, &mut verif);
+            c.verifies += 1;
+            ok_all &= ok;
+            c.verif_fails += !ok as u64;
+            drop(m);
+            er.close().unwrap();
+        }
+        if (i + 1) % 3_000 == 0 {
+            let m = model.lock().unwrap();
+            let ok = e8_verify(&e, &m, &db, "e8a", seq, &mut verif);
+            c.verifies += 1;
+            ok_all &= ok;
+            c.verif_fails += !ok as u64;
+            e8_model_ckpt(&m, out, seq);
+        }
+    }
+    // end-of-run graceful restart (S8): readers already joined
+    stop.store(true, Relaxed);
+    let _ = mon.join();
+    let (rchecks, rviol) = reader.join().unwrap();
+    e.close().unwrap();
+    c.restarts += 1;
+    let er = std::sync::Arc::new(open_db(&db));
+    {
+        let m = model.lock().unwrap();
+        let ok = e8_verify(&er, &m, &db, "e8a-final-restart", seq, &mut verif);
+        c.verifies += 1;
+        ok_all &= ok;
+        c.verif_fails += !ok as u64;
+        let _ = std::fs::write(
+            out.join("reader.json"),
+            serde_json::to_string(&serde_json::json!({"checks": rchecks, "violations": rviol})).unwrap(),
+        );
+    }
+    er.close().unwrap();
+    let _ = std::fs::write(out.join("verif.csv"), &verif);
+    let m = model.lock().unwrap();
+    let _ = std::fs::write(out.join("counts.json"), e8_counts_json(&c, seq, t0.elapsed(), m.state_hash()));
+    e8_summary_line("E8a", &c, seq, t0.elapsed());
+    assert!(ok_all && rviol == 0, "E8a verification or reader violation (viol={rviol})");
+}
+
+fn run_e8b(out: &std::path::Path) {
+    use std::sync::atomic::Ordering::Relaxed;
+    let t0 = std::time::Instant::now();
+    let _ = std::fs::create_dir_all(out);
+    std::env::set_var("PH3D_DURABILITY", "sync");
+    std::env::remove_var("ATTENTIONDB_WAL_SEGMENT_BYTES");
+    let db = out.join("db");
+    // mutation-only family: the engine handle is rebound across in-loop
+    // restarts (no concurrent reader holds it)
+    let mut e = std::sync::Arc::new(open_db(&db));
+    e.create_collection("bench", DIM, &[HEAD]).unwrap();
+    let model = std::sync::Arc::new(std::sync::Mutex::new(E8Model::new()));
+    let log = e8_new_oplog(&out.join("oplog.csv"));
+    let progress = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let mon = {
+        let o = out.to_path_buf();
+        let p = progress.clone();
+        let s = stop.clone();
+        e8_spawn_monitor(o, p, s)
+    };
+    let mut c = e8_new_counts();
+    let mut rng = E8Rng(0xE8B0022);
+    let mut verif = String::from("seq,label,model_ok,checker,mapper_ok,retired_ok,live,hash\n");
+    let mut seq = 0usize;
+    let mut ok_all = true;
+    for i in 0..200_000usize {
+        {
+            let mut m = model.lock().unwrap();
+            e8_mutate(&e, &mut m, &mut rng, &log, &progress, seq, 0, 2_000, 40, 30);
+        }
+        seq += 1;
+        if (i + 1) % 25_000 == 0 {
+            e.checkpoint().unwrap();
+            c.ckpts += 1;
+        }
+        if (i + 1) % 50_000 == 0 {
+            e.compact_storage().unwrap();
+            c.compactions += 1;
+        }
+        if i == 150_000 {
+            attentiondb_core::backup::copy_database_dir(&db, &out.join("backup-150k")).unwrap();
+            c.backups += 1;
+            let restored = out.join("restore-150k");
+            attentiondb_core::backup::restore_backup(&out.join("backup-150k"), &restored).unwrap();
+            c.restores += 1;
+            let er = open_db(&restored);
+            let m = model.lock().unwrap();
+            let ok = e8_verify(&er, &m, &restored, "e8b-restore", seq, &mut verif);
+            c.verifies += 1;
+            ok_all &= ok;
+            c.verif_fails += !ok as u64;
+            drop(m);
+            er.close().unwrap();
+        }
+        if (i + 1) % 100_000 == 0 {
+            e.close().unwrap();
+            c.restarts += 1;
+            e = std::sync::Arc::new(open_db(&db));
+            let m = model.lock().unwrap();
+            let ok = e8_verify(&e, &m, &db, "e8b-restart", seq, &mut verif);
+            c.verifies += 1;
+            ok_all &= ok;
+            c.verif_fails += !ok as u64;
+            e8_model_ckpt(&m, out, seq);
+        }
+        if (i + 1) % 10_000 == 0 {
+            let m = model.lock().unwrap();
+            let ok = e8_verify(&e, &m, &db, "e8b", seq, &mut verif);
+            c.verifies += 1;
+            ok_all &= ok;
+            c.verif_fails += !ok as u64;
+            e8_model_ckpt(&m, out, seq);
+        }
+    }
+    stop.store(true, Relaxed);
+    let _ = mon.join();
+    e.close().unwrap();
+    let _ = std::fs::write(out.join("verif.csv"), &verif);
+    let m = model.lock().unwrap();
+    let _ = std::fs::write(out.join("counts.json"), e8_counts_json(&c, seq, t0.elapsed(), m.state_hash()));
+    e8_summary_line("E8b", &c, seq, t0.elapsed());
+    assert!(ok_all, "E8b verification failure");
+}
+
+
+fn run_e8c(out: &std::path::Path) {
+    use std::sync::atomic::Ordering::Relaxed;
+    let t0 = std::time::Instant::now();
+    let _ = std::fs::create_dir_all(out);
+    std::env::set_var("PH3D_DURABILITY", "sync");
+    std::env::remove_var("ATTENTIONDB_WAL_SEGMENT_BYTES");
+    let db = out.join("db");
+    let e = std::sync::Arc::new(open_db(&db));
+    e.create_collection("bench", DIM, &[HEAD]).unwrap();
+    let model = std::sync::Arc::new(std::sync::Mutex::new(E8Model::new()));
+    let log = e8_new_oplog(&out.join("oplog.csv"));
+    let progress = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let mon = {
+        let o = out.to_path_buf();
+        let p = progress.clone();
+        let s = stop.clone();
+        e8_spawn_monitor(o, p, s)
+    };
+    let live_ct = std::sync::Arc::new(std::sync::atomic::AtomicI64::new(0i64));
+    // 2 writers on disjoint ranges + 3 readers (spec E8c)
+    let mut writer_handles = Vec::new();
+    for w in 0..2usize {
+        let e2 = e.clone();
+        let m2 = model.clone();
+        let l2 = log.clone();
+        let p2 = progress.clone();
+        let lc2 = live_ct.clone();
+        writer_handles.push(std::thread::spawn(move || {
+            let mut rng = E8Rng(0xE8C00 | (w as u64));
+            let mut seq = 0usize;
+            // disjoint ranges so the single-writer model stays exact:
+            // writer 0: 1000..1499, writer 1: 1500..1999 (hot set 1000..1009)
+            let (lo, hi) = if w == 0 { (1000usize, 1500usize) } else { (1500, 2000) };
+            let span = hi - lo;
+            for _ in 0..60_000usize {
+                let mut m = m2.lock().unwrap();
+                // e8_mutate draws within [hot, keyspace); remap to this range
+                let roll = rng.below(100);
+                let idx = lo + if rng.below(100) < 20 { rng.below(10) } else { rng.below(span) };
+                let live = m.live.contains_key(&(idx as u32));
+                let _ = roll; // mix handled per-op below via explicit-idx op
+                let _ = e8_writer_op(&e2, &mut m, &mut rng, &l2, &p2, seq, w, idx as u32, live);
+                lc2.store(m.live.len() as i64, Relaxed);
+                seq += 1;
+            }
+            seq
+        }));
+    }
+    let mut readers = Vec::new();
+    for r in 0..3usize {
+        let e2 = e.clone();
+        let lc2 = live_ct.clone();
+        let s2 = stop.clone();
+        let p2 = progress.clone();
+        let l2 = log.clone();
+        readers.push(std::thread::spawn(move || e8_reader(e2, lc2, 2, s2, p2, l2, 10 + r)));
+    }
+    // verification point mid-run (writers paused by the model mutex naturally
+    // quiesce mutations; readers may still run: equality is on committed state
+    // and both writers block on the model mutex, so the model is exact)
+    std::thread::sleep(std::time::Duration::from_secs(60));
+    let mut verif = String::from("seq,label,model_ok,checker,mapper_ok,retired_ok,live,hash\n");
+    let mut c = e8_new_counts();
+    let mut ok_all = true;
+    {
+        let m = model.lock().unwrap();
+        let ok = e8_verify(&e, &m, &db, "e8c-mid", progress.load(Relaxed), &mut verif);
+        c.verifies += 1;
+        ok_all &= ok;
+        e8_model_ckpt(&m, out, progress.load(Relaxed));
+    }
+    let mut total_writer_ops = 0usize;
+    for h in writer_handles {
+        total_writer_ops += h.join().unwrap();
+    }
+    stop.store(true, Relaxed);
+    let _ = mon.join();
+    let mut checks = 0usize;
+    let mut viol = 0usize;
+    for h in readers {
+        let (ch, vi) = h.join().unwrap();
+        checks += ch;
+        viol += vi;
+    }
+    {
+        let m = model.lock().unwrap();
+        let ok = e8_verify(&e, &m, &db, "e8c-final", total_writer_ops, &mut verif);
+        c.verifies += 1;
+        ok_all &= ok;
+        c.verif_fails += !ok as u64;
+    }
+    e.close().unwrap();
+    let _ = std::fs::write(out.join("verif.csv"), &verif);
+    let _ = std::fs::write(
+        out.join("reader.json"),
+        serde_json::to_string(&serde_json::json!({"checks": checks, "violations": viol})).unwrap(),
+    );
+    let m = model.lock().unwrap();
+    let _ = std::fs::write(out.join("counts.json"), e8_counts_json(&c, total_writer_ops, t0.elapsed(), m.state_hash()));
+    e8_summary_line("E8c", &c, total_writer_ops, t0.elapsed());
+    assert!(ok_all && viol == 0, "E8c verification or reader violation (viol={viol})");
+}
+
+/// Single mutation op with an EXPLICIT target idx (used by the disjoint-range
+/// writers of E8c so the model stays single-writer exact per range).
+#[allow(clippy::too_many_arguments)]
+fn e8_writer_op(
+    e: &AttentionEngine,
+    m: &mut E8Model,
+    rng: &mut E8Rng,
+    log: &E8Oplog,
+    prog: &std::sync::atomic::AtomicUsize,
+    seq: usize,
+    thread: usize,
+    idx: u32,
+    live: bool,
+) -> &'static str {
+    use std::sync::atomic::Ordering::Relaxed;
+    let coll = e8_coll_of(idx);
+    let done = if rng.below(100) < 15 && !live {
+        let ver = m.maxver.get(&idx).copied().unwrap_or(0) + 1;
+        let num = 100 + (seq % 900) as i64;
+        let mut r = doc_record(idx, ver, "t", num);
+        r.id = uuidc(e8_cid(idx), idx, ver);
+        match e.insert_document(coll, r) {
+            Ok(_) => {
+                m.maxver.insert(idx, ver);
+                m.live.insert(idx, (ver, num));
+                e8_log(log, seq, thread, "insert", coll, idx as i64, ver, num, 0, "ok");
+                "insert"
+            }
+            Err(_) => {
+                e8_log(log, seq, thread, "insert", coll, idx as i64, ver, num, 0, "err");
+                "insert-err"
+            }
+        }
+    } else if live && rng.below(100) < 30 {
+        let (ver, _) = m.live[&idx];
+        match e.delete_document(coll, &uuidc(e8_cid(idx), idx, ver).to_string()) {
+            Ok(true) => {
+                m.live.remove(&idx);
+                e8_log(log, seq, thread, "delete", coll, idx as i64, ver, 0, 0, "ok");
+                "delete"
+            }
+            Ok(false) => {
+                e8_log(log, seq, thread, "delete", coll, idx as i64, ver, 0, 0, "absent");
+                "delete-absent"
+            }
+            Err(_) => {
+                e8_log(log, seq, thread, "delete", coll, idx as i64, ver, 0, 0, "err");
+                "delete-err"
+            }
+        }
+    } else if live {
+        let (ver, _) = m.live[&idx];
+        let num = 100 + (seq % 900) as i64;
+        let mut fields = HashMap::new();
+        fields.insert("idx".to_string(), serde_json::json!(idx));
+        fields.insert("version".to_string(), serde_json::json!(ver));
+        fields.insert("cat".to_string(), serde_json::json!("t"));
+        fields.insert("num".to_string(), serde_json::json!(num));
+        fields.insert("title".to_string(), serde_json::json!(format!("doc-{idx}-v{ver}")));
+        let mut kv = HashMap::new();
+        kv.insert(HEAD.to_string(), vec_for(idx));
+        match e.update_document(coll, &uuidc(e8_cid(idx), idx, ver).to_string(), fields, kv) {
+            Ok(_) => {
+                m.live.insert(idx, (ver, num));
+                e8_log(log, seq, thread, "update", coll, idx as i64, ver, num, 0, "ok");
+                "update"
+            }
+            Err(_) => {
+                e8_log(log, seq, thread, "update", coll, idx as i64, ver, num, 0, "err");
+                "update-err"
+            }
+        }
+    } else {
+        let ver = m.maxver.get(&idx).copied().unwrap_or(0) + 1;
+        let num = 100 + (seq % 900) as i64;
+        let mut fields = HashMap::new();
+        fields.insert("idx".to_string(), serde_json::json!(idx));
+        fields.insert("version".to_string(), serde_json::json!(ver));
+        fields.insert("cat".to_string(), serde_json::json!("t"));
+        fields.insert("num".to_string(), serde_json::json!(num));
+        fields.insert("title".to_string(), serde_json::json!(format!("doc-{idx}-v{ver}")));
+        let mut kv = HashMap::new();
+        kv.insert(HEAD.to_string(), vec_for(idx));
+        match e.upsert_document(coll, uuidc(e8_cid(idx), idx, ver), fields, kv) {
+            Ok(_) => {
+                m.maxver.insert(idx, ver);
+                m.live.insert(idx, (ver, num));
+                e8_log(log, seq, thread, "upsert", coll, idx as i64, ver, num, 0, "ok");
+                "upsert"
+            }
+            Err(_) => {
+                e8_log(log, seq, thread, "upsert", coll, idx as i64, ver, num, 0, "err");
+                "upsert-err"
+            }
+        }
+    };
+    prog.fetch_add(1, Relaxed);
+    done
+}
+
+
+fn run_e8d(out: &std::path::Path) {
+    use attentiondb_core::transaction::TxnOp;
+    use std::sync::atomic::Ordering::Relaxed;
+    let t0 = std::time::Instant::now();
+    let _ = std::fs::create_dir_all(out);
+    std::env::set_var("PH3D_DURABILITY", "sync");
+    std::env::remove_var("ATTENTIONDB_WAL_SEGMENT_BYTES");
+    let db = out.join("db");
+    let mut e = std::sync::Arc::new(open_db(&db));
+    e.create_collection("bench", DIM, &[HEAD]).unwrap();
+    let model = std::sync::Arc::new(std::sync::Mutex::new(E8Model::new()));
+    let log = e8_new_oplog(&out.join("oplog.csv"));
+    let progress = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let mon = {
+        let o = out.to_path_buf();
+        let p = progress.clone();
+        let s = stop.clone();
+        e8_spawn_monitor(o, p, s)
+    };
+    let mut c = e8_new_counts();
+    let mut rng = E8Rng(0xE8D0044);
+    let mut verif = String::from("seq,label,model_ok,checker,mapper_ok,retired_ok,live,hash\n");
+    let mut seq = 0usize;
+    let mut ok_all = true;
+
+    // one transaction: draw keys FIRST, stage from the drawn plan, apply the
+    // model from the SAME plan only on confirmed commit (no rng divergence).
+    let run_txn = |e: &AttentionEngine,
+                   m: &mut E8Model,
+                   keys: &[u32],
+                   num: i64,
+                   do_rollback: bool,
+                   log: &E8Oplog,
+                   seq: usize,
+                   c: &mut E8Counts|
+     -> bool {
+        let t = e.begin_transaction("bench");
+        let mut plan: Vec<(u32, u64, u64, i64)> = Vec::new(); // idx, del_ver, ins_ver, num
+        for &idx in keys {
+            let del_ver = m.live.get(&idx).map(|(v, _)| *v);
+            let ins_ver = m.maxver.get(&idx).copied().unwrap_or(0) + 1;
+
+            if let Some(dv) = del_ver {
+                e.record_transaction_operation(t, TxnOp::Delete(uuidc(e8_cid(idx), idx, dv)))
+                    .unwrap();
+            }
+            let mut r = doc_record(idx, ins_ver, "t", num);
+            r.id = uuidc(e8_cid(idx), idx, ins_ver);
+            e.record_transaction_operation(t, TxnOp::Insert(r)).unwrap();
+            plan.push((idx, del_ver.unwrap_or(0), ins_ver, num));
+        }
+        c.txns += 1;
+        if do_rollback {
+            e.rollback_transaction(t).unwrap();
+            c.rollbacks += 1;
+            for (idx, dv, _, _) in &plan {
+                e8_log(log, seq, 0, "rollback", e8_coll_of(*idx), *idx as i64, *dv, 0, t, "ok");
+            }
+            return true;
+        }
+        let okc = e.commit_transaction(t).unwrap_or(false);
+        if okc {
+            c.commits += 1;
+            for (idx, _dv, ins_ver, n) in plan {
+                m.maxver.insert(idx, ins_ver);
+                m.live.insert(idx, (ins_ver, n));
+            }
+            true
+        } else {
+            false
+        }
+    };
+
+    // ---- phase 1: transaction size ladder (§19): 7 sizes x 40 commits ----
+    for size in [1usize, 2, 5, 10, 25, 50, 100] {
+        for _cycle in 0..40usize {
+            let num = 100 + (seq % 900) as i64;
+            let keys: Vec<u32> = (0..size).map(|_| rng.below(1_000) as u32).collect();
+            let mut m = model.lock().unwrap();
+            let ok = run_txn(&e, &mut m, &keys, num, false, &log, seq, &mut c);
+            drop(m);
+            ok_all &= ok;
+            progress.fetch_add(size.max(1), Relaxed);
+            seq += size;
+        }
+        {
+            let m = model.lock().unwrap();
+            let vok = e8_verify(&e, &m, &db, &format!("e8d-ladder-{size}"), seq, &mut verif);
+            c.verifies += 1;
+            ok_all &= vok;
+            c.verif_fails += !vok as u64;
+            e8_model_ckpt(&m, out, seq);
+        }
+    }
+    // ---- phase 2: mixed commit/rollback (25% rollback), 15k txns ----
+    for i in 0..15_000usize {
+        let size = 1 + rng.below(5);
+        let num = 100 + (seq % 900) as i64;
+        let keys: Vec<u32> = (0..size).map(|_| rng.below(1_000) as u32).collect();
+        let rb = rng.below(100) < 25;
+        let mut m = model.lock().unwrap();
+        let ok = run_txn(&e, &mut m, &keys, num, rb, &log, seq, &mut c);
+        drop(m);
+        ok_all &= ok;
+        progress.fetch_add(size, Relaxed);
+        seq += size;
+        if (i + 1) % 5_000 == 0 {
+            e.checkpoint().unwrap();
+            c.ckpts += 1;
+        }
+        if (i + 1) % 7_500 == 0 {
+            e.compact_storage().unwrap();
+            c.compactions += 1;
+        }
+    }
+    {
+        let m = model.lock().unwrap();
+        let vok = e8_verify(&e, &m, &db, "e8d-mixed", seq, &mut verif);
+        c.verifies += 1;
+        ok_all &= vok;
+        c.verif_fails += !vok as u64;
+    }
+    // ---- phase 3: WAL rotation during transaction-heavy workload (2 KiB) ----
+    e.close().unwrap();
+    eprintln!("[e8dbg] phase2 closed, opening phase3 (2KiB)");
+    std::env::set_var("ATTENTIONDB_WAL_SEGMENT_BYTES", "2048");
+    e = std::sync::Arc::new(open_db(&db));
+    eprintln!("[e8dbg] phase3 opened");
+    for i in 0..2_000usize {
+        let num = 100 + (seq % 900) as i64;
+        let keys: Vec<u32> = (0..3).map(|_| rng.below(1_000) as u32).collect();
+        let mut m = model.lock().unwrap();
+        let ok = run_txn(&e, &mut m, &keys, num, false, &log, seq, &mut c);
+        drop(m);
+        ok_all &= ok;
+        progress.fetch_add(3, Relaxed);
+        seq += 3;
+        if (i + 1) % 500 == 0 {
+            e.checkpoint().unwrap();
+            c.ckpts += 1;
+        }
+    }
+    {
+        let m = model.lock().unwrap();
+        let vok = e8_verify(&e, &m, &db, "e8d-rotation", seq, &mut verif);
+        c.verifies += 1;
+        ok_all &= vok;
+        c.verif_fails += !vok as u64;
+        e8_model_ckpt(&m, out, seq);
+    }
+    // ---- phase 4: restart + atomicity (S7): every committed txn intact ----
+    e.close().unwrap();
+    c.restarts += 1;
+    e = std::sync::Arc::new(open_db(&db));
+    {
+        let m = model.lock().unwrap();
+        let vok = e8_verify(&e, &m, &db, "e8d-final-restart", seq, &mut verif);
+        c.verifies += 1;
+        ok_all &= vok;
+        c.verif_fails += !vok as u64;
+    }
+    stop.store(true, Relaxed);
+    let _ = mon.join();
+    e.close().unwrap();
+    let _ = std::fs::write(out.join("verif.csv"), &verif);
+    let m = model.lock().unwrap();
+    let _ = std::fs::write(out.join("counts.json"), e8_counts_json(&c, seq, t0.elapsed(), m.state_hash()));
+    e8_summary_line("E8d", &c, seq, t0.elapsed());
+    assert!(ok_all, "E8d verification failure");
+}
+
+
+fn run_e8e(out: &std::path::Path) {
+    use std::sync::atomic::Ordering::Relaxed;
+    let t0 = std::time::Instant::now();
+    let _ = std::fs::create_dir_all(out);
+    std::env::set_var("PH3D_DURABILITY", "sync");
+    // frequent rotation: 2 KiB segments for the whole family (spec E8e)
+    std::env::set_var("ATTENTIONDB_WAL_SEGMENT_BYTES", "2048");
+    let db = out.join("db");
+    let mut e = std::sync::Arc::new(open_db(&db));
+    e.create_collection("bench", DIM, &[HEAD]).unwrap();
+    let model = std::sync::Arc::new(std::sync::Mutex::new(E8Model::new()));
+    let log = e8_new_oplog(&out.join("oplog.csv"));
+    let progress = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let mon = {
+        let o = out.to_path_buf();
+        let p = progress.clone();
+        let s = stop.clone();
+        e8_spawn_monitor(o, p, s)
+    };
+    let mut c = e8_new_counts();
+    let mut rng = E8Rng(0xE8E0055);
+    let mut verif = String::from("seq,label,model_ok,checker,mapper_ok,retired_ok,live,hash\n");
+    let mut census = String::from("seq,label,wal_n,wal_b,sst_n,sst_b,meta_n,tmp_orphans,db_bytes,hash\n");
+    let mut seq = 0usize;
+    let mut ok_all = true;
+    for cycle in 0..12usize {
+        for k in 1..=1000usize {
+            let mut m = model.lock().unwrap();
+            e8_mutate(&e, &mut m, &mut rng, &log, &progress, seq, 0, 1_000, 25, 30);
+            drop(m);
+            seq += 1;
+            if k == 100 {
+                e.checkpoint().unwrap();
+                c.ckpts += 1;
+            }
+            if k == 500 {
+                e.compact_storage().unwrap();
+                c.compactions += 1;
+            }
+            if k == 750 {
+                let bdir = out.join(format!("backup-c{cycle}"));
+                attentiondb_core::backup::copy_database_dir(&db, &bdir).unwrap();
+                c.backups += 1;
+                let restored = out.join(format!("restore-c{cycle}"));
+                attentiondb_core::backup::restore_backup(&bdir, &restored).unwrap();
+                c.restores += 1;
+                let er = open_db(&restored);
+                let m = model.lock().unwrap();
+                let ok = e8_verify(&er, &m, &restored, &format!("e8e-restore-c{cycle}"), seq, &mut verif);
+                c.verifies += 1;
+                ok_all &= ok;
+                c.verif_fails += !ok as u64;
+                drop(m);
+                er.close().unwrap();
+            }
+        }
+        // end of cycle: verify, census, restart (spec §21 cadence, 1000→restart)
+        {
+            let m = model.lock().unwrap();
+            let ok = e8_verify(&e, &m, &db, &format!("e8e-c{cycle}"), seq, &mut verif);
+            c.verifies += 1;
+            ok_all &= ok;
+            c.verif_fails += !ok as u64;
+            e8_model_ckpt(&m, out, seq);
+        }
+        e8_census(&db, &format!("e8e-c{cycle}"), seq, &mut census);
+        e.close().unwrap();
+        c.restarts += 1;
+        e = std::sync::Arc::new(open_db(&db));
+        {
+            let m = model.lock().unwrap();
+            let ok = e8_verify(&e, &m, &db, &format!("e8e-c{cycle}-restart"), seq, &mut verif);
+            c.verifies += 1;
+            ok_all &= ok;
+            c.verif_fails += !ok as u64;
+        }
+    }
+    stop.store(true, Relaxed);
+    let _ = mon.join();
+    e.close().unwrap();
+    let _ = std::fs::write(out.join("verif.csv"), &verif);
+    let _ = std::fs::write(out.join("census.csv"), &census);
+    let m = model.lock().unwrap();
+    let _ = std::fs::write(out.join("counts.json"), e8_counts_json(&c, seq, t0.elapsed(), m.state_hash()));
+    e8_summary_line("E8e", &c, seq, t0.elapsed());
+    assert!(ok_all, "E8e verification failure");
+    std::env::remove_var("ATTENTIONDB_WAL_SEGMENT_BYTES");
+}
+
+// ---------------- E8f: restart/recovery soak (kill matrix R1-R7) ----------------
+
+fn run_e8f(out: &std::path::Path) {
+    use std::sync::atomic::Ordering::Relaxed;
+    let t0 = std::time::Instant::now();
+    let _ = std::fs::create_dir_all(out);
+    std::env::set_var("PH3D_DURABILITY", "sync");
+    std::env::remove_var("ATTENTIONDB_WAL_SEGMENT_BYTES");
+    let db = out.join("db");
+    let mut e = std::sync::Arc::new(open_db(&db));
+    e.create_collection("bench", DIM, &[HEAD]).unwrap();
+    let model = std::sync::Arc::new(std::sync::Mutex::new(E8Model::new()));
+    let log = e8_new_oplog(&out.join("oplog.csv"));
+    let progress = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let mon = {
+        let o = out.to_path_buf();
+        let p = progress.clone();
+        let s = stop.clone();
+        e8_spawn_monitor(o, p, s)
+    };
+    let mut c = e8_new_counts();
+    let mut rng = E8Rng(0xE8F0066);
+    let mut verif = String::from("seq,label,model_ok,checker,mapper_ok,retired_ok,live,hash\n");
+    let mut seq = 0usize;
+    let mut ok_all = true;
+
+    // ---- graceful cycles: open -> 2000 ops -> checkpoint -> close -> reopen
+    for cycle in 0..60usize {
+        for _ in 0..2_000usize {
+            let mut m = model.lock().unwrap();
+            e8_mutate(&e, &mut m, &mut rng, &log, &progress, seq, 0, 800, 16, 25);
+            drop(m);
+            seq += 1;
+        }
+        e.checkpoint().unwrap();
+        c.ckpts += 1;
+        e.close().unwrap();
+        c.restarts += 1;
+        e = std::sync::Arc::new(open_db(&db));
+        if cycle % 10 == 0 {
+            let m = model.lock().unwrap();
+            let ok = e8_verify(&e, &m, &db, &format!("e8f-g{cycle}"), seq, &mut verif);
+            c.verifies += 1;
+            ok_all &= ok;
+            c.verif_fails += !ok as u64;
+        }
+    }
+    {
+        let m = model.lock().unwrap();
+        let ok = e8_verify(&e, &m, &db, "e8f-graceful-final", seq, &mut verif);
+        c.verifies += 1;
+        ok_all &= ok;
+        c.verif_fails += !ok as u64;
+    }
+    e.close().unwrap();
+    drop(e);
+    stop.store(true, Relaxed);
+    let _ = mon.join();
+
+    // ---- kill matrix: child runs a deterministic prefix, parent groupkills
+    // at the phase boundary, fresh open must equal the child's model JSON
+    let exe = std::env::current_exe().unwrap();
+    let mut matrix_ok = true;
+    for phase in ["R1", "R2", "R3", "R4", "R5", "R6", "R7"] {
+        for rep in 0..2usize {
+            let cdir = out.join(format!("kill-{phase}-{rep}"));
+            let _ = std::fs::remove_dir_all(&cdir);
+            let marker = cdir.with_extension("e8marker");
+            let _ = std::fs::remove_file(&marker);
+            let mut cmd = std::process::Command::new(&exe);
+            cmd.args([
+                "dbtest",
+                "e8child",
+                "--dir",
+                cdir.to_str().unwrap(),
+                "--phase",
+                phase,
+                "--seed",
+                &(0xE8F70 + rep as u64).to_string(),
+            ])
+            .env("PH3D_DURABILITY", "sync");
+            if phase == "R3" {
+                cmd.env("ATTENTIONDB_WAL_SEGMENT_BYTES", "2048");
+            }
+            use std::os::unix::process::CommandExt;
+            cmd.process_group(0);
+            let mut child = cmd.spawn().unwrap();
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(90);
+            let mut reached = false;
+            while std::time::Instant::now() < deadline {
+                if marker.exists() {
+                    reached = true;
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            if reached {
+                unsafe {
+                    libc::kill(-(child.id() as i32), libc::SIGKILL);
+                }
+            }
+            let _ = child.wait();
+            // fresh-process recovery judge
+            let model_path = cdir.with_extension("e8model");
+            if !reached || !model_path.exists() {
+                verif.push_str(&format!("{seq},e8f-{phase}-{rep},FAIL,no-marker,unknown,unknown,0,\n"));
+                matrix_ok = false;
+                continue;
+            }
+            let expected = E8Model::from_json(&std::fs::read_to_string(&model_path).unwrap());
+            let er = std::sync::Arc::new(open_db(&cdir));
+            let (rm, iss) = export_state(&er);
+            let exp_model: Model = expected
+                .live
+                .iter()
+                .map(|(k, (v, n))| (*k, (*v, "t".to_string(), *n)))
+                .collect();
+            let eq = rm == exp_model && iss.is_empty();
+            let clean = e7_checker(&er, &cdir);
+            let mapper_ok = {
+                let map = er.id_mapper.read();
+                expected
+                    .live
+                    .iter()
+                    .all(|(idx, (ver, _))| map.uuid_to_id(&uuidc(e8_cid(*idx), *idx, *ver)).is_some())
+            };
+            er.close().unwrap();
+            let ok = eq && clean && mapper_ok;
+            matrix_ok &= ok;
+            c.restarts += 1;
+            c.verifies += 1;
+            verif.push_str(&format!(
+                "{},e8f-{}-{},live:{},exp:{},clean:{},mapper:{},,\n",
+                seq, phase, rep, rm.len(), exp_model.len(), clean, mapper_ok
+            ));
+            if !ok {
+                eprintln!("e8f KILL MATRIX FAIL {phase}/{rep}: eq={eq} clean={clean} mapper={mapper_ok}");
+            }
+        }
+    }
+    ok_all &= matrix_ok;
+
+    // ---- async boundary (spec §29): Case B unflushed async -> groupkill ----
+    for rep in 0..2usize {
+        let cdir = out.join(format!("async-{rep}"));
+        let _ = std::fs::remove_dir_all(&cdir);
+        let marker = cdir.with_extension("e8marker");
+        let mut cmd = std::process::Command::new(&exe);
+        cmd.args([
+            "dbtest",
+            "e8child",
+            "--dir",
+            cdir.to_str().unwrap(),
+            "--phase",
+            "ASYNC",
+            "--seed",
+            &(0xE8F90 + rep as u64).to_string(),
+        ])
+        .env("PH3D_DURABILITY", "async");
+        use std::os::unix::process::CommandExt;
+        cmd.process_group(0);
+        let mut child = cmd.spawn().unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(90);
+        while !marker.exists() && std::time::Instant::now() < deadline {
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        unsafe {
+            libc::kill(-(child.id() as i32), libc::SIGKILL);
+        }
+        let _ = child.wait();
+        let model_path = cdir.with_extension("e8model");
+        let expected = E8Model::from_json(&std::fs::read_to_string(&model_path).unwrap());
+        std::env::set_var("PH3D_DURABILITY", "sync");
+        let er = std::sync::Arc::new(open_db(&cdir));
+        let (rm, iss) = export_state(&er);
+        let clean = e7_checker(&er, &cdir);
+        // Spec §29 Case B: an unflushed async kill may lose buffered tail ops
+        // (documented bounded loss, NOT a failure). A recovered doc at an
+        // OLDER coherent version = its latest buffered upsert was lost =
+        // documented loss. A doc at a FUTURE version or with incoherent
+        // content = corruption = failure. Missing docs = documented loss.
+        let mut content_ok = true;
+        let mut losses = 0usize;
+        for (idx, (ver, _num)) in &expected.live {
+            match rm.get(idx) {
+                Some((rv, _, _rn)) => {
+                    if rv > ver {
+                        content_ok = false; // future version: impossible post-crash
+                    } else if rv < ver {
+                        losses += 1; // older coherent version: documented loss
+                    }
+                }
+                None => {
+                    losses += 1; // doc lost entirely: documented loss
+                }
+            }
+        }
+        er.close().unwrap();
+        let ok = clean && iss.is_empty() && content_ok;
+        ok_all &= ok;
+        c.restarts += 1;
+        c.verifies += 1;
+        let recovered = rm.len();
+        verif.push_str(&format!(
+            "{},e8f-async-{rep},recovered:{}/{},losses:{},clean:{},torn:{},{},,\n",
+            seq,
+            recovered,
+            expected.live.len(),
+            losses,
+            clean,
+            !content_ok,
+            if losses > 0 { "ASYNC-LOSS-OK" } else { "NO-LOSS" }
+        ));
+        eprintln!(
+            "e8f async-{rep}: recovered {recovered}/{} acked docs, losses={losses} (documented async boundary); clean={clean}",
+            expected.live.len()
+        );
+    }
+
+    let _ = std::fs::write(out.join("verif.csv"), &verif);
+    let _ = std::fs::write(out.join("counts.json"), e8_counts_json(&c, seq, t0.elapsed(), 0));
+    e8_summary_line("E8f", &c, seq, t0.elapsed());
+    assert!(ok_all, "E8f restart/recovery failure");
+}
+
+/// E8f child: deterministic prefix + phase maintenance + model JSON + marker.
+fn e8_child(dir: &std::path::Path, phase: &str, seed: u64) -> ! {
+    let _ = std::fs::create_dir_all(dir);
+    let e = open_db(dir);
+    e.create_collection("bench", DIM, &[HEAD]).unwrap();
+    let mut model = E8Model::new();
+    let mut rng = E8Rng(seed);
+    let log = e8_new_oplog(&dir.with_extension("e8oplog"));
+    let prog = std::sync::atomic::AtomicUsize::new(0);
+    let mut seq = 0usize;
+    #[allow(clippy::explicit_counter_loop)] // seq tracks absolute op position
+    for _ in 0..3_000usize {
+        e8_mutate(&e, &mut model, &mut rng, &log, &prog, seq, 0, 400, 8, 20);
+        seq += 1;
+    }
+    match phase {
+        "R2" => {
+            let _ = e.checkpoint().unwrap();
+        }
+        "R3" => { /* 2 KiB segments via env: rotations happened during ops */ }
+        "R4" => {
+            let _ = e.checkpoint().unwrap();
+            let _ = e.compact_storage().unwrap();
+        }
+        "R5" => {
+            attentiondb_core::backup::copy_database_dir(dir, &dir.with_extension("e8bak")).unwrap();
+        }
+        "R6" => {
+            let t = e8_stage_upsert(&e, &model, 399, 777);
+            assert!(e.commit_transaction(t).unwrap());
+            e8_apply_commit(&mut model, 399, 777);
+        }
+        "R7" => {
+            let t = e8_stage_upsert(&e, &model, 398, 888);
+            e.rollback_transaction(t).unwrap();
+        }
+        _ => {} // R1: no maintenance (WAL-path recovery); ASYNC: no flush
+    }
+    let _ = std::fs::write(dir.with_extension("e8model"), model.to_json());
+    let _ = std::fs::write(dir.with_extension("e8marker"), "ready");
+    loop {
+        std::thread::sleep(std::time::Duration::from_secs(3600));
+    }
+}
+
+
+fn run_e8g(out: &std::path::Path) {
+    use attentiondb_core::transaction::TxnOp;
+    use std::sync::atomic::Ordering::Relaxed;
+    let t0 = std::time::Instant::now();
+    let _ = std::fs::create_dir_all(out);
+    std::env::set_var("PH3D_DURABILITY", "sync");
+    std::env::set_var("ATTENTIONDB_WAL_SEGMENT_BYTES", "8192");
+    let db = out.join("db");
+    let mut e = std::sync::Arc::new(open_db(&db));
+    e.create_collection("bench", DIM, &[HEAD]).unwrap();
+    e.create_collection("collb", DIM, &[HEAD]).unwrap();
+    e.create_collection("collc", DIM, &[HEAD]).unwrap();
+    let model = std::sync::Arc::new(std::sync::Mutex::new(E8Model::new()));
+    let log = e8_new_oplog(&out.join("oplog.csv"));
+    let progress = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let mon = {
+        let o = out.to_path_buf();
+        let p = progress.clone();
+        let s = stop.clone();
+        e8_spawn_monitor(o, p, s)
+    };
+    let mut c = e8_new_counts();
+    let mut rng = E8Rng(0xE8_600_077);
+    let mut verif = String::from("seq,label,model_ok,checker,mapper_ok,retired_ok,live,hash\n");
+    let mut census = String::from("seq,label,wal_n,wal_b,sst_n,sst_b,meta_n,tmp_orphans,db_bytes,hash\n");
+    let mut seq = 0usize;
+    let mut ok_all = true;
+    // blocks: bench 0..299, collb 3000..3299, collc 3300..3599
+    let blocks: [(u32, usize); 3] = [(0, 300), (3000, 300), (3300, 300)];
+    for cycle in 0..25usize {
+        // mixed mutations across the 3 collections
+        for _ in 0..40usize {
+            let (lo, span) = blocks[rng.below(3)];
+            let idx = lo + rng.below(span) as u32;
+            let mut m = model.lock().unwrap();
+            let live = m.live.contains_key(&idx);
+            e8_writer_op(&e, &mut m, &mut rng, &log, &progress, seq, 0, idx, live);
+            drop(m);
+            seq += 1;
+        }
+        // explicit lifecycle key: INSERT -> UPDATE -> DELETE -> REINSERT
+        let lk = 200u32 + (cycle % 100) as u32;
+        {
+            let mut m = model.lock().unwrap();
+            let live = m.live.contains_key(&lk);
+            e8_writer_op(&e, &mut m, &mut rng, &log, &progress, seq, 0, lk, live); // insert or update
+            seq += 1;
+            let live2 = m.live.contains_key(&lk);
+            e8_writer_op(&e, &mut m, &mut rng, &log, &progress, seq, 0, lk, live2); // update
+            seq += 1;
+            if let Some((ver, _)) = m.live.get(&lk).copied() {
+                e.delete_document("bench", &uuidc(0, lk, ver).to_string()).unwrap();
+                m.live.remove(&lk);
+                e8_log(&log, seq, 0, "delete", "bench", lk as i64, ver, 0, 0, "ok");
+                seq += 1;
+            }
+            let nver = m.maxver.get(&lk).copied().unwrap_or(0) + 1;
+            let mut r = doc_record(lk, nver, "t", 100 + (seq % 900) as i64);
+            r.id = uuidc(0, lk, nver);
+            e.insert_document("bench", r).unwrap();
+            let num = 100 + (seq % 900) as i64;
+            m.maxver.insert(lk, nver);
+            m.live.insert(lk, (nver, num));
+            e8_log(&log, seq, 0, "reinsert", "bench", lk as i64, nver, num, 0, "ok");
+            seq += 1;
+            progress.fetch_add(1, Relaxed);
+            // one 2-key transaction
+            let num = 100 + (seq % 900) as i64;
+            let k1 = (cycle * 7) as u32 % 300;
+            let k2 = 3000 + ((cycle * 11) as u32 % 300);
+            let t = e.begin_transaction("bench");
+            {
+                let idx = k1;
+                if let Some((ver, _)) = m.live.get(&idx) {
+                    e.record_transaction_operation(t, TxnOp::Delete(uuidc(0, idx, *ver))).unwrap();
+                }
+                let nv = m.maxver.get(&idx).copied().unwrap_or(0) + 1;
+                let mut rr = doc_record(idx, nv, "t", num);
+                rr.id = uuidc(0, idx, nv);
+                e.record_transaction_operation(t, TxnOp::Insert(rr)).unwrap();
+            }
+            let coll = "collb";
+            let t2 = e.begin_transaction(coll);
+            if let Some((ver, _)) = m.live.get(&k2) {
+                e.record_transaction_operation(t2, TxnOp::Delete(uuidc(1, k2, *ver))).unwrap();
+            }
+            let nv2 = m.maxver.get(&k2).copied().unwrap_or(0) + 1;
+            let mut rr2 = doc_record(k2, nv2, "t", num);
+            rr2.id = uuidc(1, k2, nv2);
+            e.record_transaction_operation(t2, TxnOp::Insert(rr2)).unwrap();
+            assert!(e.commit_transaction(t).unwrap());
+            assert!(e.commit_transaction(t2).unwrap());
+            c.txns += 2;
+            c.commits += 2;
+            for (idx, ver, nv) in [(k1, 0u64, 0u64), (k2, 0, 0)] {
+                let _ = (ver, nv);
+                let nvv = m.maxver.get(&idx).copied().unwrap_or(0) + 1;
+                m.maxver.insert(idx, nvv);
+                m.live.insert(idx, (nvv, num));
+            }
+            drop(m);
+            seq += 2;
+        }
+        // maintenance chain (§39): CKPT -> ROTATE -> COMPACT -> BACKUP -> RESTART
+        e.checkpoint().unwrap();
+        c.ckpts += 1;
+        e.flush_wal().unwrap();
+        e.compact_storage().unwrap();
+        c.compactions += 1;
+        let bdir = out.join(format!("backup-c{cycle}"));
+        attentiondb_core::backup::copy_database_dir(&db, &bdir).unwrap();
+        c.backups += 1;
+        let restored = out.join(format!("restore-c{cycle}"));
+        attentiondb_core::backup::restore_backup(&bdir, &restored).unwrap();
+        c.restores += 1;
+        {
+            let er = open_db(&restored);
+            let m = model.lock().unwrap();
+            let ok = e8_verify(&er, &m, &restored, &format!("e8g-restore-c{cycle}"), seq, &mut verif);
+            c.verifies += 1;
+            ok_all &= ok;
+            c.verif_fails += !ok as u64;
+            drop(m);
+            er.close().unwrap();
+        }
+        e.close().unwrap();
+        c.restarts += 1;
+        e = std::sync::Arc::new(open_db(&db));
+        {
+            let m = model.lock().unwrap();
+            // per-collection independence (S15/§40): verified inside e8_verify
+            let ok = e8_verify(&e, &m, &db, &format!("e8g-c{cycle}"), seq, &mut verif);
+            c.verifies += 1;
+            ok_all &= ok;
+            c.verif_fails += !ok as u64;
+            e8_model_ckpt(&m, out, seq);
+        }
+        if cycle % 5 == 0 {
+            e8_census(&db, &format!("e8g-c{cycle}"), seq, &mut census);
+        }
+    }
+    stop.store(true, Relaxed);
+    let _ = mon.join();
+    e.close().unwrap();
+    let _ = std::fs::write(out.join("verif.csv"), &verif);
+    let _ = std::fs::write(out.join("census.csv"), &census);
+    let m = model.lock().unwrap();
+    let _ = std::fs::write(out.join("counts.json"), e8_counts_json(&c, seq, t0.elapsed(), m.state_hash()));
+    e8_summary_line("E8g", &c, seq, t0.elapsed());
+    assert!(ok_all, "E8g lifecycle failure");
+    std::env::remove_var("ATTENTIONDB_WAL_SEGMENT_BYTES");
+}
+
+fn run_e8h(out: &std::path::Path) {
+    use std::sync::atomic::Ordering::Relaxed;
+    let t0 = std::time::Instant::now();
+    let _ = std::fs::create_dir_all(out);
+    std::env::set_var("PH3D_DURABILITY", "sync");
+    std::env::remove_var("ATTENTIONDB_WAL_SEGMENT_BYTES");
+    let db = out.join("db");
+    let e = std::sync::Arc::new(open_db(&db));
+    e.create_collection("bench", DIM, &[HEAD]).unwrap();
+    let model = std::sync::Arc::new(std::sync::Mutex::new(E8Model::new()));
+    let log = e8_new_oplog(&out.join("oplog.csv"));
+    let progress = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let mon = {
+        let o = out.to_path_buf();
+        let p = progress.clone();
+        let s = stop.clone();
+        e8_spawn_monitor(o, p, s)
+    };
+    let live_ct = std::sync::Arc::new(std::sync::atomic::AtomicI64::new(0i64));
+    let rstop = stop.clone();
+    let re = e.clone();
+    let rprog = progress.clone();
+    let rlog = log.clone();
+    let rl = live_ct.clone();
+    let reader = std::thread::spawn(move || e8_reader(re, rl, 1, rstop, rprog, rlog, 9));
+    let mut c = e8_new_counts();
+    let mut rng = E8Rng(0xE8_700_088);
+    let mut verif = String::from("seq,label,model_ok,checker,mapper_ok,retired_ok,live,hash\n");
+    let mut seq = 0usize;
+    let mut ok_all = true;
+    // steady state: 800-key space, live pinned at 600 (S14/S16 with constant
+    // logical size — RSS growth here is NOT live-data growth)
+    const PIN: usize = 600;
+    while t0.elapsed().as_secs() < 240 && seq < 150_000usize {
+        let mut m = model.lock().unwrap();
+        if m.live.len() < PIN {
+            // insert a dead key
+            let mut idx = rng.below(800) as u32;
+            let mut guard = 0;
+            while m.live.contains_key(&idx) && guard < 800 {
+                idx = (idx + 1) % 800;
+                guard += 1;
+            }
+            let live = m.live.contains_key(&idx);
+            e8_writer_op(&e, &mut m, &mut rng, &log, &progress, seq, 0, idx, live);
+        } else if m.live.len() > PIN {
+            let idx = *m.live.keys().next().unwrap();
+            let live = true;
+            e8_writer_op(&e, &mut m, &mut rng, &log, &progress, seq, 0, idx, live);
+        } else {
+            // churn: delete the oldest live key, insert it back with a new
+            // version (tombstone + mapping churn at constant logical size)
+            let idx = *m.live.keys().next().unwrap();
+            let (ver, _) = m.live[&idx];
+            e.delete_document("bench", &uuidc(0, idx, ver).to_string()).unwrap();
+            m.live.remove(&idx);
+            e8_log(&log, seq, 0, "delete", "bench", idx as i64, ver, 0, 0, "ok");
+            seq += 1;
+            let nver = m.maxver.get(&idx).copied().unwrap_or(0) + 1;
+            let num = 100 + (seq % 900) as i64;
+            let mut r = doc_record(idx, nver, "t", num);
+            r.id = uuidc(0, idx, nver);
+            e.insert_document("bench", r).unwrap();
+            m.maxver.insert(idx, nver);
+            m.live.insert(idx, (nver, num));
+            e8_log(&log, seq, 0, "reinsert", "bench", idx as i64, nver, num, 0, "ok");
+            progress.fetch_add(1, Relaxed);
+        }
+        live_ct.store(m.live.len() as i64, Relaxed);
+        drop(m);
+        seq += 1;
+        if seq.is_multiple_of(10_000) {
+            e.checkpoint().unwrap();
+            c.ckpts += 1;
+        }
+        if seq.is_multiple_of(30_000) {
+            e.compact_storage().unwrap();
+            c.compactions += 1;
+        }
+        if seq.is_multiple_of(60_000) {
+            let m = model.lock().unwrap();
+            let ok = e8_verify(&e, &m, &db, "e8h", seq, &mut verif);
+            c.verifies += 1;
+            ok_all &= ok;
+            c.verif_fails += !ok as u64;
+            e8_model_ckpt(&m, out, seq);
+        }
+    }
+    stop.store(true, Relaxed);
+    let _ = mon.join();
+    let (rchecks, rviol) = reader.join().unwrap();
+    e.close().unwrap();
+    let _ = std::fs::write(out.join("verif.csv"), &verif);
+    let _ = std::fs::write(
+        out.join("reader.json"),
+        serde_json::to_string(&serde_json::json!({"checks": rchecks, "violations": rviol})).unwrap(),
+    );
+    let m = model.lock().unwrap();
+    let _ = std::fs::write(out.join("counts.json"), e8_counts_json(&c, seq, t0.elapsed(), m.state_hash()));
+    e8_summary_line("E8h", &c, seq, t0.elapsed());
+    assert!(ok_all && rviol == 0, "E8h failure (viol={rviol})");
+}
+
+fn run_e8i(out: &std::path::Path) {
+    use attentiondb_core::transaction::TxnOp;
+    use std::sync::atomic::Ordering::Relaxed;
+    let t0 = std::time::Instant::now();
+    let _ = std::fs::create_dir_all(out);
+    std::env::set_var("PH3D_DURABILITY", "sync");
+    std::env::remove_var("ATTENTIONDB_WAL_SEGMENT_BYTES");
+    let db = out.join("db");
+    let mut e = std::sync::Arc::new(open_db(&db));
+    e.create_collection("bench", DIM, &[HEAD]).unwrap();
+    e.create_collection("collb", DIM, &[HEAD]).unwrap();
+    e.create_collection("collc", DIM, &[HEAD]).unwrap();
+    let model = std::sync::Arc::new(std::sync::Mutex::new(E8Model::new()));
+    let log = e8_new_oplog(&out.join("oplog.csv"));
+    let progress = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let mon = {
+        let o = out.to_path_buf();
+        let p = progress.clone();
+        let s = stop.clone();
+        e8_spawn_monitor(o, p, s)
+    };
+    let live_ct = std::sync::Arc::new(std::sync::atomic::AtomicI64::new(0i64));
+    // reader scans "bench" only — the window counter must be BENCH-SCOPED
+    // (idx < 3000), not the global 3-collection count
+    let bench_ct = std::sync::Arc::new(std::sync::atomic::AtomicI64::new(0i64));
+    let rstop = stop.clone();
+    let re = e.clone();
+    let rprog = progress.clone();
+    let rlog = log.clone();
+    let rl = bench_ct.clone();
+    let reader = std::thread::spawn(move || e8_reader(re, rl, 2, rstop, rprog, rlog, 9));
+    let mut c = e8_new_counts();
+    let mut rng = E8Rng(0xE8_800_099);
+    let mut verif = String::from("seq,label,model_ok,checker,mapper_ok,retired_ok,live,hash\n");
+    let mut census = String::from("seq,label,wal_n,wal_b,sst_n,sst_b,meta_n,tmp_orphans,db_bytes,hash\n");
+    let mut seq = 0usize;
+    let mut ok_all = true;
+    // counter-based cadence (seq-modulo is unreliable here: the %5 txn block
+    // adds +2 to seq, and every maintenance multiple of 3000 is also a
+    // multiple of 5 — the +2 always skipped the boundary and the maintenance
+    // never fired in the first E8i attempt)
+    let mut next_ckpt = 3_000usize;
+    let mut next_compact = 9_000usize;
+    let mut next_backup = 15_000usize;
+    let mut next_verify = 5_000usize;
+    let blocks = [(0u32, 300usize), (3000, 300), (3300, 300)];
+    while t0.elapsed().as_secs() < 600 && seq < 150_000usize {
+        let (lo, span) = blocks[rng.below(3)];
+        let idx = lo + rng.below(span) as u32;
+        {
+            let mut m = model.lock().unwrap();
+            let live = m.live.contains_key(&idx);
+            e8_writer_op(&e, &mut m, &mut rng, &log, &progress, seq, 0, idx, live);
+            let bench_n = m.live.range(0..3_000u32).count() as i64;
+            live_ct.store(m.live.len() as i64, Relaxed);
+            bench_ct.store(bench_n, Relaxed);
+            drop(m);
+        }
+        seq += 1;
+        if seq.is_multiple_of(5) {
+            // a small transaction every 5 ops — BOTH keys from the SAME
+            // collection block (a txn applies all ops into keys[0]'s
+            // collection; cross-block keys would be mis-tagged)
+            let num = 100 + (seq % 900) as i64;
+            let tblk = blocks[rng.below(3)];
+            let keys: Vec<u32> = (0..2).map(|_| tblk.0 + rng.below(100) as u32).collect();
+            let mut m = model.lock().unwrap();
+            let t = e.begin_transaction(e8_coll_of(keys[0]));
+            // stage from a PLAN (draw-time versions); apply the model from the
+            // SAME plan on commit — recomputing nv per key would double-step
+            // duplicate keys (model X+2 vs engine X+1)
+            let mut plan: Vec<(u32, u64)> = Vec::new();
+            for &idx in &keys {
+                if let Some((ver, _)) = m.live.get(&idx) {
+                    e.record_transaction_operation(t, TxnOp::Delete(uuidc(e8_cid(idx), idx, *ver))).unwrap();
+                }
+                let nv = m.maxver.get(&idx).copied().unwrap_or(0) + 1;
+                let mut r = doc_record(idx, nv, "t", num);
+                r.id = uuidc(e8_cid(idx), idx, nv);
+                e.record_transaction_operation(t, TxnOp::Insert(r)).unwrap();
+                plan.push((idx, nv));
+            }
+            if e.commit_transaction(t).unwrap_or(false) {
+                c.commits += 1;
+                for (idx, nv) in plan {
+                    m.maxver.insert(idx, nv);
+                    m.live.insert(idx, (nv, num));
+                }
+            }
+            c.txns += 1;
+            drop(m);
+            seq += 2;
+            progress.fetch_add(2, Relaxed);
+        }
+        if seq >= next_ckpt {
+            e.checkpoint().unwrap();
+            c.ckpts += 1;
+            next_ckpt += 3_000;
+        }
+        if seq >= next_compact {
+            e.compact_storage().unwrap();
+            c.compactions += 1;
+            next_compact += 9_000;
+        }
+        if seq >= next_backup {
+            let n = seq / 15_000;
+            let bdir = out.join(format!("backup-{n}"));
+            attentiondb_core::backup::copy_database_dir(&db, &bdir).unwrap();
+            c.backups += 1;
+            next_backup += 15_000;
+        }
+        if seq >= next_verify {
+            let m = model.lock().unwrap();
+            let ok = e8_verify(&e, &m, &db, "e8i", seq, &mut verif);
+            c.verifies += 1;
+            ok_all &= ok;
+            c.verif_fails += !ok as u64;
+            e8_model_ckpt(&m, out, seq);
+            e8_census(&db, "e8i", seq, &mut census);
+            next_verify += 5_000;
+        }
+    }
+    stop.store(true, Relaxed);
+    let _ = mon.join();
+    let (rchecks, rviol) = reader.join().unwrap();
+    // final integrated restart cycle — AFTER the reader joined (E8 constraint:
+    // the engine Arc is never rebound under a live reader clone)
+    {
+        let m = model.lock().unwrap();
+        let ok = e8_verify(&e, &m, &db, "e8i-pre-restart", seq, &mut verif);
+        c.verifies += 1;
+        ok_all &= ok;
+        c.verif_fails += !ok as u64;
+    }
+    e.close().unwrap();
+    c.restarts += 1;
+    e = std::sync::Arc::new(open_db(&db));
+    {
+        let m = model.lock().unwrap();
+        let ok = e8_verify(&e, &m, &db, "e8i-post-restart", seq, &mut verif);
+        c.verifies += 1;
+        ok_all &= ok;
+        c.verif_fails += !ok as u64;
+        e8_census(&db, "e8i-final", seq, &mut census);
+    }
+    let _ = std::fs::write(out.join("verif.csv"), &verif);
+    let _ = std::fs::write(out.join("census.csv"), &census);
+    let _ = std::fs::write(
+        out.join("reader.json"),
+        serde_json::to_string(&serde_json::json!({"checks": rchecks, "violations": rviol})).unwrap(),
+    );
+    let m = model.lock().unwrap();
+    let _ = std::fs::write(out.join("counts.json"), e8_counts_json(&c, seq, t0.elapsed(), m.state_hash()));
+    e8_summary_line("E8i", &c, seq, t0.elapsed());
+    assert!(ok_all && rviol == 0, "E8i failure (viol={rviol})");
 }

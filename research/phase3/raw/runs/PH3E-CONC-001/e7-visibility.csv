@@ -1,0 +1,13 @@
+scenario,observed_behavior,status
+Multi-document transaction visibility,per-doc atomic+monotonic ( 00=1315 0105=5 101101=1 1020=1 102102=14 1030=2 103103=13 1040=3 104104=16 1050=3 105105=15 1060=5 106106=13 1070=8 107107=43 1080=3 108108=17 1090=11 109109=21 1100=9 110110=15 1110=7 111111=17 1120=9 112112=17 1130=8 113113=17 1140=19 114114=19 1150=13 115115=21); mixed pairs observable to straddling readers -> NO per-txn snapshot,PARTIAL (per-doc atomic VERIFIED; atomic multi-doc visibility NOT provided)
+Two writers same key,commit-order-wins; later commit's value final; no error; no conflict detection,VERIFIED (commit serialization)
+Lost-update scenario,occurs: both commits succeed; one blind write silently overwritten; undetected,VERIFIED (no conflict detection)
+Write skew,UNSUPPORTED BY API (transactions have no read ops),UNSUPPORTED
+Phantom-style query,UNSUPPORTED BY API (no transactional query reads),UNSUPPORTED
+Read during staged insert,staged version invisible in every read that completed before the commit was invoked (30 ordered reps; old version stays live),VERIFIED (ordered observation)
+Read after rollback,never visible (20 barrier reps, read at 3 points),VERIFIED
+Read after commit,retire and new-appearance observed strictly inside the commit interval in 0/40 ordered reps (new visible before commit-call return in 0); 0 post-ACK stability violations,VERIFIED (visibility = apply point; bounded observation)
+Collection isolation,concurrent T->collA / T->collB: zero contamination across backup/ckpt/compact,VERIFIED
+Backup during staged/committing txn,snapshot = pre-state or post-commit state, never partial,VERIFIED
+Single-operation linearizability,point register: 0 future / 0 stale-after-completion / 0 unknown-value violations in 1744 real-time reads,VERIFIED for tested register histories (bounded subset; not a system-wide claim)
+Transaction serializability,blind-write subset: every history is serial (atomic gated commits); general serializability UNTESTABLE (no txn reads),PARTIAL (subset only)

@@ -1,0 +1,22 @@
+run,config,docs,dim,heads,peak_rss_kb,db_bytes,build_s,checkpoint_ms,compact_ms,reopen_s,retrieval_p50_us,self_hit,status,note
+PH3E-SCALE-001,primary,80000,32,1,1381616,56008259,104.4,46,NA,83.7,492,99/100,OBSERVED_LIMIT,gates green; M4 guard at measurement phase
+PH3E-SCALE-002,primary,100000,32,1,NA,NA,NA,NA,NA,NA,NA,NA,OBSERVED_LIMIT,M3 budget gate blocked launch
+PH3E-SCALE-003,primary,150000,32,1,NA,NA,NA,NA,NA,NA,NA,NA,OBSERVED_LIMIT,M3 budget gate blocked launch
+PH3E-SCALE-004,primary,200000,32,1,NA,NA,NA,NA,NA,NA,NA,NA,OBSERVED_LIMIT,M3 budget gate blocked launch
+PH3E-SCALE-005,primary,40000,32,1,699872,27989953,38.2,18,NA,32.1,356,98/100,VERIFIED,
+PH3E-SCALE-006,slim,120000,32,1,NA,NA,NA,NA,NA,NA,NA,NA,OBSERVED_LIMIT,OOM-killed ~100k docs (kernel evidence)
+PH3E-SCALE-007,slim,60000,32,1,994568,40299640,73.9,28,NA,59.9,475,100/100,VERIFIED,marginal 16.5 KB/doc
+PH3E-SCALE-008,primary-2head,40000,32,2,833324,NA,89.1,77809,NA,NA,634,97/100,SUPERSEDED,SCALE-DEFECT #1 measured (ckpt 77.8s)
+PH3E-SCALE-009,primary-4head,40000,32,4,1371304,NA,172.2,157232,NA,NA,1215,96/100,SUPERSEDED,ckpt 157.2s
+PH3E-SCALE-012,primary-2head,40000,32,2,561076,NA,85.0,32,NA,NA,580,97/100,VERIFIED,post-fix ckpt 32ms
+PH3E-SCALE-013,primary-4head,40000,32,4,862272,NA,166.4,24,NA,NA,1372,96/100,VERIFIED,post-fix ckpt 24ms
+PH3E-SCALE-010,dim128,20000,128,1,281228,NA,26.4,50,NA,NA,475,100/100,VERIFIED,
+PH3E-SCALE-011,dim256,20000,256,1,353140,NA,40.4,24,NA,NA,683,98/100,VERIFIED,
+PH3E-SCALE-014,primary-churn,60k+200k ops,32,1,877184,NA,70.7,NA,NA,NA,611,95/100,INVALIDATED,harness upsert defect; engine exonerated
+PH3E-SCALE-018,primary-churn,60k+200k ops,32,1,914932,NA,70.7,NA,NA,NA,655,97/100,VERIFIED,counts exact; hygiene holds
+PH3E-SCALE-016,primary-maint,60k-6k del,32,1,957052,NA,61.9,50,426,44.6,497,99/100,VERIFIED,compact 426ms; SST 3->1
+PH3E-SCALE-015,primary-conc,130k attempted,32,1,NA,NA,NA,NA,NA,NA,NA,NA,OBSERVED_LIMIT,config error; wall-clock terminated
+PH3E-SCALE-019,primary-conc,40k+20k,32,1,1072544,NA,NA,NA,NA,NA,NA,NA,VERIFIED,writer ~24 ops/s under reader contention
+PH3E-SCALE-020,primary-integrated,60k lifecycle,32,1,1082496,NA,59.7,436,0,NA,NA,NA,VERIFIED,txns 2000/2000; counts exact
+PH3E-SCALE-017,primary-retrieval,80000,32,1,NA,NA,94.1,NA,NA,NA,NA,NA,OBSERVED_LIMIT,self-hit 93/100 < 95% gate
+PH3E-SCALE-021,primary-retrieval,80000,32,1,NA,NA,93.1,NA,NA,NA,NA,NA,VERIFIED,self-hit 99/100; 80k recall nondeterministic (93-99)

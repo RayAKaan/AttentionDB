@@ -170,6 +170,27 @@ pub struct DocumentStore {
     memtable_threshold: usize,
     sstables: Vec<SSTableReader>,
     pub block_cache: RwLock<BlockCache>,
+    /// Whether the memtable threshold auto-flush is active. ON for the live
+    /// write path; MUST be OFF during WAL replay (recovery): a threshold flush
+    /// mid-replay writes a "ghost" SSTable into the database directory from
+    /// replayed WAL state — records whose deletes sit later in the log get
+    /// re-materialized with a NEWER timestamp than their real tombstones,
+    /// immortalizing deleted documents (E8 soak defect #2: the mid-run
+    /// dir-check opened a second engine on a live dir, its replay crossed the
+    /// threshold, and 18 dead records leaked into the final SST set).
+    auto_flush: bool,
+    /// LOGICALLY MONOTONIC. Every flush stamps ALL its entries with
+    /// `max(now_millis, last_entry_ts + 1)`, so two flushes can never share
+    /// an entry timestamp and version resolution across files is decided by
+    /// the timestamp alone; the file-order tiebreak is defense-in-depth.
+    /// Before this, two flushes inside one wall-clock millisecond produced
+    /// equal entry timestamps, and a partial compaction's `compacted_*`
+    /// output (which sorts lexically BEFORE `sstable_*`) inverted the true
+    /// chronology at the (ts, file-order) tiebreak: a record's own flush
+    /// file could shadow the record's tombstone, and the next full
+    /// compaction's tombstone GC then leaked the dead record — which
+    /// recovery rightly refused (MISSING_MAPPING orphan).
+    last_entry_ts: i64,
 }
 
 impl Default for DocumentStore {
@@ -187,7 +208,15 @@ impl DocumentStore {
             memtable_threshold: 1000,
             sstables: Vec::new(),
             block_cache: RwLock::new(BlockCache::new(50_000)),
+            auto_flush: true,
+            last_entry_ts: 0,
         }
+    }
+
+    /// Toggle the memtable threshold auto-flush. Recovery (WAL replay) MUST
+    /// disable it: replay is not a write path and must never emit SSTables.
+    pub fn set_auto_flush(&mut self, on: bool) {
+        self.auto_flush = on;
     }
 
     /// Compatibility shim: the per-store WAL was removed in Phase 1 — the engine's
@@ -247,6 +276,7 @@ impl DocumentStore {
             tracing::info!(removed = skipped_tmp, "discarded incomplete .tmp SSTables");
         }
         paths.sort();
+        let mut max_entry_ts: i64 = 0;
         for (file_idx, p) in paths.into_iter().enumerate() {
             let file_name = p.display().to_string();
             // Corruption is never silently skipped: recovery must fail loudly.
@@ -255,6 +285,7 @@ impl DocumentStore {
             })?;
             for e in reader.iter() {
                 if let Ok(rec) = Record::from_msgpack(&e.value) {
+                    max_entry_ts = max_entry_ts.max(e.timestamp);
                     let entry = merged.entry(rec.id);
                     match entry {
                         std::collections::hash_map::Entry::Vacant(v) => {
@@ -290,6 +321,8 @@ impl DocumentStore {
             memtable_threshold: 1000,
             sstables,
             block_cache: RwLock::new(BlockCache::new(50_000)),
+            auto_flush: true,
+            last_entry_ts: max_entry_ts,
         })
     }
 
@@ -311,7 +344,7 @@ impl DocumentStore {
         let id = record.id;
         self.memtable.insert(id, record.clone());
         self.block_cache.write().insert(id, record);
-        if self.memtable.len() >= self.memtable_threshold && self.storage_dir.is_some() {
+        if self.auto_flush && self.memtable.len() >= self.memtable_threshold && self.storage_dir.is_some() {
             if let Err(e) = self.flush_memtable() {
                 tracing::error!(error = %e, "memtable flush failed during insert");
             }
@@ -327,8 +360,17 @@ impl DocumentStore {
             let ts = chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0);
             let p = dir.join(format!("sstable_{}.sst", ts));
             let mut w = SSTableWriter::new(&p)?;
+            // INV-C2 corollary: one LOGICALLY MONOTONIC timestamp per flush
+            // (see `last_entry_ts`). Wall-clock ms alone can collide across
+            // same-millisecond flushes; max(.., last+1) makes the entry
+            // timestamp total-ordered, so a later flush's tombstone ALWAYS
+            // resolves newer than an earlier flush's record regardless of
+            // lexical file order.
+            let entry_ts =
+                std::cmp::max(chrono::Utc::now().timestamp_millis(), self.last_entry_ts + 1);
+            self.last_entry_ts = entry_ts;
             for (id, rec) in &self.memtable {
-                w.append(id.as_bytes().to_vec(), rec.to_msgpack()?)?;
+                w.append_with_timestamp(id.as_bytes().to_vec(), rec.to_msgpack()?, entry_ts)?;
             }
             w.flush()?;
             // E3 window: SST fully written at its FINAL name (no tmp->rename
@@ -398,6 +440,16 @@ impl DocumentStore {
     }
 
     /// Number of records waiting in the memtable (checkpoint/observability).
+    /// E9 diagnostics: flushed-record cache lens (see flushed_records docs).
+    pub fn flushed_records_len(&self) -> usize {
+        self.flushed_records.len()
+    }
+
+    /// E9 diagnostics: open SST reader count.
+    pub fn sst_readers_len(&self) -> usize {
+        self.sstables.len()
+    }
+
     pub fn memtable_len(&self) -> usize {
         self.memtable.len()
     }
@@ -468,7 +520,7 @@ impl DocumentStore {
             let tombstone = tombstone_record(*id);
             self.memtable.insert(*id, tombstone.clone());
             self.block_cache.write().insert(*id, tombstone);
-            if self.memtable.len() >= self.memtable_threshold {
+            if self.auto_flush && self.memtable.len() >= self.memtable_threshold {
                 if let Err(e) = self.flush_memtable() {
                     tracing::error!(error = %e, "memtable flush failed during delete");
                 }

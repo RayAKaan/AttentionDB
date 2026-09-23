@@ -1,0 +1,11 @@
+seq,label,model_ok,checker,mapper_ok,retired_ok,live,hash
+40,e8d-ladder-1,ok,true,true,true,40,a5926cc3985aff24
+120,e8d-ladder-2,ok,true,true,true,116,99a7f18325e1159b
+320,e8d-ladder-5,ok,true,true,true,282,3c0a32429e73a7c4
+720,e8d-ladder-10,ok,true,true,true,521,5aab4887298597d7
+1720,e8d-ladder-25,ok,true,true,true,819,2643d7cbe50f9ba0
+3720,e8d-ladder-50,ok,true,true,true,983,380ad9006196acc9
+7720,e8d-ladder-100,ok,true,true,true,1000,6a3ce175e23b2f05
+52764,e8d-mixed,ok,true,true,true,1000,cb5c48b524cf758d
+58764,e8d-rotation,ok,true,true,true,1000,bfc78643fe87dc94
+58764,e8d-final-restart,ok,true,true,true,1000,bfc78643fe87dc94

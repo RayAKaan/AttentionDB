@@ -1,0 +1,5 @@
+case,mode,aborted_at_gate,txn_state,atomicity,checker,model,notes
+t1-t2-before,sync,true,T1_PRESENT_T2_ABSENT,ATOMIC,clean,MATCH,T1 independent; T2 judged at its own gate
+t1-t2-before,group,true,T1_PRESENT_T2_ABSENT,ATOMIC,clean,MATCH,T1 independent; T2 judged at its own gate
+t1-t2-after,sync,true,T1_PRESENT_T2_PRESENT,ATOMIC,clean,MATCH,T1 independent; T2 judged at its own gate
+t1-t2-after,group,true,T1_PRESENT_T2_PRESENT,ATOMIC,clean,MATCH,T1 independent; T2 judged at its own gate

@@ -1,0 +1,8 @@
+{
+ "run_id": "PH3E-SCALE-004",
+ "family": "ladder",
+ "budget": "M3 budget-blocked (never launched)",
+ "durability": "n/a",
+ "commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+ "note": "gate record: launch forbidden by the frozen M3 budget gate"
+}

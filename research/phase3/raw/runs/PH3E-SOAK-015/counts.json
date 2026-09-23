@@ -1,0 +1,1 @@
+{"backups":10,"checkpoints":50,"commits":30000,"compactions":16,"elapsed_s":446,"final_state_hash":"312176e1cb280296","ops":150002,"restarts":1,"restores":0,"rollbacks":0,"txns":30000,"verification_failures":0,"verifications":32}

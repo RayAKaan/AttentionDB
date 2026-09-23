@@ -1,0 +1,14 @@
+{
+ "run_id": "PH3E-MEM-029",
+ "family": "f",
+ "budget": "R1-R7 + async",
+ "durability": "PH3D_DURABILITY=sync",
+ "commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+ "e9_regression_soak": true,
+ "verify_failures": "23/0",
+ "environment": {
+  "host": "2-vCPU sandbox e2b.local",
+  "rustc": "1.98.1"
+ },
+ "oplog": "oplog lost to documented trim error (TRIAGE; counts/verif/reader retained)"
+}

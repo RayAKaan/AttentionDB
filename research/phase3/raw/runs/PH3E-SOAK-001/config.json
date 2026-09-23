@@ -1,0 +1,10 @@
+{
+ "run_id": "PH3E-SOAK-001",
+ "family": "a",
+ "budget": "30000 ops",
+ "durability": "PH3D_DURABILITY=sync",
+ "commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+ "model": "lock-step reference model, never read back",
+ "reconstructed_config": true,
+ "note": "harness does not emit config.json; written 2026-09-22 from the frozen E8 spec Part II + registry (original execution env not recorded verbatim)"
+}

@@ -1,0 +1,1 @@
+{"deletes":37009,"elapsed_s":85,"ext":{"ckpt_every":10000,"compact_every":30000,"keys":800,"target_live":600},"heap_free_retained_kb":346302432.0,"heap_used_kb":282093600.0,"inserts":66836,"live_docs":601,"ops":150000,"pss_last_kb":83881.0,"rss_first_kb":5024.0,"rss_last_kb":85600.0,"rss_peak_kb":85600.0,"tel_samples":44,"updates":46155}

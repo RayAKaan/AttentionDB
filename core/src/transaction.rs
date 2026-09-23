@@ -37,6 +37,14 @@ impl Default for TransactionManager {
 }
 
 impl TransactionManager {
+    /// E9 diagnostics: (staged txn count, total staged ops).
+    pub fn staged_lens(&self) -> (usize, usize) {
+        let txns = self.transactions.lock();
+        (txns.len(), txns.values().map(|t| t.operations.len()).sum())
+    }
+}
+
+impl TransactionManager {
     pub fn new() -> Self {
         Self {
             transactions: Mutex::new(HashMap::new()),

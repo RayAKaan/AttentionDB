@@ -1,0 +1,1 @@
+{"deletes":0,"elapsed_s":16,"ext":{"gets":13334,"loaded":2000,"rss_after_load_kb":26000,"scans":4000},"heap_free_retained_kb":4502816.0,"heap_used_kb":12049120.0,"inserts":2000,"live_docs":2000,"ops":40000,"pss_last_kb":27010.0,"rss_after_load_kb":26000,"rss_first_kb":27856.0,"rss_last_kb":28740.0,"rss_peak_kb":28740.0,"tel_samples":9,"updates":0}

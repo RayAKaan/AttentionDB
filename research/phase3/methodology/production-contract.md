@@ -378,3 +378,99 @@ build, mutations, restart, replay, crash-recovery, compaction, concurrency, and 
     (integrity byte-identical), PH3E-COMPACT-005 ≡ COMPACT-004
     (classification-identical). Report:
     `research/phase3/phase3e-e6-final-report.md`.
+
+## A7 — Concurrency & Isolation Guarantee (E7 addendum; per E7 spec §40, evidence-warranted)
+
+*Added 2026-09-17 by E7 (PH3E-CONC-002). This clause documents what concurrency
+guarantees the engine **does and does not** make. It strengthens no earlier
+claim; it makes the existing behavior contractual so callers cannot over-assume.*
+
+- **A7.1 Commit serialization (VERIFIED).** Commits are applied under a single
+  mutation gate; for any two transactions, one applies entirely before the
+  other begins to apply. Later commit wins on overlapping keys. Evidence:
+  PH3E-CONC-002 E7g (6 cells, both orders × sync/group/async), E7s, E7t.
+- **A7.2 Per-operation atomicity, NOT per-transaction visibility (VERIFIED).**
+  Transaction ops apply one at a time; a concurrent non-transactional reader
+  may observe the intermediate state of a multi-op commit (delete applied
+  before re-inserting insert ⇒ key transiently absent). There is **no
+  per-transaction snapshot** and none is claimed. Evidence: E7e/E7f mixed-pair
+  observations, E7m interval classification.
+- **A7.3 No dirty reads (VERIFIED-ABSENT).** No uncommitted value was ever
+  observed in any ordered or hot-reader schedule (E7b census, E7k 30 ordered
+  reps, E7l rollback 20 reps). Staged state is invisible; rollback leaves no
+  trace.
+- **A7.4 Visibility point (VERIFIED).** A committed write becomes visible at
+  its apply step inside the commit call — potentially **before** the commit
+  returns; reads after the ACK never see stale data (0 stability violations in
+  40 ordered reps). Callers get ACK-after-apply, not ACK-at-durable-fsync for
+  async mode (A2 unchanged).
+- **A7.5 No conflict detection; lost updates possible (VERIFIED-OCCURS).** Two
+  staged writers to the same key both commit; no version check, no abort, no
+  error. Callers needing compare-and-swap must build it above the API.
+  Evidence: E7h, E7g.
+- **A7.6 Single-operation linearizability (PARTIAL, bounded subset).** For the
+  point-register subset tested (real-time histories P1/P2/P3), single ops
+  behave atomically. NO system-wide linearizability claim; transactions are
+  NOT linearizable as units (A7.2).
+- **A7.7 No formal isolation level (NO CLAIM).** Transactions cannot read
+  (`TxnOp = Insert | Delete`), so ANSI isolation levels are not expressible
+  and none is claimed. Write-skew and phantom behavior are **UNSUPPORTED BY
+  API** (not tested, not guaranteed). MVCC: **UNSUPPORTED** (single visible
+  version per uuid; no snapshots).
+- **A7.8 Maintenance isolation (VERIFIED).** Checkpoint, compaction, and
+  backup serialize with commits on the mutation gate: checkpoint never
+  commits/exposes staged state; compaction never resurrects or loses a
+  committed write; backup captures the pre-transaction or post-commit state,
+  never partial. Evidence: E7o/E7p/E7q/E7r.
+- *Scope/boundary.* Single process; the tested failure model remains
+  process-group death at instrumented gates (A3); all verdicts above are
+  bounded to the executed schedules (barrier-ordered and hot-reader, 2–16
+  threads on 2 vCPUs); absence of observed races is not a linearizability
+  proof beyond the measured subsets (E7u).
+- *Evidence:* PH3E-CONC-002 (42 MATCH + 2 UNSUPPORTED + 4 ATOMIC crash rows;
+  6042-event history), superseded first run PH3E-CONC-001 (E7a instrument
+  off-by-one; mixed-pair evidence retained), defect-#1 trail in
+  `research/phase3/methodology/phase3e-e7-deviations.md` (D12), regressions
+  PH3E-WAL-008 / DUR-011 / E3-005 / BACKUP-007 / COMPACT-006 / TXN-002 (all
+  byte- or classification-identical to their sealed baselines). Report:
+  `research/phase3/phase3e-e7-final-report.md`.
+
+## A9 — Resource Hygiene Guarantee (E9 amendment; evidence: PH3E-MEM-002..025)
+
+At every checkpoint AttentionDB (a) purges retired numeric ids from the
+exact-rerank vector store and (b) deterministically rebuilds collection
+indexes via the sealed recovery-path operation when dead index entries
+dominate live documents or the index-insert budget is exceeded
+(INV-E9-HYGIENE). Measured consequence on the 150k-op churn reproduction
+(PH3E-MEM-022 vs PH3E-MEM-002, same workload/seed/environment): peak RSS
+205,368 → 85,600 KB (58.3% reduction), RSS-growth slope 1,125 → 132
+KB/1,000 progress-ops, retrieval recall restored from degraded (0/5 exact
+hits at 97.5% dead-node ratio) to full (5/5), E1–E8 regression families
+count-identical. Explicit non-claims: this is NOT leak-freedom; RSS at rest
+is NOT claimed bounded (the allocator retains freed pages — measured ~99 MB
+free-heap retention after restart); document-proportional components
+(records, vectors of live docs, bounded read cache ≤ 50,000 entries, retired
+id sets required by INV-6) scale with legitimate state and are out of scope.
+
+## A10 — Scale Envelope (E10 amendment; evidence: PH3E-SCALE-001..021)
+
+On a 2-vCPU / 1.9 GiB RAM host, AttentionDB with the shipped default
+configuration (DIM=32, 1 head, HNSW max_elements=100k, durability=Sync,
+E9 hygiene) is VERIFIED at 40,000 documents (full gate battery incl.
+retrieval self-hit ≥95%) and 60,000 documents in the slim-payload
+configuration and the integrated lifecycle (82k ops, 2,000/2,000 txns,
+counts exact, checker clean). 80,000 documents reproduced with ALL
+correctness gates green but the resource guard fired during measurement
+(peak 1.32-1.38 GB; per-doc marginal 16.5-17.2 KB across payload variants);
+grown-graph retrieval self-hit at 80k is nondeterministic at the 95% gate
+(93-99/100 across runs) and is restored to 99-100/100 after any
+recovery/hygiene rebuild. 100k+ documents are budget-blocked (M3) for the
+primary configuration; the slim configuration hit a kernel OOM at ~100k
+docs (evidence preserved). Measured scaling: insert throughput ~700-1,100
+docs/s; checkpoint 24-436 ms at 40-60k; compaction 426 ms at 60k (SST 3→1);
+reopen 44.6-83.7 s at 60-80k (dominated by deterministic index rebuild);
+per-head costs linear; dim128/256 build+memory scale ~linearly with vector
+bytes. Known bottleneck at scale: concurrent scan-heavy readers contend
+write locks (writer ~24 ops/s vs ~700 solo at 60k). Explicitly NOT claimed:
+any scale beyond the tested tiers; production readiness; linearity beyond
+the measured rungs; multimillion-document capacity.

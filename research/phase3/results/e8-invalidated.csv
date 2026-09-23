@@ -1,0 +1,3 @@
+run,family,ops,reason
+PH3E-SOAK-009,E8i,125492,"PH3E-SOAK-009 — INVALIDATED (harness defect, engine exonerated)"
+PH3E-SOAK-010,E8i,143477,artifacts lost to platform snapshot cap (TRIAGE-2026-09-22.md); INVALIDATED record preserved in registry + E8 report s26

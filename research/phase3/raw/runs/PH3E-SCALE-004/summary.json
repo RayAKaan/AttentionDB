@@ -1,0 +1,1 @@
+{"avail_kb_at_gate":1455236,"classification":"OBSERVED_LIMIT","dataset_hash":"2b5a8c3e0643c611","docs":200000,"experiment":"e10-ladder-200000","per_doc_kb_estimate":17.2,"reason":"M3 budget gate: projected peak 3470000 KB > 80% of available 1455236 KB (per-doc marginal 17.2 KB) — launch forbidden by frozen spec"}

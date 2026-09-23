@@ -19,6 +19,21 @@ def rd(p):
     return list(csv.DictReader(open(p)))
 
 
+
+# Artifact chain: PH3E-SOAK-002/003/006/008/011 top-level evidence was lost to a
+# platform snapshot cap (see raw/runs/TRIAGE-2026-09-22.md); deterministic
+# same-seed restoration executions under NEW IDs carry the artifact set. Original
+# dirs and their surviving files are never modified. PH3E-SOAK-010 (INVALIDATED)
+# is documented-loss (its harness bugs were fixed; not re-creatable).
+RESTORATION = {"PH3E-SOAK-002": "PH3E-SOAK-012", "PH3E-SOAK-003": "PH3E-SOAK-013",
+               "PH3E-SOAK-006": "PH3E-SOAK-017", "PH3E-SOAK-011": "PH3E-SOAK-015",
+               "PH3E-SOAK-008": "PH3E-SOAK-016"}
+def e8_art_dir(rid, base):
+    import os as _os
+    if _os.path.exists(f"{base}/{rid}/counts.json"):
+        return f"{base}/{rid}"
+    return RESTORATION.get(rid, rid) and (f"{base}/{RESTORATION[rid]}" if rid in RESTORATION else f"{base}/{rid}")
+
 def main():
     # 1. every canonical results file maps to a registered experiment
     idx = json.load(open(os.path.join(HERE, "raw", "experiment-index.json")))
@@ -650,6 +665,337 @@ def main():
         ERR.append("phase3e-e6-final-report.md missing (E6 final report)")
     if not os.path.exists(os.path.join(HERE, "methodology", "ph3e-e6-deviations.md")):
         ERR.append("methodology/ph3e-e6-deviations.md missing (E6 deviations)")
+
+    # 24. Phase 3E (E7): concurrency & isolation — evidence gates.
+    #     Rejects: claimed isolation w/o evidence, serializability beyond the
+    #     blind-write subset, linearizability w/o full real-time history,
+    #     dirty-read contradiction, partial-txn visibility denial, lost
+    #     acknowledged write, reference-model mismatch, event-log corruption,
+    #     missing raw run, unregistered experiment.
+    for rid in ("PH3E-CONC-001", "PH3E-CONC-002", "PH3E-WAL-008", "PH3E-DUR-011",
+                "PH3E-E3-005", "PH3E-BACKUP-007", "PH3E-COMPACT-006", "PH3E-TXN-002"):
+        if rid not in ids:
+            ERR.append(f"{rid} missing from registry (E7 family)")
+    d7 = os.path.join(run, "PH3E-CONC-002")
+    if not os.path.isdir(d7):
+        ERR.append("PH3E-CONC-002 registered but raw dir missing")
+    else:
+        for f in ("run_info.txt", "config.json", "e7-conc.csv", "e7-crash.csv",
+                  "e7-events.csv", "e7-visibility.csv"):
+            if not os.path.exists(os.path.join(d7, f)):
+                ERR.append(f"PH3E-CONC-002: missing {f}")
+    e7_res = os.path.join(RES, "e7-concurrency.csv")
+    e7_cres = os.path.join(RES, "e7-crash-atomicity.csv")
+    e7_vres = os.path.join(RES, "e7-visibility-matrix.csv")
+    if not (os.path.exists(e7_res) and os.path.exists(e7_cres) and os.path.exists(e7_vres)):
+        ERR.append("results/e7-*.csv missing (run generate_results_ph3e.py)")
+    else:
+        c7 = rd(e7_res)
+        raw7 = rd(os.path.join(d7, "e7-conc.csv")) if os.path.isdir(d7) else []
+        if len(c7) != len(raw7):
+            ERR.append(f"e7 row drift raw {len(raw7)} vs results {len(c7)}")
+        for sr in c7:
+            if sr["match"] not in ("MATCH", "-"):
+                ERR.append(f"e7 violation: {sr['family']}/{sr['case']}")
+            if sr["match"] == "-":
+                blob = " ".join(str(v) for v in sr.values())
+                if "UNSUPPORTED" not in blob:
+                    ERR.append(f"e7 '-' row without UNSUPPORTED justification: {sr['family']}")
+        c7c = rd(e7_cres)
+        raw7c = rd(os.path.join(d7, "e7-crash.csv")) if os.path.isdir(d7) else []
+        if len(c7c) != len(raw7c):
+            ERR.append(f"e7 crash row drift raw {len(raw7c)} vs results {len(c7c)}")
+        for sr in c7c:
+            if sr["match"] != "MATCH" or sr["atomicity"] != "ATOMIC" or sr["aborted_at_gate"] != "true":
+                ERR.append(f"e7 crash row without fresh-process ATOMIC evidence: {sr['case']}/{sr['mode']}")
+        # dirty-read contradiction guard: any claimed dirty-read observation?
+        for sr in c7:
+            blob = " ".join(str(v) for v in sr.values()).lower()
+            if "dirty read observed" in blob or "uncommitted value observed" in blob:
+                ERR.append(f"e7 dirty-read contradiction: {sr['family']}/{sr['case']}")
+        # event-log sanity: monotonic seq, non-empty
+        evp = os.path.join(d7, "e7-events.csv")
+        if os.path.exists(evp):
+            ev = rd(evp)
+            if len(ev) < 1000:
+                ERR.append(f"e7 event log suspiciously small ({len(ev)} rows)")
+            seqs = [int(r["seq"]) for r in ev]
+            if seqs != sorted(seqs) or len(set(seqs)) != len(seqs):
+                ERR.append("e7 event log seq corruption")
+        # full history guard: E7u must have UNSAMPLED reads (more u-read rows
+        # than a 1/256 sample could produce for its runtime)
+        u_reads = [r for r in ev if r["op"] == "u-read"] if os.path.exists(evp) else []
+        if len(u_reads) < 200:
+            ERR.append("e7u linearizability history not FULL (sampled) — claim would be unsupported")
+    # superseded first run preserved
+    d71 = os.path.join(run, "PH3E-CONC-001")
+    if not os.path.isdir(d71):
+        ERR.append("PH3E-CONC-001 missing (superseded runs are never deleted)")
+    bugdir = os.path.join(d71, "bug-MISSING_MAPPING-preserved-dir")
+    if not os.path.isdir(bugdir):
+        ERR.append("defect-#1 preserved failing dir missing (bug protocol)")
+    # E1-E6 regression equivalence chains extended through E7
+    for base, reg, f in (
+        ("PH3E-WAL-007", "PH3E-WAL-008", "wal-integrity.csv"),
+        ("PH3E-E3-004", "PH3E-E3-005", "e3-matrix.csv"),
+        ("PH3E-TXN-001", "PH3E-TXN-002", "e6-txn.csv"),
+        ("PH3E-TXN-001", "PH3E-TXN-002", "e6-crash.csv"),
+        ("PH3E-COMPACT-005", "PH3E-COMPACT-006", "e5-crash.csv"),
+        ("PH3E-BACKUP-006", "PH3E-BACKUP-007", "e4-integrity.csv"),
+    ):
+        fb = os.path.join(run, base, f)
+        fr = os.path.join(run, reg, f)
+        if os.path.exists(fb) and os.path.exists(fr):
+            if sorted(open(fb).read().splitlines()[1:]) != sorted(open(fr).read().splitlines()[1:]):
+                ERR.append(f"{reg}/{f} differs from {base} (byte-identity chain broken)")
+        else:
+            ERR.append(f"regression pair missing: {reg}/{f}")
+    # durability byte-identity (four classification CSVs)
+    for f in ("ack-boundary.csv", "txn-ack.csv", "checkpoint-interaction.csv", "group-boundary.csv"):
+        fb = os.path.join(run, "PH3E-DUR-010", f)
+        fr = os.path.join(run, "PH3E-DUR-011", f)
+        if os.path.exists(fb) and os.path.exists(fr):
+            if sorted(open(fb).read().splitlines()[1:]) != sorted(open(fr).read().splitlines()[1:]):
+                ERR.append(f"PH3E-DUR-011/{f} differs from PH3E-DUR-010")
+        else:
+            ERR.append(f"regression pair missing: PH3E-DUR-011/{f}")
+    # MVCC / isolation overclaim guards in results
+    if os.path.exists(e7_res):
+        for sr in rd(e7_res):
+            blob = " ".join(str(v) for v in sr.values()).lower()
+            for banned in ("mvcc verified", "serializable level", "snapshot isolation provided"):
+                if banned in blob:
+                    ERR.append(f"e7 overclaim '{banned}': {sr['family']}/{sr['case']}")
+    if not os.path.exists(os.path.join(HERE, "phase3e-e7-final-report.md")):
+        ERR.append("phase3e-e7-final-report.md missing (E7 final report)")
+    if not os.path.exists(os.path.join(HERE, "methodology", "phase3e-e7-deviations.md")):
+        ERR.append("methodology/phase3e-e7-deviations.md missing (E7 deviations)")
+    rep = os.path.join(HERE, "phase3e-e7-final-report.md")
+    if os.path.exists(rep):
+        rtext = open(rep).read()
+        for h in range(1, 36):
+            if f"## §{h} " not in rtext:
+                ERR.append(f"E7 final report missing heading §{h}")
+    contract = os.path.join(HERE, "methodology", "production-contract.md")
+    if os.path.exists(contract) and "A7 — Concurrency & Isolation Guarantee" not in open(contract).read():
+        ERR.append("production contract lacks A7 (E7 evidence-warranted amendment)")
+
+    # 25. Phase 3E (E8): soak/stability/reliability — evidence gates.
+    #     Rejects: any official soak run with verification failures or reader
+    #     violations, INVALIDATED runs without preserved INVALIDATED.md,
+    #     missing telemetry, registry drift, report/heading/numerical drift,
+    #     memory-optimization contamination (E8 measures, E9 optimizes),
+    #     production-ready claims from soak, missing final report.
+    e8_runs = [("PH3E-SOAK-001", "COMPLETED"), ("PH3E-SOAK-002", "COMPLETED"),
+               ("PH3E-SOAK-003", "COMPLETED"), ("PH3E-SOAK-004", "COMPLETED"),
+               ("PH3E-SOAK-005", "COMPLETED"), ("PH3E-SOAK-006", "COMPLETED"),
+               ("PH3E-SOAK-007", "COMPLETED"), ("PH3E-SOAK-008", "COMPLETED"),
+               ("PH3E-SOAK-009", "INVALIDATED"), ("PH3E-SOAK-010", "INVALIDATED"),
+               ("PH3E-SOAK-011", "COMPLETED")]
+    triage = os.path.join(run, "TRIAGE-2026-09-22.md")
+    if not os.path.exists(triage):
+        ERR.append("raw/runs/TRIAGE-2026-09-22.md missing (platform-loss record)")
+    else:
+        ttext = open(triage).read()
+        for rid in ("PH3E-SOAK-002", "PH3E-SOAK-003", "PH3E-SOAK-006",
+                    "PH3E-SOAK-008", "PH3E-SOAK-010", "PH3E-SOAK-011"):
+            if rid not in ttext:
+                ERR.append(f"TRIAGE does not document {rid}")
+    for rid, status in e8_runs:
+        ent = [e for e in idx["experiments"] if e["experiment_id"] == rid]
+        if not ent:
+            ERR.append(f"{rid} missing from registry (E8 family)")
+            continue
+        if ent[0]["status"] != status:
+            ERR.append(f"{rid} registry status {ent[0]['status']} != {status}")
+        d8 = os.path.join(run, rid)
+        if not os.path.isdir(d8):
+            ERR.append(f"{rid} registered but raw dir missing")
+            continue
+        # artifact chain: counts/resource/verif may live in the restoration run
+        adir = d8
+        if not os.path.exists(os.path.join(d8, "counts.json")) and rid in RESTORATION:
+            adir = os.path.join(run, RESTORATION[rid])
+            rent = [e for e in idx["experiments"] if e["experiment_id"] == RESTORATION[rid]]
+            if not rent or rent[0].get("restoration_for") != rid:
+                ERR.append(f"{RESTORATION[rid]} not registered as restoration_for {rid}")
+            else:
+                orig_ops = ent[0].get("metrics", {}).get("ops")
+                new_ops = rent[0].get("metrics", {}).get("ops")
+                if orig_ops != new_ops:
+                    ERR.append(f"restoration {RESTORATION[rid]} ops {new_ops} != original {rid} ops {orig_ops}")
+        if rid == "PH3E-SOAK-010":
+            # the one accepted documented-loss run: INVALIDATED, not re-creatable
+            # (its harness bugs were fixed); loss recorded in TRIAGE + report s26.
+            # A COMPLETED run must NEVER take this path.
+            continue
+        for f in ("counts.json", "resource.csv", "verif.csv"):
+            if not os.path.exists(os.path.join(adir, f)):
+                ERR.append(f"{rid}: missing {f} (chain dir {os.path.basename(adir)})")
+        if not (os.path.exists(os.path.join(adir, "oplog.csv")) or
+                os.path.exists(os.path.join(adir, "oplog.csv.gz"))):
+            ERR.append(f"{rid}: missing oplog.csv[.gz] (chain dir {os.path.basename(adir)})")
+        if status == "INVALIDATED" and rid == "PH3E-SOAK-009" and \
+                not os.path.exists(os.path.join(d8, "INVALIDATED.md")):
+            ERR.append(f"{rid} INVALIDATED without preserved INVALIDATED.md")
+    res8 = os.path.join(RES, "e8-soak.csv")
+    mem8 = os.path.join(RES, "e8-memory.csv")
+    tab8 = os.path.join(TAB, "table-e8-soak.md")
+    if not (os.path.exists(res8) and os.path.exists(mem8) and os.path.exists(tab8)):
+        ERR.append("results/e8-*.csv or tables/table-e8-soak.md missing (run generator)")
+    else:
+        s8 = rd(res8)
+        if len(s8) != 9:
+            ERR.append(f"e8-soak.csv must hold exactly the 9 official families, got {len(s8)}")
+        for sr in s8:
+            if sr["status"] != "VERIFIED":
+                ERR.append(f"e8 official {sr['run']} not VERIFIED")
+            if int(sr["verification_failures"]) or int(sr["reader_violations"]):
+                ERR.append(f"e8 official {sr['run']} carries verification/reader failures")
+            a8 = e8_art_dir(sr["run"], run)
+            c8 = json.load(open(os.path.join(a8, "counts.json")))
+            if int(sr["ops"]) != c8["ops"] or int(sr["verifications"]) != c8.get("verifications", 0):
+                ERR.append(f"e8 {sr['run']} counts drift vs raw")
+            if sr["run"] not in open(tab8).read():
+                ERR.append(f"e8 table missing {sr['run']}")
+        m8 = rd(mem8)
+        if len(m8) != 9:
+            ERR.append(f"e8-memory.csv must hold 9 families, got {len(m8)}")
+        # S16 honesty gate: memory rows must be a classification, not a leak claim
+        for mr_ in m8:
+            if mr_["rss_class"] not in ("linear-with-ops", "bounded-plateau", "stepwise", "unexplained", "mixed"):
+                ERR.append(f"e8 memory class illegal for {mr_['run']}: {mr_['rss_class']}")
+    rep8 = os.path.join(HERE, "phase3e-e8-final-report.md")
+    if not os.path.exists(rep8):
+        ERR.append("phase3e-e8-final-report.md missing (E8 final report)")
+    else:
+        rtext8 = open(rep8).read()
+        if "## §1 " not in rtext8 or "## §31 " not in rtext8:
+            ERR.append("E8 final report must use exactly 31 fixed headings §1..§31")
+        for h in range(1, 32):
+            if f"## §{h} " not in rtext8:
+                ERR.append(f"E8 final report missing heading §{h}")
+        if "E8 COMPLETE; E9 NOT STARTED" not in rtext8:
+            ERR.append("E8 final report missing the HARD STOP line")
+        low8 = rtext8.lower()
+        if "production-ready" in low8 and "not production-ready" not in low8 and "≠ production-ready" not in rtext8 and "is not production" not in low8:
+            ERR.append("E8 report must not imply production-readiness from soak")
+        dev8 = os.path.join(HERE, "methodology", "phase3e-e8-deviations.md")
+        if not os.path.exists(dev8):
+            ERR.append("phase3e-e8-deviations.md missing (E8 deviations gate)")
+        else:
+            dtext8 = open(dev8).read()
+            for token in ("PH3E-SOAK-009", "PH3E-SOAK-010", "E8i", "E8d", "E8f",
+                          "linear-with-ops", "E9"):
+                if token not in dtext8:
+                    ERR.append(f"E8 deviations missing token {token}")
+        if "e8-soak.csv" not in rtext8:
+            ERR.append("E8 final report does not cite results/e8-soak.csv")
+
+    # 26. Phase 3E (E9): memory root-cause & optimization — evidence gates.
+    #     Rejects: missing registry entries for PH3E-MEM-001..029, missing
+    #     before/after artifacts, optimization that fails its measured floor,
+    #     missing INV-E9-HYGIENE mechanism or its regression test, missing
+    #     A9 amendment, report heading/verdict drift, leak-claim wording.
+    for n in list(range(1, 30)):
+        rid = f"PH3E-MEM-{n:03d}"
+        if not any(e["experiment_id"] == rid for e in idx["experiments"]):
+            ERR.append(f"{rid} missing from registry (E9 family)")
+        if not os.path.isdir(os.path.join(run, rid)):
+            ERR.append(f"{rid} registered but raw dir missing")
+    ba = os.path.join(RES, "e9-before-after.csv")
+    ct = os.path.join(RES, "e9-controls.csv")
+    t9 = os.path.join(TAB, "table-e9-memory.md")
+    f9 = os.path.join(HERE, "figures", "e9-before-after.svg")
+    if not all(os.path.exists(p) for p in (ba, ct, t9, f9)):
+        ERR.append("results/e9-*.csv, tables/table-e9-memory.md or figures/e9-before-after.svg missing")
+    else:
+        for r in rd(ba):
+            red = float(r["rss_reduction_pct"])
+            if r["experiment"].startswith("repro") and red < 55:
+                ERR.append(f"E9 repro reduction {red}% below the 55% measured floor")
+            if r["experiment"].startswith("restart") and red < 30:
+                ERR.append(f"E9 restart-reset reduction {red}% below floor")
+            if r["experiment"].startswith("growing") and abs(red) > 5:
+                ERR.append("E9 growing-dataset workload must be unchanged within 5% (no dead nodes)")
+    if not os.path.exists("/home/user/AttentionDB/core/tests/regression_e9_index_hygiene.rs"):
+        ERR.append("regression_e9_index_hygiene.rs missing (E9 seal)")
+    eng = open("/home/user/AttentionDB/core/src/engine.rs").read()
+    if "INV-E9-HYGIENE" not in eng:
+        ERR.append("INV-E9-HYGIENE missing from engine.rs")
+    contract9 = os.path.join(HERE, "methodology", "production-contract.md")
+    if not os.path.exists(contract9) or "A9 — Resource Hygiene Guarantee" not in open(contract9).read():
+        ERR.append("production contract lacks A9 (E9 evidence-warranted amendment)")
+    rep9 = os.path.join(HERE, "phase3e-e9-final-report.md")
+    if not os.path.exists(rep9):
+        ERR.append("phase3e-e9-final-report.md missing")
+    else:
+        rtext9 = open(rep9).read()
+        for h in range(1, 26):
+            if f"## {h}. " not in rtext9:
+                ERR.append(f"E9 final report missing heading {h}.")
+        if "E9 COMPLETE; E10 NOT STARTED" not in rtext9:
+            ERR.append("E9 final report missing the HARD STOP line")
+        low9 = rtext9.lower()
+        if "no memory leak" in low9 or "not a leak}" in low9 or "no leak" in low9:
+            ERR.append("E9 report must not make leak-freedom claims (A9 wording binds)")
+    dev9 = os.path.join(HERE, "methodology", "phase3e-e9-deviations.md")
+    if not os.path.exists(dev9):
+        ERR.append("phase3e-e9-deviations.md missing")
+    else:
+        dtext9 = open(dev9).read()
+        for token in ("D30", "D31", "D32", "D33", "D34", "D35", "D36", "mallinfo", "PH3E-SOAK-017"):
+            if token not in dtext9:
+                ERR.append(f"E9 deviations missing token {token}")
+
+    # 27. Phase 3E (E10): scale-envelope — evidence gates.
+    cap = os.path.join(RES, "e10-capacity.csv")
+    tabc = os.path.join(TAB, "table-e10-capacity.md")
+    figc = os.path.join(HERE, "figures", "e10-capacity.svg")
+    if not all(os.path.exists(p) for p in (cap, tabc, figc)):
+        ERR.append("results/e10-capacity.csv, tables/table-e10-capacity.md or figures/e10-capacity.svg missing")
+    else:
+        crows = rd(cap)
+        if len(crows) < 21:
+            ERR.append(f"e10-capacity.csv must hold the 21 registered runs, got {len(crows)}")
+        reg10 = [e for e in idx["experiments"] if e["experiment_id"].startswith("PH3E-SCALE-")]
+        if len(reg10) != 21:
+            ERR.append(f"registry must hold 21 PH3E-SCALE runs, got {len(reg10)}")
+        for cr in crows:
+            if not any(e["experiment_id"] == cr["run"] for e in idx["experiments"]):
+                ERR.append(f"{cr['run']} in capacity table but missing from registry")
+        for n in range(1, 22):
+            rid = f"PH3E-SCALE-{n:03d}"
+            if not os.path.isdir(os.path.join(run, rid)):
+                ERR.append(f"{rid} registered but raw dir missing")
+    rep10 = os.path.join(HERE, "phase3e-e10-final-report.md")
+    if not os.path.exists(rep10):
+        ERR.append("phase3e-e10-final-report.md missing")
+    else:
+        rtext10 = open(rep10).read()
+        for h in range(1, 33):
+            if f"## {h}. " not in rtext10:
+                ERR.append(f"E10 final report missing heading {h}.")
+        if "E10 COMPLETE; E11 NOT STARTED" not in rtext10:
+            ERR.append("E10 final report missing the HARD STOP line")
+        if "million" in rtext10.lower():
+            ERR.append("E10 report must not contain million-document claims")
+    contract10 = os.path.join(HERE, "methodology", "production-contract.md")
+    if not os.path.exists(contract10) or "A10 — Scale Envelope" not in open(contract10).read():
+        ERR.append("production contract lacks A10 (E10 evidence-warranted amendment)")
+    eng10 = open("/home/user/AttentionDB/core/src/engine.rs").read()
+    if "E10 SCALE-DEFECT #1" not in eng10:
+        ERR.append("SCALE-DEFECT #1 fix marker missing from engine.rs")
+    if not os.path.exists("/home/user/AttentionDB/core/tests/regression_e9_index_hygiene.rs"):
+        ERR.append("regression_e9_index_hygiene.rs missing (E10 seal)")
+    dev10 = os.path.join(HERE, "methodology", "phase3e-e10-deviations.md")
+    if not os.path.exists(dev10):
+        ERR.append("phase3e-e10-deviations.md missing")
+    else:
+        dtext10 = open(dev10).read()
+        for token in ("D38", "D39", "D40", "D41", "D42", "D43", "D44", "D45", "D46", "D47"):
+            if token not in dtext10:
+                ERR.append(f"E10 deviations missing token {token}")
 
     if ERR:
         print("PHASE 3 CONSISTENCY CHECK FAILED:")

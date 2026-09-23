@@ -1,0 +1,10 @@
+run,family,rss_first_kb,rss_max_kb,rss_last_kb,rss_class,rss_ops_corr,slope_kb_per_1k_ops,fds_min,fds_max,threads_min,threads_max,tel_samples
+PH3E-SOAK-001,E8a,13424,86944,86944,linear-with-ops,0.983,961.7,9,10,3,5,25
+PH3E-SOAK-002,E8b,18340,271968,271968,linear-with-ops,0.880,1268.1,9,10,2,4,130
+PH3E-SOAK-003,E8c,14880,213644,213644,linear-with-ops,0.971,390.4,9,9,4,9,277
+PH3E-SOAK-004,E8d,26244,126812,126812,linear-with-ops,0.888,1711.4,9,10,4,4,53
+PH3E-SOAK-005,E8e,26252,113240,113240,linear-with-ops,0.996,7249.0,9,10,4,4,11
+PH3E-SOAK-006,E8f,16884,121444,110004,linear-with-ops,0.985,776.0,8,10,4,4,69
+PH3E-SOAK-007,E8g,28200,39140,39140,linear-with-ops,1.000,10176.7,9,11,4,4,3
+PH3E-SOAK-008,E8h,17044,172456,172456,linear-with-ops,0.993,685.1,9,10,3,5,95
+PH3E-SOAK-011,E8i,17284,302700,302700,linear-with-ops,0.992,679.0,9,10,3,5,223

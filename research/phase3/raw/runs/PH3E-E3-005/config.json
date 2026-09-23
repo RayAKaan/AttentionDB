@@ -1,0 +1,9 @@
+{
+ "baseline": "PH3E-E3-004",
+ "cells": 210,
+ "equivalence": "e3-matrix.csv BYTE-identical to PH3E-E3-004 (210/210 cells incl. per-cell model/checker columns)",
+ "commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+ "tree_sha16": "2374154d738a4270",
+ "date": "2026-09-17",
+ "engine_change_under_test": "core/src/engine.rs TxnOp::Insert commit-apply re-register (E7 INV-FIX); conclusion: no behavior change on any E1-E6 classification"
+}

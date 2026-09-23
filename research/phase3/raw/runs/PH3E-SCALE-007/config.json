@@ -1,0 +1,1 @@
+{"commit":"3e65d50f (E9 tree)","dataset_scheme":"clustered-50 + near-dup-16 + mixed-length payloads (spec M8)","dim":32,"durability":"sync","experiment":"e10-ladder-60000","heads":1,"hnsw":"HNSWConfig::default() (max_nb_connection=16, ef_construction=400, ef_search=64, store_vectors=true, max_elements=100000)","hygiene":"E9 policy unchanged"}

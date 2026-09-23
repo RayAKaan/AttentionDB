@@ -45,6 +45,10 @@ pub enum EngineState {
 /// exact persistence ([`IdMapper::snapshot`] / [`IdMapper::restore_snapshot`]),
 /// retired ids (delete/update never reuse a numeric id — INV-6), and forced-id
 /// restore used by WAL replay.
+/// INV-E9-HYGIENE policy: never rebuild below this absolute dead-entry count
+/// (small databases are cheap to retain; avoids rebuild churn on tiny sets).
+pub const INDEX_REBUILD_MIN_VSTORE: usize = 20_000;
+
 pub struct IdMapper {
     u64_to_uuid: HashMap<u64, Uuid>,
     uuid_to_u64: HashMap<Uuid, u64>,
@@ -307,6 +311,44 @@ enum ReplayOp {
     },
 }
 
+/// E9 memory diagnostics: read-only census of in-memory structures.
+/// Plain data — no new dependencies, no behavior change; callers serialize it.
+/// Fields are MEASURED lens/capacities, never allocation-size claims.
+#[derive(Debug, Clone, Default)]
+pub struct MemCensus {
+    pub mapper_uuid_to_u64: usize,
+    pub mapper_u64_to_uuid: usize,
+    pub mapper_retired: usize,
+    pub mapper_next_id: u64,
+    pub store_memtable: usize,
+    pub store_flushed_records: usize,
+    pub store_sst_readers: usize,
+    pub store_block_cache_entries: usize,
+    pub store_block_cache_bytes: usize,
+    pub txn_staged: usize,
+    pub txn_staged_ops: usize,
+    pub collections: Vec<CollCensus>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct CollCensus {
+    pub name: String,
+    pub vector_store_len: usize,
+    pub heads: usize,
+    pub retired_ids: usize,
+    pub bm25_terms: usize,
+    pub bm25_postings: usize,
+    pub bm25_doc_lengths: usize,
+    pub idf_cache: usize,
+}
+
+impl IdMapper {
+    /// E9 diagnostics lens (uuid->id, id->uuid, retired, next_id).
+    pub fn census_lens(&self) -> (usize, usize, usize, u64) {
+        (self.uuid_to_u64.len(), self.u64_to_uuid.len(), self.retired.len(), self.next_id)
+    }
+}
+
 pub struct AttentionEngine {
     pub collections: Arc<RwLock<HashMap<String, Arc<Collection>>>>,
     pub document_store: Arc<RwLock<attentiondb_storage::DocumentStore>>,
@@ -318,6 +360,11 @@ pub struct AttentionEngine {
     durability: Durability,
     state: Arc<RwLock<EngineState>>,
     manifest_generation: AtomicU64,
+    /// INV-E9-HYGIENE: index-insert budget counter (graph nodes cannot be
+    /// counted via the vector store — hnsw_rs hides them — so hygiene tracks
+    /// how many index insertions happened since the last deterministic
+    /// rebuild; crossing the budget forces one at the next checkpoint).
+    index_inserts_since_rebuild: AtomicU64,
     /// Serializes mutations against checkpoints/backups (correctness > concurrency).
     mutation_gate: Arc<Mutex<()>>,
     /// Hard query limits (§18) enforced at every query entry point.
@@ -344,6 +391,7 @@ impl AttentionEngine {
             durability: Durability::GroupCommit,
             state: Arc::new(RwLock::new(EngineState::Ready)),
             manifest_generation: AtomicU64::new(0),
+            index_inserts_since_rebuild: AtomicU64::new(0),
             mutation_gate: Arc::new(Mutex::new(())),
             query_limits: crate::planner::QueryLimits::default(),
             accepting_writes: Arc::new(AtomicBool::new(true)),
@@ -439,6 +487,7 @@ impl AttentionEngine {
             durability,
             state: Arc::new(RwLock::new(EngineState::Opening)),
             manifest_generation: AtomicU64::new(0),
+            index_inserts_since_rebuild: AtomicU64::new(0),
             mutation_gate: Arc::new(Mutex::new(())),
             query_limits: crate::planner::QueryLimits::default(),
             accepting_writes: Arc::new(AtomicBool::new(true)),
@@ -453,10 +502,24 @@ impl AttentionEngine {
             }
         }
 
+        // INV-RECOVERY-READONLY: WAL replay must never emit SSTables. The
+        // memtable threshold auto-flush during replay would write a "ghost"
+        // SSTable of PARTIAL replay state into the (possibly LIVE) database
+        // directory — re-materializing deleted documents with NEWER timestamps
+        // than their real tombstones (E8 soak defect #2: the mid-run dir-check
+        // opened a second engine on a live dir; its replay crossed the
+        // threshold; 18 dead records leaked into the final SST set and the
+        // next recovery refused). Recovery persists only via an explicit,
+        // gated checkpoint. Auto-flush resumes after the replay loop; the
+        // possibly over-threshold memtable is flushed by the next live
+        // mutation or an owner-initiated checkpoint — open itself NEVER
+        // persists anything.
+        engine.document_store.write().set_auto_flush(false);
         let mut txn_buf: HashMap<u64, TxnBuffer> = HashMap::new();
         for record in &outcome.records {
             engine.apply_replay_record(record, &mut txn_buf, replayed)?;
         }
+        engine.document_store.write().set_auto_flush(true);
         // Uncommitted transactions at the end of the log are discarded (documented:
         // commit marker = atomicity boundary). Aborts are implicit.
         if !txn_buf.is_empty() {
@@ -755,6 +818,8 @@ impl AttentionEngine {
         crashgate::GATE_AFTER_WAL_APPEND.hit();
 
         self.apply_insert(&collection, uuid, numeric_id, record)?;
+        self.index_inserts_since_rebuild
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         crashgate::GATE_AFTER_APPLY.hit();
         crashgate::GATE_BEFORE_ACK.hit();
         Ok(uuid.to_string())
@@ -820,6 +885,8 @@ impl AttentionEngine {
         collection.retire_id(old_numeric);
         collection.bm25.remove(old_numeric);
         self.apply_insert(&collection, uuid, new_numeric, new_record)?;
+        self.index_inserts_since_rebuild
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         Ok(uuid.to_string())
     }
 
@@ -979,7 +1046,32 @@ impl AttentionEngine {
         for op in txn.operations.iter() {
             match op {
                 TxnOp::Insert(record) => {
-                    let numeric = self.id_mapper.read().uuid_to_id(&record.id).unwrap_or(0);
+                    // INV-FIX(E7): a same-uuid [Delete, Insert] pair inside one
+                    // transaction means the txn's own Delete arm retired the
+                    // mapping before this Insert runs. `unwrap_or(0)` then
+                    // applied the document under numeric id 0 with NO live
+                    // mapping — an orphan record that fails the post-recovery
+                    // checker after checkpoint (MISSING_MAPPING) and collides
+                    // all such inserts in the vector space under id 0.
+                    // Fix: re-register a fresh numeric id when (and only when)
+                    // the mapping is absent; the WAL-write path already
+                    // registered it for the normal case.
+                    let numeric = {
+                        // Bind first: a `match self.id_mapper.read()...`
+                        // scrutinee temporary would hold the read guard across
+                        // the arms and deadlock the write() below.
+                        let existing = self.id_mapper.read().uuid_to_id(&record.id);
+                        match existing {
+                            Some(n) => n,
+                            None => {
+                                let mut mapper = self.id_mapper.write();
+                                match mapper.uuid_to_id(&record.id) {
+                                    Some(n) => n,
+                                    None => mapper.register(record.id),
+                                }
+                            }
+                        }
+                    };
                     let mut record = record.clone();
                     let tag = format!("collection:{collection}");
                     if !record.tags.contains(&tag) {
@@ -1568,6 +1660,77 @@ impl AttentionEngine {
         // 2) Flush memtable → atomic SSTables.
         self.document_store.write().flush()?;
         crashgate::GATE_CKPT_AFTER_SST.hit();
+
+        // 2.5) INV-E9-HYGIENE — checkpoint-time index hygiene.
+        //
+        // E9 root cause (measured, PH3E-MEM-002..017): the HNSW exact-rerank
+        // vector store retains EVERY version ever inserted in this process
+        // (hnsw_rs cannot delete graph nodes; dead store entries are purged
+        // only at startup), and update/delete mint retired numeric ids that
+        // INV-6 requires us to keep. At steady cardinality the process
+        // accumulates O(mutations) dead index entries while live documents
+        // stay constant — the measured linear RSS-vs-ops signal.
+        //
+        // Hygiene, using ONLY the sealed recovery-path operation:
+        //   a) purge retired ids from the exact-rerank vector store (the
+        //      startup purge, now also at every checkpoint);
+        //   b) when dead entries dominate live documents (vector-store len
+        //      > 1.5x mapped-live AND > INDEX_REBUILD_MIN_VSTORE), rebuild
+        //      the indexes deterministically via rebuild_all_indexes() —
+        //      byte-for-byte the operation every recovery already performs
+        //      (E1-E8 sealed), so retrieval semantics are preserved by
+        //      construction; retired-id filtering (INV-3/4) is unchanged.
+        {
+            let (mapped, _, _, _) = self.id_mapper.read().census_lens();
+            // deadness is judged on the PRE-purge store length: the graph nodes
+            // behind dead store entries are what degrade search recall, so the
+            // rebuild decision must see them before they are purged away.
+            let mut vstore_pre = 0usize;
+            for coll in self.collections.read().values() {
+                let manager = coll.head_manager.read();
+                for h in manager.list_heads() {
+                    if let Ok(idx) = manager.get_head(&h) {
+                        vstore_pre += idx.read().len();
+                    }
+                }
+            }
+            // E10 SCALE-DEFECT #1 fix: the E9 ratio was head-count-blind —
+            // every head stores every live doc, so vstore = heads × mapped at
+            // zero dead entries and the old `vstore*2 > mapped*3` test fired
+            // for ANY multi-head collection (measured: forced 78–157 s
+            // rebuilds at every checkpoint, PH3E-SCALE-008/009). Deadness is
+            // now judged against the expected store size heads × mapped.
+            let head_count: usize = self
+                .collections
+                .read()
+                .values()
+                .map(|c| c.head_manager.read().list_heads().len())
+                .sum();
+            let expected_vstore = mapped.saturating_mul(head_count.max(1));
+            let dead_entries = vstore_pre.saturating_sub(expected_vstore);
+            let degraded =
+                dead_entries > INDEX_REBUILD_MIN_VSTORE && dead_entries * 2 > mapped * 3;
+            // graph-node budget: hnsw_rs nodes are invisible to the census, so
+            // track index insertions since the last rebuild instead. The budget
+            // bounds dead graph nodes to O(live) + budget between checkpoints.
+            let budget = std::cmp::max(INDEX_REBUILD_MIN_VSTORE, mapped.saturating_mul(4)) as u64;
+            let over_budget = self
+                .index_inserts_since_rebuild
+                .load(std::sync::atomic::Ordering::Relaxed)
+                > budget;
+            for coll in self.collections.read().values() {
+                coll.purge_retired_from_vector_store();
+            }
+            if degraded || over_budget {
+                tracing::info!(
+                    vstore_pre, mapped,
+                    "INV-E9-HYGIENE: dead index entries dominate live docs; deterministic rebuild"
+                );
+                self.rebuild_all_indexes()?;
+                self.index_inserts_since_rebuild
+                    .store(0, std::sync::atomic::Ordering::Relaxed);
+            }
+        }
 
         // 3) Idmap snapshot (exact allocator + retired ids — INV-6).
         let snap = self.id_mapper.read().snapshot();
@@ -2317,6 +2480,52 @@ fn enforce_wal_integrity(
     }
 
     Ok(())
+}
+
+impl AttentionEngine {
+    /// E9 memory census: snapshot of every long-lived in-memory structure.
+    /// Read-only; takes each lock briefly. NOT a model of allocation sizes.
+    pub fn mem_census(&self) -> MemCensus {
+        let mut c = MemCensus::default();
+        let (u2i, i2u, ret, nid) = self.id_mapper.read().census_lens();
+        c.mapper_uuid_to_u64 = u2i;
+        c.mapper_u64_to_uuid = i2u;
+        c.mapper_retired = ret;
+        c.mapper_next_id = nid;
+        {
+            let store = self.document_store.read();
+            c.store_memtable = store.memtable_len();
+            c.store_flushed_records = store.flushed_records_len();
+            c.store_sst_readers = store.sst_readers_len();
+            let snap = store.block_cache.read().snapshot();
+            c.store_block_cache_entries = snap.entries;
+            c.store_block_cache_bytes = snap.size_bytes;
+        }
+        let (s, so) = self.txn_manager.staged_lens();
+        c.txn_staged = s;
+        c.txn_staged_ops = so;
+        for (name, coll) in self.collections.read().iter() {
+            let mut cc = CollCensus { name: name.clone(), ..Default::default() };
+            let manager = coll.head_manager.read();
+            cc.heads = manager.list_heads().len();
+            for h in manager.list_heads() {
+                if let Ok(idx) = manager.get_head(&h) {
+                    cc.vector_store_len += idx.read().len();
+                }
+            }
+            drop(manager);
+            cc.retired_ids = coll.retired_ids.read().len();
+            let bm = coll.bm25.index.read();
+            cc.bm25_terms = bm.len();
+            cc.bm25_postings = bm.values().map(|ps| ps.len()).sum();
+            drop(bm);
+            cc.bm25_doc_lengths = coll.bm25.document_lengths.read().len();
+            cc.idf_cache = coll.bm25.idf_cache.read().len();
+            c.collections.push(cc);
+        }
+        c.collections.sort_by(|a, b| a.name.cmp(&b.name));
+        c
+    }
 }
 
 #[cfg(test)]

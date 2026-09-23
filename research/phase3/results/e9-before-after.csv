@@ -1,0 +1,5 @@
+experiment,baseline_run,baseline_peak_kb,o1_purge_only_peak_kb,optimized_run,optimized_peak_kb,pss_optimized_kb,rss_reduction_pct,baseline_elapsed_s,optimized_elapsed_s
+repro churn 150k,PH3E-MEM-002,205368.0,203080.0,PH3E-MEM-022,85600.0,83881.0,58.3,88,85
+update churn 100k @10k docs,PH3E-MEM-003,240448.0,229040.0,PH3E-MEM-023,202856.0,201247.0,15.6,121,123
+restart-reset,PH3E-MEM-015,165632.0,156660.0,PH3E-MEM-024,105496.0,103671.0,36.3,46,54
+growing 80k (expect ~0),PH3E-MEM-004,494412.0,492172.0,PH3E-MEM-025,496928.0,495128.0,-0.5,84,93

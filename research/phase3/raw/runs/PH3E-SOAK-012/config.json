@@ -1,0 +1,15 @@
+{
+ "run_id": "PH3E-SOAK-012",
+ "family": "b",
+ "budget": "200000 ops",
+ "durability": "PH3D_DURABILITY=sync",
+ "commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+ "restoration_for": "PH3E-SOAK-002",
+ "environment": {
+  "host": "2-vCPU sandbox e2b.local 6.1.158+",
+  "mem": "1.9Gi",
+  "fs": "ext2/ext3",
+  "rustc": "1.98.1"
+ },
+ "oplog": "gzipped post-run (persistence cap); line count gate-checked"
+}

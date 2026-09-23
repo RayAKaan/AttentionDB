@@ -20,6 +20,8 @@ use attentiondb_learned::gating_v2::{
 use attentiondb_storage::{Durability, Record};
 
 mod dbtest;
+mod e10;
+mod e9;
 mod headsqual;
 mod memprobe;
 mod textqual;

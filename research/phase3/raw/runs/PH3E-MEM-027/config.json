@@ -1,0 +1,14 @@
+{
+ "run_id": "PH3E-MEM-027",
+ "family": "d",
+ "budget": "ladder + 15000 txns",
+ "durability": "PH3D_DURABILITY=sync",
+ "commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+ "e9_regression_soak": true,
+ "verify_failures": "10/0",
+ "environment": {
+  "host": "2-vCPU sandbox e2b.local",
+  "rustc": "1.98.1"
+ },
+ "oplog": "gzipped post-run (persistence cap)"
+}

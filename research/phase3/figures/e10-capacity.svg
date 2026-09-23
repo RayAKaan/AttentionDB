@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="340" font-family="monospace" font-size="11">
+<rect width="720" height="340" fill="white"/>
+<text x="10" y="16">E10: peak RSS vs document count (measured rungs only)</text>
+<circle cx="660.0" cy="50.0" r="4" fill="#d62728"/>
+<text x="665.0" y="46.0" fill="#d62728" font-size="8">001</text>
+<circle cx="360.0" cy="168.4" r="4" fill="#2ca02c"/>
+<text x="365.0" y="164.4" fill="#2ca02c" font-size="8">005</text>
+<circle cx="510.0" cy="117.2" r="4" fill="#2ca02c"/>
+<text x="515.0" y="113.2" fill="#2ca02c" font-size="8">007</text>
+<circle cx="360.0" cy="145.2" r="4" fill="#d62728"/>
+<text x="365.0" y="141.2" fill="#d62728" font-size="8">008</text>
+<circle cx="360.0" cy="51.8" r="4" fill="#d62728"/>
+<text x="365.0" y="47.8" fill="#d62728" font-size="8">009</text>
+<circle cx="360.0" cy="192.5" r="4" fill="#2ca02c"/>
+<text x="365.0" y="188.5" fill="#2ca02c" font-size="8">012</text>
+<circle cx="360.0" cy="140.2" r="4" fill="#2ca02c"/>
+<text x="365.0" y="136.2" fill="#2ca02c" font-size="8">013</text>
+<circle cx="210.0" cy="241.1" r="4" fill="#2ca02c"/>
+<text x="215.0" y="237.1" fill="#2ca02c" font-size="8">010</text>
+<circle cx="210.0" cy="228.7" r="4" fill="#2ca02c"/>
+<text x="215.0" y="224.7" fill="#2ca02c" font-size="8">011</text>
+<line x1="50" y1="290" x2="690" y2="290" stroke="black"/><line x1="50" y1="30" x2="50" y2="290" stroke="black"/>
+<text x="560" y="308">docs</text><text x="4" y="26">peak RSS KB</text>
+<circle cx="480" cy="40" r="4" fill="#2ca02c"/><text x="490" y="44">VERIFIED</text><circle cx="480" cy="56" r="4" fill="#d62728"/><text x="490" y="60">OBSERVED_LIMIT</text></svg>

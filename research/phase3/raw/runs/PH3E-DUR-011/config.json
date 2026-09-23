@@ -1,0 +1,9 @@
+{
+ "baseline": "PH3E-DUR-010",
+ "cells": 192,
+ "equivalence": "ack-boundary.csv (81), txn-ack.csv (63), checkpoint-interaction.csv (27), group-boundary.csv (18) all BYTE-identical to PH3E-DUR-010; mode-latency.csv same shape/rows, latency values differ (timing, not behavior \u2014 never compared)",
+ "commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+ "tree_sha16": "2374154d738a4270",
+ "date": "2026-09-17",
+ "engine_change_under_test": "core/src/engine.rs TxnOp::Insert commit-apply re-register (E7 INV-FIX); conclusion: no behavior change on any E1-E6 classification"
+}

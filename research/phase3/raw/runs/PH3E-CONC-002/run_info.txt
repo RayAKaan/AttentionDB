@@ -1,0 +1,8 @@
+run_id=PH3E-CONC-002 (OFFICIAL E7 run; supersedes PH3E-CONC-001)
+experiment=E7 concurrency, isolation boundaries & transaction interleaving — families E7a-E7y (see PH3E-CONC-001 run_info for the full family list; identical harness and seeds)
+date=2026-09-17
+method=identical to PH3E-CONC-001 EXCEPT the E7a reader-validity instrument: attend() ids are checked against the mapper-verified numeric domain 1..=120 (mapper mints numeric ids from 1; 0 = n/a sentinel). PH3E-CONC-001 used id>=120, which flagged the legitimate doc idx 119 (numeric 120) and produced spurious E7a error counts. The instrument defect was proven by core/tests/e7_tiny_probe.rs (mapper ground truth: doc idx i -> numeric i+1; attend returns exactly the mapper id with correct top-hit ordering) — an OFF-BY-ONE IN THE HARNESS, NOT an engine defect.
+config=see config.json
+status=COMPLETED — 48 cells: 42 MATCH + 2 UNSUPPORTED BY API (E7i write-skew, E7j phantom) + 4 crash rows all ATOMIC; 0 malformed rows; 6042-row invoke/complete event history; engine checker clean on every family final state
+commit=3e65d50f8fd1a81cda339d4608260d6be98ba708 (tree dirty with E7 harness + engine INV-FIX; tree sha16 7ccdc6e15450bb23 over benchmarks/phase3/src, core/src, core/tests, core/Cargo.toml, storage/src; workspace tests 324 pass, clippy -D warnings clean)
+supersedes=PH3E-CONC-001 (E7a instrument off-by-one only; all other families classification-identical)

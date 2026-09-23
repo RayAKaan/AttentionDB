@@ -1,0 +1,11 @@
+{
+ "env": {"os": "Linux 6.1.158+ x86_64", "cpus": 2, "rustc": "1.98.1 (48a229cea 2026-09-01)"},
+ "seeds": {"E7x randomized": [11, 23, 37, 52, 68, 84], "E7v history": [7, 13], "event sampling": "1/256 for unbounded loops; E7u uses FULL unsampled read history"},
+ "thread_counts": {"E7a": [1, 2, 4, 8, 16], "E7b": "2r+1w", "E7e/f/k/l/m/p": "1 hot reader + 1 writer (barrier-ordered)", "E7s": 3, "E7t": 4, "E7u": "2w+2r", "E7v/w/x": "2-3 + sampler"},
+ "families": "E7a-E7y per methodology/phase3e-e7-spec.md; E7c/E7d expressed via ordered-observation + committed-only-census designs (see deviations D7-E7)",
+ "reference_model": "per-family independent models (static census, committed-only, later-commit-wins, all-or-nothing enumeration, record-multiset replay equality, real-time P1/P2/P3, per-txn independent crash judgment)",
+ "instrument_correction": "E7a validity domain 1..=120 (mapper mints from 1) — proven by core/tests/e7_tiny_probe.rs; engine retrieval verified correct (attend returns mapper ids, correct top-hit ordering)",
+ "engine_change_under_test": "core/src/engine.rs TxnOp::Insert commit-apply re-register (E7 INV-FIX, defect #1)",
+ "bug_found": "defect #1 MISSING_MAPPING (fixed; preserved dir in PH3E-CONC-001/bug-MISSING_MAPPING-preserved-dir; regression e7_replay_probe 2 tests). Suspected defect #2 (attend phantom id) DISSOLVED as harness off-by-one — no engine bug.",
+ "notes": "48 cells = 44 conc rows (42 MATCH + 2 UNSUPPORTED) + 4 crash rows (all ATOMIC). Raw CSVs immutable."
+}

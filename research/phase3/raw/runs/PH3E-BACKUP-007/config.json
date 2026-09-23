@@ -1,0 +1,9 @@
+{
+ "baseline": "PH3E-BACKUP-006",
+ "cells": 25,
+ "equivalence": "e4-integrity.csv BYTE-identical; e4-matrix.csv classification-identical 15/15 (only backup_us/restore_us/max_op_latency_us/notes timing fields differ)",
+ "commit": "3e65d50f8fd1a81cda339d4608260d6be98ba708",
+ "tree_sha16": "2374154d738a4270",
+ "date": "2026-09-17",
+ "engine_change_under_test": "core/src/engine.rs TxnOp::Insert commit-apply re-register (E7 INV-FIX); conclusion: no behavior change on any E1-E6 classification"
+}

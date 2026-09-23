@@ -1,0 +1,8 @@
+run_id=PH3E-E3-005
+experiment=E3 machine-crash (F2E groupkill) 210-cell matrix regression after E7 engine INV-FIX
+date=2026-09-17
+method=identical harness invocation as the sealed baseline run (phase3-bench dbtest subcommands); comparison = canonical CSV equality (byte-level) with classification-level equivalence for inherently time-dependent columns (us latencies, dynamic entry counts)
+config=see config.json
+status=COMPLETED — equivalence see config.json
+commit=3e65d50f8fd1a81cda339d4608260d6be98ba708 (tree dirty with E7 harness + engine INV-FIX; tree sha16 2374154d738a4270; workspace tests 322 pass, clippy -D warnings clean)
+supersedes=nothing (regression re-run; sealed baseline preserved untouched)

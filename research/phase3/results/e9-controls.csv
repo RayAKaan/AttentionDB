@@ -1,0 +1,13 @@
+run,control,ops,rss_peak_kb,heap_used_bytes,verdict
+PH3E-MEM-016,read-only,40000,28740.0,12049120.0,REFUTED (plateaus)
+PH3E-MEM-005,idz churn,60000,63416.0,51452000.0,SUPPORTED (dead retention)
+PH3E-MEM-006,no-compaction,60000,128032.0,100043904.0,compaction not the driver
+PH3E-MEM-007,compaction-heavy,40000,323092.0,251375264.0,REFUTED (no retained compaction memory)
+PH3E-MEM-008,wal-rotation,30000,79192.0,60607648.0,REFUTED
+PH3E-MEM-009,checkpoint-heavy,150,48100.0,30732880.0,REFUTED (flat)
+PH3E-MEM-010,backup-heavy,25,48140.0,30713872.0,REFUTED (flat)
+PH3E-MEM-011,txn-heavy,15000,80040.0,58510480.0,REFUTED (staged returns to 0)
+PH3E-MEM-012,query-isolation,45000,29012.0,11820496.0,REFUTED (transient scratch)
+PH3E-MEM-013,mapper churn,40000,41252.0,31573216.0,SUPPORTED (INV-6 by-design persistence)
+PH3E-MEM-014,accounting ladder,10000,95092.0,61866512.0,doc-proportional component measured
+PH3E-MEM-017,idle decay,40000,103816.0,74110224.0,REFUTED (no decay; state referenced)

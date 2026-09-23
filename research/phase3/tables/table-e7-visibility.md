@@ -1,0 +1,16 @@
+# E7 visibility matrix (12 scenarios) — generated from e7-visibility.csv
+
+| scenario | observed behavior | status |
+|---|---|---|
+| Multi-document transaction visibility | per-doc atomic+monotonic (); mixed pairs observable to straddling readers -&gt; NO per-txn snapshot | PARTIAL (per-doc atomic VERIFIED; atomic multi-doc visibility NOT provided) |
+| Two writers same key | commit-order-wins; later commit&#x27;s value final; no error; no conflict detection | VERIFIED (commit serialization) |
+| Lost-update scenario | occurs: both commits succeed; one blind write silently overwritten; undetected | VERIFIED (no conflict detection) |
+| Write skew | UNSUPPORTED BY API (transactions have no read ops) | UNSUPPORTED |
+| Phantom-style query | UNSUPPORTED BY API (no transactional query reads) | UNSUPPORTED |
+| Read during staged insert | staged version invisible in every read that completed before the commit was invoked (30 ordered reps; old version stays live) | VERIFIED (ordered observation) |
+| Read after rollback | never visible (20 barrier reps |  read at 3 points) |
+| Read after commit | retire and new-appearance observed strictly inside the commit interval in 0/40 ordered reps (new visible before commit-call return in 0); 0 post-ACK stability violations | VERIFIED (visibility = apply point; bounded observation) |
+| Collection isolation | concurrent T-&gt;collA / T-&gt;collB: zero contamination across backup/ckpt/compact | VERIFIED |
+| Backup during staged/committing txn | snapshot = pre-state or post-commit state |  never partial |
+| Single-operation linearizability | point register: 0 future / 0 stale-after-completion / 0 unknown-value violations in 1851 real-time reads | VERIFIED for tested register histories (bounded subset; not a system-wide claim) |
+| Transaction serializability | blind-write subset: every history is serial (atomic gated commits); general serializability UNTESTABLE (no txn reads) | PARTIAL (subset only) |
