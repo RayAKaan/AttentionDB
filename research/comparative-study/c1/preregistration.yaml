@@ -6,7 +6,7 @@ study:
   c0_entry_commit: fe4f92b2187bf631125e975a5db8a202b5316d00
   c0_tree_sha16: d12fa093bc294977
   c0_commit: 79b2837dd027aaf0064c701b8085baf29b4606f5
-  c1_protocol_commit: STAMPED-BY-REGISTRATION  # filled by the registration stamp commit immediately after this file's first commit (see protocol_change_policy)
+  c1_protocol_commit: 963170b08df333fd10f7cdc6d04bc6fbe8e3051f # stamped by registration commit that follows this content commit  # filled by the registration stamp commit immediately after this file's first commit (see protocol_change_policy)
   branch: comparative-study/c0-audit
   status: PREREGISTERED  # no benchmark results exist at this point
 
