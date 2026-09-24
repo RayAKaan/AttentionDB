@@ -36,8 +36,8 @@ results preserved.
 
 - [x] **C0 — Repository & Baseline Audit** (this commit; see
   `repository-audit/*.md`)
-- [ ] C1 — Methodology freeze + preregistration
-- [ ] C2 — Harness + baseline validation
+- [x] **C1 — Methodology freeze + preregistration** (protocol v1.0.0; 14 documents under `c1/`; validation PASS)
+- [ ] C2 — Harness + baseline validation (blocked items carried: BLK-1..4)
 - [ ] C3 — Core retrieval ablation (B0–B4)
 - [ ] C4 — External system comparisons (feasibility matrix in
   `repository-audit/baseline-readiness.md`)
