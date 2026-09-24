@@ -1,0 +1,32 @@
+[package]
+name = "c2-probe"
+version = "0.1.0"
+edition = "2021"
+
+# standalone crate: own workspace root (lives inside the repo tree but must
+# not join the AttentionDB workspace)
+[workspace]
+
+
+# C2 harness probe: reuses the EXISTING engine + learned trainer + phase2b
+# generators (charter: reuse, do not rewrite). Lives under the comparative
+# study namespace; modifies nothing in the audited tree.
+
+[dependencies]
+attentiondb-core = { path = "../../../../core" }
+attentiondb-learned = { path = "../../../../learned" }
+attentiondb-storage = { path = "../../../../storage" }
+attentiondb-hnsw = { path = "../../../../hnsw" }
+phase2b-bench = { path = "../../../../benchmarks/phase2b" }
+serde_json = "1"
+
+[[bin]]
+name = "c2probe"
+path = "main.rs"
+
+[[bin]]
+name = "bm25repro"
+path = "bm25repro.rs"
+
+[profile.release]
+opt-level = 2
