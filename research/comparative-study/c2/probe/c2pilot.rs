@@ -158,6 +158,15 @@ fn main() {
     let n_queries = cfg["n_queries"].as_u64().unwrap() as usize;
     let dim = cfg["dim"].as_u64().unwrap() as usize;
 
+    // ---- C4 overrides (budget/ef knobs, optional; defaults == C1/C3) ----
+    let cand_budget = cfg["candidate_budget"].as_u64().unwrap_or(500) as usize;
+    let min_cand_head = cfg["min_candidates_per_head"].as_u64().unwrap_or(20) as usize;
+    let cand_mult = cfg["candidate_multiplier"].as_u64().unwrap_or(0) as usize;
+    let ef_search = cfg["ef_search"].as_u64().unwrap_or(64) as usize;
+    let ef_construction = cfg["ef_construction"].as_u64().unwrap_or(400) as usize;
+    let hnsw_m = cfg["m"].as_u64().unwrap_or(16) as usize;
+    let config_id = cfg["configuration_id"].as_str().unwrap_or("").to_string();
+
     // ---- load doc vectors per head -------------------------------------
     let mut doc_vecs: HashMap<String, Vec<f32>> = HashMap::new();
     let mut canonical: Vec<f32> = Vec::new();
@@ -279,6 +288,7 @@ fn main() {
     }
 
     let coll = e.get_collection("c3p").unwrap();
+    let rc0_cand_mult = coll.retrieval_config.read().candidate_multiplier;
     {
         let mut rc = coll.retrieval_config.write();
         rc.mode = match mode {
@@ -288,12 +298,25 @@ fn main() {
             "B7" => RetrievalMode::Full,
             other => panic!("unsupported mode {other}"),
         };
+        rc.candidate_budget = cand_budget;
+        rc.min_candidates_per_head = min_cand_head;
+        if cand_mult > 0 {
+            rc.candidate_multiplier = cand_mult;
+        }
     }
     if mode == "B3" {
         let card_path = cfg["modelcard"].as_str().unwrap();
         let card = ModelCard::load(std::path::Path::new(card_path)).unwrap();
         e.install_gating_card("c3p", card).unwrap();
     }
+
+    // ---- C4: apply HNSW settings (ef_search / ef_construction / m) -----
+    let mut hsettings = coll.settings.write();
+    hsettings.ef_search = ef_search;
+    hsettings.ef_construction = ef_construction;
+    hsettings.max_nb_connection = hnsw_m;
+    hsettings.enable_exact_reranking = true;
+    drop(hsettings);
 
     let attend_heads: Vec<String> = cfg["attend_heads"]
         .as_array()
@@ -312,12 +335,16 @@ fn main() {
         let ids: Vec<u64> = exact.iter().map(|(id, _)| *id).collect();
         all_exact.push(ids.clone());
         let t = Instant::now();
-        let res = e.attend("c3p", &attend_heads, q, k).unwrap();
+        let (res, stats) = coll
+            .attend_detailed_with_stats(
+                &attend_heads, q, k, None, None, None, None, None,
+            )
+            .unwrap();
         let lat_us = t.elapsed().as_secs_f64() * 1e6;
         if pos >= warmup {
             latencies.push(lat_us);
         }
-        let hits: Vec<u64> = res.iter().map(|(id, _)| *id).collect();
+        let hits: Vec<u64> = res.iter().map(|r| r.id).collect();
         // map engine numeric ids back to doc rows
         let hits_rows: Vec<u64> = hits
             .iter()
@@ -338,8 +365,12 @@ fn main() {
         per_query.push(json!({
             "pos": pos, "query_row": qr,
             "latency_us": lat_us,
+            "configuration_id": config_id,
+            "candidate_count": stats.union_size,
+            "heads_present": stats.heads_present,
             "recall10_qrels": recall, "recall10_exact": recall_exact, "ndcg10_qrels": ndcg,
             "hits": r10, "engine_hits": hits, "n_rel": rel_set.len(),
+            "relevant_ids": rel_set.iter().cloned().collect::<Vec<_>>(),
         }));
     }
 
@@ -358,10 +389,12 @@ fn main() {
             "heads": heads,
             "attend_heads": attend_heads,
             "retrieval_mode": mode,
-            "candidate_budget": 500,
-            "min_candidates_per_head": 20,
-            "ef_search": 64, "ef_construction": 400, "m": 16,
+            "candidate_budget": cand_budget,
+            "min_candidates_per_head": min_cand_head,
+            "candidate_multiplier": if cand_mult > 0 { cand_mult } else { rc0_cand_mult },
+            "ef_search": ef_search, "ef_construction": ef_construction, "m": hnsw_m,
             "modelcard": if mode == "B3" { cfg["modelcard"].as_str().unwrap().to_string() } else { String::new() },
+            "configuration_id": config_id,
         },
         "n_docs": n_docs, "n_queries": run_rows.len(),
         "warmup": warmup, "seed": seed, "k": k,
