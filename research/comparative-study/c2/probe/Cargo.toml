@@ -28,5 +28,9 @@ path = "main.rs"
 name = "bm25repro"
 path = "bm25repro.rs"
 
+[[bin]]
+name = "c2pilot"
+path = "c2pilot.rs"
+
 [profile.release]
 opt-level = 2

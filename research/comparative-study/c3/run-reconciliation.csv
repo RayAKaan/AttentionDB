@@ -1,0 +1,17 @@
+run_id,planned_status,actual_status,evidence_dir,correction_note
+C3-W01-NFC-B0-001,REGISTERED-PLAN,PASS,raw/C3-W01-NFC-B0-001,
+C3-W01-NFC-B0-001_ABORT-ATTEMPT-0,_,FAILED(pre-measurement),raw/C3-W01-NFC-B0-001_ABORT-ATTEMPT-0,sampler guardrail semantics defect; no measurement
+C3-W01-NFC-B0-001_ABORT-ATTEMPT-1,_,FAILED(pre-measurement),raw/C3-W01-NFC-B0-001_ABORT-ATTEMPT-1,sampler guardrail semantics defect; no measurement
+C3-W01-NFC-B0-001_ABORT-ATTEMPT-2,_,FAILED(pre-measurement),raw/C3-W01-NFC-B0-001_ABORT-ATTEMPT-2,harness output-schema mismatch; no measurement
+C3-W01-NFC-B0-001_ABORT-ATTEMPT-2b,_,FAILED(pre-measurement),raw/C3-W01-NFC-B0-001_ABORT-ATTEMPT-2b,harness output-schema mismatch (pre-fix rerun); no measurement
+C3-W01-NFC-B1-001,REGISTERED-PLAN,PASS,raw/C3-W01-NFC-B1-001,
+C3-W02-NFC-B2-001,REGISTERED-PLAN,PASS,raw/C3-W02-NFC-B2-001,
+C3-W02-NFC-B2-001_CONFIG-CORRECTION-0,_,PASS(original),raw/C3-W02-NFC-B2-001_CONFIG-CORRECTION-0,4-head collection config did not match mode-registry H=3; retrieval carried equal unfavored; re-run under same ID
+C3-W07-NFC-B7-001,REGISTERED-PLAN,PASS,raw/C3-W07-NFC-B7-001,
+C3-W07-NFC-B7-001_CONFIG-CORRECTION-0,_,PASS(original),raw/C3-W07-NFC-B7-001_CONFIG-CORRECTION-0,4-head collection config did not match mode-registry H=3; re-run under same ID
+C3-W03-SCI-B3-001,REGISTERED-PLAN,PASS,raw/C3-W03-SCI-B3-001,
+C3-W03-SCI-B3-001_ABORT-ATTEMPT-0,_,FAILED-HARNESS(pre-measurement),raw/C3-W03-SCI-B3-001_ABORT-ATTEMPT-0,engine §15 refusal(4-head collection, card=3 heads); corrected to 3-head
+C3-W08-SYN-B1-001,REGISTERED-PLAN,PASS,raw/C3-W08-SYN-B1-001,
+C3-W10-SYN-DUP-B0-001,REGISTERED-PLAN,PASS,raw/C3-W10-SYN-DUP-B0-001,
+C3-EMBED-SCIFACT-001,PASS,PASS,raw/C3-EMBED-SCIFACT-001,re-embed on-own-hashes (deviation disclosure)
+C3DATA-NFC-VERIFY-001,REGISTERED-PLAN,PASS,raw/C3DATA-NFC-VERIFY-001,formal re-hash of NFCorpus on this host

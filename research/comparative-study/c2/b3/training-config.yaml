@@ -1,0 +1,42 @@
+# C2 B3 training config — preregistered BEFORE any training run (C1 §fitting-isolation).
+# ONE default grid; selection ONLY on the trainer's validation split (early
+# stopping is on val loss; grid winner = min best_val_loss). Test split rows
+# exist in datasets but are never read by train_gating (structural, verified
+# in learned/src/gating_v2.rs: train/val filters only).
+study_id: comparative-study-001
+protocol_version: "1.0.0"
+
+trainer: learned::gating_v2::train_gating (in-repo, reused unmodified)
+objective: soft_target        # cross-entropy against softmax(quality/tau)
+quality_target: recall_at_k   # B0 exact per-view recall (C1 supervision-target rule)
+tau: 1.0
+batch_size: 32
+max_epochs: 200
+patience: 15
+min_delta: 1.0e-4
+l2: 1.0e-4
+
+grid:
+  hidden: [16, 32]
+  lr: [0.005, 0.01, 0.02]
+
+seeds:
+  primary: 20260925
+  variance: [1, 2]   # multiseed variance run on the selected config (3 seeds total)
+
+arms:
+  - id: b3-synth-concat        # pipeline validation, offline (phase2b scheme: concat 3x64)
+    dataset: gating-synth-concat.json
+  - id: b3-synth-view0         # ENGINE-side activation card (input = attend() query vector)
+    dataset: gating-synth-view0.json
+  - id: b3-lodo-nf             # Track A LODO arm: NFCorpus-derived 384-d views
+    dataset: gating-lodo-nfcorpus.json
+    note: "NFCorpus test queries used as TRAINING inputs — disclosed (C1 LODO rule); SciFact untouched"
+
+selection_rule: "per arm: grid point with min best_val_loss (validation-only); ties -> lower lr, then smaller hidden"
+leakage_guards:
+  - INV-L1: train() accepts only corpus_desc prefixes {synth-multiview, lodo-train}; refuses headline/test-exports paths
+  - INV-L2: this file is hashed into every training run config; post-hoc change = new versioned amendment
+  - INV-L3: targets computed only from the exported training datasets (B0 exact top-k on training corpora)
+  - INV-L4: ModelCard::validate() refuses cards without valid TrainingMeta
+  - INV-L5: bitwise reproducibility retrain recorded per run
