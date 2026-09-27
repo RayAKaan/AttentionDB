@@ -1,0 +1,7 @@
+run_id: C2-B3-VALID-004
+study_id: comparative-study-001
+protocol_version: 1.0.0
+git_commit: 7788067c1437ae8c75ced4dc1ffc2f49b2c22a88
+purpose: B3 ModelCard engine activation validation
+card: b3-synth-view0-v2-s20260925-h16-lr0.005.json
+card_sha256: 2958ece3a9bab9b588a3f66c0dc00620c361bc752bbead378b7f32dcf694d23f

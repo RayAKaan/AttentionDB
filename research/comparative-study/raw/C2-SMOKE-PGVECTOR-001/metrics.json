@@ -1,0 +1,11 @@
+{
+  "apt_pgvector_packages": [
+    "postgresql-17-pgvector - Open-source vector similarity search for Postgres"
+  ],
+  "postgresql_packages": [
+    "postgresql-17 - The World's Most Advanced Open Source Relational Database"
+  ],
+  "pgvector_pkg": "postgresql-17-pgvector",
+  "install_rc": 100,
+  "pg_versions_present": []
+}

@@ -1,0 +1,9 @@
+run_id: C2-GATE-SCIDOCS-FIQA-002
+study_id: comparative-study-001
+protocol_version: 1.0.0
+git_commit: 7788067c1437ae8c75ced4dc1ffc2f49b2c22a88
+purpose: "conditional dataset structure gates (protocol \xA724)"
+datasets:
+- DS-SCIDOCS
+- DS-FIQA-2018
+component: conditional-gate

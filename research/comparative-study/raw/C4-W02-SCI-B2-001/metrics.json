@@ -1,0 +1,88 @@
+{
+  "run_id": "C4-W02-SCI-B2-001",
+  "mode": "B2",
+  "dataset": "DS-SCIFACT",
+  "split": "TEST",
+  "phase": "C4.4 confirmed-scale execution",
+  "test_queries": 300,
+  "rep_count": 5,
+  "warmup": 20,
+  "ef_search": 64,
+  "candidate_budget": 500,
+  "modelcard": "",
+  "config_note": "TARGET-UNREACHABLE (best 0.7458 EF64-C50); plan default retained",
+  "per_rep": [
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.795000000099341,
+      "recall10_exact_mean": 0.697000003606081,
+      "p50_us": 1939.5,
+      "p95_us": 2390.3,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7892222223182519,
+      "recall10_exact_mean": 0.6936666683355968,
+      "p50_us": 1906.7,
+      "p95_us": 3050.2,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.790555555721124,
+      "recall10_exact_mean": 0.69133333598574,
+      "p50_us": 1813.3,
+      "p95_us": 2162.1,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7941666667660078,
+      "recall10_exact_mean": 0.6933333363135655,
+      "p50_us": 1835.3,
+      "p95_us": 2299.9,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7908333334326744,
+      "recall10_exact_mean": 0.6936666705211003,
+      "p50_us": 1872.5,
+      "p95_us": 2194.4,
+      "deadline_exceeded": 0
+    }
+  ],
+  "rep_recall10_qrels_mean": [
+    0.795000000099341,
+    0.7892222223182519,
+    0.790555555721124,
+    0.7941666667660078,
+    0.7908333334326744
+  ],
+  "recall10_qrels_mean_5rep": 0.792,
+  "recall10_qrels_sd_5rep": 0.0022,
+  "rep_recall10_exact_mean": [
+    0.697000003606081,
+    0.6936666683355968,
+    0.69133333598574,
+    0.6933333363135655,
+    0.6936666705211003
+  ],
+  "recall10_exact_mean_5rep": 0.6938,
+  "p50_us_per_rep": [
+    1939.5,
+    1906.7,
+    1813.3,
+    1835.3,
+    1872.5
+  ],
+  "peak_child_rss_MiB": [
+    276.4,
+    271.7,
+    305.1,
+    271.6,
+    290.5
+  ],
+  "conclusion_rule": "matches C4-BINVERIFY-003 verdict (>=5 fresh-process reps, mean+sd reported; tolerance comparisons use rep-mean, not single draws)"
+}

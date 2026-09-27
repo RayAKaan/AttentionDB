@@ -1,0 +1,23 @@
+﻿run_id: C2-ORACLE-AGREE-001
+purpose: engine mode A vs Rust brute-force cross-check (TEST-C2-007 engine leg)
+started_utc: '2026-09-24T12:28:16Z'
+artifacts:
+  oracle-agree.json:
+    sha256: d2e404f61851492c58ef77f7a8674593218c9ded4217c66ab3d877c4551a66b2
+    bytes: 317
+finished_utc: '2026-09-24T12:28:16Z'
+status: PASS
+study_id: comparative-study-001
+protocol_version: 1.0.0
+git_commit: 7788067c1437ae8c75ced4dc1ffc2f49b2c22a88
+host:
+  logical_cpus: 8
+  mem_total_kb: 16700964
+guardrails:
+  mem_budget_kb_85pct_available: 2307947
+  disk_floor_mb: 500
+  phase3e_crash_env_asserted_unset: true
+seed: null
+note: first registration of this run_id (cited in draft register_runs.py but never
+  executed there); re-executed on the current host (Windows) 2026-09-24 with the
+  current probe source

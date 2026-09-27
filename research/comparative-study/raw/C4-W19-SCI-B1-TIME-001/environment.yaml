@@ -1,0 +1,38 @@
+{
+  "host": "Originator",
+  "os": "Windows-11-10.0.26200-SP0",
+  "python": "3.14.4",
+  "created_utc": "2026-09-26T13:46:05Z",
+  "c2pilot_sha256": "3ec8c193354975fa26a3961d8835289a0cad54cc686141f75573baeaebb31c98",
+  "input_hashes": {
+    "CANONICAL.f32": "3e350dcbb6fad01909dc707576420e034d2fd232ed0a8661e57e33202f840be3",
+    "HEAD-BODY.f32": "c7436e493ddbf41dfeedb77c3007067dc60333e15c5622f167b283ee09eb4a2c",
+    "HEAD-CITE.f32": "c927fb7372e784805f37b884336c57af4cddb2bda461714ba4d8267b94a94664",
+    "HEAD-TITLE.f32": "46b483be668257b97d9caebaff5a98d646be193fb42e42914c18bcd1eab567dd",
+    "QUERIES.f32": "bf6fe475ddee390d7672ebf15c1d66d270f3199c098b03272e45a97f1ddc93b2",
+    "TIME100000us-cfg.json": "43af652c92faec692075b3e9a4a1e4f036cc168833a079e034d22d0aa58d83f4",
+    "TIME100000us-rep1.json": "70f53c2e2a0518980c19520267c5799da1b176b23d3d71b80a99c158b1f6e16f",
+    "TIME100000us-rep2.json": "6fd89b3010468877a294af04c0f556c2007b9d5940edf517866a34dfac6183a0",
+    "TIME100000us-rep3.json": "8dc6ee65a3722ee80b3e0ef4b19e1d9c23ea222f70f4ade393842a3f9d328786",
+    "TIME100000us-rep4.json": "0ebef5849c5619bd67ceb59810c08aed8468c0a27a328b8494249967c45f5624",
+    "TIME100000us-rep5.json": "74d8e2394760b5750da501bf5ea30bee9b48b6468fca6f86894e56defc675e9a",
+    "TIME10000us-cfg.json": "f91dc8c459e9a08fccc50ea04389cd39cd247168162f0049af42da05aa20ca20",
+    "TIME10000us-rep1.json": "6edb05a2a3e5f2a56875a22ad31333c8f64e80aae741b42b37dd01a8822f2dba",
+    "TIME10000us-rep2.json": "fb958ba8aafb709d9451bc74dcb5e8d016e02a2d805a9fe7f8cac3880d61593c",
+    "TIME10000us-rep3.json": "7bf4b582c35fa5ae1e062067fcc58f0f93dec9f9e2b06708f9c046e8baa5eb21",
+    "TIME10000us-rep4.json": "53fd234cb4e2118cd2b2c8cc8c30a1d09213ab12b7d398c9f97b81eca0fb3602",
+    "TIME10000us-rep5.json": "ba4093aff75704753d74308358cd8ba9351d4e2acb7228a790313a3422340d79",
+    "TIME1000us-cfg.json": "c6b92f53c5ae85007f4dc47dceb8093ce4aa326fbf49d539aa656273f30ee400",
+    "TIME1000us-rep1.json": "a6bcc19646a64d67869456ae7d53e6e830243252e328a4b65f3e9a98504ef48b",
+    "TIME1000us-rep2.json": "31aa102cea1175aa3b435bb343959f96fb4a8e464765ece801d4354f9e30ff6d",
+    "TIME1000us-rep3.json": "e4b25ae5cb24517aa0d4b79879af07a5efbe51c2c9d2b510e3f19e0578ebc006",
+    "TIME1000us-rep4.json": "3580c9428dd1876d52d05e378c178f24c3f2a5e5bb907db46731fd1654302766",
+    "TIME1000us-rep5.json": "bc227a55a6488d1b394f4d9304bb2fc00e8866b09e3a272d35b31f6459a19596"
+  },
+  "guardrail": {
+    "policy": "sampler(500ms) aborts when child process-tree RSS >= 85% of MemAvailable at preflight",
+    "mem_avail_at_preflight_bytes": 2469105664,
+    "mem_load_pct_at_preflight": 85,
+    "ram_abort_threshold_bytes": 2098739814
+  }
+}

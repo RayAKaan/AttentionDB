@@ -1,0 +1,9 @@
+run_id: C2-DATA-GLOVE25-001
+study_id: comparative-study-001
+protocol_version: 1.0.0
+git_commit: 7788067c1437ae8c75ced4dc1ffc2f49b2c22a88
+purpose: "materialize + verify + full NN-GT recompute DS-ANN-GLOVE-25 (NN-GROUND-TRUTH\
+  \ / EFFICIENCY TRACK \u2014 not a semantic dataset)"
+dataset_id: DS-ANN-GLOVE-25
+component: ann-materialization
+seed: 20260925

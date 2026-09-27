@@ -1,0 +1,9 @@
+{
+  "note": "engine mode A is approximate; agreement rate is recorded diagnostics, score consistency is the correctness assertion",
+  "order_equality_rate": 1.0,
+  "queries": 20,
+  "returned_scores_consistent_with_stored_vectors": true,
+  "set_equality_rate": 1.0,
+  "status": "PASS",
+  "subcommand": "oracle-agree"
+}

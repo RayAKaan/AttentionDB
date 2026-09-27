@@ -1,0 +1,12 @@
+{
+  "n_docs": 12,
+  "n_samples": 200,
+  "phrase_search_distinct_orderings_seen": 1,
+  "rrf_distinct_fused_max_score_ids": [
+    11
+  ],
+  "rrf_distinct_fused_topk_memberships": 1,
+  "search_distinct_orderings_seen": 1,
+  "strict_score_ties_observed": true,
+  "top_k": 4
+}

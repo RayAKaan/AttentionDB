@@ -1,0 +1,23 @@
+run_id: C2-BM25-REPRO-002
+purpose: BM25 tie-order repro, POST-fix engine core (score desc, id asc tie rule)
+started_utc: '2026-09-24T14:35:44Z'
+artifacts:
+  repro-log.txt:
+    sha256: ee83012bdb2fc3ff15b436856b03e794c5d64c0f5c6a305b0dc7d4cba8bf0f15
+    bytes: 449
+  summary.json:
+    sha256: 50b7da6e8add6f5ce5b8594fca7f9a7443dd006ddf4116e54402990048b5242b
+    bytes: 271
+finished_utc: '2026-09-24T14:35:44Z'
+status: PASS
+study_id: comparative-study-001
+protocol_version: 1.0.0
+git_commit: 7788067c1437ae8c75ced4dc1ffc2f49b2c22a88
+host:
+  logical_cpus: 8
+  mem_total_kb: 16700964
+guardrails:
+  mem_budget_kb_85pct_available: 5900281
+  disk_floor_mb: 500
+  phase3e_crash_env_asserted_unset: true
+seed: null

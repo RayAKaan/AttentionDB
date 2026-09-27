@@ -1,0 +1,8 @@
+{
+  "startup_healthy_default_jvm": false,
+  "startup_s": 240.02,
+  "peak_rss_kb_default": 0,
+  "abort_reason_default": null,
+  "classification": "OBSERVED-LIMIT (expected; 1.9GiB envelope)",
+  "note": "guardrail abort is a legitimate recorded feasibility result; retry with reduced heap follows as -002"
+}

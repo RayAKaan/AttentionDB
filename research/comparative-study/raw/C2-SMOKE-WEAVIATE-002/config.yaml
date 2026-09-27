@@ -1,0 +1,9 @@
+run_id: C2-SMOKE-WEAVIATE-002
+study_id: comparative-study-001
+protocol_version: 1.0.0
+git_commit: 7788067c1437ae8c75ced4dc1ffc2f49b2c22a88
+purpose: "Weaviate standalone binary feasibility smoke under guarded sampler (protocol\
+  \ \xA718)"
+system: weaviate
+component: baseline-smoke
+attempt: guarded-sampler

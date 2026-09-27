@@ -1,0 +1,28 @@
+{
+  "dataset_id": "DS-SCIFACT",
+  "corpus_docs": 5183,
+  "queries": 1109,
+  "queries_file_note": "queries.jsonl holds ALL split queries; C1 'queries' count refers to TEST qrels queries",
+  "qrels_rows": {
+    "test": 339,
+    "train": 919
+  },
+  "qrels_provenance": {
+    "test": "hf-BeIR-qrels (official; positives-only)",
+    "train": "hf-BeIR-qrels (official; positives-only)"
+  },
+  "corpus_fields": [
+    "_id",
+    "metadata",
+    "text",
+    "title"
+  ],
+  "graded_levels": [
+    1
+  ],
+  "graded_levels_note": "BEIR qrels are positives-only; explicit 0 rows do not exist in the release. SciFact ships score=1 only (binary); NFCorpus ships 1 and 2. C1 recorded 'graded 0/1/2' for SciFact \u2014 recorded as C1-vs-data discrepancy (vocabulary vs shipped levels); acceptance rule (defensible labels) unaffected.",
+  "qrel_test_queries": 300,
+  "dangling_qrel_query_ids": 0,
+  "dangling_qrel_doc_ids": 0,
+  "counts_match_c1_record": true
+}

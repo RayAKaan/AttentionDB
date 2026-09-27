@@ -1,0 +1,9 @@
+run_id: C2-DATA-GLOVE25-004
+study_id: comparative-study-001
+protocol_version: 1.0.0
+git_commit: 7788067c1437ae8c75ced4dc1ffc2f49b2c22a88
+purpose: Faithful per-row NN-GT verification glove-25 (independent top-k routine)
+system: harness
+component: ann-gt-verify
+routine: per-row argsort
+attempt: faithful

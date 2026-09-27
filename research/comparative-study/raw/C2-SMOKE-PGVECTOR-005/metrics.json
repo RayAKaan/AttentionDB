@@ -1,0 +1,18 @@
+{
+  "apt_update_rc": 0,
+  "apt_pgvector_packages": [
+    "postgresql-17-pgvector - Open-source vector similarity search for Postgres"
+  ],
+  "pgvector_pkg": "postgresql-17-pgvector",
+  "install_rc": 0,
+  "pg_versions_present": [
+    "17"
+  ],
+  "cluster_start_rc": 0,
+  "hnsw_and_ivfflat_created": true,
+  "ann_query_rc": 0,
+  "ann_top1_is_self": true,
+  "pgvector_version": "0.8.0",
+  "cluster_stop_rc": 0,
+  "sampler_note": "pg_ctlcluster-managed; no tree sampler; preflight-only resources"
+}

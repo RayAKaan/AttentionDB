@@ -1,0 +1,8 @@
+run_id: C2-BM25-REPRO-002
+study_id: comparative-study-001
+protocol_version: 1.0.0
+git_commit: 7788067c1437ae8c75ced4dc1ffc2f49b2c22a88
+purpose: BM25 tie-order repro, POST-fix engine core (score desc, id asc tie rule)
+component: attentiondb-adapter-validation
+tool: bm25repro
+note: 'identical stimulus as C2-BM25-REPRO-001; expectation: single ordering'

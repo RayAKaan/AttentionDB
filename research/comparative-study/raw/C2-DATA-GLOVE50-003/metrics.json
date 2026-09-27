@@ -1,0 +1,38 @@
+{
+  "file_sha256": "388b0aedc2dad689549e6587932c8c9efeaf8a95f383f36dc567a40233a11f40",
+  "file_bytes": 246711088,
+  "train_shape": [
+    1183514,
+    50
+  ],
+  "train_dtype": "float32",
+  "test_shape": [
+    10000,
+    50
+  ],
+  "neighbors_shape": [
+    10000,
+    100
+  ],
+  "distances_shape": [
+    10000,
+    100
+  ],
+  "dim": 50,
+  "dim_matches_id": true,
+  "track_label": "NN-GROUND-TRUTH / EFFICIENCY TRACK (never semantic)",
+  "upstream": "https://ann-benchmarks.com/glove-50-angular.hdf5 (ann-benchmarks official pre-split HDF5)",
+  "split": {
+    "tune": 2000,
+    "test": 8000,
+    "seed": 20260925
+  },
+  "nn_gt_check": {
+    "queries_checked": 10000,
+    "top100_set_mismatches": 0,
+    "exact_boundary_tie_swaps": 1,
+    "match_rate": 1.0,
+    "method": "full exact recompute (B0 oracle) vs shipped neighbors, set equality per query",
+    "tolerance_note": "set equality used; float association may reorder exact ties only"
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "host": "Originator",
+  "os": "Windows-11-10.0.26200-SP0",
+  "python": "3.14.4",
+  "created_utc": "2026-09-26T13:41:26Z",
+  "c2pilot_sha256": "3ec8c193354975fa26a3961d8835289a0cad54cc686141f75573baeaebb31c98",
+  "input_hashes": {
+    "CANONICAL.f32": "3e350dcbb6fad01909dc707576420e034d2fd232ed0a8661e57e33202f840be3",
+    "HEAD-BODY.f32": "c7436e493ddbf41dfeedb77c3007067dc60333e15c5622f167b283ee09eb4a2c",
+    "HEAD-CITE.f32": "c927fb7372e784805f37b884336c57af4cddb2bda461714ba4d8267b94a94664",
+    "HEAD-TITLE.f32": "46b483be668257b97d9caebaff5a98d646be193fb42e42914c18bcd1eab567dd",
+    "MEM1024MiB-cfg.json": "d2470aa64bf456c8ba4b04ca50226dd13879c84982e2d7246490f9d93fd1c248",
+    "MEM1024MiB-rep1.json": "8c3f6984b371fc25b3ef1eede754b6d80e37e4005c9e4ea44c9aaec169a5e9da",
+    "MEM1024MiB-rep2.json": "11577c2f26c8c96a1ba8a5c2568b4e2070d1c404ab0e39aa940dc62cb4b49c14",
+    "MEM1024MiB-rep3.json": "7a2868222c65b393fc8c44daf707fea211be8cf57fcdc322463681ad11417352",
+    "MEM1024MiB-rep4.json": "f5f0549c38bb67e2fff98e9646586d7dc7e20e15bc4a045b1c57df46200838cc",
+    "MEM1024MiB-rep5.json": "916e4bd06f5116cd6a43f6fbe9006b5ffeacfdebbefe1e82ebd584c7840f917d",
+    "MEM1638MiB-cfg.json": "70fef358d6eaecc6fe5734fafa36e0821d625782331eb334a5ffe7d6d1029dab",
+    "MEM1638MiB-rep1.json": "db27013e5cf84d136b334b957d5b3f0944af108c26d01dd3e72e253988b161f4",
+    "MEM1638MiB-rep2.json": "7aa27acc7a50f2f6d3422cd5d63591de5bc9eaf596c43a80fc8831b741bc9cbb",
+    "MEM1638MiB-rep3.json": "9fabb5fa1d53c9e065681542f65937be66a0249ce658957298ff9e8fc05e3d36",
+    "MEM1638MiB-rep4.json": "952a2e1271a42e5a67cfeb48c3fd310552a6930f9e6f5b699671243dff22d636",
+    "MEM1638MiB-rep5.json": "9bef781a2d1606ea9b45201b3f2e909a8025583d7d6c7a06d80429c2add3b150",
+    "MEM512MiB-cfg.json": "64d990f2d72ff73f2b920946d848e45dc2306e39dbce7a810f3952345aa2f2c5",
+    "MEM512MiB-rep1.json": "88651f309aad4f26e882ca069bd2765f2cc802b4ab483bfa72d92c3c4e4d35b9",
+    "MEM512MiB-rep2.json": "b1cc906ed4da535d861df4eea7eee02bebdbe24c83ddbac05ab7232ae54486f5",
+    "MEM512MiB-rep3.json": "b7ab017bd286f594cae9cef05f2af531a7ad9a2fb6192a4dd909583c8182e1b9",
+    "MEM512MiB-rep4.json": "454df1c8abdd4c3d9c968ac425b9b893c69d0fa1020d4395e3103f0a51835a49",
+    "MEM512MiB-rep5.json": "8c7aacb2fabc00ae07c32dac1f5b42fe1c72d6ca395a46979b76c12420aee646",
+    "QUERIES.f32": "bf6fe475ddee390d7672ebf15c1d66d270f3199c098b03272e45a97f1ddc93b2"
+  },
+  "guardrail": {
+    "policy": "sampler(500ms) aborts when child process-tree RSS >= 85% of MemAvailable at preflight",
+    "mem_avail_at_preflight_bytes": 2137141248,
+    "mem_load_pct_at_preflight": 87,
+    "ram_abort_threshold_bytes": 1816570060
+  }
+}

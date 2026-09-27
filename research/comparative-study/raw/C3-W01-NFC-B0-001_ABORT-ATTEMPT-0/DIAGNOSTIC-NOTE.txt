@@ -1,0 +1,1 @@
+﻿harness-diagnostic: sampler guardrail was wired to host-global dwMemoryLoad (86%) instead of child process-tree RSS per c1/environment-guardrails.md; abort before any measurement (rep1 ran 0.6s, no rep output). Fixed harness measures child RSS vs 85% of preflight MemAvailable. Re-run under original ID.

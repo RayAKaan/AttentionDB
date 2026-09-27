@@ -1,0 +1,1 @@
+﻿harness-correction: original collection_heads included CANONICAL (4 heads). Mode registry B2/B7 specify H=3 (HEAD-TITLE/BODY/CITE). Engine retrieval used attend_heads=3 so results unaffected, but run config did not match the mode registry -> re-run under same planned ID with corrected 3-head collection. Original evidence preserved here.

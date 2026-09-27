@@ -1,0 +1,87 @@
+{
+  "run_id": "C4-W19-SCI-B1-EF-001",
+  "mode": "B1",
+  "dataset": "DS-SCIFACT",
+  "split": "VAL",
+  "phase": "C4.2 validation tuning",
+  "matching_metric": "qrels Relevance-Recall@10 (>=1 judged docs, top-10)",
+  "target_recall10_qrels_B0_VAL": 0.785,
+  "tolerance": 0.01,
+  "rep_count": 1,
+  "grid": {
+    "ef_search": [
+      16,
+      32,
+      64,
+      128
+    ],
+    "candidate_budget": [
+      null
+    ]
+  },
+  "levels": [
+    {
+      "n_queries": 200,
+      "recall10_qrels_mean": 0.765,
+      "recall10_exact_mean": 0.9764999961853027,
+      "p50_us": 945.5,
+      "p95_us": 1384.9,
+      "level": "EF16",
+      "ef_search": 16,
+      "candidate_budget": 500,
+      "peak_child_rss_MiB": [
+        120.7
+      ],
+      "within_tolerance": false
+    },
+    {
+      "n_queries": 200,
+      "recall10_qrels_mean": 0.775,
+      "recall10_exact_mean": 0.9734999960660935,
+      "p50_us": 951.8000000000001,
+      "p95_us": 1350.5,
+      "level": "EF32",
+      "ef_search": 32,
+      "candidate_budget": 500,
+      "peak_child_rss_MiB": [
+        131.1
+      ],
+      "within_tolerance": false
+    },
+    {
+      "n_queries": 200,
+      "recall10_qrels_mean": 0.7725,
+      "recall10_exact_mean": 0.9774999958276749,
+      "p50_us": 1029.6999999999998,
+      "p95_us": 1360.6,
+      "level": "EF64",
+      "ef_search": 64,
+      "candidate_budget": 500,
+      "peak_child_rss_MiB": [
+        131.0
+      ],
+      "within_tolerance": false
+    },
+    {
+      "n_queries": 200,
+      "recall10_qrels_mean": 0.765,
+      "recall10_exact_mean": 0.9719999963045121,
+      "p50_us": 942.1,
+      "p95_us": 1339.0,
+      "level": "EF128",
+      "ef_search": 128,
+      "candidate_budget": 500,
+      "peak_child_rss_MiB": [
+        120.2
+      ],
+      "within_tolerance": false
+    }
+  ],
+  "selection": null,
+  "selection_rule": "fastest p50 post-warmup within +-0.01 of B0 VAL target (TARGET-UNREACHABLE never interpolated)",
+  "val_split": {
+    "dataset": "DS-SCIFACT",
+    "rule": "SciFact seeded train-sample (first 200 of seed 20260925 shuffle of sorted qrel-train qids)",
+    "n_queries": 200
+  }
+}

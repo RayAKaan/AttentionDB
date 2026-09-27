@@ -1,0 +1,18 @@
+run_id: C2-DATA-SCIFACT-004
+purpose: "materialize + verify + manifest DS-SCIFACT (protocol \xA78/\xA79)"
+started_utc: '2026-09-24T07:49:08Z'
+artifacts: {}
+finished_utc: '2026-09-24T07:49:08Z'
+status: FAILED
+study_id: comparative-study-001
+protocol_version: 1.0.0
+git_commit: 7788067c1437ae8c75ced4dc1ffc2f49b2c22a88
+host:
+  logical_cpus: 2
+  mem_total_kb: 2032608
+guardrails:
+  mem_budget_kb_85pct_available: 1056934
+  disk_floor_mb: 500
+  phase3e_crash_env_asserted_unset: true
+seed: null
+reason: FileNotFoundError(2, 'No such file or directory')

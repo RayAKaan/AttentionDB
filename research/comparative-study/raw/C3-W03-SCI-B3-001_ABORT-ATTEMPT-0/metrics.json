@@ -1,0 +1,27 @@
+{
+  "run_id": "C3-W03-SCI-B3-001",
+  "mode": "B3",
+  "reps": 1,
+  "n_queries": 100,
+  "elapsed_s": 71.6,
+  "recall10_qrels_mean_of_repmeans": null,
+  "recall10_exact_mean_of_repmeans": null,
+  "latency_us": {
+    "p50_between_reps": {
+      "mean": null,
+      "min": null,
+      "max": null,
+      "n": 0
+    },
+    "p95_between_reps": {
+      "mean": null,
+      "min": null,
+      "max": null,
+      "n": 0
+    }
+  },
+  "subset_rule": "first min(100,len) of seeded qrels-test shuffle (seed 20260925)",
+  "peak_child_rss_bytes_by_rep": [
+    392859648
+  ]
+}

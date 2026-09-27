@@ -1,0 +1,31 @@
+{
+  "run_id": "C3-W02-NFC-B2-001",
+  "mode": "B2",
+  "reps": 5,
+  "n_queries": 100,
+  "elapsed_s": 147.9,
+  "recall10_qrels_mean_of_repmeans": 0.1676096200942993,
+  "recall10_exact_mean_of_repmeans": 0.6797999262809753,
+  "latency_us": {
+    "p50_between_reps": {
+      "mean": 1737.5,
+      "min": 1643.85,
+      "max": 1856.35,
+      "n": 5
+    },
+    "p95_between_reps": {
+      "mean": 2789.845,
+      "min": 1948.2150000000001,
+      "max": 4071.6999999999994,
+      "n": 5
+    }
+  },
+  "subset_rule": "first min(100,len) of seeded qrels-test shuffle (seed 20260925)",
+  "peak_child_rss_bytes_by_rep": [
+    203075584,
+    203202560,
+    203911168,
+    203276288,
+    203329536
+  ]
+}

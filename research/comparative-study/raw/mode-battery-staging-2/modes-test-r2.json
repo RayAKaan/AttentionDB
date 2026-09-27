@@ -1,0 +1,165 @@
+{
+  "collection_config": {
+    "fusion_overridden_for_reference_checks": "attention=0, multi_head_similarity=1, bm25=0"
+  },
+  "results": [
+    {
+      "deterministic": true,
+      "exact_set_agreement_rate": 0.6000000238418579,
+      "head0_only_extra_heads_ignored": true,
+      "name": "single-head ANN (B1): soundness, score consistency, determinism",
+      "note": "mode A is approximate by design; exact agreement recorded, not asserted",
+      "sound_and_scores_consistent": true,
+      "status": "PASS",
+      "test": "TEST-C2-002"
+    },
+    {
+      "mismatches": [
+        {
+          "got": [
+            [
+              31,
+              0.8265649080276489
+            ],
+            [
+              32,
+              0.8265649080276489
+            ],
+            [
+              36,
+              0.8265649080276489
+            ],
+            [
+              26,
+              0.8081494569778442
+            ],
+            [
+              20,
+              0.7970828413963318
+            ]
+          ],
+          "ref": [
+            [
+              31,
+              0.8265648484230042
+            ],
+            [
+              32,
+              0.8265648484230042
+            ],
+            [
+              33,
+              0.8265648484230042
+            ],
+            [
+              34,
+              0.8265648484230042
+            ],
+            [
+              35,
+              0.8265648484230042
+            ]
+          ]
+        },
+        {
+          "got": [
+            [
+              17,
+              0.8880656957626343
+            ],
+            [
+              31,
+              0.8512454032897949
+            ],
+            [
+              32,
+              0.8512454032897949
+            ],
+            [
+              36,
+              0.8512454032897949
+            ],
+            [
+              7,
+              0.7351332902908325
+            ]
+          ],
+          "ref": [
+            [
+              17,
+              0.888065755367279
+            ],
+            [
+              31,
+              0.8512454032897949
+            ],
+            [
+              32,
+              0.8512454032897949
+            ],
+            [
+              33,
+              0.8512454032897949
+            ],
+            [
+              34,
+              0.8512454032897949
+            ]
+          ]
+        }
+      ],
+      "name": "multi-head equal fusion matches pipeline reference (uniform gates, per-head min-max, no renormalization)",
+      "status": "FAILED",
+      "test": "TEST-C2-003"
+    },
+    {
+      "budget16_results_sound": true,
+      "budget3_refused_by_validation": true,
+      "name": "candidate-budget: invalid value refused, min budget sound",
+      "status": "PASS",
+      "test": "TEST-C2-005"
+    },
+    {
+      "dup_block_id_ascending": true,
+      "name": "deterministic tie ordering (score desc, id asc)",
+      "repeat_identical": true,
+      "status": "PASS",
+      "test": "TEST-C2-006"
+    },
+    {
+      "empty_heads_empty_result": true,
+      "name": "head membership semantics: unknown heads skipped, empty head list -> empty result",
+      "note": "recorded engine behavior; callers must validate head names (B6 mapping relies on this)",
+      "status": "PASS",
+      "test": "TEST-C2-004",
+      "unknown_head_skipped_multihead": true
+    },
+    {
+      "deterministic_5_calls": true,
+      "first_two_equal": true,
+      "n_results": 5,
+      "name": "hybrid fusion correctness (B5)",
+      "status": "PASS",
+      "test": "TEST-C2-008",
+      "token_doc_count": 8,
+      "top1_among_token_docs": true,
+      "v2_assertion_note": "token 'xyloquery' occurs in 8 docs (i%5==4); pre-v2 'unique token doc top1' scan was a last-wins iteration-order-dependent target and could not be satisfied; corrected contract = fused top-1 must belong to the token-doc set under any deterministic tie rule (see comment above)."
+    },
+    {
+      "mismatches": [],
+      "name": "Full-mode metric-consistent exact rerank (B7, evaluated as-is)",
+      "note": "verified with full-coverage pools; at default per_head_k=25 the union POOL is ANN-approximate (observed) while scores remain exact within the pool",
+      "status": "PASS",
+      "test": "TEST-C2-009"
+    },
+    {
+      "deterministic": true,
+      "mean_top5_overlap_C_vs_D": 1.0,
+      "name": "B4 identity-QK: deterministic untrained scorer; C-vs-D overlap recorded",
+      "note": "C0 documented no-op = measured contribution claim (H3); byte identity NOT asserted because fusion renormalizes present channels",
+      "status": "PASS",
+      "test": "TEST-C2-B4-NOOP"
+    }
+  ],
+  "subcommand": "modes-test"
+}

@@ -1,0 +1,17 @@
+run_id: C2-B3-LEAK-002
+purpose: B3 leakage negative tests (INV-L1..L5)
+started_utc: '2026-09-24T08:53:16Z'
+artifacts: {}
+finished_utc: '2026-09-24T08:53:17Z'
+status: PASS
+study_id: comparative-study-001
+protocol_version: 1.0.0
+git_commit: 7788067c1437ae8c75ced4dc1ffc2f49b2c22a88
+host:
+  logical_cpus: 2
+  mem_total_kb: 2032608
+guardrails:
+  mem_budget_kb_85pct_available: 1061704
+  disk_floor_mb: 500
+  phase3e_crash_env_asserted_unset: true
+seed: null

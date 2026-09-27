@@ -1,0 +1,26 @@
+run_id: C2-BM25-REPRO-001
+purpose: BM25 tie-order repro, PRE-fix engine core (TEST-C2-008 leg B5)
+started_utc: '2026-09-24T14:29:57Z'
+artifacts:
+  repro-log.txt:
+    sha256: 37df4e7a8b30327828245b09b716e9a4967d1a0d8810c6a708f288fa32055676
+    bytes: 17135
+  summary.json:
+    sha256: c52dddde1ef9a1241c63dab400dfc0026de8ecdd0cf583ea9a9d0bd961b701df
+    bytes: 355
+finished_utc: '2026-09-24T14:29:57Z'
+status: FAILED
+study_id: comparative-study-001
+protocol_version: 1.0.0
+git_commit: 7788067c1437ae8c75ced4dc1ffc2f49b2c22a88
+host:
+  logical_cpus: 8
+  mem_total_kb: 16700964
+guardrails:
+  mem_budget_kb_85pct_available: 8706485
+  disk_floor_mb: 500
+  phase3e_crash_env_asserted_unset: true
+seed: null
+reason: 'defect confirmed: strict score ties BUT top-k doc-id order in bm25 search()
+  varies per call (sort without id tiebreaker over per-call HashMap); RRF fused top-k
+  membership and max-score id consequently nondeterministic. Expected pre-fix observation.'

@@ -1,0 +1,13 @@
+timestamp_utc: '2026-09-24T07:49:44Z'
+os: Linux 6.1.158+
+kernel: 6.1.158+
+cpu_model: Intel(R) Xeon(R) Processor @ 2.60GHz
+logical_cpus: 2
+mem_total_kb: 2032608
+mem_available_kb: 1250824
+disk_free_mb: 13832
+filesystem: ext4
+python: 3.13.14
+git_commit: 7788067c1437ae8c75ced4dc1ffc2f49b2c22a88
+mem_abort_budget_kb: 1063414
+phase3e_crash_env_unset: true

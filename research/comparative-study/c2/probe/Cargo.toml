@@ -34,3 +34,9 @@ path = "c2pilot.rs"
 
 [profile.release]
 opt-level = 2
+# /Brepro makes MSVC-link.exe builds reproducible (deterministic PE timestamp
+# + PDB GUID). Without it every link embeds a fresh timestamp/GUID and the
+# sha256 of c2pilot.exe is not reproducible across builds. Recorded per-run
+# binary hashes (environment.yaml) are only meaningful with /Brepro builds.
+# Applied via .cargo/config.toml (build-backend caveats make the
+# [target...link] table unreliable here).

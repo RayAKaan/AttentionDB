@@ -1,0 +1,58 @@
+# C2 smoke registry (one line per TERMINAL attempt; failed attempts stay visible)
+# Vocabulary: PASS / FAILED / BLOCKED / ABORTED / CONDITIONAL exactly as in manifest.yaml.
+smokes:
+  - system: qdrant
+    terminal_run: C2-SMOKE-QDRANT-006
+    status: PASS
+    version: "qdrant 1.12.4"
+    evidence: startup 0.51s healthz; create/upsert/search all 200; exact self-top1 true;
+      named-vector collection (2x384d) create/upsert/search 200 + self-top1 true;
+      guarded sampler attached (peak RSS 59,604 KB, 4 samples, no abort)
+    superseded: [C2-SMOKE-QDRANT-001 PASS (no sampler evidence), C2-SMOKE-QDRANT-002 INVALID-STARTUP
+      (harness fake-thread verdict defect), C2-SMOKE-QDRANT-003 INVALID-STARTUP (rest() raised on 400),
+      C2-SMOKE-QDRANT-004 FAILED (named search payload shape), C2-SMOKE-QDRANT-005 FAILED (same)]
+    b6_note: named-vector capability CONFIRMS FEASIBILITY of the B6 proposed Qdrant config;
+      this is NOT an AttentionDB adapter and confers no benchmark result
+  - system: pgvector
+    terminal_run: C2-SMOKE-PGVECTOR-005
+    status: PASS
+    version: "postgresql-17-pgvector 0.8.0-1 (Debian distro repo)"
+    evidence: apt install clean; CREATE EXTENSION vector; HNSW + IVFFlat indexes created;
+      exact cosine <=> ANN query self-top1; cluster start/stop clean under sudo
+    superseded: [C2-SMOKE-PGVECTOR-001 (module SyntaxError, never started),
+      C2-SMOKE-PGVECTOR-002 FAILED (no sudo: apt rc=100 + IndexError), C2-SMOKE-PGVECTOR-003 FAILED
+      (su auth failure), C2-SMOKE-PGVECTOR-004 PASS (superseded: unsudoed stop, dead code path)]
+    limitation: pg_ctlcluster-managed system service — per-process tree sampler not applicable;
+      resource evidence = preflight environment.yaml only
+    blk3_resolution: distro repos carry pgvector — PGDG repo NOT required on this host
+  - system: elasticsearch
+    terminal_run: C2-SMOKE-ES-003
+    status: ABORTED
+    version: "8.15.2 (default JVM heap)"
+    evidence: guardrail abort = OBSERVED-LIMIT; tree RSS 1,149,344 KB >= 85% MemAvailable budget
+      1,089,169 KB during startup (20 sampler rows); sampler SIGKILL'd child only; ES logs preserved
+      as run artifacts; vm.max_map_count=65530 (< 262144) additionally documented
+    superseded: [C2-SMOKE-ES-001 FAILED (OSError 28: /tmp is a 993MB tmpfs, extraction cannot fit),
+      C2-SMOKE-ES-002 ABORTED (server not under sampler; chown defect; OBSERVED-LIMIT label
+      unsubstantiated - evidence hollow)]
+    policy: per prereg, the default-JVM abort is a legitimate recorded result; NO reduced-heap retry;
+      the -002 metrics note announcing a retry is RETRACTED. C1 CONDITIONAL-LOW unchanged.
+  - system: milvus-lite
+    terminal_run: C2-SMOKE-MILVUSLITE-002
+    status: PASS
+    version: "milvus-lite 3.2.1 via pymilvus[milvus-lite]"
+    evidence: pip install clean (sandbox network available this session); MilvusClient local .db;
+      create_collection/insert/search OK (5/5 hits)
+    superseded: [C2-SMOKE-MILVUSLITE-001 FAILED (milvus-lite 3.x ships no 'milvus' module)]
+    scope: milvus-STANDALONE remains EXCLUDED per C1; this smoke covers lite only
+  - system: weaviate
+    terminal_run: C2-SMOKE-WEAVIATE-004
+    status: PASS
+    version: "1.39.6 (binary; /v1/meta version field beyond truncation window)"
+    evidence: ready endpoint 200 at 5.5s; schema create/object insert/graphql nearVector all 200;
+      guarded sampler attached (peak RSS 109,656 KB, 12 samples, no abort)
+    superseded: [C2-SMOKE-WEAVIATE-002 INVALID-STARTUP (no loopback cluster env, no --scheme/--port),
+      C2-SMOKE-WEAVIATE-003 FAILED (json.loads on truncated /v1/meta; server itself healthy)]
+    env_deltas: v1.39 raft needs CLUSTER_ADVERTISE_ADDR=127.0.0.1 + gossip/data ports (sandbox has no
+      private IP) and --scheme http --port 8080 (default swagger spec otherwise demands TLS certs) —
+      all deltas recorded verbatim in the run's config.yaml

@@ -1,0 +1,59 @@
+DS-SCIDOCS:
+  dataset_id: DS-SCIDOCS
+  corpus_docs: 25657
+  queries: 1000
+  queries_file_note: queries.jsonl holds ALL split queries; C1 'queries' count refers
+    to TEST qrels queries
+  qrels_rows:
+    test: 29928
+  qrels_provenance:
+    test: tu-darmstadt-zip
+  corpus_fields:
+  - _id
+  - metadata
+  - text
+  - title
+  graded_levels:
+  - 0
+  - 1
+  graded_levels_note: "BEIR qrels are positives-only; explicit 0 rows do not exist\
+    \ in the release. SciFact ships score=1 only (binary); NFCorpus ships 1 and 2.\
+    \ C1 recorded 'graded 0/1/2' for SciFact \u2014 recorded as C1-vs-data discrepancy\
+    \ (vocabulary vs shipped levels); acceptance rule (defensible labels) unaffected."
+  qrel_test_queries: 1000
+  dangling_qrel_query_ids: 0
+  dangling_qrel_doc_ids: 0
+  counts_match_c1_record: true
+  facet_fields_beyond_title_text:
+  - metadata
+  facet_structure_reproducible: true
+DS-FIQA-2018:
+  dataset_id: DS-FIQA-2018
+  corpus_docs: 57638
+  queries: 6648
+  queries_file_note: queries.jsonl holds ALL split queries; C1 'queries' count refers
+    to TEST qrels queries
+  qrels_rows:
+    dev: 1238
+    test: 1706
+    train: 14166
+  qrels_provenance:
+    dev: tu-darmstadt-zip
+    test: tu-darmstadt-zip
+    train: tu-darmstadt-zip
+  corpus_fields:
+  - _id
+  - metadata
+  - text
+  - title
+  graded_levels:
+  - 1
+  graded_levels_note: "BEIR qrels are positives-only; explicit 0 rows do not exist\
+    \ in the release. SciFact ships score=1 only (binary); NFCorpus ships 1 and 2.\
+    \ C1 recorded 'graded 0/1/2' for SciFact \u2014 recorded as C1-vs-data discrepancy\
+    \ (vocabulary vs shipped levels); acceptance rule (defensible labels) unaffected."
+  qrel_test_queries: 648
+  dangling_qrel_query_ids: 0
+  dangling_qrel_doc_ids: 0
+  counts_match_c1_record: true
+  single_vector_role_fields_ok: true

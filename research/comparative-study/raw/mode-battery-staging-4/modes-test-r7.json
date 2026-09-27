@@ -1,0 +1,77 @@
+{
+  "collection_config": {
+    "fusion_overridden_for_reference_checks": "attention=0, multi_head_similarity=1, bm25=0"
+  },
+  "results": [
+    {
+      "deterministic": true,
+      "exact_set_agreement_rate": 0.699999988079071,
+      "head0_only_extra_heads_ignored": true,
+      "name": "single-head ANN (B1): soundness, score consistency, determinism",
+      "note": "mode A is approximate by design; exact agreement recorded, not asserted",
+      "sound_and_scores_consistent": true,
+      "status": "PASS",
+      "test": "TEST-C2-002"
+    },
+    {
+      "coverage_min_per_head": 38,
+      "deterministic_across_calls": true,
+      "exact_ref_checks": 4,
+      "name": "multi-head equal fusion (B2): exact when pools exhaustive; coverage recorded (HNSW recall observation)",
+      "note": "hnsw_rs search at k == element count is not exhaustive (0..2 docs per head unreachable, process-variable; see c2probe hrecall). Exact 1e-5 equality against the exhaustive reference is asserted only for queries whose per-head pools covered all docs; pool coverage is recorded as an observation, not an engine defect.",
+      "status": "PASS",
+      "test": "TEST-C2-003"
+    },
+    {
+      "budget16_results_sound": true,
+      "budget3_refused_by_validation": true,
+      "name": "candidate-budget: invalid value refused, min budget sound",
+      "status": "PASS",
+      "test": "TEST-C2-005"
+    },
+    {
+      "dup_block_id_ascending": true,
+      "name": "deterministic tie ordering (score desc, id asc)",
+      "repeat_identical": true,
+      "status": "PASS",
+      "test": "TEST-C2-006"
+    },
+    {
+      "empty_heads_empty_result": true,
+      "name": "head membership semantics: unknown heads skipped, empty head list -> empty result",
+      "note": "recorded engine behavior; callers must validate head names (B6 mapping relies on this)",
+      "status": "PASS",
+      "test": "TEST-C2-004",
+      "unknown_head_skipped_multihead": true
+    },
+    {
+      "deterministic_5_calls": true,
+      "first_two_equal": true,
+      "n_results": 5,
+      "name": "hybrid fusion correctness (B5)",
+      "status": "PASS",
+      "test": "TEST-C2-008",
+      "token_doc_count": 8,
+      "top1_among_token_docs": true,
+      "v2_assertion_note": "token 'xyloquery' occurs in 8 docs (i%5==4); pre-v2 'unique token doc top1' scan was a last-wins iteration-order-dependent target and could not be satisfied; corrected contract = fused top-1 must belong to the token-doc set under any deterministic tie rule (see comment above)."
+    },
+    {
+      "coverage_min_per_head": 38,
+      "deterministic_across_calls": true,
+      "exact_ref_checks": 2,
+      "name": "Full-mode exact rerank (B7): scores exact within the pool; coverage recorded (HNSW recall observation)",
+      "note": "exact gated-scoring equality vs the exact reference is asserted only when per-head pools exhaustively cover all docs (hnsw_rs search at k == count is not exhaustive; see c2probe hrecall). Within-pool scores are exact; pool coverage is recorded as an observation.",
+      "status": "PASS",
+      "test": "TEST-C2-009"
+    },
+    {
+      "deterministic": true,
+      "mean_top5_overlap_C_vs_D": 1.0,
+      "name": "B4 identity-QK: deterministic untrained scorer; C-vs-D overlap recorded",
+      "note": "C0 documented no-op = measured contribution claim (H3); byte identity NOT asserted because fusion renormalizes present channels",
+      "status": "PASS",
+      "test": "TEST-C2-B4-NOOP"
+    }
+  ],
+  "subcommand": "modes-test"
+}

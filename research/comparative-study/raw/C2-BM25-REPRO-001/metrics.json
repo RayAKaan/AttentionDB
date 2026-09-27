@@ -1,0 +1,25 @@
+{
+  "n_docs": 12,
+  "n_samples": 200,
+  "phrase_search_distinct_orderings_seen": 197,
+  "rrf_distinct_fused_max_score_ids": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+  ],
+  "rrf_distinct_fused_topk_memberships": 153,
+  "search_distinct_orderings_seen": 198,
+  "strict_score_ties_observed": true,
+  "top_k": 4,
+  "deterministic": false,
+  "finding": "defect confirmed: strict score ties BUT top-k doc-id order in bm25 search() varies per call (sort without id tiebreaker over per-call HashMap); RRF fused top-k membership and max-score id consequently nondeterministic. Expected pre-fix observation."
+}

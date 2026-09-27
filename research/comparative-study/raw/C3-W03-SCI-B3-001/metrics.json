@@ -1,0 +1,31 @@
+{
+  "run_id": "C3-W03-SCI-B3-001",
+  "mode": "B3",
+  "reps": 5,
+  "n_queries": 100,
+  "elapsed_s": 256.4,
+  "recall10_qrels_mean_of_repmeans": 0.8129999995231628,
+  "recall10_exact_mean_of_repmeans": 0.6853999376296998,
+  "latency_us": {
+    "p50_between_reps": {
+      "mean": 1909.7800000000002,
+      "min": 1817.35,
+      "max": 1946.0500000000002,
+      "n": 5
+    },
+    "p95_between_reps": {
+      "mean": 2758.365,
+      "min": 2094.495,
+      "max": 4014.0650000000005,
+      "n": 5
+    }
+  },
+  "subset_rule": "first min(100,len) of seeded qrels-test shuffle (seed 20260925)",
+  "peak_child_rss_bytes_by_rep": [
+    318529536,
+    283979776,
+    318930944,
+    284655616,
+    284008448
+  ]
+}

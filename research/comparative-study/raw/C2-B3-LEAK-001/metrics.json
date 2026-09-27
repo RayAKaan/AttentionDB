@@ -1,0 +1,11 @@
+{
+  "INV-L1-headline-refused": true,
+  "INV-L1-test-path-refused": true,
+  "INV-L4": "covered by TEST-C2-011c (tampered card rejected by validate())",
+  "INV-L5-bitwise-reproducible-all": null,
+  "INV-L2-config-hash": "8283c1271f113994df97a5b571c076fed7e2f5907e1fd6e580649f992c5e949f",
+  "INV-L3-dataset-provenance": {
+    "gating-synth-concat.json": "synth-multiview-n400-seed20260925-input-concat",
+    "gating-synth-view0.json": "synth-multiview-n400-seed20260925-input-view0"
+  }
+}

@@ -1,0 +1,8 @@
+run_id: C2-ORACLE-TESTS-002
+study_id: comparative-study-001
+protocol_version: 1.0.0
+git_commit: 7788067c1437ae8c75ced4dc1ffc2f49b2c22a88
+purpose: "B0 exact oracle validation battery (protocol \xA712)"
+component: oracle
+metric: cosine
+tie_rule: score desc, id asc

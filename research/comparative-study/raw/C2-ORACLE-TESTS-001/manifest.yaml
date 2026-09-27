@@ -1,0 +1,3 @@
+run_id: C2-ORACLE-TESTS-001
+terminal_status: INVALID-STARTUP
+reason: harness defect (RUN-INDEX.yaml append before file existed); no results produced; superseded by C2-ORACLE-TESTS-002; dir preserved per no-overwrite rule

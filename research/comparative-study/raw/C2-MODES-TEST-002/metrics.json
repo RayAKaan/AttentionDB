@@ -1,0 +1,40 @@
+{
+  "all_runs_pass": true,
+  "run_count": 8,
+  "status_by_test": {
+    "TEST-C2-002": "PASS",
+    "TEST-C2-003": "PASS",
+    "TEST-C2-005": "PASS",
+    "TEST-C2-006": "PASS",
+    "TEST-C2-004": "PASS",
+    "TEST-C2-008": "PASS",
+    "TEST-C2-009": "PASS",
+    "TEST-C2-B4-NOOP": "PASS"
+  },
+  "TEST-C2-002": {
+    "exact_set_agreement_rate": 0.5,
+    "recorded_not_asserted": true,
+    "engine_note": "single-head ANN approximate by design"
+  },
+  "TEST-C2-003": {
+    "deterministic_3_003": true,
+    "exact_ref_checks_r1": 7,
+    "coverage_min_per_head_r1": 39,
+    "exact_ref_checks_r2": 0,
+    "coverage_min_per_head_r2": 38,
+    "scope_note": "exact 1e-5 equality asserted only when per-head pools exhaustively cover all docs"
+  },
+  "TEST-C2-008": {
+    "deterministic_5_calls": true,
+    "top1_among_token_docs": true,
+    "token_doc_count": 8
+  },
+  "TEST-C2-009": {
+    "exact_ref_checks_r1": 5,
+    "coverage_min_per_head_r1": 39
+  },
+  "hnsw_recall_observation": {
+    "finding": "hnsw_rs search at k == element count is NOT exhaustive: 0..7 docs per head unreachable per process (missing sets vary across processes; high-index docs 33..40 most affected). Confirmed via c2probe hrecall (6 processes). Downstream of hash-seeded graph construction; pre-existing, NOT introduced by the BM25 fix.",
+    "artifact": "hrecall-recall-observations.txt"
+  }
+}

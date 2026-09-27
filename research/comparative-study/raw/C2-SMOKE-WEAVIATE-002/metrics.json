@@ -1,0 +1,10 @@
+{
+  "startup_healthy": false,
+  "startup_s": 120.19,
+  "server_peak_rss_kb": 59632,
+  "server_n_samples": 1,
+  "server_abort_reason": null,
+  "server_timed_out": false,
+  "server_exit_code": 1,
+  "server_log_tail": "all new schema classes without an explicit vectorizer setting, will use this vectorizer\",\"time\":\"2026-09-24T09:20:22Z\"}\n{\"action\":\"startup\",\"auto_schema_enabled\":true,\"build_git_commit\":\"\",\"build_go_version\":\"go1.26.8\",\"build_image_tag\":\"\",\"build_wv_version\":\"1.39.6\",\"level\":\"info\",\"msg\":\"auto schema enabled setting is set to \\\"true\\\"\",\"time\":\"2026-09-24T09:20:22Z\"}\n{\"action\":\"memberlist_config\",\"advertise_addr\":\"\",\"advertise_port\":7946,\"bind_addr\":\"0.0.0.0\",\"bind_port\":7946,\"build_git_commit\":\"\",\"build_go_version\":\"go1.26.8\",\"build_image_tag\":\"\",\"build_wv_version\":\"1.39.6\",\"config_type\":\"LAN\",\"hostname\":\"e2b.local\",\"level\":\"info\",\"msg\":\"memberlist configuration\",\"raft_multiplier\":5,\"tcp_timeout\":50000000000,\"time\":\"2026-09-24T09:20:22Z\"}\n{\"action\":\"memberlist_init\",\"advertise_addr\":\"\",\"advertise_port\":7946,\"bind_addr\":\"0.0.0.0\",\"bind_port\":7946,\"build_git_commit\":\"\",\"build_go_version\":\"go1.26.8\",\"build_image_tag\":\"\",\"build_wv_version\":\"1.39.6\",\"config_type\":\"LAN\",\"hostname\":\"e2b.local\",\"level\":\"error\",\"msg\":\"memberlist not created: failed to get final advertise address: no private IP address found, and explicit IP not provided\",\"time\":\"2026-09-24T09:20:22Z\"}\n{\"action\":\"startup\",\"build_git_commit\":\"\",\"build_go_version\":\"go1.26.8\",\"build_image_tag\":\"\",\"build_wv_version\":\"1.39.6\",\"level\":\"error\",\"msg\":\"could not init cluster state: create memberlist: failed to get final advertise address: no private IP address found, and explicit IP not provided\",\"time\":\"2026-09-24T09:20:22Z\"}\n"
+}

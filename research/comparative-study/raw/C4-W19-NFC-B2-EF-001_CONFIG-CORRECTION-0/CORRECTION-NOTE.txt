@@ -1,0 +1,11 @@
+harness-correction: the original C4-W19-NFC-B2-EF-001 run shipped grid
+configs with doc_vectors lacking CANONICAL, so the engine's exact_top10
+oracle was empty and every per-query recall10_exact was 0.0000 (semantically
+<None>). C1 protocol requires recall10_exact (retrieval quality vs the
+single-canonical exact oracle) for every mode; C3 B2 NFC measured ~0.68.
+Harness now adds CANONICAL to grid doc_vectors for the exact oracle only
+(NOT to collection_heads/attend_heads, preserving the B2/B7 3-head registry).
+Corrected re-run under the same planned ID per the C3 _CONFIG-CORRECTION-*
+convention; original evidence preserved in the base C4-W19-NFC-B2-EF-001 dir.
+recall_exact restored (~0.68 across grid), selection EF16-C50 (0.1393 vs
+target 0.1364, within tolerance; p50 1629 us).

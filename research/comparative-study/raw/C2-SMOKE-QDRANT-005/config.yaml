@@ -1,0 +1,9 @@
+run_id: C2-SMOKE-QDRANT-005
+study_id: comparative-study-001
+protocol_version: 1.0.0
+git_commit: 7788067c1437ae8c75ced4dc1ffc2f49b2c22a88
+purpose: "Qdrant local feasibility smoke under guarded sampler, incl. named-vector\
+  \ validation (protocol \xA714)"
+system: qdrant
+component: baseline-smoke
+attempt: guarded-sampler

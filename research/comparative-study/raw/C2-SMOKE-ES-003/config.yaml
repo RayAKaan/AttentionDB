@@ -1,0 +1,11 @@
+run_id: C2-SMOKE-ES-003
+study_id: comparative-study-001
+protocol_version: 1.0.0
+git_commit: 7788067c1437ae8c75ced4dc1ffc2f49b2c22a88
+purpose: "Elasticsearch feasibility smoke at default JVM settings, server under guarded\
+  \ sampler (protocol \xA716)"
+system: elasticsearch
+component: baseline-smoke
+attempt: default-heap
+note: 'per prereg: abort at this envelope is a legitimate OBSERVED-LIMIT; no reduced-heap
+  retry'

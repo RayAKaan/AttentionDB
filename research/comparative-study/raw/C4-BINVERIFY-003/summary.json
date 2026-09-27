@@ -1,0 +1,90 @@
+{
+  "run_id": "C4-BINVERIFY-003",
+  "status": "PASS",
+  "verdict_rule": "recorded C4.2 value within [min,max] of >=5 fresh-process draws of the new binary, for every C4.2-selected cell (SCI-B1-EF32 sampled at 11 draws = same power as C4-BINVERIFY-002; other cells 5)",
+  "new_binary_sha256": "3ec8c193354975fa26a3961d8835289a0cad54cc686141f75573baeaebb31c98",
+  "c42_binary_sha256": "9024974731d8d5c0b182348eae2601037768819ebae5eff459c82c6931f543ce",
+  "tolerance_draw_within": 0.01,
+  "change_since_002": "additive deadline_us knob (default 0 => deadline=None attend path, behavior byte-identical)",
+  "cells": [
+    {
+      "config": "NFC-B1-EF64",
+      "recorded_c4_2_recall10_qrels": 0.1351,
+      "new_binary_draws_n": 5,
+      "new_binary_min": 0.130212833808827,
+      "new_binary_max": 0.13699610450270552,
+      "new_binary_mean": 0.1353,
+      "new_binary_sd": 0.0029,
+      "recorded_within_new_binary_range": true,
+      "draws_within_tolerance_0_01": 5,
+      "draws": [
+        0.1302,
+        0.1369,
+        0.137,
+        0.1367,
+        0.1357
+      ]
+    },
+    {
+      "config": "NFC-B2-EF16-C50",
+      "recorded_c4_2_recall10_qrels": 0.1393,
+      "new_binary_draws_n": 5,
+      "new_binary_min": 0.13729406976756167,
+      "new_binary_max": 0.1404491115094128,
+      "new_binary_mean": 0.1391,
+      "new_binary_sd": 0.0014,
+      "recorded_within_new_binary_range": true,
+      "draws_within_tolerance_0_01": 5,
+      "draws": [
+        0.1393,
+        0.1383,
+        0.1373,
+        0.1404,
+        0.1403
+      ]
+    },
+    {
+      "config": "NFC-B7-EF64",
+      "recorded_c4_2_recall10_qrels": 0.1372,
+      "new_binary_draws_n": 5,
+      "new_binary_min": 0.11827350704769754,
+      "new_binary_max": 0.1391870821653693,
+      "new_binary_mean": 0.1333,
+      "new_binary_sd": 0.0087,
+      "recorded_within_new_binary_range": true,
+      "draws_within_tolerance_0_01": 4,
+      "draws": [
+        0.1392,
+        0.1365,
+        0.1183,
+        0.1386,
+        0.1341
+      ]
+    },
+    {
+      "config": "SCI-B1-EF32",
+      "recorded_c4_2_recall10_qrels": 0.7775,
+      "new_binary_draws_n": 11,
+      "new_binary_min": 0.755,
+      "new_binary_max": 0.7775,
+      "new_binary_mean": 0.7657,
+      "new_binary_sd": 0.0073,
+      "recorded_within_new_binary_range": true,
+      "draws_within_tolerance_0_01": 6,
+      "draws": [
+        0.765,
+        0.755,
+        0.755,
+        0.7675,
+        0.7725,
+        0.7575,
+        0.765,
+        0.7775,
+        0.7675,
+        0.77,
+        0.77
+      ]
+    }
+  ],
+  "conclusion": "4/4 cells PASS; deadline arm introduces no measured behavior change on the C4.2-selected configs"
+}

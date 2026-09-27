@@ -1,0 +1,11 @@
+{
+  "run_id": "C3-W08-SYN-B1-001",
+  "mode": "B1",
+  "reps": 1,
+  "n_queries": 200,
+  "generator": "phase2b_bench::corpora::multiview",
+  "gen_gt_checks_passed": 200,
+  "recall10_qrels": 0.394499808549881,
+  "recall10_exact": 0.9879998564720154,
+  "gen_gt_match_oracle": "verified-all"
+}

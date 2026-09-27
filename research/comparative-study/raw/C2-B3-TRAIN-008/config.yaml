@@ -1,0 +1,19 @@
+run_id: C2-B3-TRAIN-008
+study_id: comparative-study-001
+protocol_version: 1.0.0
+git_commit: 7788067c1437ae8c75ced4dc1ffc2f49b2c22a88
+purpose: B3 training arm b3-lodo-nf (grid + primary seed)
+arm: b3-lodo-nf
+dataset: gating-lodo-nfcorpus.json
+dataset_sha256: a58bb437456d16e78c1f9592192d5918a512416c79a594c58b4c1648dcab6ef5
+config_yaml_sha256: 8283c1271f113994df97a5b571c076fed7e2f5907e1fd6e580649f992c5e949f
+seed: 20260925
+grid:
+  hidden:
+  - 16
+  - 32
+  lr:
+  - 0.005
+  - 0.01
+  - 0.02
+trainer: learned::gating_v2::train_gating (in-repo)

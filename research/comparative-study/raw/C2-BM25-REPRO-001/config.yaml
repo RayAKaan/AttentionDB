@@ -1,0 +1,8 @@
+run_id: C2-BM25-REPRO-001
+study_id: comparative-study-001
+protocol_version: 1.0.0
+git_commit: 7788067c1437ae8c75ced4dc1ffc2f49b2c22a88
+purpose: BM25 tie-order repro, PRE-fix engine core (TEST-C2-008 leg B5)
+component: attentiondb-adapter-validation
+tool: bm25repro
+note: collapsed docs with strictly tied BM25 scores; 200 samples

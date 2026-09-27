@@ -1,0 +1,2 @@
+PASS
+new binary 3ec8c193... (deadline_us knob) distribution-equivalent to C4.2 binary 90249747... on all 4 C4.2-selected cells; recorded C4.2 values within fresh-draw range.

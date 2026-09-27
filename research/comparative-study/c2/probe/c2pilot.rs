@@ -6,11 +6,12 @@
 //!   - seeded query order, first `warmup` queries executed but excluded
 //!   - per-query latency + Recall@10 vs exact brute-force oracle + vs qrels
 //!   - modes B1 (SingleHead/CANONICAL), B2 (FixedFusion 3 heads),
-//!     B3 (LearnedGating + modelcard), B7 (Full default)
+//!     B3 (LearnedGating + modelcard), B4 (QKAttention identity-init),
+//!     B7 (Full default)
 //!
 //! Input contract (single JSON on stdin or --config path):
 //! {
-//!   "mode": "B1|B2|B3|B7",
+//!   "mode": "B1|B2|B3|B4|B7",
 //!   "k": 10,
 //!   "seed": 20260925,
 //!   "warmup": 20,
@@ -158,6 +159,16 @@ fn main() {
     let n_queries = cfg["n_queries"].as_u64().unwrap() as usize;
     let dim = cfg["dim"].as_u64().unwrap() as usize;
 
+    // ---- C4 overrides (budget/ef knobs, optional; defaults == C1/C3) ----
+    let cand_budget = cfg["candidate_budget"].as_u64().unwrap_or(500) as usize;
+    let min_cand_head = cfg["min_candidates_per_head"].as_u64().unwrap_or(20) as usize;
+    let cand_mult = cfg["candidate_multiplier"].as_u64().unwrap_or(0) as usize;
+    let ef_search = cfg["ef_search"].as_u64().unwrap_or(64) as usize;
+    let ef_construction = cfg["ef_construction"].as_u64().unwrap_or(400) as usize;
+    let hnsw_m = cfg["m"].as_u64().unwrap_or(16) as usize;
+    let config_id = cfg["configuration_id"].as_str().unwrap_or("").to_string();
+    let deadline_us = cfg["deadline_us"].as_u64().unwrap_or(0) as u64;
+
     // ---- load doc vectors per head -------------------------------------
     let mut doc_vecs: HashMap<String, Vec<f32>> = HashMap::new();
     let mut canonical: Vec<f32> = Vec::new();
@@ -279,21 +290,36 @@ fn main() {
     }
 
     let coll = e.get_collection("c3p").unwrap();
+    let rc0_cand_mult = coll.retrieval_config.read().candidate_multiplier;
     {
         let mut rc = coll.retrieval_config.write();
         rc.mode = match mode {
             "B1" => RetrievalMode::SingleHead,
             "B2" => RetrievalMode::FixedFusion,
             "B3" => RetrievalMode::LearnedGating,
+            "B4" => RetrievalMode::QKAttention,
             "B7" => RetrievalMode::Full,
             other => panic!("unsupported mode {other}"),
         };
+        rc.candidate_budget = cand_budget;
+        rc.min_candidates_per_head = min_cand_head;
+        if cand_mult > 0 {
+            rc.candidate_multiplier = cand_mult;
+        }
     }
     if mode == "B3" {
         let card_path = cfg["modelcard"].as_str().unwrap();
         let card = ModelCard::load(std::path::Path::new(card_path)).unwrap();
         e.install_gating_card("c3p", card).unwrap();
     }
+
+    // ---- C4: apply HNSW settings (ef_search / ef_construction / m) -----
+    let mut hsettings = coll.settings.write();
+    hsettings.ef_search = ef_search;
+    hsettings.ef_construction = ef_construction;
+    hsettings.max_nb_connection = hnsw_m;
+    hsettings.enable_exact_reranking = true;
+    drop(hsettings);
 
     let attend_heads: Vec<String> = cfg["attend_heads"]
         .as_array()
@@ -312,35 +338,72 @@ fn main() {
         let ids: Vec<u64> = exact.iter().map(|(id, _)| *id).collect();
         all_exact.push(ids.clone());
         let t = Instant::now();
-        let res = e.attend("c3p", &attend_heads, q, k).unwrap();
-        let lat_us = t.elapsed().as_secs_f64() * 1e6;
-        if pos >= warmup {
-            latencies.push(lat_us);
-        }
-        let hits: Vec<u64> = res.iter().map(|(id, _)| *id).collect();
-        // map engine numeric ids back to doc rows
-        let hits_rows: Vec<u64> = hits
-            .iter()
-            .map(|h| doc_map.get(h).copied().unwrap_or(*h as usize) as u64)
-            .collect();
-        let relevant = qrels.get(&qr).cloned().unwrap_or_default();
-        let rel_set: HashSet<u64> = relevant.keys().copied().collect();
-        let hits_cnt = hits_rows.iter().filter(|id| rel_set.contains(id)).count();
-        let recall = if rel_set.is_empty() { 0.0 }
-            else { hits_cnt as f32 / rel_set.len() as f32 };
-        let r10 = hits_rows.iter().map(|&r| r).collect::<Vec<_>>();
-        let recall_exact = if ids.is_empty() { 0.0 }
-            else {
-                let exact_set: HashSet<u64> = ids.iter().copied().collect();
-                hits_rows.iter().filter(|r| exact_set.contains(r)).count() as f32 / ids.len() as f32
-            };
-        let ndcg = if rel_set.is_empty() { 0.0 } else { ndcg10(&r10, &relevant, k) };
-        per_query.push(json!({
-            "pos": pos, "query_row": qr,
-            "latency_us": lat_us,
-            "recall10_qrels": recall, "recall10_exact": recall_exact, "ndcg10_qrels": ndcg,
-            "hits": r10, "engine_hits": hits, "n_rel": rel_set.len(),
-        }));
+        let deadline = if deadline_us > 0
+            && pos >= warmup {
+            Some(Instant::now() + std::time::Duration::from_micros(deadline_us))
+        } else {
+            None
+        };
+        {
+            match coll.attend_detailed_with_stats(
+                &attend_heads, q, k, None, None, None, None, deadline,
+            ) {
+                Ok((res, stats)) => {
+                    let lat_us = t.elapsed().as_secs_f64() * 1e6;
+                    if pos >= warmup {
+                        latencies.push(lat_us);
+                    }
+                    let hits: Vec<u64> = res.iter().map(|r| r.id).collect();
+                    // map engine numeric ids back to doc rows
+                    let hits_rows: Vec<u64> = hits
+                        .iter()
+                        .map(|h| doc_map.get(h).copied().unwrap_or(*h as usize) as u64)
+                        .collect();
+                    let relevant = qrels.get(&qr).cloned().unwrap_or_default();
+                    let rel_set: HashSet<u64> = relevant.keys().copied().collect();
+                    let hits_cnt = hits_rows.iter().filter(|id| rel_set.contains(id)).count();
+                    let recall = if rel_set.is_empty() { 0.0 }
+                        else { hits_cnt as f32 / rel_set.len() as f32 };
+                    let r10 = hits_rows.iter().map(|&r| r).collect::<Vec<_>>();
+                    let recall_exact = if ids.is_empty() { 0.0 }
+                        else {
+                            let exact_set: HashSet<u64> = ids.iter().copied().collect();
+                            hits_rows.iter().filter(|r| exact_set.contains(r)).count() as f32 / ids.len() as f32
+                        };
+                    let ndcg = if rel_set.is_empty() { 0.0 } else { ndcg10(&r10, &relevant, k) };
+                    per_query.push(json!({
+                        "pos": pos, "query_row": qr,
+                        "latency_us": lat_us,
+                        "configuration_id": config_id,
+                        "candidate_count": stats.union_size,
+                        "heads_present": stats.heads_present,
+                        "recall10_qrels": recall, "recall10_exact": recall_exact, "ndcg10_qrels": ndcg,
+                        "hits": r10, "engine_hits": hits, "n_rel": rel_set.len(),
+                        "relevant_ids": rel_set.iter().cloned().collect::<Vec<_>>(),
+                    }));
+                    false
+                }
+                Err(e) => {
+                    let lat_us = t.elapsed().as_secs_f64() * 1e6;
+                    let err_str = e.to_string();
+                    if err_str.contains("deadline") {
+                        // deadline miss: FAILURE counted (recall 0, no hits)
+                        per_query.push(json!({
+                            "pos": pos, "query_row": qr,
+                            "latency_us": lat_us,
+                            "configuration_id": config_id,
+                            "deadline_exceeded": true, "error": err_str,
+                            "recall10_qrels": 0.0, "recall10_exact": 0.0, "ndcg10_qrels": 0.0,
+                            "hits": [], "engine_hits": [], "n_rel": if qrels.contains_key(&qr) { qrels[&qr].keys().len() } else { 0 },
+                            "relevant_ids": [],
+                        }));
+                        true
+                    } else {
+                        panic!("attend error: {e}");
+                    }
+                }
+            }
+        };
     }
 
     let mut slat = latencies.clone();
@@ -351,6 +414,8 @@ fn main() {
     let mean_qrels = rec_qrels.iter().sum::<f32>() / rec_qrels.len().max(1) as f32;
     let mean_exact = rec_exact.iter().sum::<f32>() / rec_exact.len().max(1) as f32;
 
+    let deadline_misses = per_query.iter().filter(|r| r.get("deadline_exceeded").map(|v| v.as_bool() == Some(true)).unwrap_or(false)).count();
+
     let doc = json!({
         "subcommand": "pilot", "mode": mode, "ok": true,
         "engine": {
@@ -358,16 +423,20 @@ fn main() {
             "heads": heads,
             "attend_heads": attend_heads,
             "retrieval_mode": mode,
-            "candidate_budget": 500,
-            "min_candidates_per_head": 20,
-            "ef_search": 64, "ef_construction": 400, "m": 16,
+            "candidate_budget": cand_budget,
+            "min_candidates_per_head": min_cand_head,
+            "candidate_multiplier": if cand_mult > 0 { cand_mult } else { rc0_cand_mult },
+            "ef_search": ef_search, "ef_construction": ef_construction, "m": hnsw_m,
             "modelcard": if mode == "B3" { cfg["modelcard"].as_str().unwrap().to_string() } else { String::new() },
+            "configuration_id": config_id,
+            "deadline_us": deadline_us,
         },
         "n_docs": n_docs, "n_queries": run_rows.len(),
         "warmup": warmup, "seed": seed, "k": k,
         "latency_us_post_warmup": {"count": slat.len(), "mean": mean,
             "p50": percentile(&slat, 0.50), "p90": percentile(&slat, 0.90), "p95": percentile(&slat, 0.95)},
         "recall10_qrels_mean": mean_qrels, "recall10_exact_mean": mean_exact,
+        "deadline_exceeded_count": deadline_misses,
         "per_query": per_query, "exact_top10": all_exact,
     });
     let s = serde_json::to_string_pretty(&doc).unwrap();

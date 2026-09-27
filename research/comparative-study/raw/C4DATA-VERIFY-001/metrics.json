@@ -1,0 +1,104 @@
+{
+  "run_id": "C4DATA-VERIFY-001",
+  "all_match": true,
+  "checks": {
+    "NFC:corpus.jsonl": {
+      "expected": "10cc83ef1826b1425e6a87090b5140b39b27755d5a27e48215a88611c899991f",
+      "observed": "10cc83ef1826b1425e6a87090b5140b39b27755d5a27e48215a88611c899991f",
+      "match": true
+    },
+    "NFC:queries.jsonl": {
+      "expected": "d024e6621b84925d485ae473d316a0c3af31c62c8068a59fb29d22f7613aef2a",
+      "observed": "d024e6621b84925d485ae473d316a0c3af31c62c8068a59fb29d22f7613aef2a",
+      "match": true
+    },
+    "NFC:qrels/dev.tsv": {
+      "expected": "b1d38b5e8f78c4a5820bce2b7ec2db54911d7690dc601e76811846b211180bd8",
+      "observed": "b1d38b5e8f78c4a5820bce2b7ec2db54911d7690dc601e76811846b211180bd8",
+      "match": true
+    },
+    "NFC:qrels/test.tsv": {
+      "expected": "f8fba6ef3d4dd9c3a242a8ba4ae38276fc3622fce7dcbae764766d564542fd2a",
+      "observed": "f8fba6ef3d4dd9c3a242a8ba4ae38276fc3622fce7dcbae764766d564542fd2a",
+      "match": true
+    },
+    "NFC:qrels/train.tsv": {
+      "expected": "6336b80f9bffc4f063f3aa450047ad35c0b7c534efe4a6ba35e16dbace047f6a",
+      "observed": "6336b80f9bffc4f063f3aa450047ad35c0b7c534efe4a6ba35e16dbace047f6a",
+      "match": true
+    },
+    "NFC-EMBED:HEAD-TITLE.npy": {
+      "expected": "1f10d4eb98383d39520c1a18fbaf78f0d06524484fd9402fa0f4d7b1fb1a59eb",
+      "observed": "1f10d4eb98383d39520c1a18fbaf78f0d06524484fd9402fa0f4d7b1fb1a59eb",
+      "match": true
+    },
+    "NFC-EMBED:HEAD-BODY.npy": {
+      "expected": "0fcaaf147e094a74e41654410210784d21ba26e9cbc7ef08c65a34f43fada501",
+      "observed": "0fcaaf147e094a74e41654410210784d21ba26e9cbc7ef08c65a34f43fada501",
+      "match": true
+    },
+    "NFC-EMBED:HEAD-CITE.npy": {
+      "expected": "0fdadcb4c0e255b832b43e6d600566b63c63dd3b3b4172c4f92d02b3aec500a0",
+      "observed": "0fdadcb4c0e255b832b43e6d600566b63c63dd3b3b4172c4f92d02b3aec500a0",
+      "match": true
+    },
+    "NFC-EMBED:CANONICAL.npy": {
+      "expected": "75bf5f3f02e860574d88a68d07bb20214a37559e85c6b9fe1b1fa3f5ecd8b1a6",
+      "observed": "75bf5f3f02e860574d88a68d07bb20214a37559e85c6b9fe1b1fa3f5ecd8b1a6",
+      "match": true
+    },
+    "NFC-EMBED:QUERIES.npy": {
+      "expected": "82be7079ccf8c2b2df5f61f34fc40aff56242902db3f8c128ecf619e0ea49e93",
+      "observed": "82be7079ccf8c2b2df5f61f34fc40aff56242902db3f8c128ecf619e0ea49e93",
+      "match": true
+    },
+    "SCI:corpus.jsonl": {
+      "expected": "dec31c8182f3d744c7d2c09423756fd1d17cbef75808db13ba01cc0aab4d1ac6",
+      "observed": "dec31c8182f3d744c7d2c09423756fd1d17cbef75808db13ba01cc0aab4d1ac6",
+      "match": true
+    },
+    "SCI:queries.jsonl": {
+      "expected": "8ff84a7c903f722981cd8d595c022660140c51867b27608a6d4910db86080313",
+      "observed": "8ff84a7c903f722981cd8d595c022660140c51867b27608a6d4910db86080313",
+      "match": true
+    },
+    "SCI:qrels/test.tsv": {
+      "expected": "0864bb985e0ca2367ba217977e72004d549054b2b06666ed9d4825ac7c21284c",
+      "observed": "0864bb985e0ca2367ba217977e72004d549054b2b06666ed9d4825ac7c21284c",
+      "match": true
+    },
+    "SCI:qrels/train.tsv": {
+      "expected": "a53f2114831916c096b6c37d9e54da68cef4efdcdbd5ed46533601af972acf1d",
+      "observed": "a53f2114831916c096b6c37d9e54da68cef4efdcdbd5ed46533601af972acf1d",
+      "match": true
+    },
+    "SCI-EMBED:HEAD-TITLE.npy": {
+      "expected": "34c2290eba231d149babf84d121784a33e4c86d7163c7e031cf9fd2ac9b76365",
+      "observed": "34c2290eba231d149babf84d121784a33e4c86d7163c7e031cf9fd2ac9b76365",
+      "match": true
+    },
+    "SCI-EMBED:HEAD-BODY.npy": {
+      "expected": "f5792419df39330bb4dfa2e864f6a1c3caa6dda4d3b48278267089b762551c7e",
+      "observed": "f5792419df39330bb4dfa2e864f6a1c3caa6dda4d3b48278267089b762551c7e",
+      "match": true
+    },
+    "SCI-EMBED:HEAD-CITE.npy": {
+      "expected": "22cafcc39501f1d8b62c06a8e144a8566068b5108c02016608d1d81e5f9c8348",
+      "observed": "22cafcc39501f1d8b62c06a8e144a8566068b5108c02016608d1d81e5f9c8348",
+      "match": true
+    },
+    "SCI-EMBED:CANONICAL.npy": {
+      "expected": "c876d31284bfd99de6636454434e5be2f7461e15b1fd2623b878a685e1e5675a",
+      "observed": "c876d31284bfd99de6636454434e5be2f7461e15b1fd2623b878a685e1e5675a",
+      "match": true
+    },
+    "SCI-EMBED:QUERIES.npy": {
+      "expected": "2ffd4fb2803aa314008eb359fed4d2f70eb7cbd1dc3cf0ecdeed4e3835abd989",
+      "observed": "2ffd4fb2803aa314008eb359fed4d2f70eb7cbd1dc3cf0ecdeed4e3835abd989",
+      "match": true
+    }
+  },
+  "notes": "SciFact embeddings validated against the C3-EMBED-SCIFACT-001 own-hashes record (decision per c4-dataset-validation.md); corpus/queries/qrels against C2-DATA-SCIFACT-007 manifest.",
+  "timestamp_utc": "2026-09-25T16:26:12Z",
+  "git_commit": "5195133ca5fab7a660d403b009b565408d6a09b3"
+}
