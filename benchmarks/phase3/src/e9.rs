@@ -92,7 +92,9 @@ pub(crate) fn read_pss() -> (Option<usize>, Option<usize>, Option<usize>) {
 }
 
 pub(crate) fn fd_count() -> usize {
-    std::fs::read_dir("/proc/self/fd").map(|d| d.count()).unwrap_or(0)
+    std::fs::read_dir("/proc/self/fd")
+        .map(|d| d.count())
+        .unwrap_or(0)
 }
 
 pub(crate) fn dir_census(db: &Path) -> (usize, usize, usize, usize, usize) {
@@ -147,7 +149,6 @@ struct Tel {
 
 impl Tel {
     fn new(out: &Path) -> Self {
-        
         Tel {
             out: out.to_path_buf(),
             t0: std::time::Instant::now(),
@@ -177,21 +178,42 @@ impl Tel {
         self.rows.push(format!(
             "{el:.1},{op},{rss},{vmz},{anon},{file},{ps},{pas},{pfs},{thr},{fds},{uord},{ford},{arena},{walb},{waln},{sstb},{sstn},{dbb}"
         ));
-        self.samples.push([el, op as f64, rss as f64, pss.map(|v| v as f64).unwrap_or(0.0), anon as f64, mi.uordblks as f64, mi.fordblks as f64, sstn as f64]);
+        self.samples.push([
+            el,
+            op as f64,
+            rss as f64,
+            pss.map(|v| v as f64).unwrap_or(0.0),
+            anon as f64,
+            mi.uordblks as f64,
+            mi.fordblks as f64,
+            sstn as f64,
+        ]);
         let c = e.mem_census();
         let hdr = format!(
             "{el:.1},{op},mapper,{u2i},{i2u},{ret},{nid},store,{mt},{fl},{sr},{bc},txn,{ts},{to}",
-            u2i = c.mapper_uuid_to_u64, i2u = c.mapper_u64_to_uuid, ret = c.mapper_retired, nid = c.mapper_next_id,
-            mt = c.store_memtable, fl = c.store_flushed_records, sr = c.store_sst_readers,
-            bc = c.store_block_cache_entries, ts = c.txn_staged, to = c.txn_staged_ops
+            u2i = c.mapper_uuid_to_u64,
+            i2u = c.mapper_u64_to_uuid,
+            ret = c.mapper_retired,
+            nid = c.mapper_next_id,
+            mt = c.store_memtable,
+            fl = c.store_flushed_records,
+            sr = c.store_sst_readers,
+            bc = c.store_block_cache_entries,
+            ts = c.txn_staged,
+            to = c.txn_staged_ops
         );
         self.census_rows.push(hdr);
         for cc in &c.collections {
             let nm = cc.name.clone();
             self.census_rows.push(format!(
                 "{el:.1},{op},coll,{nm},{hd},{ri},vs,{vs},bm25t,{bt},{bp},bmdl,{dl},idfc,{ic}",
-                hd = cc.heads, ri = cc.retired_ids, vs = cc.vector_store_len,
-                bt = cc.bm25_terms, bp = cc.bm25_postings, dl = cc.bm25_doc_lengths, ic = cc.idf_cache
+                hd = cc.heads,
+                ri = cc.retired_ids,
+                vs = cc.vector_store_len,
+                bt = cc.bm25_terms,
+                bp = cc.bm25_postings,
+                dl = cc.bm25_doc_lengths,
+                ic = cc.idf_cache
             ));
         }
     }
@@ -249,7 +271,9 @@ impl W {
     }
     fn delete(&mut self, idx: u32) {
         let ver = self.live[&idx];
-        self.e.delete_document("bench", &uuid_for(idx, ver).to_string()).unwrap();
+        self.e
+            .delete_document("bench", &uuid_for(idx, ver).to_string())
+            .unwrap();
         self.live.remove(&idx);
         self.n_del += 1;
     }
@@ -258,7 +282,12 @@ impl W {
         let r = doc_record(idx, ver, "e9", 100 + (self.seq % 900) as i64);
         // update preserves the uuid (engine identity note)
         self.e
-            .update_document("bench", &uuid_for(idx, ver).to_string(), r.fields.clone(), r.k_vecs.clone())
+            .update_document(
+                "bench",
+                &uuid_for(idx, ver).to_string(),
+                r.fields.clone(),
+                r.k_vecs.clone(),
+            )
             .unwrap();
         self.n_upd += 1;
     }
@@ -293,7 +322,8 @@ fn churn_mix(w: &mut W, keys: u32, target_live: u32, budget: usize, ckpt: usize,
         w.seq += 1;
         let r = rnd();
         let pick = (r % keys as u64) as u32;
-        if w.live.len() < target_live as usize || (r >> 8) % 100 < 15 && !w.live.contains_key(&pick) {
+        if w.live.len() < target_live as usize || (r >> 8) % 100 < 15 && !w.live.contains_key(&pick)
+        {
             w.insert(pick);
         } else if (r >> 8) % 100 < 45 {
             if w.live.contains_key(&pick) {
@@ -318,13 +348,32 @@ fn churn_mix(w: &mut W, keys: u32, target_live: u32, budget: usize, ckpt: usize,
 
 // ------------------------------------------------------------ experiments
 
-fn ex_churn(out: &Path, keys: u32, live: u32, budget: usize, ckpt: usize, compact: usize, tag: &str) {
+fn ex_churn(
+    out: &Path,
+    keys: u32,
+    live: u32,
+    budget: usize,
+    ckpt: usize,
+    compact: usize,
+    tag: &str,
+) {
     let mut w = W::new(out, tag);
     churn_mix(&mut w, keys, live, budget, ckpt, compact);
     w.tel.maybe(&w.e, &w.db, w.seq, true);
-    let s = summarize(&w, serde_json::json!({"keys": keys, "target_live": live, "ckpt_every": ckpt, "compact_every": compact}));
+    let s = summarize(
+        &w,
+        serde_json::json!({"keys": keys, "target_live": live, "ckpt_every": ckpt, "compact_every": compact}),
+    );
     w.tel.flush(&s);
-    println!("e9 {tag}: ops={} ins={} del={} upd={} live={} rss_peak={}KB", w.seq, w.n_ins, w.n_del, w.n_upd, w.live.len(), s["rss_peak_kb"]);
+    println!(
+        "e9 {tag}: ops={} ins={} del={} upd={} live={} rss_peak={}KB",
+        w.seq,
+        w.n_ins,
+        w.n_del,
+        w.n_upd,
+        w.live.len(),
+        s["rss_peak_kb"]
+    );
 }
 
 fn ex_readonly(out: &Path) {
@@ -354,10 +403,16 @@ fn ex_readonly(out: &Path) {
         w.tel.maybe(&w.e, &w.db, w.seq, false);
     }
     w.tel.maybe(&w.e, &w.db, w.seq, true);
-    let mut s = summarize(&w, serde_json::json!({"loaded": 2000, "gets": gets, "scans": scans, "rss_after_load_kb": rss_after_load}));
+    let mut s = summarize(
+        &w,
+        serde_json::json!({"loaded": 2000, "gets": gets, "scans": scans, "rss_after_load_kb": rss_after_load}),
+    );
     s["rss_after_load_kb"] = serde_json::json!(rss_after_load);
     w.tel.flush(&s);
-    println!("e9 e9c-readonly: ops={} rss_load={rss_after_load} rss_last={}KB", w.seq, s["rss_last_kb"]);
+    println!(
+        "e9 e9c-readonly: ops={} rss_load={rss_after_load} rss_last={}KB",
+        w.seq, s["rss_last_kb"]
+    );
 }
 
 fn ex_updchurn(out: &Path) {
@@ -381,9 +436,15 @@ fn ex_updchurn(out: &Path) {
         w.tel.maybe(&w.e, &w.db, w.seq, false);
     }
     w.tel.maybe(&w.e, &w.db, w.seq, true);
-    let s = summarize(&w, serde_json::json!({"loaded": 10_000, "rss_after_load_kb": rss_after_load, "fixed_cardinality": true}));
+    let s = summarize(
+        &w,
+        serde_json::json!({"loaded": 10_000, "rss_after_load_kb": rss_after_load, "fixed_cardinality": true}),
+    );
     w.tel.flush(&s);
-    println!("e9 e9d-update-churn: ops={} rss_load={rss_after_load} rss_last={}KB", w.seq, s["rss_last_kb"]);
+    println!(
+        "e9 e9d-update-churn: ops={} rss_load={rss_after_load} rss_last={}KB",
+        w.seq, s["rss_last_kb"]
+    );
 }
 
 fn ex_growing(out: &Path) {
@@ -402,7 +463,10 @@ fn ex_growing(out: &Path) {
     w.tel.maybe(&w.e, &w.db, w.seq, true);
     let s = summarize(&w, serde_json::json!({"growing": true}));
     w.tel.flush(&s);
-    println!("e9 e9e-growing: docs={} rss_last={}KB", w.seq, s["rss_last_kb"]);
+    println!(
+        "e9 e9e-growing: docs={} rss_last={}KB",
+        w.seq, s["rss_last_kb"]
+    );
 }
 
 fn ex_idzchurn(out: &Path) {
@@ -428,12 +492,20 @@ fn ex_idzchurn(out: &Path) {
         w.tel.maybe(&w.e, &w.db, w.seq, false);
     }
     w.tel.maybe(&w.e, &w.db, w.seq, true);
-    let s = summarize(&w, serde_json::json!({"keys": 1000, "no_maintenance": true}));
+    let s = summarize(
+        &w,
+        serde_json::json!({"keys": 1000, "no_maintenance": true}),
+    );
     w.tel.flush(&s);
-    println!("e9 e9f-idz-churn: ops={} rss_last={}KB sst_files={}", w.seq, s["rss_last_kb"], {
-        let (_, _, _, sstn, _) = dir_census(&w.db);
-        sstn
-    });
+    println!(
+        "e9 e9f-idz-churn: ops={} rss_last={}KB sst_files={}",
+        w.seq,
+        s["rss_last_kb"],
+        {
+            let (_, _, _, sstn, _) = dir_census(&w.db);
+            sstn
+        }
+    );
 }
 
 fn ex_compactheavy(out: &Path) {
@@ -456,10 +528,13 @@ fn ex_compactheavy(out: &Path) {
         w.tel.maybe(&w.e, &w.db, w.seq, false);
     }
     let after = read_status().0;
-    let mut s = summarize(&w, serde_json::json!({
-        "rss_before_compaction_kb": before, "rss_after_compactions_kb": after,
-        "compaction_trace": compaction_trace,
-    }));
+    let mut s = summarize(
+        &w,
+        serde_json::json!({
+            "rss_before_compaction_kb": before, "rss_after_compactions_kb": after,
+            "compaction_trace": compaction_trace,
+        }),
+    );
     // restart: assignment drops the old engine exactly once
     w.e = open_db(&w.db);
     let after_restart = read_status().0;
@@ -492,7 +567,10 @@ fn ex_walrot(out: &Path) {
     std::env::remove_var("ATTENTIONDB_WAL_SEGMENT_BYTES");
     let s = summarize(&w, serde_json::json!({"segment_bytes": 2048}));
     w.tel.flush(&s);
-    println!("e9 e9i-wal-rotation: ops={} rss_last={}KB", w.seq, s["rss_last_kb"]);
+    println!(
+        "e9 e9i-wal-rotation: ops={} rss_last={}KB",
+        w.seq, s["rss_last_kb"]
+    );
 }
 
 fn ex_ckptheavy(out: &Path) {
@@ -513,7 +591,10 @@ fn ex_ckptheavy(out: &Path) {
     let after = read_status().0;
     std::thread::sleep(std::time::Duration::from_secs(10));
     let after_idle = read_status().0;
-    let s = summarize(&w, serde_json::json!({"checkpoints": 150, "rss_before_kb": before, "rss_after_kb": after, "rss_after_idle_kb": after_idle}));
+    let s = summarize(
+        &w,
+        serde_json::json!({"checkpoints": 150, "rss_before_kb": before, "rss_after_kb": after, "rss_after_idle_kb": after_idle}),
+    );
     w.tel.flush(&s);
     println!("e9 e9j-ckpt-heavy: before={before} after={after} idle={after_idle}");
 }
@@ -538,7 +619,10 @@ fn ex_backupheavy(out: &Path) {
     }
     w.tel.maybe(&w.e, &w.db, w.seq, true);
     let after = read_status().0;
-    let s = summarize(&w, serde_json::json!({"backups": 25, "rss_before_kb": before, "rss_after_kb": after}));
+    let s = summarize(
+        &w,
+        serde_json::json!({"backups": 25, "rss_before_kb": before, "rss_after_kb": after}),
+    );
     w.tel.flush(&s);
     println!("e9 e9k-backup-heavy: before={before} after={after}");
 }
@@ -557,19 +641,23 @@ fn ex_txnheavy(out: &Path) {
         let t = w.e.begin_transaction("bench");
         let mut r = doc_record(idx, ver, "e9", 100 + (i % 900) as i64);
         r.id = uuid_for(idx, ver);
-        w.e.record_transaction_operation(t, TxnOp::Insert(r)).unwrap();
+        w.e.record_transaction_operation(t, TxnOp::Insert(r))
+            .unwrap();
         let r2 = doc_record(idx + 5_000, 1, "e9", i as i64);
-        w.e.record_transaction_operation(t, TxnOp::Insert(r2)).unwrap();
+        w.e.record_transaction_operation(t, TxnOp::Insert(r2))
+            .unwrap();
         let committed = w.e.commit_transaction(t).unwrap_or(false);
         if committed {
             // r2 added a doc outside live-tracking; delete it again immediately
-            let _ = w.e.delete_document("bench", &uuid_for(idx + 5_000, 1).to_string());
+            let _ =
+                w.e.delete_document("bench", &uuid_for(idx + 5_000, 1).to_string());
         }
         if i % 5 == 0 {
             // rollback-heavy component
             let t = w.e.begin_transaction("bench");
             let r3 = doc_record(idx + 6_000, 1, "e9", i as i64);
-            w.e.record_transaction_operation(t, TxnOp::Insert(r3)).unwrap();
+            w.e.record_transaction_operation(t, TxnOp::Insert(r3))
+                .unwrap();
             let _ = w.e.rollback_transaction(t);
         }
         if w.seq.is_multiple_of(2_000) {
@@ -578,9 +666,15 @@ fn ex_txnheavy(out: &Path) {
     }
     w.tel.maybe(&w.e, &w.db, w.seq, true);
     let c = w.e.mem_census();
-    let s = summarize(&w, serde_json::json!({"txn_staged_end": c.txn_staged, "staged_ops_end": c.txn_staged_ops}));
+    let s = summarize(
+        &w,
+        serde_json::json!({"txn_staged_end": c.txn_staged, "staged_ops_end": c.txn_staged_ops}),
+    );
     w.tel.flush(&s);
-    println!("e9 e9l-txn-heavy: ops={} rss_last={}KB staged_end={}", w.seq, s["rss_last_kb"], c.txn_staged);
+    println!(
+        "e9 e9l-txn-heavy: ops={} rss_last={}KB staged_end={}",
+        w.seq, s["rss_last_kb"], c.txn_staged
+    );
 }
 
 fn ex_queryiso(out: &Path) {
@@ -616,7 +710,10 @@ fn ex_queryiso(out: &Path) {
     w.tel.maybe(&w.e, &w.db, w.seq, true);
     let s = summarize(&w, serde_json::json!({"phases": phase_rss}));
     w.tel.flush(&s);
-    println!("e9 e9m-query-iso: ops={} rss_last={}KB", w.seq, s["rss_last_kb"]);
+    println!(
+        "e9 e9m-query-iso: ops={} rss_last={}KB",
+        w.seq, s["rss_last_kb"]
+    );
 }
 
 fn ex_mapper(out: &Path) {
@@ -657,7 +754,10 @@ fn ex_mapper(out: &Path) {
     s["rss_before_restart_kb"] = serde_json::json!(rss_before);
     s["rss_after_restart_kb"] = serde_json::json!(rss_after);
     w.tel.flush(&s);
-    println!("e9 e9n-mapper: retired before={} after_restart={} rss {}->{}KB", before.mapper_retired, after.mapper_retired, rss_before, rss_after);
+    println!(
+        "e9 e9n-mapper: retired before={} after_restart={} rss {}->{}KB",
+        before.mapper_retired, after.mapper_retired, rss_before, rss_after
+    );
 }
 
 fn ex_accounting(out: &Path) {
@@ -696,7 +796,10 @@ fn ex_accounting(out: &Path) {
         "bm25_postings": c2.collections.iter().map(|x| x.bm25_postings).sum::<usize>(),
     });
     w.tel.flush(&s);
-    println!("e9 e9op-accounting: rss_after_restart={rss_after_restart} flushed_after_restart={}", c2.store_flushed_records);
+    println!(
+        "e9 e9op-accounting: rss_after_restart={rss_after_restart} flushed_after_restart={}",
+        c2.store_flushed_records
+    );
 }
 
 fn ex_restartreset(out: &Path) {
@@ -710,7 +813,11 @@ fn ex_restartreset(out: &Path) {
     let n = w.tel.samples.len();
     let (rss_a, slope_a) = {
         let (a, b) = (w.tel.samples[n / 2], w.tel.samples[n - 1]);
-        let slope = if b[1] > a[1] { (b[2] - a[2]) / ((b[1] - a[1]) / 1000.0) } else { 0.0 };
+        let slope = if b[1] > a[1] {
+            (b[2] - a[2]) / ((b[1] - a[1]) / 1000.0)
+        } else {
+            0.0
+        };
         (b[2], slope)
     };
     let c_before = w.e.mem_census();
@@ -735,7 +842,8 @@ fn ex_restartreset(out: &Path) {
         w.seq += 1;
         let uid = &uuids[(rnd() as usize) % uuids.len()];
         let r = doc_record(0, 99, "e9", 100 + (i % 900) as i64);
-        let _ = w.e.update_document("bench", uid, r.fields.clone(), r.k_vecs.clone());
+        let _ =
+            w.e.update_document("bench", uid, r.fields.clone(), r.k_vecs.clone());
         if (w.seq - seq_a).is_multiple_of(5_000) {
             w.e.checkpoint().unwrap();
         }
@@ -745,7 +853,13 @@ fn ex_restartreset(out: &Path) {
     let _m = w.tel.samples.len();
     let slope_b = {
         // samples after the restart marker (first sample with op > seq_a)
-        let post: Vec<[f64; 8]> = w.tel.samples.iter().copied().filter(|s| s[1] > seq_a as f64).collect();
+        let post: Vec<[f64; 8]> = w
+            .tel
+            .samples
+            .iter()
+            .copied()
+            .filter(|s| s[1] > seq_a as f64)
+            .collect();
         if post.len() >= 3 {
             let (a, b) = (post[0], post[post.len() - 1]);
             if b[1] > a[1] {
@@ -758,18 +872,21 @@ fn ex_restartreset(out: &Path) {
         }
     };
     let rss_b_end = read_status().0;
-    let s = summarize(&w, serde_json::json!({
-        "rss_after_load_kb": rss_load, "rss_phase_a_end_kb": rss_a, "slope_a_kb_per_1kops": slope_a,
-        "rss_after_restart_kb": rss_restart,
-        "flushed_before_restart": c_before.store_flushed_records,
-        "flushed_after_restart": c_after.store_flushed_records,
-        "vstore_before_restart": c_before.collections.iter().map(|x| x.vector_store_len).sum::<usize>(),
-        "vstore_after_restart": c_after.collections.iter().map(|x| x.vector_store_len).sum::<usize>(),
-        "mapper_retired_before_restart": c_before.mapper_retired,
-        "mapper_retired_after_restart": c_after.mapper_retired,
-        "phase_b_start_rss_kb": phase_b_start_rss_kb, "phase_b_end_rss_kb": rss_b_end,
-        "slope_b_kb_per_1kops": slope_b,
-    }));
+    let s = summarize(
+        &w,
+        serde_json::json!({
+            "rss_after_load_kb": rss_load, "rss_phase_a_end_kb": rss_a, "slope_a_kb_per_1kops": slope_a,
+            "rss_after_restart_kb": rss_restart,
+            "flushed_before_restart": c_before.store_flushed_records,
+            "flushed_after_restart": c_after.store_flushed_records,
+            "vstore_before_restart": c_before.collections.iter().map(|x| x.vector_store_len).sum::<usize>(),
+            "vstore_after_restart": c_after.collections.iter().map(|x| x.vector_store_len).sum::<usize>(),
+            "mapper_retired_before_restart": c_before.mapper_retired,
+            "mapper_retired_after_restart": c_after.mapper_retired,
+            "phase_b_start_rss_kb": phase_b_start_rss_kb, "phase_b_end_rss_kb": rss_b_end,
+            "slope_b_kb_per_1kops": slope_b,
+        }),
+    );
     w.tel.flush(&s);
     println!("e9 e9q-restart-reset: load={rss_load} phaseA_end={rss_a} (slope {slope_a:.0}KB/1kops) restart={rss_restart} phaseB slope={slope_b:.0}KB/1kops flushed {}->{} vstore {}->{} retired {}->{}",
         c_before.store_flushed_records, c_after.store_flushed_records,
@@ -817,19 +934,40 @@ fn ex_idle(out: &Path) {
         let mi = unsafe { mallinfo2() };
         let (pss, _, _) = read_pss();
         let ps = pss.map(|v| v.to_string()).unwrap_or_else(|| "NA".into());
-        idle_rows.push(format!("{},{},{},{},{},{},{}", t_end.elapsed().as_secs(), rss, anon, file, ps, mi.uordblks, mi.fordblks));
+        idle_rows.push(format!(
+            "{},{},{},{},{},{},{}",
+            t_end.elapsed().as_secs(),
+            rss,
+            anon,
+            file,
+            ps,
+            mi.uordblks,
+            mi.fordblks
+        ));
         w.tel.maybe(&w.e, &w.db, w.seq, false);
     }
-    let _ = std::fs::write(out.join("idle.csv"), format!("t_s,rss_kb,anon_kb,file_kb,pss_kb,uord_kb,ford_kb\n{}", idle_rows.join("\n")));
+    let _ = std::fs::write(
+        out.join("idle.csv"),
+        format!(
+            "t_s,rss_kb,anon_kb,file_kb,pss_kb,uord_kb,ford_kb\n{}",
+            idle_rows.join("\n")
+        ),
+    );
     let idle_end = read_status().0;
-    let s = summarize(&w, serde_json::json!({"churn_end_rss_kb": churn_end, "idle_end_rss_kb": idle_end}));
+    let s = summarize(
+        &w,
+        serde_json::json!({"churn_end_rss_kb": churn_end, "idle_end_rss_kb": idle_end}),
+    );
     w.tel.flush(&s);
-    println!("e9 e9r-idle: churn_end={churn_end} idle_end={idle_end} heap_used={} heap_free_retained={}", {
-        let mi = unsafe { mallinfo2() };
-        mi.uordblks
-    }, {
-        let mi = unsafe { mallinfo2() };
-        mi.fordblks
-    });
+    println!(
+        "e9 e9r-idle: churn_end={churn_end} idle_end={idle_end} heap_used={} heap_free_retained={}",
+        {
+            let mi = unsafe { mallinfo2() };
+            mi.uordblks
+        },
+        {
+            let mi = unsafe { mallinfo2() };
+            mi.fordblks
+        }
+    );
 }
-

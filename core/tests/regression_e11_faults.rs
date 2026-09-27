@@ -83,14 +83,17 @@ fn e11_regressed_sidecar_opens_with_full_recovery() {
     }
     let state = dir.join("WAL").join("wal-state.json");
     assert!(state.exists(), "sidecar must exist after checkpoint");
-    let mut v: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(&state).unwrap()).unwrap();
+    let mut v: serde_json::Value = serde_json::from_slice(&std::fs::read(&state).unwrap()).unwrap();
     let hw = v["high_watermark"].as_u64().unwrap();
     v["high_watermark"] = serde_json::json!(hw.saturating_sub(10));
     std::fs::write(&state, serde_json::to_vec_pretty(&v).unwrap()).unwrap();
 
     let e = AttentionEngine::open_dir(&dir, Durability::Sync).unwrap();
-    assert_eq!(count_live(&e), 30, "regressed sidecar must not lose records");
+    assert_eq!(
+        count_live(&e),
+        30,
+        "regressed sidecar must not lose records"
+    );
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -116,8 +119,14 @@ fn e11_torn_tail_recovers_intact_prefix() {
 
     let e = AttentionEngine::open_dir(&dir, Durability::Sync).unwrap();
     let live = count_live(&e);
-    assert!(live > 0 && live <= 20, "intact prefix must recover, got {live}");
-    assert_ne!(live, 20, "test must actually destroy records to be meaningful");
+    assert!(
+        live > 0 && live <= 20,
+        "intact prefix must recover, got {live}"
+    );
+    assert_ne!(
+        live, 20,
+        "test must actually destroy records to be meaningful"
+    );
     // repeated restart deterministic
     drop(e);
     let e2 = AttentionEngine::open_dir(&dir, Durability::Sync).unwrap();
@@ -135,24 +144,30 @@ fn e11_upsert_dual_live_uuid_is_documented_semantics() {
     build(&dir, 5);
     let e = AttentionEngine::open_dir(&dir, Durability::Sync).unwrap();
     e.insert_document("bench", rec(0)).unwrap(); // same logical idx, new uuid? No:
-    // Record::new generates a fresh uuid; rec(0) keeps fields idx=0.
-    assert_eq!(count_live(&e), 6, "second live record for idx 0 must be stored");
+                                                 // Record::new generates a fresh uuid; rec(0) keeps fields idx=0.
+    assert_eq!(
+        count_live(&e),
+        6,
+        "second live record for idx 0 must be stored"
+    );
     let got = e.scan_filtered("bench", None, 100).unwrap();
     let idx0 = got
         .iter()
         .filter(|(uid, _)| {
             let store = e.document_store.read();
-            store
-                .list_all_records()
-                .into_iter()
-                .any(|r| &r.id.to_string() == uid
-                    && r.fields.get("idx").and_then(|v| v.as_u64()) == Some(0))
+            store.list_all_records().into_iter().any(|r| {
+                &r.id.to_string() == uid && r.fields.get("idx").and_then(|v| v.as_u64()) == Some(0)
+            })
         })
         .count();
     assert_eq!(idx0, 2, "both live versions of idx 0 must be scannable");
     e.checkpoint().unwrap();
     drop(e);
     let e2 = AttentionEngine::open_dir(&dir, Durability::Sync).unwrap();
-    assert_eq!(count_live(&e2), 6, "both live versions must survive restart");
+    assert_eq!(
+        count_live(&e2),
+        6,
+        "both live versions must survive restart"
+    );
     let _ = std::fs::remove_dir_all(&dir);
 }

@@ -895,8 +895,11 @@ mod tests {
         {
             let mut wal = Wal::open(src.path(), Durability::Sync, 1 << 20).unwrap();
             for i in 0..40u64 {
-                wal.append(rec(RecordKind::InsertDocument, format!("payload-{i}").as_bytes()))
-                    .unwrap();
+                wal.append(rec(
+                    RecordKind::InsertDocument,
+                    format!("payload-{i}").as_bytes(),
+                ))
+                .unwrap();
             }
             wal.flush().unwrap();
         }
@@ -905,7 +908,9 @@ mod tests {
         for seed in 0..32u64 {
             let dir = tmpdir();
             let mut x = seed.wrapping_mul(0x2545F4914F6CDD1D) ^ 0xA5A5A5A5;
-            x ^= x << 13; x ^= x >> 7; x ^= x << 17;
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
             let cut = 1 + (x as usize) % valid.len();
             let seg = dir.path().join("00000000000000000001.wal");
             std::fs::write(&seg, &valid[..cut]).unwrap();
@@ -934,13 +939,17 @@ mod tests {
                 wal.append(rec(RecordKind::InsertDocument, format!("p{i}").as_bytes()))
                     .unwrap();
             }
-            let ws = read_wal_state(dir.path()).unwrap().expect("state after first append");
+            let ws = read_wal_state(dir.path())
+                .unwrap()
+                .expect("state after first append");
             // first segment still active: completed coverage is empty (0),
             // active segment starts at 1
             assert_eq!(ws.high_watermark, 0);
             assert_eq!(ws.active_start, 1);
             wal.rotate().unwrap();
-            let ws2 = read_wal_state(dir.path()).unwrap().expect("state after rotate");
+            let ws2 = read_wal_state(dir.path())
+                .unwrap()
+                .expect("state after rotate");
             // seqs 1..=5 are now in a completed segment
             assert_eq!(ws2.high_watermark, 5);
             assert_eq!(ws2.active_start, 6);

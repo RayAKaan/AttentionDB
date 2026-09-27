@@ -53,9 +53,7 @@ fn recovery_replay_writes_no_sstables() {
     let t = e.begin_transaction("bench");
     e.record_transaction_operation(
         t,
-        attentiondb_core::transaction::TxnOp::Delete(uuid::Uuid::from_u128(
-            (4242u128 << 64) | 1,
-        )),
+        attentiondb_core::transaction::TxnOp::Delete(uuid::Uuid::from_u128((4242u128 << 64) | 1)),
     )
     .unwrap();
     assert!(e.commit_transaction(t).unwrap());

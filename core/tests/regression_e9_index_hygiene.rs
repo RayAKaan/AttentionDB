@@ -13,7 +13,10 @@ fn rec(idx: u32, ver: u64, tag: &str) -> Record {
     let mut fields = HashMap::new();
     fields.insert("idx".to_string(), serde_json::json!(idx));
     fields.insert("ver".to_string(), serde_json::json!(ver));
-    fields.insert("title".to_string(), serde_json::json!(format!("doc-{idx}-v{ver}-{tag}")));
+    fields.insert(
+        "title".to_string(),
+        serde_json::json!(format!("doc-{idx}-v{ver}-{tag}")),
+    );
     let mut r = Record::new(fields);
     let mut h: u32 = 0x811C9DC5;
     for b in idx.to_le_bytes() {
@@ -39,11 +42,15 @@ fn e9_hygiene_multi_head_fresh_checkpoint_must_not_rebuild() {
     let dir = std::env::temp_dir().join(format!(
         "e9hygiene-mh-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
     ));
     std::fs::create_dir_all(&dir).unwrap();
     let e = AttentionEngine::open_dir(&dir, Durability::Sync).unwrap();
-    e.create_collection("bench", DIM, &["h", "h2", "h3"]).unwrap();
+    e.create_collection("bench", DIM, &["h", "h2", "h3"])
+        .unwrap();
     for i in 0..12_000u32 {
         let mut r = rec(i, 1, "a");
         r.id = uuid::Uuid::parse_str(&uuid_for(i, 1)).unwrap();
@@ -72,7 +79,10 @@ fn e9_hygiene_bounds_dead_index_retention_and_preserves_retrieval() {
     let dir = std::env::temp_dir().join(format!(
         "e9hygiene-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
     ));
     std::fs::create_dir_all(&dir).unwrap();
     // query = doc 0's own vector (a guaranteed exact match)
@@ -122,9 +132,22 @@ fn e9_hygiene_bounds_dead_index_retention_and_preserves_retrieval() {
         // checkpoint runs INV-E9-HYGIENE
         e.checkpoint().unwrap();
         let hits_mid = e.attend("bench", &[HEAD.to_string()], &v, 5).unwrap();
-        eprintln!("post-checkpoint hits: {} (retired={}, mapped={})", hits_mid.len(),
-            { let c = e.mem_census(); c.mapper_retired }, { let c = e.mem_census(); c.mapper_uuid_to_u64 });
-        assert!(!hits_mid.is_empty(), "post-hygiene retrieval must restore the exact match (rebuild ran)");
+        eprintln!(
+            "post-checkpoint hits: {} (retired={}, mapped={})",
+            hits_mid.len(),
+            {
+                let c = e.mem_census();
+                c.mapper_retired
+            },
+            {
+                let c = e.mem_census();
+                c.mapper_uuid_to_u64
+            }
+        );
+        assert!(
+            !hits_mid.is_empty(),
+            "post-hygiene retrieval must restore the exact match (rebuild ran)"
+        );
         let c_post = e.mem_census();
         let vstore_post: usize = c_post.collections.iter().map(|c| c.vector_store_len).sum();
         assert!(
@@ -137,7 +160,10 @@ fn e9_hygiene_bounds_dead_index_retention_and_preserves_retrieval() {
         v[0] = 1.0;
         let hits = e.attend("bench", &[HEAD.to_string()], &v, 5).unwrap();
         eprintln!("post-hygiene hits: {}", hits.len());
-        assert!(!hits.is_empty(), "retrieval must work after hygiene rebuild");
+        assert!(
+            !hits.is_empty(),
+            "retrieval must work after hygiene rebuild"
+        );
         // every returned id maps to a live (non-retired) record
         let checker_clean = attentiondb_core::checker::check_engine(&e).is_empty();
         assert!(checker_clean, "checker must be clean after hygiene rebuild");
@@ -153,8 +179,15 @@ fn e9_hygiene_bounds_dead_index_retention_and_preserves_retrieval() {
         hits2.len(),
         c2.mapper_uuid_to_u64,
         c2.mapper_retired,
-        c2.collections.iter().map(|c| c.vector_store_len).sum::<usize>(),
-        e2.document_store.read().list_all_records().first().map(|r| r.tags.clone()),
+        c2.collections
+            .iter()
+            .map(|c| c.vector_store_len)
+            .sum::<usize>(),
+        e2.document_store
+            .read()
+            .list_all_records()
+            .first()
+            .map(|r| r.tags.clone()),
     );
     assert_eq!(c2.mapper_uuid_to_u64, 900, "all live docs must survive");
     let _ = std::fs::remove_dir_all(&dir);
