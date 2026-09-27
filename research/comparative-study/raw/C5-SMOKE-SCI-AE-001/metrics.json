@@ -1,0 +1,38 @@
+{
+  "run_id": "C5-SMOKE-SCI-AE-001",
+  "mode": "A",
+  "dataset": "DS-SCIFACT",
+  "split": "SMOKE",
+  "phase": "C5 execution",
+  "test_queries": 20,
+  "rep_count": 1,
+  "warmup": 20,
+  "ef_search": 64,
+  "lambda": 0.0,
+  "candidate_budget": 500,
+  "per_rep": [
+    {
+      "n_queries": 20,
+      "recall10_qrels_mean": 0.775,
+      "recall10_exact_mean": 0.964999994635582,
+      "p50_us": 942.3,
+      "p95_us": 1334.5,
+      "deadline_exceeded": 0
+    }
+  ],
+  "rep_recall10_qrels_mean": [
+    0.775
+  ],
+  "recall10_qrels_mean_5rep": 0.775,
+  "recall10_qrels_sd_5rep": 0.0,
+  "rep_recall10_exact_mean": [
+    0.964999994635582
+  ],
+  "recall10_exact_mean_5rep": 0.965,
+  "p50_us_per_rep": [
+    942.3
+  ],
+  "peak_child_rss_MiB": [
+    119.5
+  ]
+}

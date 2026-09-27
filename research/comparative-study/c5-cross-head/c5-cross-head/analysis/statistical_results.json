@@ -1,0 +1,88 @@
+{
+  "primary_contrasts": {
+    "SCI_AB": {
+      "dataset": "SCI",
+      "contrast": "AvsB",
+      "mean_diff": -0.013111111124356584,
+      "ci95": [
+        -0.04200277777810891,
+        0.014333333333333335
+      ],
+      "wilcoxon_stat": 338.5,
+      "wilcoxon_p": 0.2275751612413559,
+      "cohens_dz": -0.05324779823129195,
+      "negligible": false,
+      "holm_alpha": 0.0125,
+      "holm_reject": false
+    },
+    "SCI_BC": {
+      "dataset": "SCI",
+      "contrast": "BvsC",
+      "mean_diff": 0.0018000000119209288,
+      "ci95": [
+        -0.007933333297570547,
+        0.011467500011622896
+      ],
+      "wilcoxon_stat": 27.0,
+      "wilcoxon_p": 0.5915050369949166,
+      "cohens_dz": 0.02134835770197821,
+      "negligible": true,
+      "holm_alpha": 0.025,
+      "holm_reject": false
+    },
+    "NFC_AB": {
+      "dataset": "NFC",
+      "contrast": "AvsB",
+      "mean_diff": -0.00876405173941478,
+      "ci95": [
+        -0.020587270484326098,
+        0.0023439848002178975
+      ],
+      "wilcoxon_stat": 4956.5,
+      "wilcoxon_p": 0.23177029246460235,
+      "cohens_dz": -0.0836560917027545,
+      "negligible": true,
+      "holm_alpha": 0.016666666666666666,
+      "holm_reject": false
+    },
+    "NFC_BC": {
+      "dataset": "NFC",
+      "contrast": "BvsC",
+      "mean_diff": -0.0016623611443736608,
+      "ci95": [
+        -0.005514779115577255,
+        0.0020817079906850656
+      ],
+      "wilcoxon_stat": 1832.5,
+      "wilcoxon_p": 0.870023047372819,
+      "cohens_dz": -0.04809179913006409,
+      "negligible": true,
+      "holm_alpha": 0.05,
+      "holm_reject": false
+    }
+  },
+  "candidate_analysis": {
+    "SCI": {
+      "n_queries": 300,
+      "changed_count": 300,
+      "pct_changed": 1.0,
+      "binom_p": 0.0
+    },
+    "NFC": {
+      "n_queries": 323,
+      "changed_count": 322,
+      "pct_changed": 0.9969040247678018,
+      "binom_p": 0.0
+    }
+  },
+  "metadata": {
+    "seed": 20260925,
+    "n_boot": 10000,
+    "n_reps": 5,
+    "test_queries": {
+      "SCI": 300,
+      "NFC": 323
+    },
+    "protocol": "C5 cross-head candidate-generation"
+  }
+}

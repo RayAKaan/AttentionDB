@@ -1,0 +1,22 @@
+{
+  "host": "Originator",
+  "os": "Windows-11-10.0.26200-SP0",
+  "python": "3.14.4",
+  "created_utc": "2026-09-27T13:51:50Z",
+  "c5pilot_sha256": "39643638b4623157eef98e56c957186bdd4016036d9585567562c97abbbd415d",
+  "input_hashes": {
+    "CANONICAL.f32": "4f1f7a3bc26916b14545e7ac0a5dae1d16393db944a54b37441f7c70029f09ef",
+    "HEAD-BODY.f32": "2f76b795e31d0c09bc63988acf15710cd3607e09d60e0ecdf87ebb42c0fb892a",
+    "HEAD-CITE.f32": "181c17fb89cd63299cca102bb18dc401b3171bf1a60dc0b662d36b694742a5d5",
+    "HEAD-TITLE.f32": "87634220e8b730dcdc5711a5033414bf8168ba6d6feac19a08bb0bfe6d7a1d84",
+    "QUERIES.f32": "afb866ae799124ad3fcd5faadca70bbd698d62c3c38f47d63b5f181ef26cfc15",
+    "RUN-cfg.json": "f63f3cc7ba408afe0c6086b94148243bf23f342d37a45061164855d63c4ed1f8",
+    "RUN-rep1.json": "200864fb678738cd98356a2badce3f15ec12aba98e09964a0a06de18f646fab5"
+  },
+  "guardrail": {
+    "policy": "sampler(500ms) aborts when child process-tree RSS >= 85% of MemAvailable at preflight; 1800s timeout",
+    "mem_avail_at_preflight_bytes": 3773689856,
+    "mem_load_pct_at_preflight": 77,
+    "ram_abort_threshold_bytes": 3207636377
+  }
+}

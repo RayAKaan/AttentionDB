@@ -1,0 +1,8 @@
+[build]
+# /Brepro: deterministic MSVC PE timer + PDB GUID so release binary sha256 is
+# reproducible (mirrors c2/probe/.cargo/config.toml).
+rustflags = ["-C", "link-arg=/Brepro"]
+
+[env]
+# Force a fixed rustc codegen unit count for reproducible builds.
+CARGO_INCREMENTAL = "0"

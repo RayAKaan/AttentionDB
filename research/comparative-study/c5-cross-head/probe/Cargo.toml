@@ -1,0 +1,29 @@
+[package]
+name = "c5-probe"
+version = "0.1.0"
+edition = "2021"
+
+# standalone crate: own workspace root (lives inside the repo tree but must
+# not join the AttentionDB workspace)
+[workspace]
+
+
+# C5 harness probe: drives the REAL attentiondb-core engine through the
+# additive cross-head interaction (RetrievalConfig.cross_refine + ef_search).
+# The mechanism lives in core (research-additive, off by default); this crate
+# only configures and times it. Reuses the C2/C4 config + fixed-qrels protocol.
+
+[dependencies]
+attentiondb-core = { path = "../../../../core" }
+attentiondb-storage = { path = "../../../../storage" }
+serde_json = "1"
+
+[[bin]]
+name = "c5pilot"
+path = "c5pilot.rs"
+
+[profile.release]
+opt-level = 2
+# /Brepro keeps MSVC linker output reproducible (deterministic PE timestamp +
+# PDB GUID), so the recorded binary sha256 is meaningful across runs. Applied
+# via .cargo/config.toml like c2.

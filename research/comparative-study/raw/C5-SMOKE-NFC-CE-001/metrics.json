@@ -1,0 +1,46 @@
+{
+  "run_id": "C5-SMOKE-NFC-CE-001",
+  "mode": "C",
+  "dataset": "DS-NFCORPUS",
+  "split": "SMOKE",
+  "phase": "C5 execution",
+  "test_queries": 20,
+  "rep_count": 1,
+  "warmup": 20,
+  "ef_search": 64,
+  "lambda": 0.25,
+  "candidate_budget": 500,
+  "per_rep": [
+    {
+      "n_queries": 20,
+      "recall10_qrels_mean": 0.10200160862877965,
+      "recall10_exact_mean": 0.6150000005960464,
+      "p50_us": 5172.900000000001,
+      "p95_us": 6982.0,
+      "deadline_exceeded": 0,
+      "candidate_change_count": 20,
+      "surprise_empty_queries": 0
+    }
+  ],
+  "rep_recall10_qrels_mean": [
+    0.10200160862877965
+  ],
+  "recall10_qrels_mean_5rep": 0.102,
+  "recall10_qrels_sd_5rep": 0.0,
+  "rep_recall10_exact_mean": [
+    0.6150000005960464
+  ],
+  "recall10_exact_mean_5rep": 0.615,
+  "p50_us_per_rep": [
+    5172.900000000001
+  ],
+  "peak_child_rss_MiB": [
+    192.6
+  ],
+  "candidate_change_count": [
+    20
+  ],
+  "surprise_empty_queries": [
+    0
+  ]
+}

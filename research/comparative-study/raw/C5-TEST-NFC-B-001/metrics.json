@@ -1,0 +1,86 @@
+{
+  "run_id": "C5-TEST-NFC-B-001",
+  "mode": "B",
+  "dataset": "DS-NFCORPUS",
+  "split": "TEST",
+  "phase": "C5 execution",
+  "test_queries": 323,
+  "rep_count": 5,
+  "warmup": 20,
+  "ef_search": 64,
+  "lambda": 0.0,
+  "candidate_budget": 500,
+  "per_rep": [
+    {
+      "n_queries": 323,
+      "recall10_qrels_mean": 0.1602892658410842,
+      "recall10_exact_mean": 0.6724458241333533,
+      "p50_us": 2374.7999999999997,
+      "p95_us": 10655.2,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 323,
+      "recall10_qrels_mean": 0.1614239533711513,
+      "recall10_exact_mean": 0.6708978367017888,
+      "p50_us": 2493.7000000000003,
+      "p95_us": 12090.4,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 323,
+      "recall10_qrels_mean": 0.1593907413940773,
+      "recall10_exact_mean": 0.6733746167399197,
+      "p50_us": 2728.5,
+      "p95_us": 12280.4,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 323,
+      "recall10_qrels_mean": 0.15776181590365643,
+      "recall10_exact_mean": 0.6721362275973931,
+      "p50_us": 1858.8000000000002,
+      "p95_us": 2754.0,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 323,
+      "recall10_qrels_mean": 0.157482346176709,
+      "recall10_exact_mean": 0.6708978361943189,
+      "p50_us": 2251.2000000000003,
+      "p95_us": 5001.5,
+      "deadline_exceeded": 0
+    }
+  ],
+  "rep_recall10_qrels_mean": [
+    0.1602892658410842,
+    0.1614239533711513,
+    0.1593907413940773,
+    0.15776181590365643,
+    0.157482346176709
+  ],
+  "recall10_qrels_mean_5rep": 0.1593,
+  "recall10_qrels_sd_5rep": 0.0015,
+  "rep_recall10_exact_mean": [
+    0.6724458241333533,
+    0.6708978367017888,
+    0.6733746167399197,
+    0.6721362275973931,
+    0.6708978361943189
+  ],
+  "recall10_exact_mean_5rep": 0.672,
+  "p50_us_per_rep": [
+    2374.7999999999997,
+    2493.7000000000003,
+    2728.5,
+    1858.8000000000002,
+    2251.2000000000003
+  ],
+  "peak_child_rss_MiB": [
+    197.0,
+    199.7,
+    197.0,
+    197.4,
+    197.6
+  ]
+}

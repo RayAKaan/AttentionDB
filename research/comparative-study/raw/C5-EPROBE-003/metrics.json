@@ -1,0 +1,38 @@
+{
+  "run_id": "C5-EPROBE-003",
+  "mode": "B",
+  "dataset": "DS-NFCORPUS",
+  "split": "PROBE",
+  "phase": "C5 execution",
+  "test_queries": 20,
+  "rep_count": 1,
+  "warmup": 20,
+  "ef_search": 16,
+  "lambda": 0.0,
+  "candidate_budget": 500,
+  "per_rep": [
+    {
+      "n_queries": 20,
+      "recall10_qrels_mean": 0.11186268534511327,
+      "recall10_exact_mean": 0.6349999994039536,
+      "p50_us": 2020.1,
+      "p95_us": 7203.700000000001,
+      "deadline_exceeded": 0
+    }
+  ],
+  "rep_recall10_qrels_mean": [
+    0.11186268534511327
+  ],
+  "recall10_qrels_mean_5rep": 0.1119,
+  "recall10_qrels_sd_5rep": 0.0,
+  "rep_recall10_exact_mean": [
+    0.6349999994039536
+  ],
+  "recall10_exact_mean_5rep": 0.635,
+  "p50_us_per_rep": [
+    2020.1
+  ],
+  "peak_child_rss_MiB": [
+    192.5
+  ]
+}

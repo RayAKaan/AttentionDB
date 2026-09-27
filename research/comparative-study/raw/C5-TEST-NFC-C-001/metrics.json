@@ -1,0 +1,110 @@
+{
+  "run_id": "C5-TEST-NFC-C-001",
+  "mode": "C",
+  "dataset": "DS-NFCORPUS",
+  "split": "TEST",
+  "phase": "C5 execution",
+  "test_queries": 323,
+  "rep_count": 5,
+  "warmup": 20,
+  "ef_search": 64,
+  "lambda": 0.1,
+  "candidate_budget": 500,
+  "per_rep": [
+    {
+      "n_queries": 323,
+      "recall10_qrels_mean": 0.1602925689885214,
+      "recall10_exact_mean": 0.6671826661371225,
+      "p50_us": 5334.0,
+      "p95_us": 10436.4,
+      "deadline_exceeded": 0,
+      "candidate_change_count": 306,
+      "surprise_empty_queries": 0
+    },
+    {
+      "n_queries": 323,
+      "recall10_qrels_mean": 0.16556317407361032,
+      "recall10_exact_mean": 0.6733746154020446,
+      "p50_us": 5326.5,
+      "p95_us": 8642.300000000001,
+      "deadline_exceeded": 0,
+      "candidate_change_count": 306,
+      "surprise_empty_queries": 0
+    },
+    {
+      "n_queries": 323,
+      "recall10_qrels_mean": 0.16006801167543366,
+      "recall10_exact_mean": 0.6705882378591472,
+      "p50_us": 5571.5,
+      "p95_us": 12195.7,
+      "deadline_exceeded": 0,
+      "candidate_change_count": 308,
+      "surprise_empty_queries": 0
+    },
+    {
+      "n_queries": 323,
+      "recall10_qrels_mean": 0.16141849356896645,
+      "recall10_exact_mean": 0.6724458235336161,
+      "p50_us": 4512.8,
+      "p95_us": 6050.9,
+      "deadline_exceeded": 0,
+      "candidate_change_count": 308,
+      "surprise_empty_queries": 0
+    },
+    {
+      "n_queries": 323,
+      "recall10_qrels_mean": 0.1573176801020147,
+      "recall10_exact_mean": 0.6712074342065552,
+      "p50_us": 4755.7,
+      "p95_us": 7557.8,
+      "deadline_exceeded": 0,
+      "candidate_change_count": 309,
+      "surprise_empty_queries": 0
+    }
+  ],
+  "rep_recall10_qrels_mean": [
+    0.1602925689885214,
+    0.16556317407361032,
+    0.16006801167543366,
+    0.16141849356896645,
+    0.1573176801020147
+  ],
+  "recall10_qrels_mean_5rep": 0.1609,
+  "recall10_qrels_sd_5rep": 0.0027,
+  "rep_recall10_exact_mean": [
+    0.6671826661371225,
+    0.6733746154020446,
+    0.6705882378591472,
+    0.6724458235336161,
+    0.6712074342065552
+  ],
+  "recall10_exact_mean_5rep": 0.671,
+  "p50_us_per_rep": [
+    5334.0,
+    5326.5,
+    5571.5,
+    4512.8,
+    4755.7
+  ],
+  "peak_child_rss_MiB": [
+    201.1,
+    200.4,
+    200.3,
+    200.3,
+    199.3
+  ],
+  "candidate_change_count": [
+    306,
+    306,
+    308,
+    308,
+    309
+  ],
+  "surprise_empty_queries": [
+    0,
+    0,
+    0,
+    0,
+    0
+  ]
+}
