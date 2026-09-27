@@ -345,7 +345,12 @@ pub struct CollCensus {
 impl IdMapper {
     /// E9 diagnostics lens (uuid->id, id->uuid, retired, next_id).
     pub fn census_lens(&self) -> (usize, usize, usize, u64) {
-        (self.uuid_to_u64.len(), self.u64_to_uuid.len(), self.retired.len(), self.next_id)
+        (
+            self.uuid_to_u64.len(),
+            self.u64_to_uuid.len(),
+            self.retired.len(),
+            self.next_id,
+        )
     }
 }
 
@@ -1708,8 +1713,7 @@ impl AttentionEngine {
                 .sum();
             let expected_vstore = mapped.saturating_mul(head_count.max(1));
             let dead_entries = vstore_pre.saturating_sub(expected_vstore);
-            let degraded =
-                dead_entries > INDEX_REBUILD_MIN_VSTORE && dead_entries * 2 > mapped * 3;
+            let degraded = dead_entries > INDEX_REBUILD_MIN_VSTORE && dead_entries * 2 > mapped * 3;
             // graph-node budget: hnsw_rs nodes are invisible to the census, so
             // track index insertions since the last rebuild instead. The budget
             // bounds dead graph nodes to O(live) + budget between checkpoints.
@@ -1723,7 +1727,8 @@ impl AttentionEngine {
             }
             if degraded || over_budget {
                 tracing::info!(
-                    vstore_pre, mapped,
+                    vstore_pre,
+                    mapped,
                     "INV-E9-HYGIENE: dead index entries dominate live docs; deterministic rebuild"
                 );
                 self.rebuild_all_indexes()?;
@@ -2427,7 +2432,10 @@ fn enforce_wal_integrity(
     // (1) The recorded active segment must still exist (or a newer one — a
     // crash between checkpoint-manifest install and the rotation's state write
     // leaves a stale active_start pointing at a legitimately trimmed segment).
-    if !wal_dir.join(format!("{:020}.wal", ws.active_start)).exists() {
+    if !wal_dir
+        .join(format!("{:020}.wal", ws.active_start))
+        .exists()
+    {
         let newer = std::fs::read_dir(wal_dir)
             .map(|d| {
                 d.flatten().any(|e| {
@@ -2505,7 +2513,10 @@ impl AttentionEngine {
         c.txn_staged = s;
         c.txn_staged_ops = so;
         for (name, coll) in self.collections.read().iter() {
-            let mut cc = CollCensus { name: name.clone(), ..Default::default() };
+            let mut cc = CollCensus {
+                name: name.clone(),
+                ..Default::default()
+            };
             let manager = coll.head_manager.read();
             cc.heads = manager.list_heads().len();
             for h in manager.list_heads() {
@@ -2979,8 +2990,8 @@ mod tests {
     fn wal_integrity_delete_active_after_checkpoint_refuses() {
         let dir = tmp();
         e1_build(dir.path(), 20, 16, true); // close() checkpoints + trims
-        // the trimmed state keeps the post-checkpoint active segment; deleting
-        // every segment must refuse
+                                            // the trimmed state keeps the post-checkpoint active segment; deleting
+                                            // every segment must refuse
         for seg in std::fs::read_dir(e1_wal_dir(dir.path())).unwrap().flatten() {
             let p = seg.path();
             if p.extension().and_then(|s| s.to_str()) == Some("wal") {
@@ -2998,7 +3009,11 @@ mod tests {
         let dir = tmp();
         e1_build(dir.path(), 20, 16, false);
         let seg = e1_first_segment(dir.path());
-        std::fs::rename(&seg, e1_wal_dir(dir.path()).join("00000000000000001000.wal")).unwrap();
+        std::fs::rename(
+            &seg,
+            e1_wal_dir(dir.path()).join("00000000000000001000.wal"),
+        )
+        .unwrap();
         let refused = e1_open_err_contains(dir.path(), "WAL_LOST_SEGMENT")
             || e1_open_err_contains(dir.path(), "WAL replay failed");
         assert!(refused);
@@ -3009,7 +3024,10 @@ mod tests {
         let dir = tmp();
         e1_build(dir.path(), 20, 16, false);
         std::fs::write(e1_wal_dir(dir.path()).join("wal-state.json"), b"{ not json").unwrap();
-        assert!(e1_open_err_contains(dir.path(), "WAL integrity record unreadable"));
+        assert!(e1_open_err_contains(
+            dir.path(),
+            "WAL integrity record unreadable"
+        ));
     }
 
     #[test]

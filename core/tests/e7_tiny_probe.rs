@@ -28,7 +28,10 @@ fn attend_ids_match_mapper() {
     // mapper ground truth
     for i in 0..3u32 {
         let uuid = uuid::Uuid::from_u128(((9000u64 + i as u64) as u128) << 64 | 1);
-        println!("doc idx={i} numeric={:?}", e.id_mapper.read().uuid_to_id(&uuid));
+        println!(
+            "doc idx={i} numeric={:?}",
+            e.id_mapper.read().uuid_to_id(&uuid)
+        );
     }
     for qd in 0..3u32 {
         let mut v = vec![0.0f32; 32];

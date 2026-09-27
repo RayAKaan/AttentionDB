@@ -51,7 +51,6 @@ impl ProjectionStore {
             .read_exact(&mut buf)
             .map_err(|e| StorageError::Projection(e.to_string()))?;
         let mut vec = Vec::with_capacity(self.head_dim);
-        #[allow(clippy::chunks_exact_to_as_chunks)]
         // as_chunks stabilized later than our MSRV target
         for chunk in buf.chunks_exact(4) {
             if let Ok(bytes) = chunk.try_into() {

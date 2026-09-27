@@ -13,8 +13,9 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 fn rec(id: uuid::Uuid) -> Record {
-    let fields: HashMap<String, serde_json::Value> =
-        [("k".to_string(), serde_json::json!(1))].into_iter().collect();
+    let fields: HashMap<String, serde_json::Value> = [("k".to_string(), serde_json::json!(1))]
+        .into_iter()
+        .collect();
     let mut r = Record::new(fields);
     r.id = id;
     r
@@ -81,14 +82,16 @@ fn distinct_ts_resolution_tombstone_beats_record_despite_file_order() {
 
     // sstable_1.sst: LIVE record at ts 1000 (older flush).
     let mut w = SSTableWriter::new(&sst_dir.join("sstable_1.sst")).unwrap();
-    w.append_with_timestamp(key.clone(), rec(id).to_msgpack().unwrap(), 1000).unwrap();
+    w.append_with_timestamp(key.clone(), rec(id).to_msgpack().unwrap(), 1000)
+        .unwrap();
     w.flush().unwrap();
 
     // compacted_2.sst: TOMBSTONE at ts 1001 (later flush, later compacted).
     let mut t = rec(id);
     t.tags.push("__TOMBSTONE__".to_string());
     let mut w = SSTableWriter::new(&sst_dir.join("compacted_2.sst")).unwrap();
-    w.append_with_timestamp(key.clone(), t.to_msgpack().unwrap(), 1001).unwrap();
+    w.append_with_timestamp(key.clone(), t.to_msgpack().unwrap(), 1001)
+        .unwrap();
     w.flush().unwrap();
 
     // NOTE: files are crafted OUTSIDE DocumentStore open (which re-reads them
