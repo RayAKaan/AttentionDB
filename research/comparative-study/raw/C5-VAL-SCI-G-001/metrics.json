@@ -1,0 +1,46 @@
+{
+  "run_id": "C5-VAL-SCI-G-001",
+  "mode": "C",
+  "dataset": "DS-SCIFACT",
+  "split": "VALID",
+  "phase": "C5 execution",
+  "test_queries": 200,
+  "rep_count": 1,
+  "warmup": 20,
+  "ef_search": 64,
+  "lambda": 0.0,
+  "candidate_budget": 500,
+  "per_rep": [
+    {
+      "n_queries": 200,
+      "recall10_qrels_mean": 0.7458333334326744,
+      "recall10_exact_mean": 0.7065000011771917,
+      "p50_us": 4996.2,
+      "p95_us": 8617.6,
+      "deadline_exceeded": 0,
+      "candidate_change_count": 0,
+      "surprise_empty_queries": 0
+    }
+  ],
+  "rep_recall10_qrels_mean": [
+    0.7458333334326744
+  ],
+  "recall10_qrels_mean_5rep": 0.7458,
+  "recall10_qrels_sd_5rep": 0.0,
+  "rep_recall10_exact_mean": [
+    0.7065000011771917
+  ],
+  "recall10_exact_mean_5rep": 0.7065,
+  "p50_us_per_rep": [
+    4996.2
+  ],
+  "peak_child_rss_MiB": [
+    271.6
+  ],
+  "candidate_change_count": [
+    0
+  ],
+  "surprise_empty_queries": [
+    0
+  ]
+}

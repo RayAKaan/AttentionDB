@@ -132,6 +132,125 @@ pub fn candidate_union(set: &CandidateSet, budget: usize) -> Vec<UnionCandidate>
 }
 
 // ---------------------------------------------------------------------------
+// Cross-head interaction (C5: research-only, additive, default-off)
+// ---------------------------------------------------------------------------
+//
+// Legacy scoring-only cross-head behavior (union + fusion) does not change
+// candidate GENERATION. C5 adds an optional one-step interaction that does:
+// after the first per-head search, each head H receives a refined query built
+// from the "cross-head surprise" set S_H = ids that OTHER heads round-1-revealed
+// but H did not. H re-searches with q'_H (round 2), and its round-1 ∪ round-2
+// list is capped back to the per-head budget. NO scoring/config change happens
+// after union — stages 3..9 of the pipeline are identical to the no-interaction
+// path, so any difference in output is attributable to the candidate SET.
+//
+// Effort rule (frozen in C5 protocol §4): round-1 runs at ef/2 and round-2 at
+// ef - ef/2, so the total HNSW ef work of C5-C equals C5-B's single-search ef.
+// λ = 0.0 is the glue arm and MUST reproduce the control candidate set.
+
+/// Interaction parameters (validation-gated). Off by default (`None`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CrossRefineConfig {
+    /// Blend of the query with the cross-head centroid (0.0 = pure query).
+    pub lambda: f32,
+}
+
+/// Per-query causal ledger for the interaction cell (C5 protocol §6). Records
+/// exactly what the interaction changed so a claim can be falsified or shown
+/// inert. Lists are in HNSW rank order (best first) unless noted.
+#[derive(Debug, Clone, Default)]
+pub struct CrossHeadTrace {
+    /// Heads that contributed (present) candidates, in head order.
+    pub heads: Vec<String>,
+    /// Round-1 per-head candidate ids (engine numeric ids), in rank order.
+    pub round1: Vec<Vec<u64>>,
+    /// S_H = ids returned by OTHER heads in round-1 but not by this head.
+    pub surprise: Vec<Vec<u64>>,
+    /// Whether H's round-2 query was refined (true) or = round-1 query (false).
+    pub refined: Vec<bool>,
+    /// Round-2 ids that were NOT in H's round-1 list (interaction additions).
+    pub round2_added: Vec<Vec<u64>>,
+    /// ids that reach the FINAL union only because of the interaction.
+    pub interaction_union_additions: Vec<u64>,
+    /// per-head list length after round-1 ∪ round-2 cap (== per_head_k when
+    /// the head had that many).
+    pub per_head_capped: Vec<usize>,
+    /// union size of round-1 only.
+    pub union_pre: usize,
+    /// union size after interaction (== candidate_union budget cap applied).
+    pub union_post: usize,
+    /// ef used for round-1 and round-2 (sum == control ef).
+    pub ef_r1: usize,
+    pub ef_r2: usize,
+}
+
+/// L2-normalize in place; a zero/empty/non-finite vector is left as-is so the
+/// caller can fall back to the original query (deterministic, NaN-safe).
+pub fn l2_normalize(v: &mut [f32]) {
+    let norm2: f64 = v.iter().map(|&x| x as f64 * x as f64).sum();
+    if norm2.is_finite() && norm2 > 0.0 {
+        let inv = 1.0 / norm2.sqrt();
+        for x in v.iter_mut() {
+            *x = (*x as f64 * inv) as f32;
+        }
+    }
+}
+
+/// Refined query for one head: `q' = normalize(q + λ·centroid)`.
+/// λ == 0 returns the input query unchanged (glue arm, documented). A
+/// degenerate centroid (empty) returns the query unchanged. Always finite.
+pub fn cross_refine_query(q: &[f32], centroid: &[f32], lambda: f32) -> Vec<f32> {
+    if lambda == 0.0 || centroid.is_empty() {
+        return q.to_vec();
+    }
+    let mut out: Vec<f32> = q
+        .iter()
+        .zip(centroid.iter())
+        .map(|(a, c)| {
+            let v = *a + lambda * c;
+            if v.is_finite() {
+                v
+            } else {
+                *a
+            }
+        })
+        .collect();
+    // q and centroid are same-dim (both head embedding space); if lengths
+    // differ (should not happen: gated by caller), keep q's tail unchanged.
+    if q.len() > centroid.len() {
+        out.extend_from_slice(&q[centroid.len()..]);
+    }
+    l2_normalize(&mut out);
+    out
+}
+
+/// Mean vector of `vectors` (same dim), in id-ascending input order so the
+/// float sum is deterministic. Empty/zero-norm → empty (caller falls back).
+pub fn cross_head_centroid(vectors: &[Vec<f32>]) -> Vec<f32> {
+    let Some(first_len) = vectors.first().map(|v| v.len()) else {
+        return Vec::new();
+    };
+    // deterministic canonical order (ids already sorted by caller)
+    let mut sum = vec![0.0f64; first_len];
+    let mut n = 0usize;
+    for v in vectors {
+        if v.len() != first_len {
+            continue;
+        }
+        for (s, &x) in sum.iter_mut().zip(v.iter()) {
+            if x.is_finite() {
+                *s += x as f64;
+            }
+        }
+        n += 1;
+    }
+    if n == 0 || !sum.iter().all(|s| s.is_finite()) {
+        return Vec::new();
+    }
+    sum.iter().map(|s| (*s / n as f64) as f32).collect()
+}
+
+// ---------------------------------------------------------------------------
 // Score normalization (§7, §25 — float safety)
 // ---------------------------------------------------------------------------
 
@@ -710,5 +829,70 @@ mod tests {
             bm25: 0.5,
         };
         assert!(w.validate().is_err());
+    }
+
+    #[test]
+    fn cross_refine_lambda_zero_is_glue() {
+        // λ=0 must reproduce the query exactly: q' = normalize(q + 0·centroid),
+        // and for cosine (scale-invariant) ranking this is the control arm.
+        let q = vec![0.3, -0.5, 0.9];
+        let c = vec![1.0, 1.0, 1.0];
+        let q2 = cross_refine_query(&q, &c, 0.0);
+        // (q + 0·c) = q; normalization preserves direction → same cosine order
+        assert_eq!(q2, q, "λ=0 must return the input query unchanged");
+    }
+
+    #[test]
+    fn cross_refine_empties_and_degenerate_are_safe() {
+        let q = vec![0.1, 0.8];
+        // empty centroid → fall back to query (never panic, always finite)
+        assert_eq!(cross_refine_query(&q, &[], 0.5), q);
+        // NaN in the centroid must not poison a finite query
+        let out = cross_refine_query(&q, &[1.0, f32::NAN], 0.5);
+        assert!(out.iter().all(|x| x.is_finite()), "output must be finite");
+        // centroid longer than query still yields a query-length vector
+        let long = cross_refine_query(&q, &[1.0, 0.0, 9.9], 0.5);
+        assert_eq!(long.len(), q.len());
+        assert!(long.iter().all(|x| x.is_finite()));
+        // query longer than centroid keeps the query's unmatched tail
+        let long_q = cross_refine_query(&[0.1, 0.8, 0.3], &[1.0, 0.0], 0.5);
+        assert_eq!(long_q.len(), 3);
+    }
+
+    #[test]
+    fn cross_refine_is_normalized_and_direction_sensitive() {
+        let q = vec![1.0, 0.0];
+        let c = vec![0.0, 1.0];
+        let q2 = cross_refine_query(&q, &c, 1.0);
+        let norm: f32 = q2.iter().map(|x| x * x).sum::<f32>().sqrt();
+        assert!((norm - 1.0).abs() < 1e-5, "q' must be L2-normalized");
+        // both components active (0.5, 0.5) — direction points into quadrant
+        assert!(q2[0] > 0.0 && q2[1] > 0.0);
+        // λ=0.1 must stay closer to the query than λ=1.0
+        let q2_small = cross_refine_query(&q, &c, 0.1);
+        assert!(
+            q2_small[0] > q2[0],
+            "smaller λ keeps q' closer to the original query"
+        );
+    }
+
+    #[test]
+    fn cross_head_centroid_is_deterministic_mean() {
+        let v = vec![vec![1.0, 2.0], vec![3.0, 4.0], vec![5.0, 6.0]];
+        // input order irrelevant → reordered input gives the same mean
+        let mut v2 = v.clone();
+        v2.reverse();
+        let a = cross_head_centroid(&v);
+        let b = cross_head_centroid(&v2);
+        assert_eq!(a, b, "centroid must be order-independent");
+        assert_eq!(a, vec![3.0, 4.0], "mean of the three vectors");
+    }
+
+    #[test]
+    fn cross_head_centroid_skips_mismatched_and_empty_inputs() {
+        assert_eq!(cross_head_centroid(&[]), Vec::<f32>::new());
+        // mismatched dims are skipped; single-vector input is the mean
+        let v = vec![vec![1.0, 2.0], vec![5.0, 6.0, 7.0]];
+        assert_eq!(cross_head_centroid(&v), vec![1.0, 2.0]);
     }
 }

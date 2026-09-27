@@ -1,0 +1,38 @@
+{
+  "run_id": "C5-SMOKE-NFC-BE-001",
+  "mode": "B",
+  "dataset": "DS-NFCORPUS",
+  "split": "SMOKE",
+  "phase": "C5 execution",
+  "test_queries": 20,
+  "rep_count": 1,
+  "warmup": 20,
+  "ef_search": 64,
+  "lambda": 0.0,
+  "candidate_budget": 500,
+  "per_rep": [
+    {
+      "n_queries": 20,
+      "recall10_qrels_mean": 0.11043411400169134,
+      "recall10_exact_mean": 0.6399999991059303,
+      "p50_us": 1989.2999999999997,
+      "p95_us": 2349.1,
+      "deadline_exceeded": 0
+    }
+  ],
+  "rep_recall10_qrels_mean": [
+    0.11043411400169134
+  ],
+  "recall10_qrels_mean_5rep": 0.1104,
+  "recall10_qrels_sd_5rep": 0.0,
+  "rep_recall10_exact_mean": [
+    0.6399999991059303
+  ],
+  "recall10_exact_mean_5rep": 0.64,
+  "p50_us_per_rep": [
+    1989.2999999999997
+  ],
+  "peak_child_rss_MiB": [
+    192.6
+  ]
+}

@@ -764,3 +764,292 @@
   status: PASS
   purpose: 'C4.7 closure decision COMPLETE (commit 0842cb7); gate audit 20/20 PASS; reconciliation 15/15 OK; budget checks clean'
 
+- run_id: C5-EPROBE-001
+  status: RUN
+  purpose: 'C5 PROBE B DS-SCIFACT (20 qids, 1 fresh-process reps, ef=16, lambda=0.0)'
+  started: 2026-09-27T13:33:49Z
+  preregistration: 'frozen c5-run-plan.csv C5-EPROBE-001; pre-execution registration before measurement'
+- run_id: C5-EPROBE-002
+  status: RUN
+  purpose: 'C5 PROBE B DS-SCIFACT (20 qids, 1 fresh-process reps, ef=128, lambda=0.0)'
+  started: 2026-09-27T13:34:03Z
+  preregistration: 'frozen c5-run-plan.csv C5-EPROBE-002; pre-execution registration before measurement'
+- run_id: C5-EPROBE-002
+  status: PASS
+  purpose: 'C5 PROBE B DS-SCIFACT (20 qids, 1 reps)'
+  completed: 2026-09-27T13:34:54Z
+  result: recall10_qrels=0.7750 sd=0.0000 p50_us=2764.6
+- run_id: C5-EPROBE-001
+  status: FAILED
+  failure: 'harness bug (KeyError query_ids pre-measurement); artifacts materialized, no measurement; superseded by C5-EPROBE-005'
+
+- run_id: C5-EPROBE-003
+  status: RUN
+  purpose: 'C5 PROBE B DS-NFCORPUS (20 qids, 1 fresh-process reps, ef=16, lambda=0.0)'
+  started: 2026-09-27T13:35:15Z
+  preregistration: 'frozen c5-run-plan.csv C5-EPROBE-003; pre-execution registration before measurement'
+- run_id: C5-EPROBE-003
+  status: PASS
+  purpose: 'C5 PROBE B DS-NFCORPUS (20 qids, 1 reps)'
+  completed: 2026-09-27T13:35:44Z
+  result: recall10_qrels=0.1119 sd=0.0000 p50_us=2020.1
+- run_id: C5-EPROBE-004
+  status: RUN
+  purpose: 'C5 PROBE B DS-NFCORPUS (20 qids, 1 fresh-process reps, ef=128, lambda=0.0)'
+  started: 2026-09-27T13:35:45Z
+  preregistration: 'frozen c5-run-plan.csv C5-EPROBE-004; pre-execution registration before measurement'
+- run_id: C5-EPROBE-004
+  status: PASS
+  purpose: 'C5 PROBE B DS-NFCORPUS (20 qids, 1 reps)'
+  completed: 2026-09-27T13:36:17Z
+  result: recall10_qrels=0.1191 sd=0.0000 p50_us=2626.6
+- run_id: C5-EPROBE-005
+  status: RUN
+  purpose: 'C5 PROBE B DS-SCIFACT (20 qids, 1 fresh-process reps, ef=16, lambda=0.0)'
+  started: 2026-09-27T13:37:04Z
+  preregistration: 'frozen c5-run-plan.csv C5-EPROBE-005; pre-execution registration before measurement'
+- run_id: C5-EPROBE-005
+  status: PASS
+  purpose: 'C5 PROBE B DS-SCIFACT (20 qids, 1 reps)'
+  completed: 2026-09-27T13:37:58Z
+  result: recall10_qrels=0.7750 sd=0.0000 p50_us=2154.2
+- run_id: C5-SMOKE-SCI-AE-001
+  status: RUN
+  purpose: 'C5 SMOKE A DS-SCIFACT (20 qids, 1 fresh-process reps, ef=64, lambda=0.0)'
+  started: 2026-09-27T13:38:26Z
+  preregistration: 'frozen c5-run-plan.csv C5-SMOKE-SCI-AE-001; pre-execution registration before measurement'
+- run_id: C5-SMOKE-SCI-AE-001
+  status: PASS
+  purpose: 'C5 SMOKE A DS-SCIFACT (20 qids, 1 reps)'
+  completed: 2026-09-27T13:38:45Z
+  result: recall10_qrels=0.7750 sd=0.0000 p50_us=942.3
+- run_id: C5-SMOKE-SCI-BE-001
+  status: RUN
+  purpose: 'C5 SMOKE B DS-SCIFACT (20 qids, 1 fresh-process reps, ef=64, lambda=0.0)'
+  started: 2026-09-27T13:38:45Z
+  preregistration: 'frozen c5-run-plan.csv C5-SMOKE-SCI-BE-001; pre-execution registration before measurement'
+- run_id: C5-SMOKE-SCI-BE-001
+  status: PASS
+  purpose: 'C5 SMOKE B DS-SCIFACT (20 qids, 1 reps)'
+  completed: 2026-09-27T13:39:42Z
+  result: recall10_qrels=0.7750 sd=0.0000 p50_us=2653.8
+- run_id: C5-SMOKE-SCI-CE-001
+  status: RUN
+  purpose: 'C5 SMOKE C DS-SCIFACT (20 qids, 1 fresh-process reps, ef=64, lambda=0.25)'
+  started: 2026-09-27T13:39:47Z
+  preregistration: 'frozen c5-run-plan.csv C5-SMOKE-SCI-CE-001; pre-execution registration before measurement'
+- run_id: C5-SMOKE-SCI-CE-001
+  status: PASS
+  purpose: 'C5 SMOKE C DS-SCIFACT (20 qids, 1 reps)'
+  completed: 2026-09-27T13:40:40Z
+  result: recall10_qrels=0.7750 sd=0.0000 p50_us=4908.3
+- run_id: C5-SMOKE-SCI-GE-001
+  status: RUN
+  purpose: 'C5 SMOKE C DS-SCIFACT (20 qids, 1 fresh-process reps, ef=64, lambda=0.0)'
+  started: 2026-09-27T13:40:41Z
+  preregistration: 'frozen c5-run-plan.csv C5-SMOKE-SCI-GE-001; pre-execution registration before measurement'
+- run_id: C5-SMOKE-SCI-GE-001
+  status: PASS
+  purpose: 'C5 SMOKE C DS-SCIFACT (20 qids, 1 reps)'
+  completed: 2026-09-27T13:41:36Z
+  result: recall10_qrels=0.7625 sd=0.0000 p50_us=5956.1
+- run_id: C5-SMOKE-NFC-AE-001
+  status: RUN
+  purpose: 'C5 SMOKE A DS-NFCORPUS (20 qids, 1 fresh-process reps, ef=64, lambda=0.0)'
+  started: 2026-09-27T13:41:41Z
+  preregistration: 'frozen c5-run-plan.csv C5-SMOKE-NFC-AE-001; pre-execution registration before measurement'
+- run_id: C5-SMOKE-NFC-AE-001
+  status: PASS
+  purpose: 'C5 SMOKE A DS-NFCORPUS (20 qids, 1 reps)'
+  completed: 2026-09-27T13:41:50Z
+  result: recall10_qrels=0.0843 sd=0.0000 p50_us=1068.0
+- run_id: C5-SMOKE-NFC-BE-001
+  status: RUN
+  purpose: 'C5 SMOKE B DS-NFCORPUS (20 qids, 1 fresh-process reps, ef=64, lambda=0.0)'
+  started: 2026-09-27T13:41:51Z
+  preregistration: 'frozen c5-run-plan.csv C5-SMOKE-NFC-BE-001; pre-execution registration before measurement'
+- run_id: C5-SMOKE-NFC-BE-001
+  status: PASS
+  purpose: 'C5 SMOKE B DS-NFCORPUS (20 qids, 1 reps)'
+  completed: 2026-09-27T13:42:25Z
+  result: recall10_qrels=0.1104 sd=0.0000 p50_us=1989.3
+- run_id: C5-SMOKE-NFC-CE-001
+  status: RUN
+  purpose: 'C5 SMOKE C DS-NFCORPUS (20 qids, 1 fresh-process reps, ef=64, lambda=0.25)'
+  started: 2026-09-27T13:42:37Z
+  preregistration: 'frozen c5-run-plan.csv C5-SMOKE-NFC-CE-001; pre-execution registration before measurement'
+- run_id: C5-SMOKE-NFC-CE-001
+  status: PASS
+  purpose: 'C5 SMOKE C DS-NFCORPUS (20 qids, 1 reps)'
+  completed: 2026-09-27T13:43:07Z
+  result: recall10_qrels=0.1020 sd=0.0000 p50_us=5172.9
+- run_id: C5-SMOKE-NFC-GE-001
+  status: RUN
+  purpose: 'C5 SMOKE C DS-NFCORPUS (20 qids, 1 fresh-process reps, ef=64, lambda=0.0)'
+  started: 2026-09-27T13:43:07Z
+  preregistration: 'frozen c5-run-plan.csv C5-SMOKE-NFC-GE-001; pre-execution registration before measurement'
+- run_id: C5-SMOKE-NFC-GE-001
+  status: PASS
+  purpose: 'C5 SMOKE C DS-NFCORPUS (20 qids, 1 reps)'
+  completed: 2026-09-27T13:43:36Z
+  result: recall10_qrels=0.1120 sd=0.0000 p50_us=4229.1
+- run_id: C5-VAL-SCI-B-001
+  status: RUN
+  purpose: 'C5 VALID B DS-SCIFACT (200 qids, 1 fresh-process reps, ef=64, lambda=0.0)'
+  started: 2026-09-27T13:43:51Z
+  preregistration: 'frozen c5-run-plan.csv C5-VAL-SCI-B-001; pre-execution registration before measurement'
+- run_id: C5-VAL-SCI-B-001
+  status: PASS
+  purpose: 'C5 VALID B DS-SCIFACT (200 qids, 1 reps)'
+  completed: 2026-09-27T13:44:47Z
+  result: recall10_qrels=0.7425 sd=0.0000 p50_us=2081.4
+- run_id: C5-VAL-SCI-G-001
+  status: RUN
+  purpose: 'C5 VALID C DS-SCIFACT (200 qids, 1 fresh-process reps, ef=64, lambda=0.0)'
+  started: 2026-09-27T13:44:47Z
+  preregistration: 'frozen c5-run-plan.csv C5-VAL-SCI-G-001; pre-execution registration before measurement'
+- run_id: C5-VAL-SCI-G-001
+  status: PASS
+  purpose: 'C5 VALID C DS-SCIFACT (200 qids, 1 reps)'
+  completed: 2026-09-27T13:45:44Z
+  result: recall10_qrels=0.7458 sd=0.0000 p50_us=4996.2
+- run_id: C5-VAL-SCI-C010-001
+  status: RUN
+  purpose: 'C5 VALID C DS-SCIFACT (200 qids, 1 fresh-process reps, ef=64, lambda=0.1)'
+  started: 2026-09-27T13:45:44Z
+  preregistration: 'frozen c5-run-plan.csv C5-VAL-SCI-C010-001; pre-execution registration before measurement'
+- run_id: C5-VAL-SCI-C010-001
+  status: PASS
+  purpose: 'C5 VALID C DS-SCIFACT (200 qids, 1 reps)'
+  completed: 2026-09-27T13:46:37Z
+  result: recall10_qrels=0.7412 sd=0.0000 p50_us=4715.7
+- run_id: C5-VAL-SCI-C025-001
+  status: RUN
+  purpose: 'C5 VALID C DS-SCIFACT (200 qids, 1 fresh-process reps, ef=64, lambda=0.25)'
+  started: 2026-09-27T13:46:38Z
+  preregistration: 'frozen c5-run-plan.csv C5-VAL-SCI-C025-001; pre-execution registration before measurement'
+- run_id: C5-VAL-SCI-C025-001
+  status: PASS
+  purpose: 'C5 VALID C DS-SCIFACT (200 qids, 1 reps)'
+  completed: 2026-09-27T13:47:33Z
+  result: recall10_qrels=0.7221 sd=0.0000 p50_us=4786.5
+- run_id: C5-VAL-SCI-C050-001
+  status: RUN
+  purpose: 'C5 VALID C DS-SCIFACT (200 qids, 1 fresh-process reps, ef=64, lambda=0.5)'
+  started: 2026-09-27T13:47:34Z
+  preregistration: 'frozen c5-run-plan.csv C5-VAL-SCI-C050-001; pre-execution registration before measurement'
+- run_id: C5-VAL-SCI-C050-001
+  status: PASS
+  purpose: 'C5 VALID C DS-SCIFACT (200 qids, 1 reps)'
+  completed: 2026-09-27T13:48:28Z
+  result: recall10_qrels=0.7233 sd=0.0000 p50_us=4432.0
+- run_id: C5-VAL-NFC-B-001
+  status: RUN
+  purpose: 'C5 VALID B DS-NFCORPUS (324 qids, 1 fresh-process reps, ef=64, lambda=0.0)'
+  started: 2026-09-27T13:50:11Z
+  preregistration: 'frozen c5-run-plan.csv C5-VAL-NFC-B-001; pre-execution registration before measurement'
+- run_id: C5-VAL-NFC-B-001
+  status: PASS
+  purpose: 'C5 VALID B DS-NFCORPUS (324 qids, 1 reps)'
+  completed: 2026-09-27T13:50:43Z
+  result: recall10_qrels=0.1400 sd=0.0000 p50_us=2517.3
+- run_id: C5-VAL-NFC-G-001
+  status: RUN
+  purpose: 'C5 VALID C DS-NFCORPUS (324 qids, 1 fresh-process reps, ef=64, lambda=0.0)'
+  started: 2026-09-27T13:50:44Z
+  preregistration: 'frozen c5-run-plan.csv C5-VAL-NFC-G-001; pre-execution registration before measurement'
+- run_id: C5-VAL-NFC-G-001
+  status: PASS
+  purpose: 'C5 VALID C DS-NFCORPUS (324 qids, 1 reps)'
+  completed: 2026-09-27T13:51:18Z
+  result: recall10_qrels=0.1389 sd=0.0000 p50_us=4478.7
+- run_id: C5-VAL-NFC-C010-001
+  status: RUN
+  purpose: 'C5 VALID C DS-NFCORPUS (324 qids, 1 fresh-process reps, ef=64, lambda=0.1)'
+  started: 2026-09-27T13:51:19Z
+  preregistration: 'frozen c5-run-plan.csv C5-VAL-NFC-C010-001; pre-execution registration before measurement'
+- run_id: C5-VAL-NFC-C010-001
+  status: PASS
+  purpose: 'C5 VALID C DS-NFCORPUS (324 qids, 1 reps)'
+  completed: 2026-09-27T13:51:50Z
+  result: recall10_qrels=0.1396 sd=0.0000 p50_us=4149.5
+- run_id: C5-VAL-NFC-C025-001
+  status: RUN
+  purpose: 'C5 VALID C DS-NFCORPUS (324 qids, 1 fresh-process reps, ef=64, lambda=0.25)'
+  started: 2026-09-27T13:51:50Z
+  preregistration: 'frozen c5-run-plan.csv C5-VAL-NFC-C025-001; pre-execution registration before measurement'
+- run_id: C5-VAL-NFC-C025-001
+  status: PASS
+  purpose: 'C5 VALID C DS-NFCORPUS (324 qids, 1 reps)'
+  completed: 2026-09-27T13:52:24Z
+  result: recall10_qrels=0.1373 sd=0.0000 p50_us=4638.6
+- run_id: C5-VAL-NFC-C050-001
+  status: RUN
+  purpose: 'C5 VALID C DS-NFCORPUS (324 qids, 1 fresh-process reps, ef=64, lambda=0.5)'
+  started: 2026-09-27T13:52:24Z
+  preregistration: 'frozen c5-run-plan.csv C5-VAL-NFC-C050-001; pre-execution registration before measurement'
+- run_id: C5-VAL-NFC-C050-001
+  status: PASS
+  purpose: 'C5 VALID C DS-NFCORPUS (324 qids, 1 reps)'
+  completed: 2026-09-27T13:52:59Z
+  result: recall10_qrels=0.1335 sd=0.0000 p50_us=5005.0
+- run_id: C5-TEST-SCI-A-001
+  status: RUN
+  purpose: 'C5 TEST A DS-SCIFACT (300 qids, 5 fresh-process reps, ef=64, lambda=0.0)'
+  started: 2026-09-27T13:55:30Z
+  preregistration: 'frozen c5-run-plan.csv C5-TEST-SCI-A-001; pre-execution registration before measurement'
+- run_id: C5-TEST-SCI-A-001
+  status: PASS
+  purpose: 'C5 TEST A DS-SCIFACT (300 qids, 5 reps)'
+  completed: 2026-09-27T13:57:06Z
+  result: recall10_qrels=0.7767 sd=0.0053 p50_us=1327.5
+- run_id: C5-TEST-SCI-B-001
+  status: RUN
+  purpose: 'C5 TEST B DS-SCIFACT (300 qids, 5 fresh-process reps, ef=64, lambda=0.0)'
+  started: 2026-09-27T13:57:15Z
+  preregistration: 'frozen c5-run-plan.csv C5-TEST-SCI-B-001; pre-execution registration before measurement'
+- run_id: C5-TEST-SCI-B-001
+  status: PASS
+  purpose: 'C5 TEST B DS-SCIFACT (300 qids, 5 reps)'
+  completed: 2026-09-27T14:02:01Z
+  result: recall10_qrels=0.7898 sd=0.0043 p50_us=1903.3
+- run_id: C5-TEST-SCI-C-001
+  status: RUN
+  purpose: 'C5 TEST C DS-SCIFACT (300 qids, 5 fresh-process reps, ef=64, lambda=0.1)'
+  started: 2026-09-27T14:02:11Z
+  preregistration: 'frozen c5-run-plan.csv C5-TEST-SCI-C-001; pre-execution registration before measurement'
+- run_id: C5-TEST-SCI-C-001
+  status: PASS
+  purpose: 'C5 TEST C DS-SCIFACT (300 qids, 5 reps)'
+  completed: 2026-09-27T14:07:42Z
+  result: recall10_qrels=0.7880 sd=0.0005 p50_us=5546.5
+- run_id: C5-TEST-NFC-A-001
+  status: RUN
+  purpose: 'C5 TEST A DS-NFCORPUS (323 qids, 5 fresh-process reps, ef=64, lambda=0.0)'
+  started: 2026-09-27T14:07:52Z
+  preregistration: 'frozen c5-run-plan.csv C5-TEST-NFC-A-001; pre-execution registration before measurement'
+- run_id: C5-TEST-NFC-A-001
+  status: PASS
+  purpose: 'C5 TEST A DS-NFCORPUS (323 qids, 5 reps)'
+  completed: 2026-09-27T14:08:56Z
+  result: recall10_qrels=0.1505 sd=0.0021 p50_us=1259.1
+- run_id: C5-TEST-NFC-B-001
+  status: RUN
+  purpose: 'C5 TEST B DS-NFCORPUS (323 qids, 5 fresh-process reps, ef=64, lambda=0.0)'
+  started: 2026-09-27T14:09:16Z
+  preregistration: 'frozen c5-run-plan.csv C5-TEST-NFC-B-001; pre-execution registration before measurement'
+- run_id: C5-TEST-NFC-B-001
+  status: PASS
+  purpose: 'C5 TEST B DS-NFCORPUS (323 qids, 5 reps)'
+  completed: 2026-09-27T14:12:40Z
+  result: recall10_qrels=0.1593 sd=0.0015 p50_us=2374.8
+- run_id: C5-TEST-NFC-C-001
+  status: RUN
+  purpose: 'C5 TEST C DS-NFCORPUS (323 qids, 5 fresh-process reps, ef=64, lambda=0.1)'
+  started: 2026-09-27T14:12:56Z
+  preregistration: 'frozen c5-run-plan.csv C5-TEST-NFC-C-001; pre-execution registration before measurement'
+- run_id: C5-TEST-NFC-C-001
+  status: PASS
+  purpose: 'C5 TEST C DS-NFCORPUS (323 qids, 5 reps)'
+  completed: 2026-09-27T14:16:08Z
+  result: recall10_qrels=0.1609 sd=0.0027 p50_us=5334.0

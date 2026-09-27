@@ -1,0 +1,86 @@
+{
+  "run_id": "C5-TEST-SCI-A-001",
+  "mode": "A",
+  "dataset": "DS-SCIFACT",
+  "split": "TEST",
+  "phase": "C5 execution",
+  "test_queries": 300,
+  "rep_count": 5,
+  "warmup": 20,
+  "ef_search": 64,
+  "lambda": 0.0,
+  "candidate_budget": 500,
+  "per_rep": [
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7800000000993411,
+      "recall10_exact_mean": 0.9849999972184499,
+      "p50_us": 1327.5,
+      "p95_us": 2940.5,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7733333334326744,
+      "recall10_exact_mean": 0.9783333301544189,
+      "p50_us": 1061.0,
+      "p95_us": 2268.3,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7700000000993411,
+      "recall10_exact_mean": 0.981333331267039,
+      "p50_us": 1022.3999999999999,
+      "p95_us": 1348.9,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7850000000993411,
+      "recall10_exact_mean": 0.9786666629711787,
+      "p50_us": 1056.6,
+      "p95_us": 1529.1000000000001,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7750000000993411,
+      "recall10_exact_mean": 0.9753333292404811,
+      "p50_us": 1060.6999999999998,
+      "p95_us": 1599.9,
+      "deadline_exceeded": 0
+    }
+  ],
+  "rep_recall10_qrels_mean": [
+    0.7800000000993411,
+    0.7733333334326744,
+    0.7700000000993411,
+    0.7850000000993411,
+    0.7750000000993411
+  ],
+  "recall10_qrels_mean_5rep": 0.7767,
+  "recall10_qrels_sd_5rep": 0.0053,
+  "rep_recall10_exact_mean": [
+    0.9849999972184499,
+    0.9783333301544189,
+    0.981333331267039,
+    0.9786666629711787,
+    0.9753333292404811
+  ],
+  "recall10_exact_mean_5rep": 0.9797,
+  "p50_us_per_rep": [
+    1327.5,
+    1061.0,
+    1022.3999999999999,
+    1056.6,
+    1060.6999999999998
+  ],
+  "peak_child_rss_MiB": [
+    119.9,
+    120.7,
+    120.7,
+    120.6,
+    131.1
+  ]
+}

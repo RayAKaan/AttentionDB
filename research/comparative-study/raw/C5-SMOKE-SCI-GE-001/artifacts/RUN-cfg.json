@@ -1,0 +1,122 @@
+{
+  "run_id": "C5-SMOKE-SCI-GE-001",
+  "mode": "C",
+  "k": 10,
+  "seed": 20260925,
+  "warmup": 20,
+  "n_queries": 1109,
+  "n_docs": 5183,
+  "dim": 384,
+  "subsample": [
+    405,
+    232,
+    182,
+    782,
+    303,
+    227,
+    558,
+    753,
+    480,
+    282,
+    147,
+    619,
+    666,
+    571,
+    69,
+    596,
+    212,
+    224,
+    756,
+    676
+  ],
+  "collection_heads": [
+    "HEAD-TITLE",
+    "HEAD-BODY",
+    "HEAD-CITE"
+  ],
+  "attend_heads": [
+    "HEAD-TITLE",
+    "HEAD-BODY",
+    "HEAD-CITE"
+  ],
+  "qrels": {
+    "405": {
+      "858": 1
+    },
+    "232": {
+      "203": 1
+    },
+    "182": {
+      "133": 1
+    },
+    "782": {
+      "2606": 1
+    },
+    "303": {
+      "2435": 1
+    },
+    "227": {
+      "2240": 1
+    },
+    "558": {
+      "5001": 1,
+      "4019": 1,
+      "4065": 1,
+      "1699": 1
+    },
+    "753": {
+      "2142": 1,
+      "2603": 1
+    },
+    "480": {
+      "906": 1
+    },
+    "282": {
+      "3354": 1
+    },
+    "147": {
+      "4563": 1
+    },
+    "619": {
+      "844": 1
+    },
+    "666": {
+      "2066": 1
+    },
+    "571": {
+      "2627": 1
+    },
+    "69": {
+      "3764": 1,
+      "977": 1
+    },
+    "596": {
+      "1256": 1
+    },
+    "212": {
+      "112": 1
+    },
+    "224": {
+      "2898": 1
+    },
+    "756": {
+      "2984": 1
+    },
+    "676": {
+      "1335": 1
+    }
+  },
+  "query_vectors": "H:\\Attention-DB\\AttentionDB\\research\\comparative-study\\raw\\C5-SMOKE-SCI-GE-001\\artifacts\\QUERIES.f32",
+  "doc_vectors": {
+    "HEAD-TITLE": "H:\\Attention-DB\\AttentionDB\\research\\comparative-study\\raw\\C5-SMOKE-SCI-GE-001\\artifacts\\HEAD-TITLE.f32",
+    "HEAD-BODY": "H:\\Attention-DB\\AttentionDB\\research\\comparative-study\\raw\\C5-SMOKE-SCI-GE-001\\artifacts\\HEAD-BODY.f32",
+    "HEAD-CITE": "H:\\Attention-DB\\AttentionDB\\research\\comparative-study\\raw\\C5-SMOKE-SCI-GE-001\\artifacts\\HEAD-CITE.f32",
+    "CANONICAL": "H:\\Attention-DB\\AttentionDB\\research\\comparative-study\\raw\\C5-SMOKE-SCI-GE-001\\artifacts\\CANONICAL.f32"
+  },
+  "candidate_budget": 500,
+  "min_candidates_per_head": 20,
+  "ef_search": 64,
+  "lambda": 0.0,
+  "configuration_id": "C5-SMOKE-SCI-GE-001__C",
+  "deadline_us": 0
+}

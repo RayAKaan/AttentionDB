@@ -1,0 +1,110 @@
+{
+  "run_id": "C5-TEST-SCI-C-001",
+  "mode": "C",
+  "dataset": "DS-SCIFACT",
+  "split": "TEST",
+  "phase": "C5 execution",
+  "test_queries": 300,
+  "rep_count": 5,
+  "warmup": 20,
+  "ef_search": 64,
+  "lambda": 0.1,
+  "candidate_budget": 500,
+  "per_rep": [
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7883333334326744,
+      "recall10_exact_mean": 0.6910000025232633,
+      "p50_us": 5546.5,
+      "p95_us": 16453.6,
+      "deadline_exceeded": 0,
+      "candidate_change_count": 275,
+      "surprise_empty_queries": 0
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7883333334326744,
+      "recall10_exact_mean": 0.6906666705012321,
+      "p50_us": 5338.3,
+      "p95_us": 9000.3,
+      "deadline_exceeded": 0,
+      "candidate_change_count": 278,
+      "surprise_empty_queries": 0
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7872222223877907,
+      "recall10_exact_mean": 0.6923333362738291,
+      "p50_us": 5423.3,
+      "p95_us": 7354.6,
+      "deadline_exceeded": 0,
+      "candidate_change_count": 278,
+      "surprise_empty_queries": 0
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7883333334326744,
+      "recall10_exact_mean": 0.7003333353002866,
+      "p50_us": 5609.3,
+      "p95_us": 11611.4,
+      "deadline_exceeded": 0,
+      "candidate_change_count": 280,
+      "surprise_empty_queries": 0
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7876666667064031,
+      "recall10_exact_mean": 0.6923333343863487,
+      "p50_us": 5299.9,
+      "p95_us": 9114.4,
+      "deadline_exceeded": 0,
+      "candidate_change_count": 274,
+      "surprise_empty_queries": 0
+    }
+  ],
+  "rep_recall10_qrels_mean": [
+    0.7883333334326744,
+    0.7883333334326744,
+    0.7872222223877907,
+    0.7883333334326744,
+    0.7876666667064031
+  ],
+  "recall10_qrels_mean_5rep": 0.788,
+  "recall10_qrels_sd_5rep": 0.0005,
+  "rep_recall10_exact_mean": [
+    0.6910000025232633,
+    0.6906666705012321,
+    0.6923333362738291,
+    0.7003333353002866,
+    0.6923333343863487
+  ],
+  "recall10_exact_mean_5rep": 0.6933,
+  "p50_us_per_rep": [
+    5546.5,
+    5338.3,
+    5423.3,
+    5609.3,
+    5299.9
+  ],
+  "peak_child_rss_MiB": [
+    272.3,
+    304.9,
+    271.8,
+    305.9,
+    304.9
+  ],
+  "candidate_change_count": [
+    275,
+    278,
+    278,
+    280,
+    274
+  ],
+  "surprise_empty_queries": [
+    0,
+    0,
+    0,
+    0,
+    0
+  ]
+}
