@@ -1,0 +1,186 @@
+# Comparative-study metric registry (definitions, units, aggregation, caveats)
+meta:
+  study_id: comparative-study-001
+  version: "1.0.0"
+  rule: metrics are computed by ONE harness implementation from raw per-query rows; no system-specific metric paths
+
+quality_metrics:
+  - id: M-RECALL-K
+    name: "recall@k"
+    formula: "|retrieved_top_k ∩ relevant_or_gt| / |relevant_or_gt|"
+    unit: "ratio [0,1]"
+    aggregation: "per-query then mean (+distribution)"
+    direction: higher
+    workloads: "all retrieval"
+    caveats: "for NN-GT sets relevant = exact top-k from B0 (candidate/ANN quality, NOT semantic relevance); for qrels sets relevant = graded>=1 (or graded>=2 secondary, both reported)"
+  - id: M-RECALL-CAND
+    name: "candidate-recall@k"
+    formula: "recall computed on the candidate pool BEFORE fusion/rerank"
+    unit: "ratio [0,1]"
+    aggregation: "per-query mean"
+    direction: higher
+    workloads: "AttentionDB modes (PipelineStats boundary) + systems exposing candidate sets"
+    caveats: "separates candidate-generation quality from final-ranking quality; external systems without candidate exposure: n/a (flagged, never imputed)"
+  - id: M-NDGG-K
+    name: "ndcg@k"
+    formula: "standard NDCG with gains 2^rel-1 (graded) or binary rel"
+    unit: "ratio [0,1]"
+    aggregation: "per-query mean"
+    direction: higher
+    workloads: "graded datasets (SciFact/NFCorpus/ESCI with E=3,S=2,C=1 mapping preregistered)"
+    caveats: "gain mapping fixed before outcomes; binary variant also reported"
+  - id: M-MRR
+    name: "mrr"
+    formula: "1/rank of first relevant"
+    unit: "ratio (0,1]"
+    aggregation: "per-query mean"
+    direction: higher
+    workloads: "datasets with at least one relevant per query"
+    caveats: "undefined queries (no relevant) excluded with count reported"
+  - id: M-PRECISION-K
+    name: "precision@k"
+    formula: "|top_k ∩ relevant| / k"
+    unit: "ratio [0,1]"
+    aggregation: "per-query mean"
+    direction: higher
+    workloads: "fixed-k result sets"
+    caveats: "only meaningful where |relevant| varies; reported alongside recall"
+  - id: M-FILTERED-RECALL
+    name: "filtered-recall@k"
+    formula: "recall restricted to filter-satisfying relevant items"
+    unit: "ratio [0,1]"
+    aggregation: "per-query mean"
+    direction: higher
+    workloads: "W-11/W-12/W-13"
+    caveats: "soundness (no leaking docs) checked separately as a hard 0-tolerance violation"
+
+latency_metrics:
+  - id: M-LAT-P50
+    name: "p50 latency"
+    formula: "percentile of per-query wall time"
+    unit: "ms"
+    aggregation: "per-run query distribution then per-repetition"
+    direction: lower
+    workloads: "all"
+    caveats: "client-observed wall time; measurement boundary documented per adapter (connection reuse, no result consumption cost)"
+  - id: M-LAT-P95
+    name: "p95 latency"
+    formula: "percentile of per-query wall time"
+    unit: "ms"
+    aggregation: "as above"
+    direction: lower
+    workloads: "all"
+    caveats: "same as p50"
+  - id: M-LAT-P99
+    name: "p99 latency"
+    formula: "percentile of per-query wall time"
+    unit: "ms"
+    aggregation: "as above"
+    direction: lower
+    workloads: "all"
+    caveats: "with 300-query sets p99 is ~3 samples - report but flag granularity"
+  - id: M-LAT-COLD
+    name: "cold-start latency"
+    formula: "percentile of per-query wall time"
+    unit: "ms/s"
+    aggregation: "median of >=5 fresh-process runs"
+    direction: lower
+    workloads: "W-18"
+    caveats: "first-query distribution of a FRESH process (engine open/index load included per documented boundary); OS page cache state recorded (drop-caches not permitted in shared sandbox - disclosed)"
+  - id: M-LAT-WARM
+    name: "warm latency"
+    formula: "percentile of per-query wall time"
+    unit: "ms"
+    aggregation: "as M-LAT-P50"
+    direction: lower
+    workloads: "all"
+    caveats: "steady-state distribution after preregistered warmup (statistical plan: first 20 seeded-order queries discarded)"
+
+throughput_metrics:
+  - id: M-QPS
+    name: "query throughput"
+    formula: "count / wall time"
+    unit: "queries/s"
+    aggregation: "per-run"
+    direction: higher
+    workloads: "read-heavy W-19"
+    caveats: "single-client on 2 vCPU unless a concurrency level is explicitly configured"
+  - id: M-INGEST
+    name: "ingestion throughput"
+    formula: "count / wall time"
+    unit: "records/s (vectors/s also recorded)"
+    aggregation: "per-run"
+    direction: higher
+    workloads: "W-16/W-17"
+    caveats: "batch sizes documented per system; durability mode recorded for AttentionDB"
+  - id: M-UPD-DEL
+    name: "update/delete throughput"
+    formula: "count / wall time"
+    unit: "ops/s"
+    aggregation: "per-run"
+    direction: higher
+    workloads: "W-15"
+    caveats: "AttentionDB update = delete+insert (engine semantics)"
+
+resource_metrics:
+  - id: M-RSS-PEAK
+    name: "peak RSS"
+    formula: "per definition"
+    unit: "MiB"
+    aggregation: "sampler max (500 ms poll, process tree)"
+    direction: lower
+    workloads: "all"
+    caveats: "shared-memory caveats for postgres (documented per row)"
+  - id: M-RSS-STEADY
+    name: "steady-state RSS"
+    formula: "per definition"
+    unit: "MiB"
+    aggregation: "post-warmup window median"
+    direction: lower
+    workloads: "all"
+    caveats: "same sampler"
+  - id: M-CPU
+    name: "cpu utilization"
+    formula: "per definition"
+    unit: "percent (process tree)"
+    aggregation: "sampler mean"
+    direction: lower
+    workloads: "query + ingest"
+    caveats: "2-vCPU host; utilization alone is not a quality measure"
+  - id: M-IDX-SIZE
+    name: "index size"
+    formula: "per definition"
+    unit: "MiB"
+    aggregation: "du after build (post-checkpoint)"
+    direction: lower
+    workloads: "W-16/W-17"
+    caveats: "system-specific definitions (with/without data copies) documented per row"
+  - id: M-STOR-AMP
+    name: "storage amplification"
+    formula: "per definition"
+    unit: "ratio (index_size / raw_data_size)"
+    aggregation: "per-run"
+    direction: lower
+    workloads: "W-16/W-17"
+    caveats: "raw_data_size = exported bytes actually ingested"
+  - id: M-BUILD-TIME
+    name: "index-build time"
+    formula: "per definition"
+    unit: "s"
+    aggregation: "per-run wall"
+    direction: lower
+    workloads: "W-16/W-17"
+    caveats: "includes force-merge/optimization where part of documented setup"
+  - id: M-RESTART-TIME
+    name: "recovery/restart time"
+    formula: "per definition"
+    unit: "s"
+    aggregation: "per-run wall"
+    direction: lower
+    workloads: "lifecycle (opt-in)"
+    caveats: "AttentionDB restart includes deterministic index rebuild (sealed E10 finding)"
+
+composite_rules:
+  - "resource-normalized quality (e.g., recall per MiB) MAY be reported as a derived VIEW, never as a headline score"
+  - "NO overall winner score; NO weighted leaderboard (charter 16)"
+  - "error/timeout rate reported per run: fraction of queries failing (0-tolerance for silent wrong results - a wrong-result bug is a DEFECT, not a metric point)"

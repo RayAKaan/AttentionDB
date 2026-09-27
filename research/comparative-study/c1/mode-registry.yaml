@@ -1,0 +1,168 @@
+# Comparative-study mode registry (formal B0-B7 definitions).
+# Grounded in C0 audit (commit 79b2837, code tree sha16 d12fa093bc294977).
+# status: implemented | conditional | requires-implementation | documented-noop
+meta:
+  study_id: comparative-study-001
+  version: "1.0.0"
+  code_baseline_tree_sha16: d12fa093bc294977
+  notes: >
+    Equivalences are explicit. B2 is identical to B3 when no trained
+    ModelCard is activated (C0: collection.rs get_gated_weights fallback
+    chain); B4 identity-init QK attention was measured a mathematical no-op
+    vs B3 (phase2 findings). Neither pair may be presented as independent
+    architectural contributions.
+
+modes:
+  - id: MODE-B0
+    name: exact-reference-oracle
+    role: exact reference / oracle (quality ceiling)
+    implementation: harness-side exact cosine kNN over the exported dataset vectors (engine-independent; validates against a brute-force reference on fixtures)
+    implemented: false
+    status: requires-implementation
+    implementation_site: research/comparative-study/scripts/run/oracle (C2)
+    query_inputs: [canonical_query_embedding]
+    indexed_inputs: all record vectors of the given view (brute-force, no index)
+    candidate_generation: full scan, exact cosine
+    candidate_budget: none (top-k from all records)
+    fusion_or_rerank: none (exact ranking)
+    training_requirements: none
+    modelcard_required: false
+    candidate_level_interactions: false
+    expected_resource_cost: O(N*dim) per query; seconds-to-minutes per query at 40k+ on 2 vCPU (batched/parallel only)
+    known_limitations: defines NN ground truth, not human semantic relevance; per-query cost caps usable query counts at large N (subsample queries per statistical plan)
+    tracks: [TRK-A, TRK-B]
+
+  - id: MODE-B1
+    name: attentiondb-single-head-approx
+    role: approximate single-vector retrieval baseline
+    implementation: AttentionDB RetrievalMode::SingleHead (collection.rs:418-450) via attend(); one head index; hnsw_rs HNSW
+    implemented: true
+    status: implemented
+    query_inputs: [canonical_query_embedding]
+    indexed_inputs: 1 vector/record (canonical view), dim 384 (text sets) or 512 (COCO)
+    candidate_generation: HNSW search, k=top_k, ef_search from CollectionSettings
+    candidate_budget: per-head k (no union)
+    fusion_or_rerank: none (raw generator scores; retired ids filtered)
+    training_requirements: none
+    modelcard_required: false
+    candidate_level_interactions: false
+    expected_resource_cost: "1x index (N vectors), lowest query cost (phase2: p50 239us on a 32-d corpus; expect higher at 384-d)"
+    known_limitations: approximate (ef-dependent); recall gap vs B0 measured, not assumed
+    tracks: [TRK-A, TRK-B]
+
+  - id: MODE-B2
+    name: attentiondb-multihead-fixed-fusion
+    role: multi-head union with equal fixed weights
+    implementation: RetrievalMode::FixedFusion (uniform 1/n profile) via attend() with mode override, or attend_weighted(all-equal)
+    implemented: true
+    status: implemented
+    query_inputs: [canonical_query_embedding]
+    indexed_inputs: H vectors/record (one per head view), H in {2,3} for text sets (title/body/metadata views), 2 for COCO (image/text)
+    candidate_generation: every present head searched, per_head_k = max(top_k*5, 20); union clamped to candidate_budget 500
+    candidate_budget: 500 (default RetrievalConfig)
+    fusion_or_rerank: gated sum over min-max-normalized per-head scores, gates = uniform
+    training_requirements: none
+    modelcard_required: false
+    candidate_level_interactions: false
+    expected_resource_cost: ~H x index build/memory/ingest vs B1; ~H x per-query head search cost
+    known_limitations: min-max normalization is per-head-result-set relative (documented C0 stage 3)
+    tracks: [TRK-A, TRK-B]
+
+  - id: MODE-B3
+    name: attentiondb-multihead-learned-gating
+    role: multi-head with query-dependent learned head weights
+    implementation: RetrievalMode::LearnedGating + engine.activate_gating_model(ModelCard trained via learned/ GatingDataset/GatingMlp); supervision generated on TRAIN corpora only
+    implemented: true (engine path) / conditional (training supervision pipeline)
+    status: conditional
+    conditional_on: C2 must build + verify the leakage-safe training pipeline and activate a ModelCard; if training cannot be made credible under host resources, B3 is reported BLOCKED and is never substituted by uniform weights while labeled learned
+    query_inputs: [canonical_query_embedding]
+    indexed_inputs: same as MODE-B2
+    candidate_generation: identical to B2 (gates do NOT affect candidate generation - C0 finding 2)
+    candidate_budget: 500
+    fusion_or_rerank: gated sum with ModelCard MLP softmax weights (query -> head weights)
+    training_requirements: yes (see training-and-leakage.md); seeds recorded; validation-only checkpoint selection
+    modelcard_required: true
+    candidate_level_interactions: false
+    expected_resource_cost: "B2 cost + ~1us/query MLP forward (phase2 PH2B-LATENCY-001: 0.87us) + offline training time (accounted end-to-end)"
+    known_limitations: phase2 evidence for gating benefit is synthetic-corpus-only; this study re-tests on public data
+    tracks: [TRK-A]
+
+  - id: MODE-B4
+    name: attentiondb-candidate-attention-qk
+    role: candidate-level attention/scoring arm
+    implementation: RetrievalMode::QKAttention (AttentionScorer, identity Wq/Wk, rank weight 0.1)
+    implemented: true
+    status: documented-noop
+    noop_statement: >
+      Plainly: identity-init QK attention is a per-candidate tanh-bounded
+      dot product (profile x features) with NO cross-candidate interaction
+      and NO trained parameters; phase2 measured it mathematically identical
+      to B3 to 3 decimals (R@10/NDCG). It is retained as an arm ONLY to
+      verify that finding on public data; it must not be described as
+      transformer-style attention.
+    query_inputs: [canonical_query_embedding]
+    indexed_inputs: same as MODE-B2
+    candidate_generation: identical to B2/B3
+    candidate_budget: 500
+    fusion_or_rerank: B3 gating + attention feature (fusion weight 0.3 of final score)
+    training_requirements: none (weights are NOT learned; no training path exists)
+    modelcard_required: false
+    candidate_level_interactions: false
+    expected_resource_cost: B3 + O(candidates*(heads*2+attn_dim)) per query
+    known_limitations: equivalence with B3 expected; a B3-vs-B4 difference would indicate an implementation surprise requiring defect review
+    tracks: [TRK-A]
+
+  - id: MODE-B5
+    name: attentiondb-hybrid-sparse-dense
+    role: hybrid lexical+semantic retrieval
+    implementation: attend_hybrid; two preregistered strategies - HybridStrategy::Rrf (k=60, default) and HybridStrategy::Fusion (staged pipeline w/ bm25 feature weight 0.2)
+    implemented: true
+    status: implemented
+    query_inputs: [canonical_query_embedding, query_text]
+    indexed_inputs: per-head vectors (as B2) + BM25 inverted index over record text fields (built at ingest from the same exported text)
+    candidate_generation: vector heads as B2 + BM25 channel (top per_head_k)
+    candidate_budget: per_head_k union (RRF) or pipeline budget (Fusion)
+    fusion_or_rerank: RRF 1/(60+rank) over channels, or staged fusion equation
+    training_requirements: none
+    modelcard_required: false
+    candidate_level_interactions: false
+    expected_resource_cost: B2 + BM25 index memory/build + one sparse channel search
+    known_limitations: in-memory BM25 is AttentionDB-internal (not an external analyzer ecosystem); query_text is the raw query string
+    tracks: [TRK-A, TRK-B]
+
+  - id: MODE-B6
+    name: external-multi-vector-or-late-interaction
+    role: external multi-vector / late-interaction baseline
+    implementation: "PROPOSED (no adapter exists): Qdrant named-vectors + server-side prefetch fusion (RRF) as a multi-vector configuration; late-interaction (ColBERT/MaxSim) explicitly OUT of scope for this host unless a C2 feasibility smoke proves otherwise"
+    implemented: false
+    status: requires-implementation
+    status_note: adapters/proposed.md in C2; distinguish from the three feature-declared-but-missing adapter files (C0)
+    query_inputs: [per-head query embeddings matching each named vector]
+    indexed_inputs: H named vector fields per point (same exported per-head embeddings as AttentionDB receives)
+    candidate_generation: Qdrant prefetch per named vector + server-side fusion (documented config recorded verbatim)
+    candidate_budget: per-config recorded (preregistered grid)
+    fusion_or_rerank: server-side RRF/fusion (Qdrant-documented), recorded exactly
+    training_requirements: none
+    modelcard_required: false
+    candidate_level_interactions: false (prefetch-fusion), true for MaxSim late interaction (out of scope unless proven feasible)
+    expected_resource_cost: H x vector storage in one collection; measured, not assumed
+    known_limitations: single external system (Qdrant) means B6 conclusions do not generalize to all multi-vector designs
+    tracks: [TRK-A, TRK-B]
+
+  - id: MODE-B7
+    name: attentiondb-full-default-union-rerank
+    role: AttentionDB production-default configuration (RetrievalConfig::default)
+    implementation: RetrievalMode::Full = B3-tier gating + identity QK attention + metric-consistent exact rerank over the union
+    implemented: true
+    status: implemented
+    query_inputs: [canonical_query_embedding]
+    indexed_inputs: as MODE-B2
+    candidate_generation: as B2 (budget 500)
+    candidate_budget: 500 (rerank_size = union)
+    fusion_or_rerank: exact cosine similarity per union candidate per head (gated), + attention feature, fused 0.3/0.5/0.2
+    training_requirements: as B3 (uniform until a model is activated - documented)
+    modelcard_required: false (uniform-gating variant) / true (learned variant, secondary)
+    candidate_level_interactions: false
+    expected_resource_cost: B2 + O(union x H x dim) exact rerank per query (~5-9x B1 latency in phase2)
+    known_limitations: prior synthetic evidence UNFAVORABLE vs B2 (R@10 0.558 vs 0.672) - evaluated as-is, never redefined (charter §5)
+    tracks: [TRK-A, TRK-B]

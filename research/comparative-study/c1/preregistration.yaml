@@ -1,0 +1,95 @@
+study:
+  id: comparative-study-001
+  title: "AttentionDB vs established retrieval systems: matched-mode and practical-configuration comparisons"
+  version: "1.0.0"
+  created: "2026-09-25"
+  c0_entry_commit: fe4f92b2187bf631125e975a5db8a202b5316d00
+  c0_tree_sha16: d12fa093bc294977
+  c0_commit: 79b2837dd027aaf0064c701b8085baf29b4606f5
+  c1_protocol_commit: 963170b08df333fd10f7cdc6d04bc6fbe8e3051f # stamped by registration commit that follows this content commit  # filled by the registration stamp commit immediately after this file's first commit (see protocol_change_policy)
+  branch: comparative-study/c0-audit
+  status: PREREGISTERED  # no benchmark results exist at this point
+
+research_questions:
+  - {id: RQ1,  question: "Does AttentionDB retrieve more relevant results than conventional single-vector retrieval under equivalent conditions?"}
+  - {id: RQ2,  question: "Do multiple retrieval heads improve quality vs a single head?"}
+  - {id: RQ3,  question: "Does learned query-dependent gating improve quality vs fixed equal weighting?"}
+  - {id: RQ4,  question: "What latency/throughput/memory/CPU/index-size costs do multi-head retrieval and gating add?"}
+  - {id: RQ5,  question: "How does AttentionDB compare with strong configurations of established vector/hybrid systems?"}
+  - {id: RQ6,  question: "Are advantages concentrated in specific query classes, dataset structures, or metadata conditions?"}
+  - {id: RQ7,  question: "How does AttentionDB behave under concurrent ingestion, updates, deletions, compaction, retrieval?"}
+  - {id: RQ8,  question: "How do quality and performance change with dataset size?"}
+  - {id: RQ9,  question: "What does a user gain or lose choosing AttentionDB over established alternatives?"}
+  - {id: RQ10, question: "Does the multi-head architecture provide a defensible, reproducible contribution beyond existing hybrid/multi-vector/reranking/query-adaptive retrieval?"}
+
+hypotheses:
+  - {id: H1, rq: RQ2, type: directional-two-sided-neutral, statement: "On primary datasets, B2 (multi-head fixed fusion) differs from B1 (single-head) in graded-relevance quality by more than the practical-significance threshold (0.01 absolute nDCG@10/Recall@10); direction NOT presumed.", test: paired bootstrap + Wilcoxon, family: primary}
+  - {id: H2, rq: RQ3, type: directional, statement: "IF B3 trains credibly (else BLOCKED-TRAINING reported), trained gating >= B2 on held-out test queries (one-sided); note prior positive evidence is synthetic-only and does not transfer as finding.", test: paired bootstrap + Wilcoxon (one-sided preregistered), family: primary}
+  - {id: H3, rq: RQ2, type: null-expectation, statement: "B4 (identity QK attention) is indistinguishable from B3 within 0.001 mean metric difference (phase2 no-op reproduced on public data).", test: equivalence-style check (CI within bound), family: secondary}
+  - {id: H4, rq: RQ4, type: directional, statement: "AttentionDB multi-head modes cost >= H x (index build, index size, ingest) relative to B1 on the same dataset (measured, not assumed; H = heads).", test: descriptive with CIs, family: primary}
+  - {id: H5, rq: RQ4/RQ5, type: directional, statement: "At matched Recall@10, B1 latency <= multi-head mode latency (fusion is not free); magnitude unknown.", test: matched-config latency comparison, family: primary}
+  - {id: H6, rq: RQ5, type: exploratory, statement: "AttentionDB modes and tuned external baselines are Pareto-incomparable on at least one (quality, latency) point per dataset; no overall winner is inferred.", test: full quality-latency curves, family: exploratory}
+  - {id: H7, rq: RQ6, type: exploratory, statement: "Any multi-head advantage concentrates in preregistered query strata (conflicting-signal / multi-faceted queries); post-hoc strata are labeled exploratory and validated on holdout before strong claims.", test: stratified paired analysis, family: exploratory}
+
+tracks:
+  - {id: TRK-A, name: matched-retrieval-mode, docs: c1/protocol.md §1, claims_allowed: [architecture-isolated quality/latency statements under identical inputs], claims_forbidden: [practical deployment superiority, end-to-end cost superiority]}
+  - {id: TRK-B, name: practical-configuration, docs: c1/protocol.md §1, claims_allowed: [documented-configuration comparisons incl. setup/ingest/index/storage/query costs], claims_forbidden: [architecture isolation claims]}
+
+datasets:
+  accepted: [DS-SCIFACT, DS-NFCORPUS, DS-ANN-GLOVE-25, DS-ANN-GLOVE-50]
+  conditional: [DS-SCIDOCS, DS-ESCI-EN-SUB, DS-COCO-CAP-5K, DS-ANN-FMNIST, DS-ANN-NYTIMES, DS-FIQA-2018]
+  rejected: [DS-MSMARCO-FULL, DS-FLICKR8K]
+  diagnostic_only: [DS-SYNTH-PH2B]
+  split_rules:
+    - "BEIR official test queries are TEST ONLY; B3 supervision uses synthetic train corpora + leave-one-dataset-out transfer (training-and-leakage.md)"
+    - "ann-benchmarks: preregistered split of the 10k queries: first 2000 (seeded shuffle, seed 20260925) = tuning-validation; remaining 8000 = test"
+    - "ESCI (if admitted): subset from official TRAIN split with qrels-closure; official test split untouched for headline reporting"
+    - "COCO (if admitted): caption-level split; query captions disjoint from indexed captions"
+  embedding_models:
+    - {id: EMB-MINILM, name: sentence-transformers/all-MiniLM-L6-v2, license: Apache-2.0, dim: 384, role: text canonical + per-field head views}
+    - {id: EMB-CLIP, name: openai/clip-vit-base-patch32, license: MIT, dim: 512, role: COCO image+text heads (conditional)}
+  hashes: "dataset + embedding manifests recorded at C2 ingest; all Track A systems receive byte-identical exports"
+
+modes: [MODE-B0, MODE-B1, MODE-B2, MODE-B3, MODE-B4, MODE-B5, MODE-B6, MODE-B7]
+baselines: [BASE-ADB, BASE-ORACLE, BASE-QDRANT, BASE-PGVECTOR, BASE-ES, BASE-MILVUSLITE, BASE-WEAVIATE, BASE-PINECONE, BASE-MONGO]
+workloads: [W-01, W-02, W-03, W-04, W-05, W-06, W-07, W-08, W-09, W-10, W-11, W-12, W-13, W-14, W-15, W-16, W-17, W-18, W-19]
+metrics: [M-RECALL-K, M-RECALL-CAND, M-NDGG-K, M-MRR, M-PRECISION-K, M-FILTERED-RECALL, M-LAT-P50, M-LAT-P95, M-LAT-P99, M-LAT-COLD, M-LAT-WARM, M-QPS, M-INGEST, M-UPD-DEL, M-RSS-PEAK, M-RSS-STEADY, M-CPU, M-IDX-SIZE, M-STOR-AMP, M-BUILD-TIME, M-RESTART-TIME]
+
+primary_outcomes:
+  - "H1 contrast: B2 - B1 graded-relevance quality (nDCG@10, Recall@10) on DS-SCIFACT and DS-NFCORPUS (paired, Holm-corrected)"
+  - "H2 contrast: B3 - B2 on the same (conditional on training readiness)"
+  - "H5 contrast: p50 latency at matched Recall@10 (+-0.01) between B1 and multi-head modes (DS-SCIFACT + ANN sets)"
+secondary_outcomes:
+  - "B3 - B4 equivalence check (H3); B2 vs B7 default-mode trade-offs; candidate-recall vs final-recall separation; per-resource accounting (H4); Track B practical tables; scale-ladder curves (RQ8); workload strata (H7)"
+
+tuning_policy:
+  - "preregistered per-system parameter grids, equal grid budget per system (Rule 8); tuning on validation queries only; frozen configs then run on test"
+  - "quality-matched (+-0.01 Recall@10) and budget-matched (BUDGET-CAND/EF/MEM/TIME) comparisons per recall-and-budget-matching.md"
+statistical_plan: c1/statistical-plan.md
+resource_limits: c1/environment-guardrails.md
+fairness_accounting: c1/fairness-and-resource-accounting.md
+
+exclusion_invalidation_rules:
+  - "INV-L1..L5 (training-and-leakage.md)"
+  - "soundness violation (a filtered query returns a non-matching doc) -> comparison frozen pending defect review"
+  - "silent wrong result -> DEFECT (not a metric point); preserve, ledger, rerun under new ID if fixed"
+  - "OOM/timeout -> OBSERVED-LIMIT/FAILED classification preserved; never silently dropped or retried at a different config without amendment"
+  - "post-hoc data exclusion without a preregistered rule -> analysis INVALIDATED"
+
+known_limitations:
+  - "2 vCPU / 1.9 GiB host caps dataset sizes and excludes some external systems (baseline-feasibility.csv)"
+  - "managed services blocked pending user authorization; no cloud data transmission has occurred"
+  - "B3 training supervision must be constructed in C2; if not credible, reported BLOCKED-TRAINING (never uniform-as-learned)"
+  - "B4 is identity-init untrained attention; treated as a no-op verification arm"
+  - "p99 on 300-query sets has coarse granularity; flagged wherever reported"
+  - "prior phase2/phase2b synthetic evidence and master_comparator_results.json external rows are NOT evidence in this study"
+
+unresolved_blockers:
+  - {id: BLK-1, item: "Pinecone / MongoDB Atlas comparisons require user credentials + budget authorization", impact: "C4 coverage only; local work proceeds"}
+  - {id: BLK-2, item: "COCO CLIP-on-CPU encode feasibility unproven", impact: "native-two-head dataset conditional; acceptance rule already met without it"}
+  - {id: BLK-3, item: "pgvector availability in distro repos + Milvus-Lite wheel support unverified on this host", impact: "C2 smokes decide; statusesCONDITIONAL"}
+  - {id: BLK-4, item: "ESCI subset size bounded by host RAM", impact: "conditional dataset"}
+
+protocol_change_policy:
+  - "post-freeze changes = versioned amendments appended to this file with timestamp, justification, and author; outcomes already observed force new-ID reruns of affected experiments"
+  - "the registration stamp commit records the C1 protocol commit hash immediately after the C1 content commit; later amendments never rewrite preregistered sections - they append"

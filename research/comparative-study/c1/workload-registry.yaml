@@ -1,0 +1,32 @@
+# Comparative-study workload registry (stable IDs; preregistered generators in C2)
+meta:
+  study_id: comparative-study-001
+  version: "1.0.0"
+  notes: >
+    W13 paced-reader semantics CONFIRMED from the prior benchmark design:
+    reader issues queries in a loop with a fixed 2 ms sleep between queries
+    (AttentionDB E10 harness pattern), capped total queries, single reader
+    thread on this 2-vCPU host; writer throughput sampled concurrently.
+    Synthetic workloads are DIAGNOSTIC-labeled. Every workload records
+    generator, parameters, seed, and expected properties in its run config.
+
+workloads:
+  - {id: W-01, name: single-head-retrieval,       datasets: [DS-SCIFACT, DS-NFCORPUS, DS-ANN-GLOVE-25], modes: [MODE-B0, MODE-B1], purpose: "RQ1 baseline quality + latency floor"}
+  - {id: W-02, name: fixed-multihead-retrieval,   datasets: [DS-SCIFACT, DS-NFCORPUS, DS-COCO-CAP-5K],  modes: [MODE-B2],          purpose: "RQ2/RQ6 multi-head union quality vs B1"}
+  - {id: W-03, name: learned-multihead-retrieval, datasets: [DS-SCIFACT, DS-NFCORPUS],                  modes: [MODE-B3],          purpose: "RQ3 gating contribution (conditional on training readiness)"}
+  - {id: W-04, name: candidate-attention-arm,     datasets: [DS-SCIFACT],                               modes: [MODE-B4],          purpose: "verify phase2 no-op finding on public data"}
+  - {id: W-05, name: hybrid-sparse-dense,         datasets: [DS-SCIFACT, DS-ESCI-EN-SUB],               modes: [MODE-B5],          purpose: "RQ1/RQ5 hybrid comparison (text present)"}
+  - {id: W-06, name: multiview-external,          datasets: [DS-SCIFACT, DS-COCO-CAP-5K],               modes: [MODE-B6],          purpose: "RQ5/RQ10 external multi-vector comparison (conditional)"}
+  - {id: W-07, name: default-full-mode,           datasets: [DS-SCIFACT, DS-NFCORPUS],                  modes: [MODE-B7],          purpose: "RQ9 production-default trade-offs (unfavorable evidence evaluated as-is)"}
+  - {id: W-08, name: conflicting-signals,         datasets: [DS-SYNTH-PH2B(multiview)],                 modes: [MODE-B1, MODE-B2, MODE-B3], purpose: "RQ6 query classes where heads disagree (diagnostic/synthetic, labeled)"}
+  - {id: W-09, name: head-dominance-classes,      datasets: [DS-SYNTH-PH2B(multiview)],                 modes: [MODE-B1, MODE-B2, MODE-B3], purpose: "RQ6 dominant-head vs contributing-head query classes (diagnostic)"}
+  - {id: W-10, name: duplicate-heavy,             datasets: [DS-SYNTH-PH2B(dup-variant), DS-COCO-CAP-5K], modes: [MODE-B0, MODE-B1, MODE-B2], purpose: "RQ6 near-duplicate stability (dedupe semantics)"}
+  - {id: W-11, name: filtered-retrieval,          datasets: [DS-ESCI-EN-SUB],                           modes: [MODE-B1, MODE-B2, MODE-B5, external-filtered], purpose: "RQ5/RQ6 metadata filtering (Track B primary for external systems)"}
+  - {id: W-12, name: selective-filter,            datasets: [DS-ESCI-EN-SUB],                           modes: [same as W-11],     purpose: "high-selectivity filter behavior + filtered-recall"}
+  - {id: W-13, name: low-selectivity-filter,      datasets: [DS-ESCI-EN-SUB],                           modes: [same as W-11],     purpose: "low-selectivity filter cost"}
+  - {id: W-14, name: concurrent-paced-reader,     datasets: [DS-SCIFACT or ESCI subset],                modes: [MODE-B2],          purpose: "RQ7 mixed read/write; paced-reader: 2ms sleep between reader queries, 1 reader thread, query cap 20k, concurrent single-writer ingest; sampled writer throughput"}
+  - {id: W-15, name: update-delete-heavy,         datasets: [DS-SCIFACT],                   modes: [MODE-B1, MODE-B2], purpose: "RQ7 churn + compaction effects (retired-id design measured as-is)"}
+  - {id: W-16, name: ingestion-heavy,             datasets: [DS-ANN-GLOVE-25, DS-ANN-GLOVE-50],                            modes: [MODE-B1],          purpose: "RQ4/RQ7 ingestion throughput + index build vs size"}
+  - {id: W-17, name: scale-ladder,                datasets: [DS-ANN-GLOVE-25, ladder rungs 10k/25k/40k/60k/80k subsets + DS-ANN-FMNIST + DS-ANN-NYTIMES], modes: [MODE-B0, MODE-B1, MODE-B2], purpose: "RQ8 size scaling within host envelope; larger only if guardrails allow"}
+  - {id: W-18, name: cold-warm-cache,             datasets: [DS-SCIFACT],                               modes: [MODE-B1, MODE-B2, MODE-B7], purpose: "RQ4 cold vs warm latency (fresh process vs steady state; documented OS cache state)"}
+  - {id: W-19, name: recall-latency-sweep,        datasets: [DS-ANN-GLOVE-25, DS-ANN-GLOVE-50, DS-SCIFACT], modes: [all AttentionDB modes + feasible externals], purpose: "RQ4/RQ5 matched-budget curves (recall-and-budget-matching.md)"}
