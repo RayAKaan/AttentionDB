@@ -36,8 +36,10 @@ fn replay_same_uuid_delete_reinsert_two_txns() {
         e.checkpoint().unwrap();
         for num in [100i64, 200] {
             let t = e.begin_transaction("bench");
-            e.record_transaction_operation(t, TxnOp::Delete(uuid::Uuid::from_u128(6100u128 << 64))).unwrap();
-            e.record_transaction_operation(t, TxnOp::Insert(rec(6100, 0, num))).unwrap();
+            e.record_transaction_operation(t, TxnOp::Delete(uuid::Uuid::from_u128(6100u128 << 64)))
+                .unwrap();
+            e.record_transaction_operation(t, TxnOp::Insert(rec(6100, 0, num)))
+                .unwrap();
             let ok = e.commit_transaction(t).unwrap();
             println!("commit num={num} -> {ok}");
         }
@@ -74,11 +76,8 @@ fn replay_same_uuid_delete_reinsert_wal_no_close() {
         e.checkpoint().unwrap();
         for num in [100i64, 200] {
             let t = e.begin_transaction("bench");
-            e.record_transaction_operation(
-                t,
-                TxnOp::Delete(uuid::Uuid::from_u128(6100u128 << 64)),
-            )
-            .unwrap();
+            e.record_transaction_operation(t, TxnOp::Delete(uuid::Uuid::from_u128(6100u128 << 64)))
+                .unwrap();
             e.record_transaction_operation(t, TxnOp::Insert(rec(6100, 0, num)))
                 .unwrap();
             let ok = e.commit_transaction(t).unwrap();

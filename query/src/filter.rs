@@ -590,7 +590,10 @@ mod tests {
         for _ in 0..(MAX_FILTER_DEPTH + 2) {
             deep = FilterExpr::Not(Box::new(deep));
         }
-        assert!(deep.validate().is_err(), "over-deep filter must fail validation");
+        assert!(
+            deep.validate().is_err(),
+            "over-deep filter must fail validation"
+        );
     }
 
     fn build_random(
@@ -599,7 +602,9 @@ mod tests {
         mk_value: &impl Fn(u64) -> FilterValue,
         depth: usize,
     ) -> FilterExpr {
-        n = n.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        n = n
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         if depth >= 3 {
             return FilterExpr::Comparison {
                 field: leaf_fields[(n % leaf_fields.len() as u64) as usize].to_string(),
@@ -753,7 +758,10 @@ mod e6_semantics_tests {
                 op,
                 value: FilterValue::Int(5),
             };
-            assert!(!f.eval(&missing), "op {op:?} on missing field must be false");
+            assert!(
+                !f.eval(&missing),
+                "op {op:?} on missing field must be false"
+            );
         }
     }
 }

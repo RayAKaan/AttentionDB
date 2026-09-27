@@ -87,14 +87,26 @@ fn title_for(idx: u32) -> String {
         return format!("s{}", idx % 97);
     }
     let words = idx % 7 + 1;
-    (0..words).map(|w| format!("w{}-{}", w, fnv1a(0x717, (idx as u64) * 131 + w as u64) % 9973)).collect::<Vec<_>>().join(" ")
+    (0..words)
+        .map(|w| {
+            format!(
+                "w{}-{}",
+                w,
+                fnv1a(0x717, (idx as u64) * 131 + w as u64) % 9973
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn gen_record(dim: usize, idx: u32, ver: u64, heads: &[String]) -> Record {
     let mut fields = HashMap::new();
     fields.insert("idx".to_string(), serde_json::json!(idx));
     fields.insert("version".to_string(), serde_json::json!(ver));
-    fields.insert("cat".to_string(), serde_json::json!(format!("c{}", idx % 50)));
+    fields.insert(
+        "cat".to_string(),
+        serde_json::json!(format!("c{}", idx % 50)),
+    );
     fields.insert("num".to_string(), serde_json::json!((idx % 9973) as i64));
     fields.insert("title".to_string(), serde_json::json!(title_for(idx)));
     let mut r = Record::new(fields);
@@ -126,7 +138,11 @@ fn avail_kb() -> usize {
     if let Ok(s) = std::fs::read_to_string("/proc/meminfo") {
         for line in s.lines() {
             if let Some(rest) = line.strip_prefix("MemAvailable:") {
-                return rest.split_whitespace().next().and_then(|v| v.parse().ok()).unwrap_or(0);
+                return rest
+                    .split_whitespace()
+                    .next()
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(0);
             }
         }
     }
@@ -172,7 +188,10 @@ impl Tel {
             "{el:.1},{op},{rss},{vmz},{anon},{file},{ps},{pas},{pfs},{thr},{fds},{av},{walb},{waln},{sstb},{sstn},{dbb}"
         ));
         if rss > self.guard_rss_kb && self.halt.is_none() {
-            self.halt = Some(format!("live RSS {rss} KB exceeded 85% of launch MemAvailable ({} KB) at op {op}", self.guard_rss_kb));
+            self.halt = Some(format!(
+                "live RSS {rss} KB exceeded 85% of launch MemAvailable ({} KB) at op {op}",
+                self.guard_rss_kb
+            ));
         }
         // incremental flush so OOM-killed runs still preserve telemetry
         if self.rows.len().is_multiple_of(5) {
@@ -352,7 +371,11 @@ fn verify(ctx: &mut Ctx, n_samples: usize) -> Verif {
         p50_us: p(0.50),
         p95_us: p(0.95),
         p99_us: p(0.99),
-        qps: if total > 0.0 { nq as f64 / (total / 1e6) } else { 0.0 },
+        qps: if total > 0.0 {
+            nq as f64 / (total / 1e6)
+        } else {
+            0.0
+        },
     }
 }
 
@@ -387,7 +410,10 @@ fn ex_ladder(out: &str, docs: u32, exp: &str) {
     std::fs::create_dir_all(&out).unwrap();
     // M3 pre-flight: projected peak = base 30 MB + per-doc marginal (measured
     // from the previous tier via E10_PER_DOC_KB, default 7.0 KB/doc)
-    let per_doc_kb: f64 = std::env::var("E10_PER_DOC_KB").ok().and_then(|v| v.parse().ok()).unwrap_or(7.0);
+    let per_doc_kb: f64 = std::env::var("E10_PER_DOC_KB")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(7.0);
     let avail = avail_kb();
     let projected = 30_000.0 + per_doc_kb * docs as f64;
     if projected > 0.80 * avail as f64 {
@@ -414,7 +440,17 @@ fn ex_ladder(out: &str, docs: u32, exp: &str) {
         }
     }
     let build_s = t_build.elapsed().as_secs_f64();
-    let rss0 = ctx.tel.rows.first().map(|r| r.split(',').nth(2).and_then(|v| v.parse::<usize>().ok()).unwrap_or(0)).unwrap_or(0);
+    let rss0 = ctx
+        .tel
+        .rows
+        .first()
+        .map(|r| {
+            r.split(',')
+                .nth(2)
+                .and_then(|v| v.parse::<usize>().ok())
+                .unwrap_or(0)
+        })
+        .unwrap_or(0);
     let t_ckpt = std::time::Instant::now();
     if ctx.tel.halt.is_none() {
         ctx.e.checkpoint().unwrap();
@@ -422,7 +458,11 @@ fn ex_ladder(out: &str, docs: u32, exp: &str) {
     let ckpt_ms = t_ckpt.elapsed().as_millis() as u64;
     let census_post_build = census_json(&ctx.e);
     ctx.tel.maybe(&ctx.e, &ctx.db, ctx.seq, true);
-    let v1 = if ctx.tel.halt.is_none() { verify(&mut ctx, 5_000) } else { Verif::default() };
+    let v1 = if ctx.tel.halt.is_none() {
+        verify(&mut ctx, 5_000)
+    } else {
+        Verif::default()
+    };
     // reopen
     let t_reopen = std::time::Instant::now();
     if ctx.tel.halt.is_none() {
@@ -430,9 +470,19 @@ fn ex_ladder(out: &str, docs: u32, exp: &str) {
     }
     let reopen_s = t_reopen.elapsed().as_secs_f64();
     let census_post_reopen = census_json(&ctx.e);
-    let v2 = if ctx.tel.halt.is_none() { verify(&mut ctx, 5_000) } else { Verif::default() };
+    let v2 = if ctx.tel.halt.is_none() {
+        verify(&mut ctx, 5_000)
+    } else {
+        Verif::default()
+    };
     ctx.tel.maybe(&ctx.e, &ctx.db, ctx.seq, true);
-    let peak_kb = ctx.tel.rows.iter().filter_map(|r| r.split(',').nth(2).and_then(|v| v.parse::<usize>().ok())).max().unwrap_or(0);
+    let peak_kb = ctx
+        .tel
+        .rows
+        .iter()
+        .filter_map(|r| r.split(',').nth(2).and_then(|v| v.parse::<usize>().ok()))
+        .max()
+        .unwrap_or(0);
     let last = ctx.tel.rows.last().cloned().unwrap_or_default();
     let p = |i: usize| -> String { last.split(',').nth(i).unwrap_or("NA").to_string() };
     let (_, _, sstn, _, dbb) = dir_census(&ctx.db);
@@ -484,7 +534,10 @@ fn ex_retrieval(out: &str, docs: u32) {
     ctx.e.checkpoint().unwrap();
     let build_s = t_build.elapsed().as_secs_f64();
     // 1,000-query batch (100 self + 900 noise), per-query latency
-    let idxs: Vec<u32> = (0..docs).step_by((docs / 100).max(1) as usize).take(100).collect();
+    let idxs: Vec<u32> = (0..docs)
+        .step_by((docs / 100).max(1) as usize)
+        .take(100)
+        .collect();
     let mut self_hits = 0;
     let mut lat: Vec<f64> = Vec::new();
     for &idx in &idxs {
@@ -534,7 +587,14 @@ fn ex_retrieval(out: &str, docs: u32) {
     }
     let _ = std::fs::write(out.join("summary.json"), s.to_string());
     ctx.tel.flush("t_s,op,rss_kb,vmz_kb,anon_kb,file_kb,pss_kb,pss_anon_kb,pss_file_kb,threads,fds,avail_kb,wal_bytes,wal_files,sst_bytes,sst_files,db_bytes");
-    println!("e10 retrieval@{docs}: selfhit={}/{} p50={:.0}us p95={:.0}us p99={:.0}us qps={qps:.0}", self_hits, idxs.len(), p(0.50), p(0.95), p(0.99));
+    println!(
+        "e10 retrieval@{docs}: selfhit={}/{} p50={:.0}us p95={:.0}us p99={:.0}us qps={qps:.0}",
+        self_hits,
+        idxs.len(),
+        p(0.50),
+        p(0.95),
+        p(0.99)
+    );
 }
 
 fn ex_heads(out: &str, heads: usize, docs: u32) {
@@ -554,7 +614,13 @@ fn ex_heads(out: &str, heads: usize, docs: u32) {
     let census = census_json(&ctx.e);
     let v = verify(&mut ctx, 2_000);
     ctx.tel.maybe(&ctx.e, &ctx.db, ctx.seq, true);
-    let peak_kb = ctx.tel.rows.iter().filter_map(|r| r.split(',').nth(2).and_then(|x| x.parse::<usize>().ok())).max().unwrap_or(0);
+    let peak_kb = ctx
+        .tel
+        .rows
+        .iter()
+        .filter_map(|r| r.split(',').nth(2).and_then(|x| x.parse::<usize>().ok()))
+        .max()
+        .unwrap_or(0);
     let s = serde_json::json!({
         "experiment": "e10-heads", "heads": heads, "docs": docs, "ops": ctx.seq,
         "build_s": build_s, "checkpoint_ms": ckpt_ms, "rss_peak_kb": peak_kb,
@@ -563,7 +629,10 @@ fn ex_heads(out: &str, heads: usize, docs: u32) {
     });
     let _ = std::fs::write(out.join("summary.json"), s.to_string());
     ctx.tel.flush("t_s,op,rss_kb,vmz_kb,anon_kb,file_kb,pss_kb,pss_anon_kb,pss_file_kb,threads,fds,avail_kb,wal_bytes,wal_files,sst_bytes,sst_files,db_bytes");
-    println!("e10 heads={heads}@{docs}: build={build_s:.1}s peak={peak_kb}KB selfhit={}/{} p50={:.0}us", v.self_hits, v.self_queries, v.p50_us);
+    println!(
+        "e10 heads={heads}@{docs}: build={build_s:.1}s peak={peak_kb}KB selfhit={}/{} p50={:.0}us",
+        v.self_hits, v.self_queries, v.p50_us
+    );
 }
 
 fn ex_dims(out: &str, dim: usize, docs: u32) {
@@ -583,7 +652,13 @@ fn ex_dims(out: &str, dim: usize, docs: u32) {
     let census = census_json(&ctx.e);
     let v = verify(&mut ctx, 2_000);
     ctx.tel.maybe(&ctx.e, &ctx.db, ctx.seq, true);
-    let peak_kb = ctx.tel.rows.iter().filter_map(|r| r.split(',').nth(2).and_then(|x| x.parse::<usize>().ok())).max().unwrap_or(0);
+    let peak_kb = ctx
+        .tel
+        .rows
+        .iter()
+        .filter_map(|r| r.split(',').nth(2).and_then(|x| x.parse::<usize>().ok()))
+        .max()
+        .unwrap_or(0);
     let s = serde_json::json!({
         "experiment": "e10-dims", "dim": dim, "docs": docs, "ops": ctx.seq,
         "build_s": build_s, "checkpoint_ms": ckpt_ms, "rss_peak_kb": peak_kb,
@@ -591,7 +666,10 @@ fn ex_dims(out: &str, dim: usize, docs: u32) {
     });
     let _ = std::fs::write(out.join("summary.json"), s.to_string());
     ctx.tel.flush("t_s,op,rss_kb,vmz_kb,anon_kb,file_kb,pss_kb,pss_anon_kb,pss_file_kb,threads,fds,avail_kb,wal_bytes,wal_files,sst_bytes,sst_files,db_bytes");
-    println!("e10 dim={dim}@{docs}: build={build_s:.1}s peak={peak_kb}KB selfhit={}/{} p50={:.0}us", v.self_hits, v.self_queries, v.p50_us);
+    println!(
+        "e10 dim={dim}@{docs}: build={build_s:.1}s peak={peak_kb}KB selfhit={}/{} p50={:.0}us",
+        v.self_hits, v.self_queries, v.p50_us
+    );
 }
 
 fn ex_churn(out: &str) {
@@ -627,18 +705,35 @@ fn ex_churn(out: &str) {
         ctx.seq += 1;
         let r = rnd();
         let hot = r % 10 == 0;
-        let pick = if hot { (r >> 8) % 50 } else { (r >> 8) % 60_000 };
+        let pick = if hot {
+            (r >> 8) % 50
+        } else {
+            (r >> 8) % 60_000
+        };
         let idx = pick as u32;
         let mode = (r >> 20) % 100;
         if mode < 45 && ctx.model.live.contains_key(&idx) {
             // update (uuid preserved, numeric remapped by engine)
             let ver = ctx.model.live[&idx];
             let rec = gen_record(32, idx, ver, &ctx.heads);
-            ctx.e.update_document("bench", &uuid_for(idx, ver).to_string(), rec.fields.clone(), rec.k_vecs.clone()).unwrap();
+            ctx.e
+                .update_document(
+                    "bench",
+                    &uuid_for(idx, ver).to_string(),
+                    rec.fields.clone(),
+                    rec.k_vecs.clone(),
+                )
+                .unwrap();
             n_upd += 1;
         } else if mode < 70 && ctx.model.live.contains_key(&idx) {
-            let deleted = ctx.e.delete_document("bench", &uuid_for(idx, ctx.model.live[&idx]).to_string()).unwrap();
-            assert!(deleted, "model/engine divergence: delete of a modeled-live doc returned false");
+            let deleted = ctx
+                .e
+                .delete_document("bench", &uuid_for(idx, ctx.model.live[&idx]).to_string())
+                .unwrap();
+            assert!(
+                deleted,
+                "model/engine divergence: delete of a modeled-live doc returned false"
+            );
             ctx.model.live.remove(&idx);
             n_del += 1;
         } else if !ctx.model.live.contains_key(&idx) {
@@ -650,7 +745,14 @@ fn ex_churn(out: &str) {
             // upsert on a live doc = update
             let ver = ctx.model.live[&idx];
             let rec = gen_record(32, idx, ver, &ctx.heads);
-            ctx.e.update_document("bench", &uuid_for(idx, ver).to_string(), rec.fields.clone(), rec.k_vecs.clone()).unwrap();
+            ctx.e
+                .update_document(
+                    "bench",
+                    &uuid_for(idx, ver).to_string(),
+                    rec.fields.clone(),
+                    rec.k_vecs.clone(),
+                )
+                .unwrap();
             n_upd += 1;
         }
         if ctx.seq.is_multiple_of(20_000) {
@@ -668,7 +770,13 @@ fn ex_churn(out: &str) {
     let census_end = census_json(&ctx.e);
     let v = verify(&mut ctx, 5_000);
     ctx.tel.maybe(&ctx.e, &ctx.db, ctx.seq, true);
-    let peak_kb = ctx.tel.rows.iter().filter_map(|r| r.split(',').nth(2).and_then(|x| x.parse::<usize>().ok())).max().unwrap_or(0);
+    let peak_kb = ctx
+        .tel
+        .rows
+        .iter()
+        .filter_map(|r| r.split(',').nth(2).and_then(|x| x.parse::<usize>().ok()))
+        .max()
+        .unwrap_or(0);
     let s = serde_json::json!({
         "experiment": "e10-churn", "base_docs": 60_000, "ops": ctx.seq,
         "updates": n_upd, "deletes": n_del, "reinserts": n_re,
@@ -753,7 +861,13 @@ fn ex_concurrency(out: &str) {
     ctx.e = std::sync::Arc::new(open_db(&ctx.db));
     let v = verify(&mut ctx, 5_000);
     ctx.tel.maybe(&ctx.e, &ctx.db, ctx.seq, true);
-    let peak_kb = ctx.tel.rows.iter().filter_map(|r| r.split(',').nth(2).and_then(|x| x.parse::<usize>().ok())).max().unwrap_or(0);
+    let peak_kb = ctx
+        .tel
+        .rows
+        .iter()
+        .filter_map(|r| r.split(',').nth(2).and_then(|x| x.parse::<usize>().ok()))
+        .max()
+        .unwrap_or(0);
     let s = serde_json::json!({
         "experiment": "e10-concurrency", "base_docs": 40_000, "ops": ctx.seq,
         "writer_ops": 20_000, "reader_checks": checks, "conc_s": conc_s,
@@ -796,10 +910,23 @@ fn ex_integrated(out: &str, docs: u32) {
         if mode < 50 && ctx.model.live.contains_key(&idx) {
             let ver = ctx.model.live[&idx];
             let rec = gen_record(32, idx, ver, &ctx.heads);
-            ctx.e.update_document("bench", &uuid_for(idx, ver).to_string(), rec.fields.clone(), rec.k_vecs.clone()).unwrap();
+            ctx.e
+                .update_document(
+                    "bench",
+                    &uuid_for(idx, ver).to_string(),
+                    rec.fields.clone(),
+                    rec.k_vecs.clone(),
+                )
+                .unwrap();
         } else if mode < 75 && ctx.model.live.contains_key(&idx) {
-            let deleted = ctx.e.delete_document("bench", &uuid_for(idx, ctx.model.live[&idx]).to_string()).unwrap();
-            assert!(deleted, "model/engine divergence: delete of a modeled-live doc returned false");
+            let deleted = ctx
+                .e
+                .delete_document("bench", &uuid_for(idx, ctx.model.live[&idx]).to_string())
+                .unwrap();
+            assert!(
+                deleted,
+                "model/engine divergence: delete of a modeled-live doc returned false"
+            );
             ctx.model.live.remove(&idx);
         } else if !ctx.model.live.contains_key(&idx) {
             ctx.insert_new(idx);
@@ -815,14 +942,20 @@ fn ex_integrated(out: &str, docs: u32) {
         let idx = docs + 1_000 + i as u32;
         let t = ctx.e.begin_transaction("bench");
         let r1 = gen_record(32, idx, 1, &ctx.heads);
-        ctx.e.record_transaction_operation(t, TxnOp::Insert(r1)).unwrap();
+        ctx.e
+            .record_transaction_operation(t, TxnOp::Insert(r1))
+            .unwrap();
         let r2 = gen_record(32, idx, 2, &ctx.heads);
-        ctx.e.record_transaction_operation(t, TxnOp::Insert(r2)).unwrap();
+        ctx.e
+            .record_transaction_operation(t, TxnOp::Insert(r2))
+            .unwrap();
         if ctx.e.commit_transaction(t).unwrap_or(false) {
             txn_ok += 1;
             // r2 (ver 2) supersedes r1; model keeps idx at the highest ver
             ctx.model.live.insert(idx, 2);
-            let _ = ctx.e.delete_document("bench", &uuid_for(idx, 1).to_string());
+            let _ = ctx
+                .e
+                .delete_document("bench", &uuid_for(idx, 1).to_string());
         }
         if ctx.seq.is_multiple_of(5_000) {
             ctx.tel.maybe(&ctx.e, &ctx.db, ctx.seq, false);
@@ -845,7 +978,13 @@ fn ex_integrated(out: &str, docs: u32) {
     ctx.e = std::sync::Arc::new(open_db(&ctx.db));
     let v = verify(&mut ctx, 5_000);
     ctx.tel.maybe(&ctx.e, &ctx.db, ctx.seq, true);
-    let peak_kb = ctx.tel.rows.iter().filter_map(|r| r.split(',').nth(2).and_then(|x| x.parse::<usize>().ok())).max().unwrap_or(0);
+    let peak_kb = ctx
+        .tel
+        .rows
+        .iter()
+        .filter_map(|r| r.split(',').nth(2).and_then(|x| x.parse::<usize>().ok()))
+        .max()
+        .unwrap_or(0);
     let s = serde_json::json!({
         "experiment": "e10-integrated", "docs_base": docs, "ops": ctx.seq,
         "build_s": build_s, "churn_ops": churn_ops, "txn_ok": txn_ok,
@@ -875,7 +1014,10 @@ fn ex_maintenance(out: &str, docs: u32) {
     for idx in 0..docs / 10 {
         ctx.seq += 1;
         let ver = ctx.model.live[&idx];
-        let deleted = ctx.e.delete_document("bench", &uuid_for(idx, ver).to_string()).unwrap();
+        let deleted = ctx
+            .e
+            .delete_document("bench", &uuid_for(idx, ver).to_string())
+            .unwrap();
         assert!(deleted);
         ctx.model.live.remove(&idx);
     }
@@ -897,7 +1039,13 @@ fn ex_maintenance(out: &str, docs: u32) {
     let reopen_s = t_reopen.elapsed().as_secs_f64();
     let v = verify(&mut ctx, 5_000);
     ctx.tel.maybe(&ctx.e, &ctx.db, ctx.seq, true);
-    let peak_kb = ctx.tel.rows.iter().filter_map(|r| r.split(',').nth(2).and_then(|x| x.parse::<usize>().ok())).max().unwrap_or(0);
+    let peak_kb = ctx
+        .tel
+        .rows
+        .iter()
+        .filter_map(|r| r.split(',').nth(2).and_then(|x| x.parse::<usize>().ok()))
+        .max()
+        .unwrap_or(0);
     let s = serde_json::json!({
         "experiment": "e10-maintenance", "docs": docs, "ops": ctx.seq,
         "build_s": build_s, "checkpoint_ms": ckpt_ms,

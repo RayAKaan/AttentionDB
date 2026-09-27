@@ -187,11 +187,13 @@ fn t13_crash_during_checkpoint() {
             let e = open_sync(d2.path());
             e.create_collection("c", 8, &["default"]).unwrap();
             for i in 0..5 {
-                e.insert_document("c", doc(i, &one_hot(i as usize, 8), "safe")).unwrap();
+                e.insert_document("c", doc(i, &one_hot(i as usize, 8), "safe"))
+                    .unwrap();
             }
             e.checkpoint().unwrap(); // gen 2 (cp=6); WAL trimmed, active @7
             for i in 5..8 {
-                e.insert_document("c", doc(i, &one_hot(i as usize, 8), "tail")).unwrap();
+                e.insert_document("c", doc(i, &one_hot(i as usize, 8), "tail"))
+                    .unwrap();
             }
             std::mem::forget(e);
         }
