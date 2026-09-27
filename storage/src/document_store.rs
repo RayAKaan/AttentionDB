@@ -344,7 +344,10 @@ impl DocumentStore {
         let id = record.id;
         self.memtable.insert(id, record.clone());
         self.block_cache.write().insert(id, record);
-        if self.auto_flush && self.memtable.len() >= self.memtable_threshold && self.storage_dir.is_some() {
+        if self.auto_flush
+            && self.memtable.len() >= self.memtable_threshold
+            && self.storage_dir.is_some()
+        {
             if let Err(e) = self.flush_memtable() {
                 tracing::error!(error = %e, "memtable flush failed during insert");
             }
@@ -366,8 +369,10 @@ impl DocumentStore {
             // timestamp total-ordered, so a later flush's tombstone ALWAYS
             // resolves newer than an earlier flush's record regardless of
             // lexical file order.
-            let entry_ts =
-                std::cmp::max(chrono::Utc::now().timestamp_millis(), self.last_entry_ts + 1);
+            let entry_ts = std::cmp::max(
+                chrono::Utc::now().timestamp_millis(),
+                self.last_entry_ts + 1,
+            );
             self.last_entry_ts = entry_ts;
             for (id, rec) in &self.memtable {
                 w.append_with_timestamp(id.as_bytes().to_vec(), rec.to_msgpack()?, entry_ts)?;

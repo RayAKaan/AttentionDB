@@ -133,8 +133,7 @@ fn do_compact(
             let should_replace = match merged.get(&entry.key) {
                 Some((_, existing_ts, _, existing_file)) => {
                     entry.timestamp > *existing_ts
-                        || (entry.timestamp == *existing_ts
-                            && file_idx > *existing_file)
+                        || (entry.timestamp == *existing_ts && file_idx > *existing_file)
                 }
                 None => true,
             };
@@ -290,7 +289,8 @@ mod tests {
         let write_sst = |name: &str, key: &[u8], val: &[u8], ts: i64| {
             let path = sst_dir.join(name);
             let mut w = SSTableWriter::new(&path).unwrap();
-            w.append_with_timestamp(key.to_vec(), val.to_vec(), ts).unwrap();
+            w.append_with_timestamp(key.to_vec(), val.to_vec(), ts)
+                .unwrap();
             w.flush().unwrap();
         };
         // Force the same logical millisecond on both versions.
@@ -319,7 +319,10 @@ mod tests {
         // (Under the old strictly-greater rule the LIVE value won the tie, the
         // tombstone never survived into `merged`, and full compaction would have
         // RE-PUBLISHED the pre-delete value — resurrection.)
-        assert!(get(b"k2").is_none(), "tombstone must win the ts tie and be GCed");
+        assert!(
+            get(b"k2").is_none(),
+            "tombstone must win the ts tie and be GCed"
+        );
         cleanup_merged_files(&result).unwrap();
     }
 

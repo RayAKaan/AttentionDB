@@ -40,12 +40,18 @@ fn attend_concurrent_readers_never_return_invalid_ids() {
                 }
             }
         }
-        println!("PRE-checkpoint exhaustive: has-120={} distinct={}", seen_pre.contains(&120), seen_pre.len());
+        println!(
+            "PRE-checkpoint exhaustive: has-120={} distinct={}",
+            seen_pre.contains(&120),
+            seen_pre.len()
+        );
         // offender forensics (pre-checkpoint, single-threaded)
         for r in 0..200u32 {
             let mut v = vec![0.0f32; 32];
             v[(r as usize) % 32] = 1.0;
-            let det = e.get_collection("bench").unwrap()
+            let det = e
+                .get_collection("bench")
+                .unwrap()
                 .attend_detailed(&["h".to_string()], &v, 10, None, None, None, None, None)
                 .unwrap();
             if det.iter().any(|c| c.id == 0 || c.id > 120) {
@@ -73,25 +79,44 @@ fn attend_concurrent_readers_never_return_invalid_ids() {
                 }
             }
         }
-        let out_of_range: Vec<u64> = seen.iter().filter(|&&id| id == 0 || id > 120).copied().collect();
-        println!("single-thread exhaustive: distinct={} out-of-range={:?}", seen.len(), out_of_range);
+        let out_of_range: Vec<u64> = seen
+            .iter()
+            .filter(|&&id| id == 0 || id > 120)
+            .copied()
+            .collect();
+        println!(
+            "single-thread exhaustive: distinct={} out-of-range={:?}",
+            seen.len(),
+            out_of_range
+        );
         // find the first offending query + its scores via attend_detailed stats
         for r in 0..200u32 {
             let mut v = vec![0.0f32; 32];
             v[(r as usize) % 32] = 1.0;
-            let det = e.get_collection("bench").unwrap()
+            let det = e
+                .get_collection("bench")
+                .unwrap()
                 .attend_detailed(&["h".to_string()], &v, 10, None, None, None, None, None)
                 .unwrap();
             if det.iter().any(|c| c.id >= 120) {
-                let bad: Vec<_> = det.iter().filter(|c| c.id >= 120)
-                    .map(|c| (c.id, c.final_score)).collect();
+                let bad: Vec<_> = det
+                    .iter()
+                    .filter(|c| c.id >= 120)
+                    .map(|c| (c.id, c.final_score))
+                    .collect();
                 println!("offending query r={r}: results={}", det.len());
                 println!("  bad={bad:?}");
-                println!("  all ids={:?}", det.iter().map(|c| c.id).collect::<Vec<_>>());
+                println!(
+                    "  all ids={:?}",
+                    det.iter().map(|c| c.id).collect::<Vec<_>>()
+                );
                 break;
             }
         }
-        println!("POST-checkpoint exhaustive: has-120={}", seen.contains(&120));
+        println!(
+            "POST-checkpoint exhaustive: has-120={}",
+            seen.contains(&120)
+        );
     }
     let mut qv = vec![0.0f32; 32];
     qv[3] = 1.0;

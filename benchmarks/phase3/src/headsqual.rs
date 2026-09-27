@@ -121,7 +121,10 @@ fn load(data_dir: &str) -> LoadedH {
             head_vecs.insert(h.clone(), v);
         }
         let g = read_i64_vec(&format!("{data_dir}/gt_{t}.i64"));
-        let dh: String = defining.get(*t).cloned().unwrap_or_else(|| "full".to_string());
+        let dh: String = defining
+            .get(*t)
+            .cloned()
+            .unwrap_or_else(|| "full".to_string());
         for q in 0..n_per_type[ti] {
             let row: Vec<Vec<f32>> = heads
                 .iter()
