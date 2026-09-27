@@ -35,10 +35,16 @@ fn search_tie_order_is_deterministic_score_desc_id_asc() {
         }
         orderings.push(res.iter().map(|x| x.0).collect());
     }
-    assert!(all_scores_tied, "scores must be strictly tied for this stimulus");
+    assert!(
+        all_scores_tied,
+        "scores must be strictly tied for this stimulus"
+    );
     let first = orderings[0].clone();
     for o in orderings.iter().skip(1) {
-        assert_eq!(&first, o, "tied-score doc order must be stable across calls");
+        assert_eq!(
+            &first, o,
+            "tied-score doc order must be stable across calls"
+        );
     }
     let mut expected: Vec<u64> = (0..N_DOCS).collect();
     expected.truncate(TOP_K);
@@ -59,7 +65,10 @@ fn search_phrase_tie_order_is_deterministic() {
     }
     let mut expected: Vec<u64> = (0..N_DOCS).collect();
     expected.truncate(TOP_K);
-    assert_eq!(first, expected, "phrase tie rule must be score desc, id asc");
+    assert_eq!(
+        first, expected,
+        "phrase tie rule must be score desc, id asc"
+    );
 }
 
 #[test]
@@ -71,10 +80,17 @@ fn reciprocal_rank_fusion_is_deterministic_and_id_asc_on_ties() {
     for _ in 0..SAMPLES {
         let sp = ix.search("alpha", N_DOCS as usize);
         let fused = reciprocal_rank_fusion(&dense, &sp, TOP_K);
-        assert_eq!(first, fused, "RRF training order instabilities must not resurface");
+        assert_eq!(
+            first, fused,
+            "RRF training order instabilities must not resurface"
+        );
     }
     let ids: Vec<u64> = first.iter().map(|x| x.0).collect();
     // fused(d) = 1/(12-d) + 1/(d+1) pairs {0,11}, {1,10}, {2,9}, {3,8} on ties:
     // top-4 by fused score desc with id-asc tie rule = [0,11,1,10].
-    assert_eq!(ids, vec![0, 11, 1, 10], "RRF tie rule must be fused score desc, id asc");
+    assert_eq!(
+        ids,
+        vec![0, 11, 1, 10],
+        "RRF tie rule must be fused score desc, id asc"
+    );
 }
