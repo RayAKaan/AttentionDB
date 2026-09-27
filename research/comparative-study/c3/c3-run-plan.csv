@@ -1,0 +1,21 @@
+run_id,workload_cell,mode,dataset,queries_source,query_subset,latency_reps,warmup,seed,status,notes
+# C3 pilot: bounded preregistered slice of the eligibility matrix.
+# Status values: REGISTERED-PLAN (frozen pre-execution) / RUN / PASS / FAILED / INVALID-STARTUP / ABORTED / SUPERSEDED / BLOCKED.
+# Every run_id below is NEW (C3 namespace); raw evidence is immutable under c3/raw + ../raw.
+# Qualifying under: C1 protocol (latency = 5 fresh-process reps, warmup 20 seeded-order queries discarded, seeded), statistical plan (paired-per-query bootstrap, seeded).
+
+# --- Track A baseline + mode floor on DS-NFCORPUS (fully verified on this host) ---
+C3-W01-NFC-B0-001,W01-NFCORPUS-B0,MODE-B0,DS-NFCORPUS,qrels-test-323,SAMPLED-subset,5,20,20260925,PASS,exact oracle; exact GT artifacts hashed; establishes quality ceiling + subsample list
+C3-W01-NFC-B1-001,W01-NFCORPUS-B1,MODE-B1,DS-NFCORPUS,qrels-test-323,SAMPLED-subset,5,20,20260925,PASS,single-head approx on CANONICAL view; ef_search grid baseline cell
+C3-W02-NFC-B2-001,W02-NFCORPUS-B2,MODE-B2,DS-NFCORPUS,qrels-test-323,SAMPLED-subset,5,20,20260925,PASS,multi-head union (H=3 title/body/cite), candidate_budget 500
+C3-W07-NFC-B7-001,W07-NFCORPUS-B7,MODE-B7,DS-NFCORPUS,qrels-test-323,SAMPLED-subset,5,20,20260925,PASS,production default Full; evaluated as-is
+C3-W03-SCI-B3-001,W03-SCIFACT-B3,MODE-B3,DS-SCIFACT,qrels-test-300,SAMPLED-subset,5,20,20260925,PASS,scifact-headline B3 with C2-validated b3-lodo-nf modelcard (NFCorpus-derived LODO supervision per C1); inputs = C3-EMBED-SCIFACT-001 vectors; headline test queries = SciFact test split, never touched during training
+# --- Diagnostic synthetic cells (generator in repo, deterministic; DIAGNOSTIC-label) ---
+C3-W08-SYN-B1-001,W08-SYNTH, MODE-B1,DS-SYNTH-PH2B,generator-validation,generator-query-set,1,0,20260925,PASS,conflicting-signals diagnostic; harness validation
+C3-W10-SYN-DUP-B0-001,W10-SYNTH-DUP,MODE-B0,DS-SYNTH-PH2B-dup,generator-validation,generator-query-set,1,0,20260925,PASS,duplicate-heavy; dedupe semantics diagnostic
+# --- Preflight data revalidation runs (R-namespace; REGISTERED-PLAN until executed) ---
+C3DATA-NFC-VERIFY-001,,,DS-NFCORPUS,,,0,0,,REGISTERED-PLAN,recompute dataset+embedding hashes on THIS host vs C2 manifests (observed value already MATCH; run formalizes it)
+C3DATA-SCIFACT-REEMBED-001_regen,CONDITIONAL,DS-SCIFACT,,,,,,REGISTERED-PLAN,re-embed SciFact (pinned model,batch32,order) + per-view sha256 vs C2-EMBED-SCIFACT-003 manifest; RUN only if user approves re-procurement
+C3DATA-GLOVE25-REFETCH-001_regen,CONDITIONAL,DS-ANN-GLOVE-25,,,,,,REGISTERED-PLAN,re-fetch HDF5 + sha256 + NN-GT recompute; RUN only if user approves re-procurement
+C3DATA-ESCI-REFETCH-001_regen,CONDITIONAL,DS-ESCI-EN-SUB,,,,,,REGISTERED-PLAN,qrels-closure subset build + smoke; RUN only if user approves re-procurement
+C3DATA-COCO-REFETCH-001_regen,CONDITIONAL,DS-COCO-CAP-5K,,,,,,REGISTERED-PLAN,re-fetch + CLIP-CPU encode smoke; RUN only if user approves re-procurement

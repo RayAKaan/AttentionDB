@@ -1,0 +1,42 @@
+# C3 resource budget (per C1 environment-guardrails; absolute axes unchanged)
+study_id: comparative-study-001
+phase: c3
+host: "Windows 11 Pro build 26200; AMD Ryzen 3 3100 (8 logical CPUs); 16,700,964 KB RAM; NTFS (H:)"
+toolchain: {rustc: "1.96.0", python: "3.14.4", numpy: "2.4.6", pytorch: "2.12.1+cpu", sentence_transformers: "5.7.0"}
+
+# Per-run guardrails (unchanged from C1; enforced at preflight of every run)
+guardrails:
+  mem_budget_kb_85pct_available: "measured per run at start (85% of MemAvailable)"
+  sampler: {interval_ms: 500, abort_at_pct_available: 85}
+  disk_floor_mb: 500
+  one_external_server_at_a_time: true
+  phase3e_crash_env_asserted_unset: true
+  timeouts: {build_minutes: 60, query_phase_minutes: 30}
+  raw_evidence_immutable: true
+
+# Preregistered budget axes (absolute levels; applied as matching caps, never enlarged)
+budget_axes:
+  BUDGET-CAND: [50, 100, 200, 500]
+  BUDGET-EF: [16, 32, 64, 128]
+  BUDGET-MEM: ["512 MiB", "1.0 GiB", "1.6 GiB"]   # enforced by sampler abort
+  BUDGET-TIME: ["1 ms", "10 ms", "100 ms"]        # per-query deadline; client-side for external
+
+# Estimated single-run footprints (informative; preflight measures actuals)
+estimates_mib:
+  MODE-B0_NFC: "oracle N=3633 x 384 f32 ~5.6 MiB vectors + outputs"
+  MODE-B1_NFC: "single-head index ~5.6 MiB vectors + HNSW"
+  MODE-B2_NFC: "3-head ~16.8 MiB vectors + HNSW x3 + candidate budget 500"
+  MODE-B7_NFC: "B2 + union exact rerank (union <= 500 x 3 heads)"
+  MODE-B3_NFC: "B2 + MLP forward (~1 us/query) + training (minutes-scale on host)"
+
+# Dataset working-footprint budget (accepted at preflight: total plan must fit disk - 500 MiB floor)
+disk_plan_bytes:
+  current_materialized_verified: "SciFact 8.3 MB + NFCorpus 6.4 MB + scidocs/fiqa qrels ~4 MB + embeddings ~22 MB"
+  pending_reprocurement_bytes: {"GLOVE25": 127359688, "GLOVE50": 246711088, "ESCI-parquet": "TBD", "COCO": "~1.2 GB"}
+  rule: "dataset x1.3 must fit free disk; any run exceeding -> PRE-DECLARED-BLOCKED"
+
+# Run budget for the bounded pilot (freeze before execution; exceeds -> confirm)
+pilot_budget:
+  max_runs: 12
+  max_wall_minutes: 180
+  email_of_record: "n/a (local study)"

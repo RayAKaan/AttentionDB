@@ -1,0 +1,116 @@
+{
+  "best_epoch": 0,
+  "best_val_loss": 1.0985511541366577,
+  "card_path": "/home/user/AttentionDB/research/comparative-study/raw/../c2/b3/modelcards/b3-lodo-nf-v2-s20260925-h32-lr0.02.json",
+  "curves": [
+    {
+      "epoch": 0,
+      "train_loss": 1.0990118980407715,
+      "val_loss": 1.0985511541366577,
+      "val_weight_quality_corr": 0.03586408123373985
+    },
+    {
+      "epoch": 1,
+      "train_loss": 1.0987094640731812,
+      "val_loss": 1.098624348640442,
+      "val_weight_quality_corr": 0.009545552544295788
+    },
+    {
+      "epoch": 2,
+      "train_loss": 1.098629355430603,
+      "val_loss": 1.0985928773880005,
+      "val_weight_quality_corr": 0.028057636693120003
+    },
+    {
+      "epoch": 3,
+      "train_loss": 1.0987823009490967,
+      "val_loss": 1.0986008644104004,
+      "val_weight_quality_corr": 0.01780577003955841
+    },
+    {
+      "epoch": 4,
+      "train_loss": 1.0983542203903198,
+      "val_loss": 1.0986335277557373,
+      "val_weight_quality_corr": 0.03754258155822754
+    },
+    {
+      "epoch": 5,
+      "train_loss": 1.0991164445877075,
+      "val_loss": 1.0986489057540894,
+      "val_weight_quality_corr": 0.02626330778002739
+    },
+    {
+      "epoch": 6,
+      "train_loss": 1.0989737510681152,
+      "val_loss": 1.0986524820327759,
+      "val_weight_quality_corr": 0.011305244639515877
+    },
+    {
+      "epoch": 7,
+      "train_loss": 1.0987590551376343,
+      "val_loss": 1.098557710647583,
+      "val_weight_quality_corr": 0.034258320927619934
+    },
+    {
+      "epoch": 8,
+      "train_loss": 1.0988099575042725,
+      "val_loss": 1.098609209060669,
+      "val_weight_quality_corr": 0.011290734633803368
+    },
+    {
+      "epoch": 9,
+      "train_loss": 1.098725438117981,
+      "val_loss": 1.098576545715332,
+      "val_weight_quality_corr": 0.034706175327301025
+    },
+    {
+      "epoch": 10,
+      "train_loss": 1.0985984802246094,
+      "val_loss": 1.09859037399292,
+      "val_weight_quality_corr": 0.026572760194540024
+    },
+    {
+      "epoch": 11,
+      "train_loss": 1.0986151695251465,
+      "val_loss": 1.09853994846344,
+      "val_weight_quality_corr": 0.038621094077825546
+    },
+    {
+      "epoch": 12,
+      "train_loss": 1.09860360622406,
+      "val_loss": 1.098629355430603,
+      "val_weight_quality_corr": 0.009130383841693401
+    },
+    {
+      "epoch": 13,
+      "train_loss": 1.0985140800476074,
+      "val_loss": 1.098572850227356,
+      "val_weight_quality_corr": 0.03287101164460182
+    },
+    {
+      "epoch": 14,
+      "train_loss": 1.0986220836639404,
+      "val_loss": 1.098572015762329,
+      "val_weight_quality_corr": 0.03478109464049339
+    },
+    {
+      "epoch": 15,
+      "train_loss": 1.098905324935913,
+      "val_loss": 1.0986682176589966,
+      "val_weight_quality_corr": 0.0250000711530447
+    }
+  ],
+  "dataset_hash_fnv1a64": 15997548480257594487,
+  "final_train_loss": 1.098905324935913,
+  "hidden": 32,
+  "lr": 0.019999999552965164,
+  "model_id": "b3-lodo-nf-v2",
+  "ok": true,
+  "reproducible_bitwise": true,
+  "rows": {
+    "test_unused_by_trainer": 0,
+    "total": 3237
+  },
+  "seed": 20260925,
+  "stopped_early": true
+}
