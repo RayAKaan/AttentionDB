@@ -127,7 +127,8 @@ fn rec1(idx: u32, ver: u64, cat: &str, num: i64) -> Record {
 fn rec3(idx: u32, ver: u64, cat: &str, num: i64) -> Record {
     let mut r = rec1(idx, ver, cat, num);
     for (i, hname) in HEADS3.iter().enumerate().skip(1) {
-        r.k_vecs.insert(hname.to_string(), vec_for(idx, i as u32 + 1));
+        r.k_vecs
+            .insert(hname.to_string(), vec_for(idx, i as u32 + 1));
     }
     r
 }
@@ -140,14 +141,14 @@ type Live = BTreeMap<u32, (u64, String, i64)>;
 #[derive(Default)]
 struct Model {
     live: Live,
-    acked: Vec<String>,            // acked op ids in order
-    acked_live_idx: Vec<u32>,      // idx live purely via ACKED ops (sync/group guarantee set)
-    in_flight: Option<u32>,        // op whose engine call never returned
-    staged_txn_idx: Vec<u32>,      // ops inside a txn whose commit call was in progress
-    allowed_unacked: Vec<u32>,     // the op (if any) that could be in flight at a fault moment
+    acked: Vec<String>,        // acked op ids in order
+    acked_live_idx: Vec<u32>,  // idx live purely via ACKED ops (sync/group guarantee set)
+    in_flight: Option<u32>,    // op whose engine call never returned
+    staged_txn_idx: Vec<u32>,  // ops inside a txn whose commit call was in progress
+    allowed_unacked: Vec<u32>, // the op (if any) that could be in flight at a fault moment
     txns: Vec<TxnRec>,
-    async_promoted: usize,         // ops promoted to OS before fault (async legs)
-    extra: Value,                  // family-specific evidence (ckpt durations, etc.)
+    async_promoted: usize, // ops promoted to OS before fault (async legs)
+    extra: Value,          // family-specific evidence (ckpt durations, etc.)
 }
 
 #[derive(Default, serde::Serialize, Clone)]
@@ -193,7 +194,9 @@ struct AckLog {
 }
 impl AckLog {
     fn new(path: &str) -> Self {
-        Self { f: std::fs::File::create(path).unwrap() }
+        Self {
+            f: std::fs::File::create(path).unwrap(),
+        }
     }
     fn ack(&mut self, op: &str, idx: u32) {
         writeln!(self.f, "ACK {op} {idx}").unwrap();
@@ -233,8 +236,10 @@ fn park() -> ! {
 }
 
 fn stage_marker(spec: &Spec, name: &str, out_dir: &str) -> ! {
-    write_json(&format!("{out_dir}/reached.marker"),
-               &json!({"stage": name, "run_id": spec.run_id}));
+    write_json(
+        &format!("{out_dir}/reached.marker"),
+        &json!({"stage": name, "run_id": spec.run_id}),
+    );
     park()
 }
 
@@ -259,8 +264,14 @@ fn writer(spec: &Spec, out_dir: &str) -> ! {
     let _ = std::fs::remove_dir_all(&spec.db_dir);
     std::fs::create_dir_all(&spec.db_dir).unwrap();
     let mode = dur(&spec.mode);
-    let e = std::sync::Arc::new(AttentionEngine::open_dir(std::path::Path::new(&spec.db_dir), mode).unwrap());
-    let heads: &[&str] = if spec.family == "F07A" { &HEADS3 } else { &[HEAD] };
+    let e = std::sync::Arc::new(
+        AttentionEngine::open_dir(std::path::Path::new(&spec.db_dir), mode).unwrap(),
+    );
+    let heads: &[&str] = if spec.family == "F07A" {
+        &HEADS3
+    } else {
+        &[HEAD]
+    };
     e.create_collection("bench", DIM, heads).unwrap();
     let mut ack = AckLog::new(&format!("{out_dir}/ack-log.jsonl"));
     let mut m = Model::default();
@@ -299,7 +310,8 @@ fn writer(spec: &Spec, out_dir: &str) -> ! {
             // base sealed, then a 10-insert txn; gates fire during commit
             for i in 0..n {
                 let idx = i as u32;
-                e.insert_document("bench", rec1(idx, 1, "base", i as i64)).unwrap();
+                e.insert_document("bench", rec1(idx, 1, "base", i as i64))
+                    .unwrap();
                 ack.ack("base", idx);
                 apply(&mut m.live, idx, 1, "base", i as i64);
                 m.acked.push(format!("base-{idx}"));
@@ -318,7 +330,12 @@ fn writer(spec: &Spec, out_dir: &str) -> ! {
             }
             // model ON DISK before the commit call — a tx_* gate fire must find it
             m.staged_txn_idx = txn_idx.clone();
-            m.txns.push(TxnRec { tx: 1, committed: false, acked: false, idxs: txn_idx.clone() });
+            m.txns.push(TxnRec {
+                tx: 1,
+                committed: false,
+                acked: false,
+                idxs: txn_idx.clone(),
+            });
             save_model(&m, spec, out_dir);
             match spec.stage.as_deref() {
                 Some("pre_commit_park") => {
@@ -347,7 +364,12 @@ fn writer(spec: &Spec, out_dir: &str) -> ! {
                             m.acked_live_idx.push(*idx);
                         }
                         m.staged_txn_idx.clear();
-                        m.txns[0] = TxnRec { tx: 1, committed: true, acked: true, idxs: txn_idx };
+                        m.txns[0] = TxnRec {
+                            tx: 1,
+                            committed: true,
+                            acked: true,
+                            idxs: txn_idx,
+                        };
                     } else {
                         m.txns[0].acked = false;
                     }
@@ -360,7 +382,8 @@ fn writer(spec: &Spec, out_dir: &str) -> ! {
         "F04" => {
             for i in 0..n {
                 let idx = i as u32;
-                e.insert_document("bench", rec1(idx, 1, "ck", i as i64)).unwrap();
+                e.insert_document("bench", rec1(idx, 1, "ck", i as i64))
+                    .unwrap();
                 ack.ack("ins", idx);
                 apply(&mut m.live, idx, 1, "ck", i as i64);
                 m.acked.push(format!("ins-{idx}"));
@@ -377,7 +400,8 @@ fn writer(spec: &Spec, out_dir: &str) -> ! {
         "F05" => {
             for i in 0..n {
                 let idx = i as u32;
-                e.insert_document("bench", rec1(idx, 1, "bk", i as i64)).unwrap();
+                e.insert_document("bench", rec1(idx, 1, "bk", i as i64))
+                    .unwrap();
                 ack.ack("ins", idx);
                 apply(&mut m.live, idx, 1, "bk", i as i64);
                 m.acked.push(format!("ins-{idx}"));
@@ -396,7 +420,8 @@ fn writer(spec: &Spec, out_dir: &str) -> ! {
             for i in 0..n {
                 let idx = i as u32;
                 let cat = if idx.is_multiple_of(2) { "del" } else { "keep" };
-                e.insert_document("bench", rec1(idx, 1, cat, i as i64)).unwrap();
+                e.insert_document("bench", rec1(idx, 1, cat, i as i64))
+                    .unwrap();
                 ack.ack("ins", idx);
                 apply(&mut m.live, idx, 1, cat, i as i64);
                 m.acked.push(format!("ins-{idx}"));
@@ -412,7 +437,9 @@ fn writer(spec: &Spec, out_dir: &str) -> ! {
                 }
                 let idx = i as u32;
                 if idx.is_multiple_of(2) {
-                    let ok = e.delete_document("bench", &uuid_for(idx, 1).to_string()).unwrap();
+                    let ok = e
+                        .delete_document("bench", &uuid_for(idx, 1).to_string())
+                        .unwrap();
                     assert!(ok, "delete of live doc must return true");
                     ack.ack("del", idx);
                     m.live.remove(&idx);
@@ -435,7 +462,11 @@ fn writer(spec: &Spec, out_dir: &str) -> ! {
             let multi = spec.family == "F07A";
             for i in 0..n {
                 let idx = i as u32;
-                let r = if multi { rec3(idx, 1, "hy", i as i64) } else { rec1(idx, 1, "hy", i as i64) };
+                let r = if multi {
+                    rec3(idx, 1, "hy", i as i64)
+                } else {
+                    rec1(idx, 1, "hy", i as i64)
+                };
                 e.insert_document("bench", r).unwrap();
                 ack.ack("ins", idx);
                 apply(&mut m.live, idx, 1, "hy", i as i64);
@@ -460,7 +491,9 @@ fn writer(spec: &Spec, out_dir: &str) -> ! {
                         break;
                     }
                     let idx = i as u32;
-                    let ok = e.delete_document("bench", &uuid_for(idx, 1).to_string()).unwrap();
+                    let ok = e
+                        .delete_document("bench", &uuid_for(idx, 1).to_string())
+                        .unwrap();
                     assert!(ok);
                     ack.ack("del", idx);
                     m.live.remove(&idx);
@@ -533,7 +566,8 @@ fn writer(spec: &Spec, out_dir: &str) -> ! {
                 let idx = (40_000 + i) as u32;
                 m.allowed_unacked = vec![idx];
                 save_model(&m, spec, out_dir);
-                e.insert_document("bench", rec1(idx, 1, "conc", i as i64)).unwrap();
+                e.insert_document("bench", rec1(idx, 1, "conc", i as i64))
+                    .unwrap();
                 ack.ack("ins", idx);
                 apply(&mut m.live, idx, 1, "conc", i as i64);
                 m.acked.push(format!("ins-{idx}"));
@@ -550,7 +584,8 @@ fn writer(spec: &Spec, out_dir: &str) -> ! {
             // integrated 40k lifecycle; see phase3e-e11-spec.md M5/M6
             for i in 0..n {
                 let idx = i as u32;
-                e.insert_document("bench", rec1(idx, 1, "life", i as i64)).unwrap();
+                e.insert_document("bench", rec1(idx, 1, "life", i as i64))
+                    .unwrap();
                 if i % 100 == 0 {
                     ack.ack("ins_batch", idx);
                 }
@@ -570,15 +605,20 @@ fn writer(spec: &Spec, out_dir: &str) -> ! {
             }
             for i in 0..5_000usize {
                 let idx = i as u32;
-                let ok = e.delete_document("bench", &uuid_for(idx, 1).to_string()).unwrap();
+                let ok = e
+                    .delete_document("bench", &uuid_for(idx, 1).to_string())
+                    .unwrap();
                 assert!(ok);
-                e.insert_document("bench", rec1(idx, 2, "life", i as i64)).unwrap();
+                e.insert_document("bench", rec1(idx, 2, "life", i as i64))
+                    .unwrap();
                 apply(&mut m.live, idx, 2, "life", i as i64);
             }
             ack.note("CHURN_UPDATES_DONE 5000");
             for i in 0..2_000usize {
                 let idx = (10_000 + i) as u32;
-                let ok = e.delete_document("bench", &uuid_for(idx, 1).to_string()).unwrap();
+                let ok = e
+                    .delete_document("bench", &uuid_for(idx, 1).to_string())
+                    .unwrap();
                 assert!(ok);
                 m.live.remove(&idx);
                 prune_acked(&mut m, idx);
@@ -586,9 +626,12 @@ fn writer(spec: &Spec, out_dir: &str) -> ! {
             ack.note("CHURN_DELETES_DONE 2000");
             for i in 0..1_000usize {
                 let idx = (30_000 + i) as u32;
-                let ok = e.delete_document("bench", &uuid_for(idx, 1).to_string()).unwrap();
+                let ok = e
+                    .delete_document("bench", &uuid_for(idx, 1).to_string())
+                    .unwrap();
                 assert!(ok);
-                e.insert_document("bench", rec1(idx, 3, "life", i as i64)).unwrap();
+                e.insert_document("bench", rec1(idx, 3, "life", i as i64))
+                    .unwrap();
                 apply(&mut m.live, idx, 3, "life", i as i64);
             }
             ack.note("CHURN_REINSERTS_DONE 1000");
@@ -598,11 +641,17 @@ fn writer(spec: &Spec, out_dir: &str) -> ! {
                 let a = 50_000 + (tno as u32) * 2;
                 let b = a + 1;
                 let del = 20_000 + tno as u32;
-                e.txn_manager.record_operation(t, TxnOp::Insert(rec1(a, 1, "txn", a as i64))).unwrap();
-                e.txn_manager.record_operation(t, TxnOp::Insert(rec1(b, 1, "txn", b as i64))).unwrap();
+                e.txn_manager
+                    .record_operation(t, TxnOp::Insert(rec1(a, 1, "txn", a as i64)))
+                    .unwrap();
+                e.txn_manager
+                    .record_operation(t, TxnOp::Insert(rec1(b, 1, "txn", b as i64)))
+                    .unwrap();
                 let had = m.live.contains_key(&del);
                 if had {
-                    e.txn_manager.record_operation(t, TxnOp::Delete(uuid_for(del, 1))).unwrap();
+                    e.txn_manager
+                        .record_operation(t, TxnOp::Delete(uuid_for(del, 1)))
+                        .unwrap();
                 }
                 e.commit_transaction(t).unwrap();
                 apply(&mut m.live, a, 1, "txn", a as i64);
@@ -649,13 +698,29 @@ fn export_live(e: &AttentionEngine) -> (Live, usize, Vec<String>, BTreeMap<Strin
         if !r.tags.contains(&"collection:bench".to_string()) {
             continue;
         }
-        let idx = r.fields.get("idx").and_then(|v| v.as_u64()).unwrap_or(u64::MAX) as u32;
-        let ver = r.fields.get("version").and_then(|v| v.as_u64()).unwrap_or(0);
-        let cat = r.fields.get("cat").and_then(|v| v.as_str()).unwrap_or("?").to_string();
+        let idx = r
+            .fields
+            .get("idx")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(u64::MAX) as u32;
+        let ver = r
+            .fields
+            .get("version")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+        let cat = r
+            .fields
+            .get("cat")
+            .and_then(|v| v.as_str())
+            .unwrap_or("?")
+            .to_string();
         let num = r
             .fields
             .get("num")
-            .and_then(|v| v.as_i64().or_else(|| v.as_str().and_then(|s| s.parse::<i64>().ok())))
+            .and_then(|v| {
+                v.as_i64()
+                    .or_else(|| v.as_str().and_then(|s| s.parse::<i64>().ok()))
+            })
             .unwrap_or(i64::MIN);
         model.insert(idx, (ver, cat, num));
     }
@@ -674,7 +739,12 @@ fn self_hit(e: &AttentionEngine, live: &Live, samples: usize) -> (usize, usize) 
     if samples == 0 || live.is_empty() {
         return (0, 0);
     }
-    let pick: Vec<u32> = live.keys().step_by((live.len() / samples).max(1)).take(samples).copied().collect();
+    let pick: Vec<u32> = live
+        .keys()
+        .step_by((live.len() / samples).max(1))
+        .take(samples)
+        .copied()
+        .collect();
     let mut hits = 0;
     for idx in &pick {
         let q = vec_for(*idx, 0);
@@ -712,7 +782,11 @@ fn recover(spec: &Spec, out_dir: &str, leg: usize) -> i32 {
                     "verdict": if refused { "REFUSED-AS-EXPECTED" } else { "REFUSED-UNEXPECTED" },
                 }),
             );
-            if refused { 0 } else { 1 }
+            if refused {
+                0
+            } else {
+                1
+            }
         }
         Ok(e) => {
             if spec.expect_open == "refuse" {
@@ -723,9 +797,10 @@ fn recover(spec: &Spec, out_dir: &str, leg: usize) -> i32 {
                 );
                 return 1;
             }
-            let model: Value =
-                serde_json::from_slice(&std::fs::read(format!("{out_dir}/reference-model.json")).unwrap())
-                    .unwrap();
+            let model: Value = serde_json::from_slice(
+                &std::fs::read(format!("{out_dir}/reference-model.json")).unwrap(),
+            )
+            .unwrap();
             let expected: Live = model["live"]
                 .as_object()
                 .map(|o| {
@@ -745,7 +820,12 @@ fn recover(spec: &Spec, out_dir: &str, leg: usize) -> i32 {
                 .unwrap_or_default();
             let acked_idx: Vec<u32> = model["acked_live_idx"]
                 .as_array()
-                .map(|a| a.iter().filter_map(|x| x.as_u64()).map(|x| x as u32).collect())
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|x| x.as_u64())
+                        .map(|x| x as u32)
+                        .collect()
+                })
                 .unwrap_or_default();
             let mode = spec.mode.clone();
 
@@ -754,8 +834,16 @@ fn recover(spec: &Spec, out_dir: &str, leg: usize) -> i32 {
 
             // 1. live-state equality vs model (full, not sampled — M6); async legs
             //    assert the subset shape here and the loss boundary in check 2
-            let missing: Vec<u32> = expected.keys().filter(|k| !observed.contains_key(k)).copied().collect();
-            let extra: Vec<u32> = observed.keys().filter(|k| !expected.contains_key(k)).copied().collect();
+            let missing: Vec<u32> = expected
+                .keys()
+                .filter(|k| !observed.contains_key(k))
+                .copied()
+                .collect();
+            let extra: Vec<u32> = observed
+                .keys()
+                .filter(|k| !expected.contains_key(k))
+                .copied()
+                .collect();
             let content_mismatch: Vec<u32> = expected
                 .iter()
                 .filter(|(k, v)| observed.contains_key(k) && observed.get(k) != Some(*v))
@@ -764,26 +852,44 @@ fn recover(spec: &Spec, out_dir: &str, leg: usize) -> i32 {
             let promoted = model["async_promoted"].as_u64().unwrap_or(0) as usize;
             let staged: Vec<u32> = model["staged_txn_idx"]
                 .as_array()
-                .map(|a| a.iter().filter_map(|x| x.as_u64()).map(|x| x as u32).collect())
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|x| x.as_u64())
+                        .map(|x| x as u32)
+                        .collect()
+                })
                 .unwrap_or_default();
             let allowed_unacked: Vec<u32> = model["allowed_unacked"]
                 .as_array()
-                .map(|a| a.iter().filter_map(|x| x.as_u64()).map(|x| x as u32).collect())
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|x| x.as_u64())
+                        .map(|x| x as u32)
+                        .collect()
+                })
                 .unwrap_or_default();
             let rank = |x: u32| acked_idx.iter().position(|a| a == &x);
-            let allowance: Vec<u32> = allowed_unacked.iter().chain(staged.iter()).copied().collect();
-            let extra_unallowed: Vec<u32> = extra.iter().filter(|k| !allowance.contains(k)).copied().collect();
+            let allowance: Vec<u32> = allowed_unacked
+                .iter()
+                .chain(staged.iter())
+                .copied()
+                .collect();
+            let extra_unallowed: Vec<u32> = extra
+                .iter()
+                .filter(|k| !allowance.contains(k))
+                .copied()
+                .collect();
             let exact_ok = if mode == "async" {
                 extra_unallowed.is_empty()
                     && content_mismatch.is_empty()
-                    && missing.iter().all(|k| rank(*k).is_none_or(|r| r >= promoted))
+                    && missing
+                        .iter()
+                        .all(|k| rank(*k).is_none_or(|r| r >= promoted))
             } else if spec.tamper_shape == "prefix" {
                 // F01 torn-tail: contract = intact prefix recovers, loss reported
                 extra.is_empty() && content_mismatch.is_empty()
             } else {
-                missing.is_empty()
-                    && extra_unallowed.is_empty()
-                    && content_mismatch.is_empty()
+                missing.is_empty() && extra_unallowed.is_empty() && content_mismatch.is_empty()
             };
             checks.push(json!({"name": "exact_live_state", "ok": exact_ok,
                                "mode_shape": if mode == "async" { "subset+tail-loss-allowed" }
@@ -795,11 +901,17 @@ fn recover(spec: &Spec, out_dir: &str, leg: usize) -> i32 {
                                "extra_sample": &extra[..extra.len().min(10)]}));
 
             // 2. acknowledged-write durability per mode
-            let missing_acked: Vec<u32> = acked_idx.iter().filter(|k| !observed.contains_key(k)).copied().collect();
+            let missing_acked: Vec<u32> = acked_idx
+                .iter()
+                .filter(|k| !observed.contains_key(k))
+                .copied()
+                .collect();
             let in_flight = model["in_flight_idx"].as_u64().map(|v| v as u32);
             let mode_ok = match mode.as_str() {
                 "sync" | "group" => missing_acked.is_empty(),
-                "async" => missing_acked.iter().all(|k| rank(*k).is_none_or(|r| r >= promoted)),
+                "async" => missing_acked
+                    .iter()
+                    .all(|k| rank(*k).is_none_or(|r| r >= promoted)),
                 _ => false,
             };
             // F01 torn-tail tamper: post-ack file destruction is the scenario
@@ -838,13 +950,23 @@ fn recover(spec: &Spec, out_dir: &str, leg: usize) -> i32 {
             }
 
             // 4. duplicate live ids
-            let dupes: Vec<(String, usize)> = dup.iter().filter(|(_, c)| **c > 1).map(|(k, c)| (k.clone(), *c)).collect();
+            let dupes: Vec<(String, usize)> = dup
+                .iter()
+                .filter(|(_, c)| **c > 1)
+                .map(|(k, c)| (k.clone(), *c))
+                .collect();
             checks.push(json!({"name": "no_duplicate_live_ids", "ok": dupes.is_empty(), "dupes": dupes.len()}));
 
             // 5. deleted docs absent from filtered scan (F06 shapes)
             if spec.family == "F06" {
-                let f = FilterExpr::Comparison { field: "cat".into(), op: FilterOp::Eq, value: FilterValue::Str("del".into()) };
-                let got = e.scan_filtered("bench", Some(&f), 100_000).unwrap_or_default();
+                let f = FilterExpr::Comparison {
+                    field: "cat".into(),
+                    op: FilterOp::Eq,
+                    value: FilterValue::Str("del".into()),
+                };
+                let got = e
+                    .scan_filtered("bench", Some(&f), 100_000)
+                    .unwrap_or_default();
                 let store = e.document_store.read();
                 let got_idx: Vec<u32> = got
                     .iter()
@@ -908,10 +1030,11 @@ fn recover(spec: &Spec, out_dir: &str, leg: usize) -> i32 {
                         checks.push(json!({"name": "restore_equals_source", "ok": hr == he,
                                            "restored": obs_r.len(), "source": observed.len(),
                                            "checkpoint_seq": meta.checkpoint_seq}));
-                        let clean_r = crate::dbtest::checker_report(&re, std::path::Path::new(&rdir))
-                            .get("clean")
-                            .and_then(|v| v.as_bool())
-                            .unwrap_or(false);
+                        let clean_r =
+                            crate::dbtest::checker_report(&re, std::path::Path::new(&rdir))
+                                .get("clean")
+                                .and_then(|v| v.as_bool())
+                                .unwrap_or(false);
                         checks.push(json!({"name": "restore_checker", "ok": clean_r}));
                     }
                 }
@@ -928,8 +1051,10 @@ fn recover(spec: &Spec, out_dir: &str, leg: usize) -> i32 {
             let (observed3, _, _, _) = export_live(&e3);
             let h3 = state_hash(&observed3);
             drop(e3);
-            checks.push(json!({"name": "repeat_restart_determinism", "ok": h1 == h2 && h2 == h3,
-                               "hashes": [h1, h2, h3]}));
+            checks.push(
+                json!({"name": "repeat_restart_determinism", "ok": h1 == h2 && h2 == h3,
+                               "hashes": [h1, h2, h3]}),
+            );
 
             let verdict = if checks.iter().all(|c| c["ok"].as_bool().unwrap_or(false)) {
                 "PASS"
@@ -944,7 +1069,11 @@ fn recover(spec: &Spec, out_dir: &str, leg: usize) -> i32 {
                         "fault_in_recovery_leg": spec.fault_in_recovery && leg == 2,
                         "checks": checks}),
             );
-            if verdict == "PASS" { 0 } else { 1 }
+            if verdict == "PASS" {
+                0
+            } else {
+                1
+            }
         }
     }
 }
@@ -1009,22 +1138,29 @@ fn tamper(spec: &Spec, out_dir: &str) -> i32 {
     let _ = std::fs::remove_dir_all(&spec.db_dir);
     std::fs::create_dir_all(&spec.db_dir).unwrap();
     {
-        let e = AttentionEngine::open_dir(std::path::Path::new(&spec.db_dir), Durability::Sync).unwrap();
+        let e = AttentionEngine::open_dir(std::path::Path::new(&spec.db_dir), Durability::Sync)
+            .unwrap();
         e.create_collection("bench", DIM, &[HEAD]).unwrap();
         for i in 0..spec.n_docs {
-            e.insert_document("bench", rec1(i as u32, 1, "a", i as i64)).unwrap();
+            e.insert_document("bench", rec1(i as u32, 1, "a", i as i64))
+                .unwrap();
         }
         // graceful close WITHOUT checkpoint: everything lives in the WAL
     }
     // sidecar cases need a wal-state.json to exist: checkpoint, then append
     // post-checkpoint records so both the sidecar and a live WAL are present
-    let sidecar_case = matches!(spec.tamper_case.as_deref(), Some("sidecar_regress") | Some("sidecar_absent"));
+    let sidecar_case = matches!(
+        spec.tamper_case.as_deref(),
+        Some("sidecar_regress") | Some("sidecar_absent")
+    );
     let n_total = if sidecar_case {
         {
-            let e = AttentionEngine::open_dir(std::path::Path::new(&spec.db_dir), Durability::Sync).unwrap();
+            let e = AttentionEngine::open_dir(std::path::Path::new(&spec.db_dir), Durability::Sync)
+                .unwrap();
             e.checkpoint().unwrap();
             for i in spec.n_docs..spec.n_docs + 10 {
-                e.insert_document("bench", rec1(i as u32, 1, "a", i as i64)).unwrap();
+                e.insert_document("bench", rec1(i as u32, 1, "a", i as i64))
+                    .unwrap();
             }
         }
         spec.n_docs + 10
@@ -1130,12 +1266,19 @@ fn tamper(spec: &Spec, out_dir: &str) -> i32 {
             "refuse" => "refuse".into(),
             _ => "open".into(),
         },
-        tamper_shape: if expect == "open_tolerated_torn_tail" { "prefix".into() } else { String::new() },
+        tamper_shape: if expect == "open_tolerated_torn_tail" {
+            "prefix".into()
+        } else {
+            String::new()
+        },
         ..spec.clone()
     };
     let code = recover(&spec2, out_dir, 1);
     std::fs::create_dir_all(format!("{out_dir}/post")).unwrap();
-    inventory_dir(std::path::Path::new(&spec.db_dir), &format!("{out_dir}/post"));
+    inventory_dir(
+        std::path::Path::new(&spec.db_dir),
+        &format!("{out_dir}/post"),
+    );
     code
 }
 
@@ -1165,28 +1308,52 @@ pub fn run(args: &[String]) -> String {
     }
     let raw = std::fs::read(&spec_path).unwrap();
     let spec: Spec = serde_json::from_slice(&raw).unwrap();
-    let out_dir = std::path::Path::new(&spec_path).parent().unwrap().display().to_string();
+    let out_dir = std::path::Path::new(&spec_path)
+        .parent()
+        .unwrap()
+        .display()
+        .to_string();
     let code = match role.as_str() {
         "writer" => writer(&spec, &out_dir),
         "recover" => recover(&spec, &out_dir, leg),
         "tamper" => tamper(&spec, out_dir.as_str()),
         "probe" => {
-            let e = AttentionEngine::open_dir(std::path::Path::new(&spec.db_dir), Durability::Sync).unwrap();
+            let e = AttentionEngine::open_dir(std::path::Path::new(&spec.db_dir), Durability::Sync)
+                .unwrap();
             let store = e.document_store.read();
             let mut by_idx: BTreeMap<u32, Vec<(u64, String)>> = BTreeMap::new();
             for r in store.list_all_records() {
-                if !r.tags.contains(&"collection:bench".to_string()) { continue; }
-                let idx = r.fields.get("idx").and_then(|v| v.as_u64()).unwrap_or(u64::MAX) as u32;
-                let ver = r.fields.get("version").and_then(|v| v.as_u64()).unwrap_or(0);
+                if !r.tags.contains(&"collection:bench".to_string()) {
+                    continue;
+                }
+                let idx = r
+                    .fields
+                    .get("idx")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(u64::MAX) as u32;
+                let ver = r
+                    .fields
+                    .get("version")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
                 by_idx.entry(idx).or_default().push((ver, r.id.to_string()));
             }
-            let multi: Vec<(u32, usize, Vec<u64>)> = by_idx.iter()
+            let multi: Vec<(u32, usize, Vec<u64>)> = by_idx
+                .iter()
                 .filter(|(_, v)| v.len() > 1)
                 .map(|(k, v)| (*k, v.len(), v.iter().map(|x| x.0).collect()))
                 .collect();
-            println!("PROBE live_idx={} multi_version_idxs={} sample={:?}",
-                     by_idx.len(), multi.len(), &multi[..multi.len().min(8)]);
-            let f = FilterExpr::Comparison { field: "idx".into(), op: FilterOp::Eq, value: FilterValue::Int(multi.first().map(|x| x.0).unwrap_or(0) as i64) };
+            println!(
+                "PROBE live_idx={} multi_version_idxs={} sample={:?}",
+                by_idx.len(),
+                multi.len(),
+                &multi[..multi.len().min(8)]
+            );
+            let f = FilterExpr::Comparison {
+                field: "idx".into(),
+                op: FilterOp::Eq,
+                value: FilterValue::Int(multi.first().map(|x| x.0).unwrap_or(0) as i64),
+            };
             let got = e.scan_filtered("bench", Some(&f), 100).unwrap();
             println!("PROBE scan for first multi idx returned {}", got.len());
             0

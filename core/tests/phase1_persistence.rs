@@ -105,9 +105,8 @@ fn t07_multi_collection() {
     let r_alpha = e
         .attend("alpha", &["default".into()], &one_hot(3, 8), 10)
         .unwrap();
-    let alpha_ids: std::collections::HashSet<u64> = (0..5)
-        .filter_map(|i| id_of_idx(&e, "alpha", i))
-        .collect();
+    let alpha_ids: std::collections::HashSet<u64> =
+        (0..5).filter_map(|i| id_of_idx(&e, "alpha", i)).collect();
     assert!(!r_alpha.is_empty(), "attend returned nothing for alpha");
     for (numeric, _) in &r_alpha {
         assert!(
