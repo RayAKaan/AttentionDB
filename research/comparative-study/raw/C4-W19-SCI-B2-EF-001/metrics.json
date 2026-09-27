@@ -1,0 +1,258 @@
+{
+  "run_id": "C4-W19-SCI-B2-EF-001",
+  "mode": "B2",
+  "dataset": "DS-SCIFACT",
+  "split": "VAL",
+  "phase": "C4.2 validation tuning",
+  "matching_metric": "qrels Relevance-Recall@10 (>=1 judged docs, top-10)",
+  "target_recall10_qrels_B0_VAL": 0.785,
+  "tolerance": 0.01,
+  "rep_count": 1,
+  "grid": {
+    "ef_search": [
+      16,
+      32,
+      64,
+      128
+    ],
+    "candidate_budget": [
+      50,
+      100,
+      200,
+      500
+    ]
+  },
+  "levels": [
+    {
+      "n_queries": 200,
+      "recall10_qrels_mean": 0.7358333334326744,
+      "recall10_exact_mean": 0.7055000016093254,
+      "p50_us": 1876.4,
+      "p95_us": 2987.9,
+      "level": "EF16-C50",
+      "ef_search": 16,
+      "candidate_budget": 50,
+      "peak_child_rss_MiB": [
+        304.8
+      ],
+      "within_tolerance": false
+    },
+    {
+      "n_queries": 200,
+      "recall10_qrels_mean": 0.74375,
+      "recall10_exact_mean": 0.7030000016093254,
+      "p50_us": 1981.5000000000002,
+      "p95_us": 3419.4,
+      "level": "EF16-C100",
+      "ef_search": 16,
+      "candidate_budget": 100,
+      "peak_child_rss_MiB": [
+        271.4
+      ],
+      "within_tolerance": false
+    },
+    {
+      "n_queries": 200,
+      "recall10_qrels_mean": 0.7325,
+      "recall10_exact_mean": 0.7070000007003546,
+      "p50_us": 1955.9999999999998,
+      "p95_us": 2735.2000000000003,
+      "level": "EF16-C200",
+      "ef_search": 16,
+      "candidate_budget": 200,
+      "peak_child_rss_MiB": [
+        271.0
+      ],
+      "within_tolerance": false
+    },
+    {
+      "n_queries": 200,
+      "recall10_qrels_mean": 0.7383333334326744,
+      "recall10_exact_mean": 0.7070000009238719,
+      "p50_us": 1504.7,
+      "p95_us": 2001.9999999999998,
+      "level": "EF16-C500",
+      "ef_search": 16,
+      "candidate_budget": 500,
+      "peak_child_rss_MiB": [
+        271.3
+      ],
+      "within_tolerance": false
+    },
+    {
+      "n_queries": 200,
+      "recall10_qrels_mean": 0.7408333334326744,
+      "recall10_exact_mean": 0.7055000019073486,
+      "p50_us": 1511.8,
+      "p95_us": 1935.5,
+      "level": "EF32-C50",
+      "ef_search": 32,
+      "candidate_budget": 50,
+      "peak_child_rss_MiB": [
+        305.6
+      ],
+      "within_tolerance": false
+    },
+    {
+      "n_queries": 200,
+      "recall10_qrels_mean": 0.7358333334326744,
+      "recall10_exact_mean": 0.7020000027120114,
+      "p50_us": 1461.0,
+      "p95_us": 1903.8,
+      "level": "EF32-C100",
+      "ef_search": 32,
+      "candidate_budget": 100,
+      "peak_child_rss_MiB": [
+        271.8
+      ],
+      "within_tolerance": false
+    },
+    {
+      "n_queries": 200,
+      "recall10_qrels_mean": 0.7445833334326744,
+      "recall10_exact_mean": 0.7070000018179416,
+      "p50_us": 1457.0,
+      "p95_us": 1930.5,
+      "level": "EF32-C200",
+      "ef_search": 32,
+      "candidate_budget": 200,
+      "peak_child_rss_MiB": [
+        271.9
+      ],
+      "within_tolerance": false
+    },
+    {
+      "n_queries": 200,
+      "recall10_qrels_mean": 0.7370833334326744,
+      "recall10_exact_mean": 0.6990000034123659,
+      "p50_us": 1473.5,
+      "p95_us": 1787.5,
+      "level": "EF32-C500",
+      "ef_search": 32,
+      "candidate_budget": 500,
+      "peak_child_rss_MiB": [
+        271.7
+      ],
+      "within_tolerance": false
+    },
+    {
+      "n_queries": 200,
+      "recall10_qrels_mean": 0.7458333334326744,
+      "recall10_exact_mean": 0.7060000011324883,
+      "p50_us": 1590.1000000000001,
+      "p95_us": 2859.8,
+      "level": "EF64-C50",
+      "ef_search": 64,
+      "candidate_budget": 50,
+      "peak_child_rss_MiB": [
+        271.3
+      ],
+      "within_tolerance": false
+    },
+    {
+      "n_queries": 200,
+      "recall10_qrels_mean": 0.7345833334326745,
+      "recall10_exact_mean": 0.7030000022798777,
+      "p50_us": 1492.8000000000002,
+      "p95_us": 2034.7999999999997,
+      "level": "EF64-C100",
+      "ef_search": 64,
+      "candidate_budget": 100,
+      "peak_child_rss_MiB": [
+        271.6
+      ],
+      "within_tolerance": false
+    },
+    {
+      "n_queries": 200,
+      "recall10_qrels_mean": 0.7425,
+      "recall10_exact_mean": 0.7015000016242265,
+      "p50_us": 1707.2,
+      "p95_us": 2042.8,
+      "level": "EF64-C200",
+      "ef_search": 64,
+      "candidate_budget": 200,
+      "peak_child_rss_MiB": [
+        272.4
+      ],
+      "within_tolerance": false
+    },
+    {
+      "n_queries": 200,
+      "recall10_qrels_mean": 0.7433333334326744,
+      "recall10_exact_mean": 0.7035000014305115,
+      "p50_us": 1766.5,
+      "p95_us": 2124.2000000000003,
+      "level": "EF64-C500",
+      "ef_search": 64,
+      "candidate_budget": 500,
+      "peak_child_rss_MiB": [
+        271.7
+      ],
+      "within_tolerance": false
+    },
+    {
+      "n_queries": 200,
+      "recall10_qrels_mean": 0.7408333334326744,
+      "recall10_exact_mean": 0.698500002771616,
+      "p50_us": 1801.5,
+      "p95_us": 2242.9,
+      "level": "EF128-C50",
+      "ef_search": 128,
+      "candidate_budget": 50,
+      "peak_child_rss_MiB": [
+        304.7
+      ],
+      "within_tolerance": false
+    },
+    {
+      "n_queries": 200,
+      "recall10_qrels_mean": 0.7408333334326744,
+      "recall10_exact_mean": 0.7005000005662442,
+      "p50_us": 1764.3,
+      "p95_us": 2078.8999999999996,
+      "level": "EF128-C100",
+      "ef_search": 128,
+      "candidate_budget": 100,
+      "peak_child_rss_MiB": [
+        271.4
+      ],
+      "within_tolerance": false
+    },
+    {
+      "n_queries": 200,
+      "recall10_qrels_mean": 0.7458333334326744,
+      "recall10_exact_mean": 0.7085000009834767,
+      "p50_us": 1863.1,
+      "p95_us": 2799.5,
+      "level": "EF128-C200",
+      "ef_search": 128,
+      "candidate_budget": 200,
+      "peak_child_rss_MiB": [
+        304.4
+      ],
+      "within_tolerance": false
+    },
+    {
+      "n_queries": 200,
+      "recall10_qrels_mean": 0.7425,
+      "recall10_exact_mean": 0.7010000013560057,
+      "p50_us": 1893.6999999999998,
+      "p95_us": 2893.4,
+      "level": "EF128-C500",
+      "ef_search": 128,
+      "candidate_budget": 500,
+      "peak_child_rss_MiB": [
+        271.6
+      ],
+      "within_tolerance": false
+    }
+  ],
+  "selection": null,
+  "selection_rule": "fastest p50 post-warmup within +-0.01 of B0 VAL target (TARGET-UNREACHABLE never interpolated)",
+  "val_split": {
+    "dataset": "DS-SCIFACT",
+    "rule": "SciFact seeded train-sample (first 200 of seed 20260925 shuffle of sorted qrel-train qids)",
+    "n_queries": 200
+  }
+}

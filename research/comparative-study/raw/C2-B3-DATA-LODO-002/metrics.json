@@ -1,0 +1,9 @@
+{
+  "judged_queries": 3237,
+  "splits": {
+    "Train": 2590,
+    "Val": 647
+  },
+  "dim": 384,
+  "out": "/home/user/AttentionDB/research/comparative-study/c2/b3/datasets/gating-lodo-nfcorpus.json"
+}

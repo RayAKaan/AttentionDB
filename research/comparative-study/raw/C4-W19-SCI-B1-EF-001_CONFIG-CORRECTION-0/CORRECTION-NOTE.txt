@@ -1,0 +1,9 @@
+harness-correction: the original C4-W19-SCI-B1-EF-001 run applied a strict
+float comparison (abs(config-target) <= 0.01) that rejected the exactly-
+boundary EF32 config (best qrels recall 0.775 vs B0 target 0.785, diff 0.010)
+as TARGET-UNREACHABLE by a ~1e-15 float artifact. The C1 matching rule is
+inclusive ("within +-0.01"); the harness now applies <= 0.01 + 1e-9 so
+exact-boundary configs qualify. Corrected re-run under the same planned ID
+per the C3 _CONFIG-CORRECTION-* convention; original evidence preserved in
+the base C4-W19-SCI-B1-EF-001 dir. Result below selects EF32 (0.7775 vs
+target 0.785, diff 0.0075 within tolerance; p50 962.3 us).

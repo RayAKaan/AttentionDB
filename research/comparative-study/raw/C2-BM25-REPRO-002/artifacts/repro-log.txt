@@ -1,0 +1,13 @@
+﻿search('alpha', top_k=4) over 12 tied docs, 200 samples
+strict_score_ties_observed: true
+first_call_doc_order: [0, 1, 2, 3]
+distinct_doc_orderings_seen: 1
+  ordering[0]: [0, 1, 2, 3]
+
+search('alpha bravo', top_k=4): distinct_doc_orderings_seen: 1
+  ordering[0]: [0, 1, 2, 3]
+
+reciprocal_rank_fusion(dense, tied_search) fused outputs:
+ distinct_fused_topk_memberships: 1
+ distinct_fused_max_score_ids: [11]
+  fused[0]: [0, 11, 1, 10]

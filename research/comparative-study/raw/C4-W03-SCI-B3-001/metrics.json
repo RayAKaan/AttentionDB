@@ -1,0 +1,88 @@
+{
+  "run_id": "C4-W03-SCI-B3-001",
+  "mode": "B3",
+  "dataset": "DS-SCIFACT",
+  "split": "TEST",
+  "phase": "C4.4 confirmed-scale execution",
+  "test_queries": 300,
+  "rep_count": 5,
+  "warmup": 20,
+  "ef_search": 64,
+  "candidate_budget": 500,
+  "modelcard": "H:\\Attention-DB\\AttentionDB\\research\\comparative-study\\c2\\b3\\modelcards\\b3-lodo-nf-v2-s20260925-h32-lr0.01.json",
+  "config_note": "B3 mirrors B2 candidate gen; SCI-B2 unreachable -> plan default",
+  "per_rep": [
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7916666667660077,
+      "recall10_exact_mean": 0.6970000021159649,
+      "p50_us": 1850.6,
+      "p95_us": 2292.7999999999997,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7941666667660078,
+      "recall10_exact_mean": 0.6953333359956742,
+      "p50_us": 1861.1999999999998,
+      "p95_us": 2255.9,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.791000000089407,
+      "recall10_exact_mean": 0.6953333360453446,
+      "p50_us": 1887.0,
+      "p95_us": 3104.8999999999996,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7872222223877907,
+      "recall10_exact_mean": 0.69600000222524,
+      "p50_us": 1851.0,
+      "p95_us": 2361.7,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7916666667660077,
+      "recall10_exact_mean": 0.7056666682163875,
+      "p50_us": 1843.5,
+      "p95_us": 2149.4,
+      "deadline_exceeded": 0
+    }
+  ],
+  "rep_recall10_qrels_mean": [
+    0.7916666667660077,
+    0.7941666667660078,
+    0.791000000089407,
+    0.7872222223877907,
+    0.7916666667660077
+  ],
+  "recall10_qrels_mean_5rep": 0.7911,
+  "recall10_qrels_sd_5rep": 0.0022,
+  "rep_recall10_exact_mean": [
+    0.6970000021159649,
+    0.6953333359956742,
+    0.6953333360453446,
+    0.69600000222524,
+    0.7056666682163875
+  ],
+  "recall10_exact_mean_5rep": 0.6979,
+  "p50_us_per_rep": [
+    1850.6,
+    1861.1999999999998,
+    1887.0,
+    1851.0,
+    1843.5
+  ],
+  "peak_child_rss_MiB": [
+    271.9,
+    304.8,
+    271.5,
+    275.0,
+    272.0
+  ],
+  "conclusion_rule": "matches C4-BINVERIFY-003 verdict (>=5 fresh-process reps, mean+sd reported; tolerance comparisons use rep-mean, not single draws)"
+}

@@ -1,0 +1,19 @@
+run_id: C2-SMOKE-ES-003
+purpose: "Elasticsearch feasibility smoke at default JVM settings, server under guarded\
+  \ sampler (protocol \xA716)"
+started_utc: '2026-09-24T09:16:03Z'
+artifacts: {}
+finished_utc: '2026-09-24T09:20:11Z'
+status: ABORTED
+study_id: comparative-study-001
+protocol_version: 1.0.0
+git_commit: 7788067c1437ae8c75ced4dc1ffc2f49b2c22a88
+host:
+  logical_cpus: 2
+  mem_total_kb: 2032608
+guardrails:
+  mem_budget_kb_85pct_available: 1089169
+  disk_floor_mb: 500
+  phase3e_crash_env_asserted_unset: true
+seed: null
+reason: 'OBSERVED-LIMIT: tree RSS 1149344KB >= 85% MemAvailable budget 1089169KB'

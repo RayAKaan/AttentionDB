@@ -1,0 +1,31 @@
+{
+  "host": "Originator",
+  "os": "Windows-11-10.0.26200-SP0",
+  "python": "3.14.4",
+  "created_utc": "2026-09-25T16:41:20Z",
+  "c2pilot_sha256": "9024974731d8d5c0b182348eae2601037768819ebae5eff459c82c6931f543ce",
+  "input_hashes": {
+    "B0-cfg.json": "53deda8a0e5de340ba56d7628cf7a2dd7f741ae8cb22912b7cf52f1f5652c15c",
+    "B0-rep1.json": "9a6150f48c97d13bb0026b64dc66ebe30b03abfb022cccc8e56549d2fc2bc358",
+    "CANONICAL.f32": "4f1f7a3bc26916b14545e7ac0a5dae1d16393db944a54b37441f7c70029f09ef",
+    "EF128-cfg.json": "5f55dd9954fc25f1a02f650683207a459e975efe5d2b612170747e8c876e4465",
+    "EF128-rep1.json": "795119c48848cad9098432a498d1f66c7271db7103af04ae5b6f877c9a569448",
+    "EF16-cfg.json": "1f951c9b1f4384bc6c135444fe5c5277ed69eb25667fbc19ddc9bcae4b61486a",
+    "EF16-rep1.json": "03462725be469114ac6569273afd6de66678418f8e0e1f533635ae4b34b7b77f",
+    "EF32-cfg.json": "4a0a721f2899326e21b13dfdc0bab3cd029f7cd920417d0ca47f40de7a28f75f",
+    "EF32-rep1.json": "3fd7e4e1fe72b99520f4d83c5d759c6c773651738e496972941a397f109b4085",
+    "EF64-cfg.json": "83a3043d77bcfd86da365a953ce242694e3879e6eb18d117073430076615a79d",
+    "EF64-rep1.json": "e59a4f76b33d4c8213fedb9607d04d62b1baa350b91988ecb37b3e0f6e456cf3",
+    "HEAD-BODY.f32": "2f76b795e31d0c09bc63988acf15710cd3607e09d60e0ecdf87ebb42c0fb892a",
+    "HEAD-CITE.f32": "181c17fb89cd63299cca102bb18dc401b3171bf1a60dc0b662d36b694742a5d5",
+    "HEAD-TITLE.f32": "87634220e8b730dcdc5711a5033414bf8168ba6d6feac19a08bb0bfe6d7a1d84",
+    "QUERIES.f32": "afb866ae799124ad3fcd5faadca70bbd698d62c3c38f47d63b5f181ef26cfc15"
+  },
+  "env_vars": {},
+  "guardrail": {
+    "policy": "sampler(500ms) aborts when child process-tree RSS >= 85% of MemAvailable at preflight",
+    "mem_avail_at_preflight_bytes": 3061186560,
+    "mem_load_pct_at_preflight": 82,
+    "ram_abort_threshold_bytes": 2602008576
+  }
+}

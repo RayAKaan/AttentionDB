@@ -1,0 +1,9 @@
+run_id: C2-MODES-TEST-001
+study_id: comparative-study-001
+protocol_version: 1.0.0
+git_commit: 7788067c1437ae8c75ced4dc1ffc2f49b2c22a88
+purpose: engine mode correctness battery TEST-C2-002..009 + B4 evidence (via c2probe,
+  current source)
+component: attentiondb-adapter-validation
+tool: c2probe modes-test
+note: in-process engine, <5s wall, negligible RSS

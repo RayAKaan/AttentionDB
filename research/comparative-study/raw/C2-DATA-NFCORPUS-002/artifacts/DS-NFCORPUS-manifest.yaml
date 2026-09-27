@@ -1,0 +1,70 @@
+dataset_id: DS-NFCORPUS
+upstream_url: https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/nfcorpus.zip
+origin: BEIR (HF BeIR/nfcorpus); original NFCorpus UIUC
+download_timestamp_utc: '2026-09-24T07:49:44Z'
+license_metadata: cc-by-sa-4.0 per HF card (C1 record); verify-at-download flag
+zip_sha256: efe5be03f8c5b86a5870102d0599d227c8c6e2484328e68c6522560385671b0b
+files:
+  corpus.jsonl:
+    sha256: 10cc83ef1826b1425e6a87090b5140b39b27755d5a27e48215a88611c899991f
+    bytes: 6219364
+  queries.jsonl:
+    sha256: d024e6621b84925d485ae473d316a0c3af31c62c8068a59fb29d22f7613aef2a
+    bytes: 441466
+  qrels/dev.tsv:
+    sha256: b1d38b5e8f78c4a5820bce2b7ec2db54911d7690dc601e76811846b211180bd8
+    bytes: 258218
+  qrels/test.tsv:
+    sha256: f8fba6ef3d4dd9c3a242a8ba4ae38276fc3622fce7dcbae764766d564542fd2a
+    bytes: 279572
+  qrels/train.tsv:
+    sha256: 6336b80f9bffc4f063f3aa450047ad35c0b7c534efe4a6ba35e16dbace047f6a
+    bytes: 2504643
+  hf-qrels/dev.tsv:
+    sha256: b1d38b5e8f78c4a5820bce2b7ec2db54911d7690dc601e76811846b211180bd8
+    bytes: 258218
+    source: https://huggingface.co/datasets/BeIR/nfcorpus-qrels
+  hf-qrels/test.tsv:
+    sha256: f8fba6ef3d4dd9c3a242a8ba4ae38276fc3622fce7dcbae764766d564542fd2a
+    bytes: 279572
+    source: https://huggingface.co/datasets/BeIR/nfcorpus-qrels
+  hf-qrels/train.tsv:
+    sha256: 6336b80f9bffc4f063f3aa450047ad35c0b7c534efe4a6ba35e16dbace047f6a
+    bytes: 2504643
+    source: https://huggingface.co/datasets/BeIR/nfcorpus-qrels
+preprocessing_version: c2-beir-v1 (raw pass-through; no dedup, no text mutation)
+preprocessing_script: research/comparative-study/c2/harness/beir_materialize.py
+preprocessing_script_git_commit: null
+corpus_size: 3633
+query_count: 3237
+qrels_count: &id001
+  dev: 11385
+  test: 12334
+  train: 110575
+integrity:
+  dataset_id: DS-NFCORPUS
+  corpus_docs: 3633
+  queries: 3237
+  queries_file_note: queries.jsonl holds ALL split queries; C1 'queries' count refers
+    to TEST qrels queries
+  qrels_rows: *id001
+  qrels_provenance:
+    dev: hf-BeIR-qrels (official; positives-only)
+    test: hf-BeIR-qrels (official; positives-only)
+    train: hf-BeIR-qrels (official; positives-only)
+  corpus_fields:
+  - _id
+  - metadata
+  - text
+  - title
+  graded_levels:
+  - 1
+  - 2
+  graded_levels_note: "BEIR qrels are positives-only; explicit 0 rows do not exist\
+    \ in the release. SciFact ships score=1 only (binary); NFCorpus ships 1 and 2.\
+    \ C1 recorded 'graded 0/1/2' for SciFact \u2014 recorded as C1-vs-data discrepancy\
+    \ (vocabulary vs shipped levels); acceptance rule (defensible labels) unaffected."
+  qrel_test_queries: 323
+  dangling_qrel_query_ids: 0
+  dangling_qrel_doc_ids: 0
+  counts_match_c1_record: true

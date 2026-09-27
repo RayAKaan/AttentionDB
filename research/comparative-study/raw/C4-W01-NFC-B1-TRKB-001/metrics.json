@@ -1,0 +1,88 @@
+{
+  "run_id": "C4-W01-NFC-B1-TRKB-001",
+  "mode": "B1",
+  "dataset": "DS-NFCORPUS",
+  "split": "TEST",
+  "phase": "C4.4 confirmed-scale execution",
+  "test_queries": 323,
+  "rep_count": 5,
+  "warmup": 20,
+  "ef_search": 64,
+  "candidate_budget": 500,
+  "modelcard": "",
+  "config_note": "Track-B practical default single-head (ef 64 k10)",
+  "per_rep": [
+    {
+      "n_queries": 323,
+      "recall10_qrels_mean": 0.1519763582636928,
+      "recall10_exact_mean": 0.9603715123775943,
+      "p50_us": 772.0999999999999,
+      "p95_us": 1110.8,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 323,
+      "recall10_qrels_mean": 0.15150817352759396,
+      "recall10_exact_mean": 0.9681114504580897,
+      "p50_us": 806.1999999999999,
+      "p95_us": 1111.9,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 323,
+      "recall10_qrels_mean": 0.15213103460049943,
+      "recall10_exact_mean": 0.9721362188504576,
+      "p50_us": 975.1999999999999,
+      "p95_us": 1298.8,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 323,
+      "recall10_qrels_mean": 0.14981285714466505,
+      "recall10_exact_mean": 0.9705882310498241,
+      "p50_us": 849.2,
+      "p95_us": 1156.1,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 323,
+      "recall10_qrels_mean": 0.14630075605822607,
+      "recall10_exact_mean": 0.9662538652449569,
+      "p50_us": 808.2,
+      "p95_us": 1099.6999999999998,
+      "deadline_exceeded": 0
+    }
+  ],
+  "rep_recall10_qrels_mean": [
+    0.1519763582636928,
+    0.15150817352759396,
+    0.15213103460049943,
+    0.14981285714466505,
+    0.14630075605822607
+  ],
+  "recall10_qrels_mean_5rep": 0.1503,
+  "recall10_qrels_sd_5rep": 0.0022,
+  "rep_recall10_exact_mean": [
+    0.9603715123775943,
+    0.9681114504580897,
+    0.9721362188504576,
+    0.9705882310498241,
+    0.9662538652449569
+  ],
+  "recall10_exact_mean_5rep": 0.9675,
+  "p50_us_per_rep": [
+    772.0999999999999,
+    806.1999999999999,
+    975.1999999999999,
+    849.2,
+    808.2
+  ],
+  "peak_child_rss_MiB": [
+    96.1,
+    96.2,
+    95.3,
+    95.5,
+    95.9
+  ],
+  "conclusion_rule": "matches C4-BINVERIFY-003 verdict (>=5 fresh-process reps, mean+sd reported; tolerance comparisons use rep-mean, not single draws)"
+}

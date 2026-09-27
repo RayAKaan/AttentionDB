@@ -1,0 +1,73 @@
+{
+  "run_id": "C4-W19-SCI-B3-MEM-001",
+  "mode": "B3",
+  "dataset": "DS-SCIFACT",
+  "split": "TEST",
+  "phase": "C4.4 confirmed-scale MEM boundary",
+  "test_queries": 300,
+  "rep_count": 5,
+  "warmup": 20,
+  "legs_miB": [
+    512,
+    1024,
+    1638
+  ],
+  "legs": [
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7897222223877907,
+      "recall10_exact_mean": 0.6960000017285347,
+      "p50_us": 1886.4,
+      "p95_us": 2293.2,
+      "deadline_exceeded": 0,
+      "leg_miB": 512,
+      "leg_guard_bytes": 536870912,
+      "peak_child_rss_MiB": [
+        272.1,
+        271.4,
+        271.9,
+        271.3,
+        272.1
+      ],
+      "within_leg_budget": true
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.791000000089407,
+      "recall10_exact_mean": 0.7000000024835269,
+      "p50_us": 1887.5,
+      "p95_us": 2391.7999999999997,
+      "deadline_exceeded": 0,
+      "leg_miB": 1024,
+      "leg_guard_bytes": 1073741824,
+      "peak_child_rss_MiB": [
+        272.2,
+        305.1,
+        271.8,
+        305.3,
+        304.7
+      ],
+      "within_leg_budget": true
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7916666667660077,
+      "recall10_exact_mean": 0.6986666688323021,
+      "p50_us": 2207.7,
+      "p95_us": 4329.3,
+      "deadline_exceeded": 0,
+      "leg_miB": 1638,
+      "leg_guard_bytes": 1717567488,
+      "peak_child_rss_MiB": [
+        271.6,
+        304.7,
+        272.0,
+        290.6,
+        271.8
+      ],
+      "within_leg_budget": true
+    }
+  ],
+  "guardrail": "sampler-abort at min(85% MemAvailable, leg budget) applied per leg; within_leg_budget=False = budget crossed",
+  "config_note": "B3 mirrors B2 candidate gen; SCI-B2 unreachable -> plan default"
+}

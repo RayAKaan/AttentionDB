@@ -1,0 +1,101 @@
+{
+  "HEAD-TITLE": {
+    "dim_ok": true,
+    "finite_no_nan_inf": true,
+    "dtype": "float32",
+    "n": 5183
+  },
+  "HEAD-BODY": {
+    "dim_ok": true,
+    "finite_no_nan_inf": true,
+    "dtype": "float32",
+    "n": 5183
+  },
+  "HEAD-CITE": {
+    "dim_ok": true,
+    "finite_no_nan_inf": true,
+    "dtype": "float32",
+    "n": 5183
+  },
+  "CANONICAL": {
+    "dim_ok": true,
+    "finite_no_nan_inf": true,
+    "dtype": "float32",
+    "n": 5183
+  },
+  "QUERIES": {
+    "dim_ok": true,
+    "finite_no_nan_inf": true,
+    "dtype": "float32",
+    "n": 1109
+  },
+  "manifest": {
+    "dataset_id": "DS-SCIFACT",
+    "source_dataset_hash_sha256": "dec31c8182f3d744c7d2c09423756fd1d17cbef75808db13ba01cc0aab4d1ac6",
+    "model_id": "sentence-transformers/all-MiniLM-L6-v2",
+    "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+    "files_sha256": {
+      "modules.json": "84e40c8e006c9b1d6c122e02cba9b02458120b5fb0c87b746c41e0207cf642cf",
+      "config_sentence_transformers.json": "061ca9d39661d6c6d6de5ba27f79a1cd5770ea247f8d46412a68a498dc5ac9f3",
+      "sentence_bert_config.json": "fc1993fde0a95c24ec6c022539d41cf6e2f7c9721e5415d6fb6897472a9cd4b7",
+      "config.json": "953f9c0d463486b10a6871cc2fd59f223b2c70184f49815e7efbcab5d8908b41",
+      "tokenizer.json": "be50c3628f2bf5bb5e3a7f17b1f74611b2561a3a27eeab05e5aa30f411572037",
+      "tokenizer_config.json": "acb92769e8195aabd29b7b2137a9e6d6e25c476a4f15aa4355c233426c61576b",
+      "vocab.txt": "07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3",
+      "special_tokens_map.json": "303df45a03609e4ead04bc3dc1536d0ab19b5358db685b6f3da123d05ec200e3",
+      "1_Pooling/config.json": "4be450dde3b0273bb9787637cfbd28fe04a7ba6ab9d36ac48e92b11e350ffc23",
+      "model.safetensors": "53aa51172d142c89d9012cce15ae4d6cc0ca6895895114379cacb4fab128d9db"
+    },
+    "sentence_transformers_version": "6.1.0",
+    "torch_version": "2.14.0+cpu",
+    "transformers_version": "5.17.0",
+    "inference": "sentence-transformers encode, float32, batch 32, sort_by_length off, no normalization (cosine metric applied downstream)",
+    "embedding_dimension": 384,
+    "metric": "cosine",
+    "dtype": "float32",
+    "records": {
+      "HEAD-TITLE": 5183,
+      "HEAD-BODY": 5183,
+      "HEAD-CITE": 5183,
+      "CANONICAL": 5183,
+      "QUERIES": 1109
+    },
+    "head_view_definitions": {
+      "HEAD-TITLE": "embed(title)",
+      "HEAD-BODY": "embed(text)",
+      "HEAD-CITE": "embed(first + final sentence of text; query-independent, fixed before any run)",
+      "CANONICAL": "embed(title + ' ' + text); the single vector every external single-vector system receives",
+      "QUERIES": "embed(query text)"
+    },
+    "determinism_full_view_reencode_byte_equal": true,
+    "batch1_bitwise_differs": false,
+    "export_hashes": {
+      "HEAD-TITLE.npy": "34c2290eba231d149babf84d121784a33e4c86d7163c7e031cf9fd2ac9b76365",
+      "HEAD-BODY.npy": "f5792419df39330bb4dfa2e864f6a1c3caa6dda4d3b48278267089b762551c7e",
+      "HEAD-CITE.npy": "22cafcc39501f1d8b62c06a8e144a8566068b5108c02016608d1d81e5f9c8348",
+      "CANONICAL.npy": "c876d31284bfd99de6636454434e5be2f7461e15b1fd2623b878a685e1e5675a",
+      "QUERIES.npy": "2ffd4fb2803aa314008eb359fed4d2f70eb7cbd1dc3cf0ecdeed4e3835abd989"
+    },
+    "byte_equal_to_C2_reference": {
+      "HEAD-TITLE.npy": false,
+      "HEAD-BODY.npy": false,
+      "HEAD-CITE.npy": false,
+      "CANONICAL.npy": false,
+      "QUERIES.npy": false
+    },
+    "repro_run_id": "C3-EMBED-SCIFACT-001",
+    "env": {
+      "timestamp_utc": "2026-09-25T13:50:34Z",
+      "os": "Windows 11",
+      "kernel": "10.0.26200",
+      "cpu_model": "AMD64 Family 23 Model 113 Stepping 0, AuthenticAMD",
+      "logical_cpus": 8,
+      "mem_total_kb": 16700964,
+      "mem_available_kb": 5607532,
+      "disk_free_mb": 466458,
+      "filesystem": "usage",
+      "python": "3.14.4",
+      "git_commit": "7cbd16ddd62b671eaefccf4db44bf464164d79ca"
+    }
+  }
+}

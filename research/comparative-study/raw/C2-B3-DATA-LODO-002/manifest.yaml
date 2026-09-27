@@ -1,0 +1,17 @@
+run_id: C2-B3-DATA-LODO-002
+purpose: LODO NFCorpus-derived B3 training dataset construction
+started_utc: '2026-09-24T08:53:18Z'
+artifacts: {}
+finished_utc: '2026-09-24T08:53:21Z'
+status: PASS
+study_id: comparative-study-001
+protocol_version: 1.0.0
+git_commit: 7788067c1437ae8c75ced4dc1ffc2f49b2c22a88
+host:
+  logical_cpus: 2
+  mem_total_kb: 2032608
+guardrails:
+  mem_budget_kb_85pct_available: 1047543
+  disk_floor_mb: 500
+  phase3e_crash_env_asserted_unset: true
+seed: 20260925

@@ -1,0 +1,49 @@
+run_id: C2-MODES-TEST-002
+purpose: 'POST-fix modes battery: B1/B2/B4/B5/B7 engine validation with re-scoped
+  harness assertions'
+started_utc: '2026-09-24T15:04:06Z'
+artifacts:
+  modes-test-r1.json:
+    sha256: 8d3879d6b0ef994b13ac0cef8a253c730f36cf465b9a4977a23c0b8be7136176
+    bytes: 3485
+  modes-test-r2.json:
+    sha256: 1f1bb798b70e0388ea03ec5d1c6279d9ca0bad02e0fea19b9ea6f33267f2cfd2
+    bytes: 3485
+  modes-test-r3.json:
+    sha256: b97293409f74fc90a832140ed31e58c07eb1d96563b44b1905822e3b4e77a1df
+    bytes: 3485
+  modes-test-r4.json:
+    sha256: 32c14b51e7304486f02113ca4d3a39d70959e2a7fd26fc00dd6cb903ee0f52d2
+    bytes: 3485
+  modes-test-r5.json:
+    sha256: 1f1bb798b70e0388ea03ec5d1c6279d9ca0bad02e0fea19b9ea6f33267f2cfd2
+    bytes: 3485
+  modes-test-r6.json:
+    sha256: f11fd0fbc5006827bee0db4dc1b200cddf76ee5b49c94074bb0295b296b6b8f0
+    bytes: 3502
+  modes-test-r7.json:
+    sha256: 1efab542c054f563fb415dc1947d91884e22d55408fb34fe0d9680dff09067be
+    bytes: 3499
+  modes-test-r8.json:
+    sha256: 387b00a39c516413377b55c705e8e8276c9bf6feace9fb823427eb81b54cde2f
+    bytes: 3487
+  hrecall-recall-observations.txt:
+    sha256: 38d215d85317e3386ee6aecf8f6eafd76370e60a891d077e24e57a76540dc240
+    bytes: 3371
+finished_utc: '2026-09-24T15:04:06Z'
+status: PASS
+study_id: comparative-study-001
+protocol_version: 1.0.0
+git_commit: 7788067c1437ae8c75ced4dc1ffc2f49b2c22a88
+host:
+  logical_cpus: 8
+  mem_total_kb: 16700964
+guardrails:
+  mem_budget_kb_85pct_available: 2950295
+  disk_floor_mb: 500
+seed: null
+reason: 'BM25 tie-order fix verified: TEST-C2-003/-009 re-scoped to assert determinism
+  + exact score equality only when per-head candidate pools are exhaustive (hnsw_rs
+  at k==count is not exhaustive, recorded observation); TEST-C2-008 uses corrected
+  token-doc-set assertion (v2). All 8 battery runs PASS. git_commit field = pre-fix
+  HEAD (fix uncommitted at registration; fix_commit recorded in finding doc).'

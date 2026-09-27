@@ -1,0 +1,6 @@
+{
+  "order_equality_rate": 0.0,
+  "queries": 20,
+  "set_equality_rate": 0.0,
+  "subcommand": "oracle-agree"
+}

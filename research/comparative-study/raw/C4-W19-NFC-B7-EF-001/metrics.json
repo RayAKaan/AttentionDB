@@ -1,0 +1,100 @@
+{
+  "run_id": "C4-W19-NFC-B7-EF-001",
+  "mode": "B7",
+  "dataset": "DS-NFCORPUS",
+  "split": "VAL",
+  "phase": "C4.2 validation tuning",
+  "matching_metric": "qrels Relevance-Recall@10 (>=1 judged docs, top-10)",
+  "target_recall10_qrels_B0_VAL": 0.13642410370866181,
+  "tolerance": 0.01,
+  "rep_count": 1,
+  "grid": {
+    "ef_search": [
+      16,
+      32,
+      64,
+      128
+    ],
+    "candidate_budget": [
+      null
+    ]
+  },
+  "levels": [
+    {
+      "n_queries": 324,
+      "recall10_qrels_mean": 0.13561985670031268,
+      "recall10_exact_mean": 0.619135806635942,
+      "p50_us": 1897.3,
+      "p95_us": 3287.2000000000003,
+      "level": "EF16",
+      "ef_search": 16,
+      "candidate_budget": 500,
+      "peak_child_rss_MiB": [
+        198.6
+      ],
+      "within_tolerance": true
+    },
+    {
+      "n_queries": 324,
+      "recall10_qrels_mean": 0.13503566663712263,
+      "recall10_exact_mean": 0.617283954296583,
+      "p50_us": 2030.1,
+      "p95_us": 4079.2,
+      "level": "EF32",
+      "ef_search": 32,
+      "candidate_budget": 500,
+      "peak_child_rss_MiB": [
+        197.4
+      ],
+      "within_tolerance": true
+    },
+    {
+      "n_queries": 324,
+      "recall10_qrels_mean": 0.13721120283783725,
+      "recall10_exact_mean": 0.6154321033599568,
+      "p50_us": 1624.7,
+      "p95_us": 2064.5,
+      "level": "EF64",
+      "ef_search": 64,
+      "candidate_budget": 500,
+      "peak_child_rss_MiB": [
+        197.4
+      ],
+      "within_tolerance": true
+    },
+    {
+      "n_queries": 324,
+      "recall10_qrels_mean": 0.1369353368415578,
+      "recall10_exact_mean": 0.6216049428891253,
+      "p50_us": 2007.9999999999998,
+      "p95_us": 2619.4,
+      "level": "EF128",
+      "ef_search": 128,
+      "candidate_budget": 500,
+      "peak_child_rss_MiB": [
+        196.9
+      ],
+      "within_tolerance": true
+    }
+  ],
+  "selection": {
+    "n_queries": 324,
+    "recall10_qrels_mean": 0.13721120283783725,
+    "recall10_exact_mean": 0.6154321033599568,
+    "p50_us": 1624.7,
+    "p95_us": 2064.5,
+    "level": "EF64",
+    "ef_search": 64,
+    "candidate_budget": 500,
+    "peak_child_rss_MiB": [
+      197.4
+    ],
+    "within_tolerance": true
+  },
+  "selection_rule": "fastest p50 post-warmup within +-0.01 of B0 VAL target (TARGET-UNREACHABLE never interpolated)",
+  "val_split": {
+    "dataset": "DS-NFCORPUS",
+    "rule": "NFCorpus official qrel-dev (324 qids)",
+    "n_queries": 324
+  }
+}

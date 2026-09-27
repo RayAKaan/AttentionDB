@@ -1,0 +1,91 @@
+{
+  "run_id": "C4-W19-SCI-B1-TIME-001",
+  "mode": "B1",
+  "dataset": "DS-SCIFACT",
+  "split": "TEST",
+  "phase": "C4.4 confirmed-scale TIME boundary",
+  "test_queries": 300,
+  "rep_count": 5,
+  "warmup": 20,
+  "legs_us": [
+    1000,
+    10000,
+    100000
+  ],
+  "legs": [
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7833333334326744,
+      "recall10_exact_mean": 0.9776666631301244,
+      "p50_us": 1014.8,
+      "p95_us": 1817.3,
+      "deadline_exceeded": 0,
+      "deadline_us": 1000,
+      "deadline_exceeded_per_rep": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "deadline_exceeded_total": 0,
+      "peak_child_rss_MiB": [
+        122.0,
+        131.3,
+        130.9,
+        120.7,
+        120.1
+      ]
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7766666667660077,
+      "recall10_exact_mean": 0.980333330631256,
+      "p50_us": 998.3,
+      "p95_us": 1441.8,
+      "deadline_exceeded": 0,
+      "deadline_us": 10000,
+      "deadline_exceeded_per_rep": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "deadline_exceeded_total": 0,
+      "peak_child_rss_MiB": [
+        120.6,
+        120.4,
+        131.1,
+        131.5,
+        120.4
+      ]
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7766666667660077,
+      "recall10_exact_mean": 0.9806666632493337,
+      "p50_us": 1106.6,
+      "p95_us": 1874.5,
+      "deadline_exceeded": 0,
+      "deadline_us": 100000,
+      "deadline_exceeded_per_rep": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "deadline_exceeded_total": 0,
+      "peak_child_rss_MiB": [
+        120.3,
+        121.1,
+        120.4,
+        131.4,
+        120.5
+      ]
+    }
+  ],
+  "deadline_policy": "deadline misses = FAILURES counted; latency excludes deadline-miss queries (they return no result)",
+  "config_note": "C4.2 matched SCI-B1 EF32 0.7775"
+}

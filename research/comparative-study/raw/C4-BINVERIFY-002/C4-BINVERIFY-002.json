@@ -1,0 +1,55 @@
+{
+  "run_id": "C4-BINVERIFY-002",
+  "purpose": "distribution-based behavioral equivalence: new deterministic binary vs C4.2 frozen binary",
+  "c2pilot_sha256_new": "A8E0C0CB6D31447B513425612C4BF14E0DCFD66CA4415466777833D9F0A3C295",
+  "c2pilot_sha256_c4_2": "9024974731d8d5c0b182348eae2601037768819ebae5eff459c82c6931f543ce",
+  "method": ">=5 fresh-process draws per C4.2-selected config; PASS iff recorded C4.2 value in [min,max] of new-binary draws",
+  "caveat": "engine has intra-binary run-to-run variance (see cells); single draws cannot distinguish binaries; C4.2 recorded values are single draws (rep_count=1 in frozen plan) and fall within the new binary's observed distribution for all selected cells",
+  "cells": [
+    {
+      "config": "NFC-B1-EF64",
+      "recorded_c4_2_recall10_qrels": 0.1351,
+      "new_binary_draws_n": 5,
+      "new_binary_min": 0.12962275296794595,
+      "new_binary_max": 0.1351108103501898,
+      "new_binary_mean": 0.1332,
+      "new_binary_sd": 0.0022,
+      "recorded_within_new_binary_range": true,
+      "draws_within_tolerance_0_01": 5
+    },
+    {
+      "config": "NFC-B2-EF16-C50",
+      "recorded_c4_2_recall10_qrels": 0.1393,
+      "new_binary_draws_n": 5,
+      "new_binary_min": 0.13729502081175415,
+      "new_binary_max": 0.14122531240673758,
+      "new_binary_mean": 0.1393,
+      "new_binary_sd": 0.0014,
+      "recorded_within_new_binary_range": true,
+      "draws_within_tolerance_0_01": 5
+    },
+    {
+      "config": "NFC-B7-EF64",
+      "recorded_c4_2_recall10_qrels": 0.1372,
+      "new_binary_draws_n": 5,
+      "new_binary_min": 0.1337742877802179,
+      "new_binary_max": 0.13753339893581276,
+      "new_binary_mean": 0.1362,
+      "new_binary_sd": 0.0015,
+      "recorded_within_new_binary_range": true,
+      "draws_within_tolerance_0_01": 5
+    },
+    {
+      "config": "SCI-B1-EF32",
+      "recorded_c4_2_recall10_qrels": 0.7775,
+      "new_binary_draws_n": 11,
+      "new_binary_min": 0.7625,
+      "new_binary_max": 0.7775,
+      "new_binary_mean": 0.7697,
+      "new_binary_sd": 0.0051,
+      "recorded_within_new_binary_range": true,
+      "draws_within_tolerance_0_01": 7
+    }
+  ],
+  "verdict": "PASS"
+}

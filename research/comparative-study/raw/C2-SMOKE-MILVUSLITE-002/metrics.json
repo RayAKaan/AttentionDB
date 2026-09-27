@@ -1,0 +1,6 @@
+{
+  "pip_rc": 0,
+  "pip_tail": "ady satisfied: urllib3<3,>=1.26 in /usr/local/lib/python3.13/site-packages (from requests>=2.20.0->pymilvus[milvus-lite]) (2.7.0)\nRequirement already satisfied: certifi>=2023.5.7 in /usr/local/lib/python3.13/site-packages (from requests>=2.20.0->pymilvus[milvus-lite]) (2026.7.22)\nDownloading pymilvus-3.0.2-py3-none-any.whl (417 kB)\nDownloading python_dotenv-1.2.3-py3-none-any.whl (22 kB)\nDownloading cachetools-7.2.0-py3-none-any.whl (16 kB)\nDownloading protobuf-7.36.2-cp310-abi3-manylinux2014_x86_64.whl (343 kB)\nInstalling collected packages: python-dotenv, protobuf, cachetools, pymilvus\n\nSuccessfully installed cachetools-7.2.0 protobuf-7.36.2 pymilvus-3.0.2 python-dotenv-1.2.3\n\n[notice] A new release of pip is available: 26.1.2 -> 26.2.1\n[notice] To update, run: pip install --upgrade pip\n",
+  "search_hits": 5,
+  "status_detail": "import+init+create+insert+search OK"
+}

@@ -40,7 +40,36 @@ start (before any C4 run). Companion: `c4-plan.md`, `c4-dataset-validation.md`,
   `candidate_count`/`heads_present`/`relevant_ids` via
   `attend_detailed_with_stats`):
   `9024974731d8d5c0b182348eae2601037768819ebae5eff459c82c6931f543ce`
-  (smoke-tested on this host: budget=16/ef=4 cell PASS, exit 0).
+  (smoke-tested on this host: budget=16/ef=4 cell PASS, exit 0; used by all
+  C4.2 VAL tuning cells whose `environment.yaml` records this hash).
+- **C4 binary update (C4.2-complete, pre-C4.3/C4.4 rebuild):** MSVC `link.exe`
+  embeds a fresh PE `TimeDateStamp` + PDB debug GUID on every link, so two
+  builds from identical source were NOT byte-reproducible (verified: code
+  sections `.text/.data/.pdata/.reloc` byte-identical across builds; only
+  header/GUID bytes differed). To give every C4 run artifact an auditable,
+  reproducible binary hash, the build now forces `/Brepro` via
+  `c2/probe/.cargo/config.toml` ([build] rustflags), which makes clean
+  rebuilds deterministic (verified: two clean builds -> identical sha256).
+  A B4 entry (`RetrievalMode::QKAttention`, identity-init QK attention, no
+  trained params) was added to the pilot mode map for the frozen
+  `C4-W04-SCI-B4-001` no-op arm. **C4.2 evidence stands unchanged** (each
+  C4.2 run recorded the hash of the binary actually used at run time);
+  C4.3/C4.4 onward use the new frozen binary:
+  `A8E0C0CB6D31447B513425612C4BF14E0DCFD66CA4415466777833D9F0A3C295`
+  (deterministic; code-identical to `90249747...` for all C4.2-tuned modes;
+  behavioral equivalence verified in C4-BINVERIFY-001).
+- **C4 binary update 2 (pre-C4.4, additive `deadline_us` knob):** the frozen
+  TIME boundary cell `C4-W19-SCI-B1-TIME-001` requires a per-query deadline.
+  The engine already exposes `deadline: Option<Instant>` (Timeout error above
+  generous work bounds); c2pilot now passes `deadline_us` from config
+  (default 0 → `deadline=None`, byte-identical attend call as before; only
+  `pos >= warmup` timed queries with `deadline_us > 0` get a deadline).
+  New deterministic binary (`/Brepro`):
+  `3ec8c193354975fa26a3961d8835289a0cad54cc686141f75573baeaebb31c98`.
+  Distribution-based equivalence re-verified (C4-BINVERIFY-003, fresh draws):
+  **PASS 4/4** C4.2-selected cells; recorded C4.2 values in fresh-draw range
+  (SCI-B1 EF32 0.7775 in [0.7550, 0.7775] @ 11 draws). This binary (deadline
+  arm) supersedes `A8E0C0CB...` as the executing engine for C4.3/C4.4.
   `c2probe.exe` / `bm25repro.exe` present for synthetic corpus export + BM25
   regression. C2-MODES-TEST-002 PASS 8/8 on this host.
 - Exact oracle: `harness/oracle.py` (numpy) + pure-python reference + Rust

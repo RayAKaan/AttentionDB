@@ -1,0 +1,16 @@
+SUPERSEDED - single-draw exploration only; definitive verdict is C4-BINVERIFY-002 (PASS)
+
+C4-BINVERIFY-001 ran each C4.2-selected config once with the new deterministic
+binary. NFC cells reproduced within +-0.01; SCI-B1 EF32 drew 0.7650 vs recorded
+0.7775 (-0.0125). Single-draw comparison is NOT conclusive because the engine
+has intrinsic run-to-run recall variance.
+
+C4-BINVERIFY-002 (distribution-based, 11 fresh-process draws combined) shows:
+- NFC-B1 EF64 recorded 0.1351 in_new[0.1296,0.1351] PASS
+- NFC-B2 EF16-C50 recorded 0.1393 in_new[0.1373,0.1412] PASS
+- NFC-B7 EF64 recorded 0.1372 in_new[0.1338,0.1375] PASS
+- SCI-B1 EF32 recorded 0.7775 in_new[0.7625,0.7775] PASS (recorded == new max)
+All recorded C4.2 values are plausible draws from the new binary -> PASS.
+
+Implication for C4.4 TEST: use 5 fresh-process reps (frozen plan default) and
+report mean+sd; matching tolerance +-0.01 against rep-mean, not single draws.

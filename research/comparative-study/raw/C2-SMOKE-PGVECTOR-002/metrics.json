@@ -1,0 +1,18 @@
+{
+  "apt_pgvector_packages": [
+    "postgresql-17-pgvector - Open-source vector similarity search for Postgres"
+  ],
+  "postgresql_packages": [
+    "postgresql-17 - The World's Most Advanced Open Source Relational Database"
+  ],
+  "pgvector_pkg": "postgresql-17-pgvector",
+  "install_rc": 0,
+  "pg_versions_present": [
+    "17"
+  ],
+  "cluster_start_rc": 0,
+  "sql_errors": [
+    "CREATE EXTENSION IF NOT EXISTS vector => Password: su: Authentication failure\n",
+    "CREATE TABLE t (id int primary key, v ve => Password: su: Authentication failure\n"
+  ]
+}

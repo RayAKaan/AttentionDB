@@ -1,0 +1,6 @@
+run_id: C2-INTEGRITY-001
+study_id: comparative-study-001
+protocol_version: 1.0.0
+git_commit: 7788067c1437ae8c75ced4dc1ffc2f49b2c22a88
+purpose: manifest integrity re-hash across all C2 runs (TEST-C2-013)
+component: artifact-integrity

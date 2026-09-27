@@ -1,0 +1,762 @@
+﻿- run_id: C2-ORACLE-TESTS-001
+  status: INVALID-STARTUP
+  purpose: B0 exact oracle validation battery (startup failed; superseded)
+- run_id: C2-ORACLE-TESTS-002
+  status: PASS
+  purpose: B0 exact oracle validation battery (protocol Ã‚Â§12)
+  started: 2026-09-24T07:46:39Z
+  finished: 2026-09-24T07:46:40Z
+- run_id: C2-DATA-SCIFACT-001
+  status: FAILED
+  purpose: materialize + verify + manifest DS-SCIFACT (protocol Ã‚Â§8/Ã‚Â§9)
+  started: 2026-09-24T07:46:56Z
+  finished: 2026-09-24T07:46:56Z
+  reason: FileNotFoundError(2, 'No such file or directory')
+- run_id: C2-GATE-SCIDOCS-FIQA-001
+  status: FAILED
+  purpose: conditional dataset structure gates (protocol Ã‚Â§24)
+  started: 2026-09-24T07:46:56Z
+  finished: 2026-09-24T07:47:00Z
+  reason: FileNotFoundError(2, 'No such file or directory')
+- run_id: C2-DATA-SCIFACT-001
+  status: INVALID-STARTUP
+  purpose: materialize DS-SCIFACT (loader defect; superseded by -002)
+- run_id: C2-GATE-SCIDOCS-FIQA-001
+  status: INVALID-STARTUP
+  purpose: conditional gates (loader defect; superseded by -002)
+- run_id: C2-DATA-SCIFACT-002
+  status: FAILED
+  purpose: materialize + verify + manifest DS-SCIFACT (protocol Ã‚Â§8/Ã‚Â§9)
+  started: 2026-09-24T07:47:34Z
+  finished: 2026-09-24T07:47:34Z
+  reason: FileNotFoundError(2, 'No such file or directory')
+- run_id: C2-DATA-SCIFACT-003
+  status: FAILED
+  purpose: materialize + verify + manifest DS-SCIFACT (protocol Ã‚Â§8/Ã‚Â§9)
+  started: 2026-09-24T07:48:54Z
+  finished: 2026-09-24T07:48:54Z
+  reason: FileNotFoundError(2, 'No such file or directory')
+- run_id: C2-DATA-SCIFACT-002
+  status: INVALID-STARTUP
+  purpose: materialize DS-SCIFACT (manifest hash loop defect; superseded by -003)
+- run_id: C2-DATA-SCIFACT-004
+  status: FAILED
+  purpose: materialize + verify + manifest DS-SCIFACT (protocol Ã‚Â§8/Ã‚Â§9)
+  started: 2026-09-24T07:49:08Z
+  finished: 2026-09-24T07:49:08Z
+  reason: FileNotFoundError(2, 'No such file or directory')
+- run_id: C2-DATA-SCIFACT-003
+  status: INVALID-STARTUP
+  purpose: materialize DS-SCIFACT (stale manifest_for; superseded by -004)
+- run_id: C2-GATE-SCIDOCS-FIQA-002
+  status: FAILED
+  purpose: conditional dataset structure gates (protocol Ã‚Â§24)
+  started: 2026-09-24T07:49:29Z
+  finished: 2026-09-24T07:49:30Z
+  reason: KeyError('hf_qrels')
+- run_id: C2-DATA-SCIFACT-004
+  status: INVALID-STARTUP
+  purpose: materialize DS-SCIFACT (dir consumed pre-patch; superseded by -005)
+- run_id: C2-DATA-SCIFACT-005
+  status: FAILED
+  purpose: materialize + verify + manifest DS-SCIFACT (protocol Ã‚Â§8/Ã‚Â§9)
+  started: 2026-09-24T07:49:35Z
+  finished: 2026-09-24T07:49:35Z
+  reason: SameFileError("'/home/user/AttentionDB/research/comparative-study/raw/C2-DATA-SCIFACT-005/artifacts/DS-SCIFACT-manifest.yaml' and '/home/user/AttentionDB/research/comparative-study/raw/C2-DATA-SCIFACT-005/artifacts/DS-SCIFACT-manifest.yaml' are the same file")
+- run_id: C2-DATA-SCIFACT-005
+  status: INVALID-STARTUP
+  purpose: materialize DS-SCIFACT (artifact self-copy defect; superseded by -006)
+- run_id: C2-DATA-SCIFACT-006
+  status: FAILED
+  purpose: materialize + verify + manifest DS-SCIFACT (protocol Ã‚Â§8/Ã‚Â§9)
+  started: 2026-09-24T07:49:44Z
+  finished: 2026-09-24T07:49:44Z
+- run_id: C2-DATA-NFCORPUS-002
+  status: FAILED
+  purpose: materialize + verify + manifest DS-NFCORPUS (protocol Ã‚Â§8/Ã‚Â§9)
+  started: 2026-09-24T07:49:44Z
+  finished: 2026-09-24T07:49:45Z
+- run_id: C2-DATA-SCIFACT-006
+  status: FAILED-HARNESS-ASSERTION
+  purpose: materialize DS-SCIFACT (data correct; assertion wrong; superseded by -007)
+- run_id: C2-DATA-NFCORPUS-002
+  status: FAILED-HARNESS-ASSERTION
+  purpose: materialize DS-NFCORPUS (data correct; assertion wrong; superseded by -003)
+- run_id: C2-GATE-SCIDOCS-FIQA-002
+  status: FAILED-HARNESS-DEFECT
+  purpose: conditional gates (KeyError; superseded by -003)
+- run_id: C2-DATA-SCIFACT-007
+  status: PASS
+  purpose: materialize + verify + manifest DS-SCIFACT (protocol Ã‚Â§8/Ã‚Â§9)
+  started: 2026-09-24T07:49:58Z
+  finished: 2026-09-24T07:49:58Z
+- run_id: C2-DATA-NFCORPUS-003
+  status: PASS
+  purpose: materialize + verify + manifest DS-NFCORPUS (protocol Ã‚Â§8/Ã‚Â§9)
+  started: 2026-09-24T07:49:58Z
+  finished: 2026-09-24T07:49:59Z
+- run_id: C2-GATE-SCIDOCS-FIQA-003
+  status: PASS
+  purpose: conditional dataset structure gates (protocol Ã‚Â§24)
+  started: 2026-09-24T07:49:59Z
+  finished: 2026-09-24T07:50:01Z
+- run_id: C2-EMBED-SCIFACT-001
+  status: FAILED-HARNESS-DEFECT
+  purpose: pinned MiniLM embeddings DS-SCIFACT (manifest-step crash; superseded by -002)
+- run_id: C2-EMBED-SCIFACT-002
+  status: FAILED
+  purpose: pinned MiniLM embeddings for DS-SCIFACT (protocol Ã‚Â§9/Ã‚Â§10/Ã‚Â§21)
+  started: 2026-09-24T08:06:27Z
+  finished: 2026-09-24T08:19:57Z
+- run_id: C2-EMBED-SCIFACT-002
+  status: FAILED-HARNESS-CHECK-DEFECT
+  purpose: pinned MiniLM embeddings DS-SCIFACT (exports valid; determinism check wrong; superseded by -003)
+- run_id: C2-EMBED-NFCORPUS-001
+  status: INVALID-STARTUP
+  purpose: superseded embed attempt
+- run_id: C2-EMBED-NFCORPUS-002
+  status: INVALID-STARTUP
+  purpose: superseded embed attempt (dir existed; superseded by -003)
+- run_id: C2-EMBED-SCIFACT-003
+  status: PASS
+  purpose: pinned MiniLM embeddings for DS-SCIFACT (protocol Ã‚Â§9/Ã‚Â§10/Ã‚Â§21)
+  started: 2026-09-24T08:20:35Z
+  finished: 2026-09-24T08:39:30Z
+- run_id: C2-EMBED-NFCORPUS-003
+  status: PASS
+  purpose: pinned MiniLM embeddings for DS-NFCORPUS (protocol Ã‚Â§9/Ã‚Â§10/Ã‚Â§21)
+  started: 2026-09-24T08:39:32Z
+  finished: 2026-09-24T08:52:04Z
+- run_id: C2-B3-LEAK-001
+  status: FAILED
+  purpose: B3 leakage negative tests (INV-L1..L5)
+  started: 2026-09-24T08:52:14Z
+  finished: 2026-09-24T08:52:15Z
+- run_id: C2-B3-TRAIN-001
+  status: INVALID-STARTUP
+  purpose: B3 synth-concat training (SIGPIPE kill from invoking shell; superseded by -002)
+- run_id: C2-B3-TRAIN-002
+  status: INVALID-STARTUP
+  purpose: B3 synth-concat training (harness KeyError; superseded by -004)
+- run_id: C2-B3-LEAK-002
+  status: PASS
+  purpose: B3 leakage negative tests (INV-L1..L5)
+  started: 2026-09-24T08:53:16Z
+  finished: 2026-09-24T08:53:17Z
+- run_id: C2-B3-DATA-LODO-002
+  status: PASS
+  purpose: LODO NFCorpus-derived B3 training dataset construction
+  started: 2026-09-24T08:53:18Z
+  finished: 2026-09-24T08:53:21Z
+- run_id: C2-B3-TRAIN-004
+  status: INVALID-STARTUP
+  purpose: id collision; superseded by -006
+- run_id: C2-B3-TRAIN-005
+  status: INVALID-STARTUP
+  purpose: id collision; superseded by -007
+- run_id: C2-B3-TRAIN-006
+  status: PASS
+  purpose: B3 training arm b3-synth-concat (grid + primary seed)
+  started: 2026-09-24T08:53:35Z
+  finished: 2026-09-24T08:53:39Z
+- run_id: C2-B3-TRAIN-007
+  status: PASS
+  purpose: B3 training arm b3-synth-view0 (grid + primary seed)
+  started: 2026-09-24T08:53:39Z
+  finished: 2026-09-24T08:53:43Z
+- run_id: C2-B3-VALID-002
+  status: FAILED
+  purpose: B3 ModelCard engine activation validation
+  started: 2026-09-24T08:53:43Z
+  finished: 2026-09-24T08:53:50Z
+- run_id: C2-B3-TRAIN-008
+  status: PASS
+  purpose: B3 training arm b3-lodo-nf (grid + primary seed)
+  started: 2026-09-24T08:53:50Z
+  finished: 2026-09-24T08:54:05Z
+- run_id: C2-B3-VALID-003
+  status: FAILED
+  purpose: B3 ModelCard engine activation validation
+  started: 2026-09-24T08:54:50Z
+  finished: 2026-09-24T08:54:57Z
+- run_id: C2-B3-TRAIN-006
+  status: SUPERSEDED
+  purpose: B3 training (cards lacked head_names; engine uniform fallback; caught by 010a; retrained as 009)
+- run_id: C2-B3-TRAIN-007
+  status: SUPERSEDED
+  purpose: B3 training (same; retrained as 010)
+- run_id: C2-B3-TRAIN-008
+  status: SUPERSEDED
+  purpose: B3 LODO training (same; retrained as 011)
+- run_id: C2-B3-TRAIN-009
+  status: PASS
+  purpose: B3 training arm b3-synth-concat-v2 (grid + primary seed)
+  started: 2026-09-24T08:55:42Z
+  finished: 2026-09-24T08:55:46Z
+- run_id: C2-B3-TRAIN-010
+  status: PASS
+  purpose: B3 training arm b3-synth-view0-v2 (grid + primary seed)
+  started: 2026-09-24T08:55:46Z
+  finished: 2026-09-24T08:55:50Z
+- run_id: C2-B3-TRAIN-011
+  status: PASS
+  purpose: B3 training arm b3-lodo-nf-v2 (grid + primary seed)
+  started: 2026-09-24T08:55:50Z
+  finished: 2026-09-24T08:56:05Z
+- run_id: C2-B3-VALID-004
+  status: PASS
+  purpose: B3 ModelCard engine activation validation
+  started: 2026-09-24T08:56:05Z
+  finished: 2026-09-24T08:56:12Z
+- run_id: C2-DATA-GLOVE25-001
+  status: INVALID-STARTUP
+  purpose: glove-25 materialization (died pre-terminal; superseded by -002)
+- run_id: C2-DATA-GLOVE50-001
+  status: INVALID-STARTUP
+  purpose: glove-50 materialization (died pre-terminal; superseded by -002)
+- run_id: C2-DATA-GLOVE25-002
+  status: FAILED
+  purpose: materialize + verify + full NN-GT recompute DS-ANN-GLOVE-25 (NN-GROUND-TRUTH / EFFICIENCY TRACK Ã¢â‚¬â€ not a semantic dataset)
+  started: 2026-09-24T08:57:31Z
+  finished: 2026-09-24T08:58:55Z
+- run_id: C2-DATA-GLOVE50-002
+  status: FAILED
+  purpose: materialize + verify + full NN-GT recompute DS-ANN-GLOVE-50 (NN-GROUND-TRUTH / EFFICIENCY TRACK Ã¢â‚¬â€ not a semantic dataset)
+  started: 2026-09-24T08:58:55Z
+  finished: 2026-09-24T09:00:31Z
+- run_id: C2-DATA-GLOVE25-002
+  status: FAILED-HARNESS-CHECK-DEFECT
+  purpose: glove-25 NN-GT recompute (data intact; tie-unaware criterion; superseded by -003)
+- run_id: C2-DATA-GLOVE50-002
+  status: FAILED-HARNESS-CHECK-DEFECT
+  purpose: glove-50 NN-GT recompute (data intact; tie-unaware criterion; superseded by -003)
+- run_id: C2-DATA-GLOVE25-003
+  status: PASS
+  purpose: materialize + verify + full NN-GT recompute DS-ANN-GLOVE-25 (NN-GROUND-TRUTH / EFFICIENCY TRACK Ã¢â‚¬â€ not a semantic dataset)
+  started: 2026-09-24T09:04:00Z
+  finished: 2026-09-24T09:05:20Z
+- run_id: C2-DATA-GLOVE50-003
+  status: PASS
+  purpose: materialize + verify + full NN-GT recompute DS-ANN-GLOVE-50 (NN-GROUND-TRUTH / EFFICIENCY TRACK Ã¢â‚¬â€ not a semantic dataset)
+  started: 2026-09-24T09:05:20Z
+  finished: 2026-09-24T09:06:56Z
+- run_id: C2-SMOKE-QDRANT-001
+  status: PASS
+  purpose: Qdrant local feasibility smoke (protocol Ã‚Â§14)
+  started: 2026-09-24T09:07:19Z
+  finished: 2026-09-24T09:07:22Z
+- run_id: C2-SMOKE-PGVECTOR-001
+  status: FAILED
+  purpose: PostgreSQL+pgvector feasibility smoke (protocol Ã‚Â§15)
+  started: 2026-09-24T09:07:28Z
+  finished: 2026-09-24T09:07:30Z
+  reason: IndexError('list index out of range')
+- run_id: C2-SMOKE-PGVECTOR-002
+  status: FAILED
+  purpose: PostgreSQL+pgvector feasibility smoke (protocol Ã‚Â§15)
+  started: 2026-09-24T09:08:21Z
+  finished: 2026-09-24T09:08:31Z
+  reason: OSError(7, 'Argument list too long')
+- run_id: C2-SMOKE-PGVECTOR-003
+  status: FAILED
+  purpose: PostgreSQL+pgvector feasibility smoke (protocol Ã‚Â§15)
+  started: 2026-09-24T09:08:39Z
+  finished: 2026-09-24T09:08:51Z
+- run_id: C2-SMOKE-PGVECTOR-004
+  status: PASS
+  purpose: PostgreSQL+pgvector feasibility smoke (protocol Ã‚Â§15)
+  started: 2026-09-24T09:08:56Z
+  finished: 2026-09-24T09:08:59Z
+- run_id: C2-SMOKE-ES-001
+  status: FAILED
+  purpose: Elasticsearch feasibility smoke at default JVM settings (protocol Ã‚Â§16)
+  started: 2026-09-24T09:09:17Z
+  finished: 2026-09-24T09:09:22Z
+  reason: OSError(28, 'No space left on device')
+- run_id: C2-SMOKE-ES-002
+  status: ABORTED
+  purpose: Elasticsearch feasibility smoke at default JVM settings (protocol Ã‚Â§16)
+  started: 2026-09-24T09:09:48Z
+  finished: 2026-09-24T09:13:59Z
+- run_id: C2-SMOKE-ES-003
+  status: ABORTED
+  purpose: Elasticsearch feasibility smoke at default JVM settings, server under guarded sampler (protocol Ã‚Â§16)
+  started: 2026-09-24T09:16:03Z
+  finished: 2026-09-24T09:20:11Z
+  reason: OBSERVED-LIMIT: tree RSS 1149344KB >= 85% MemAvailable budget 1089169KB
+- run_id: C2-SMOKE-WEAVIATE-002
+  status: FAILED
+  purpose: Weaviate standalone binary feasibility smoke under guarded sampler (protocol Ã‚Â§18)
+  started: 2026-09-24T09:20:20Z
+  finished: 2026-09-24T09:22:21Z
+  reason: server not healthy; exit_code=1; log tail in metrics.server_log_tail
+- run_id: C2-SMOKE-QDRANT-002
+  status: INVALID-STARTUP
+  purpose: qdrant smoke (harness verdict-path defect; superseded by -003)
+- run_id: C2-SMOKE-WEAVIATE-002
+  status: INVALID-STARTUP
+  purpose: weaviate smoke (missing loopback cluster env + missing --scheme/--port; superseded by -003)
+- run_id: C2-SMOKE-ES-002
+  status: SUPERSEDED
+  purpose: ES smoke (server not under sampler; chown defect; evidence hollow; superseded by -003)
+- run_id: C2-SMOKE-QDRANT-003
+  status: FAILED
+  purpose: Qdrant local feasibility smoke under guarded sampler, incl. named-vector validation (protocol Ã‚Â§14)
+  started: 2026-09-24T09:25:41Z
+  finished: 2026-09-24T09:25:42Z
+  reason: <HTTPError 400: 'Bad Request'>
+- run_id: C2-SMOKE-QDRANT-004
+  status: FAILED
+  purpose: Qdrant local feasibility smoke under guarded sampler, incl. named-vector validation (protocol Ã‚Â§14)
+  started: 2026-09-24T09:25:54Z
+  finished: 2026-09-24T09:25:56Z
+  reason: health OK but minimal op set failed (see metrics)
+- run_id: C2-SMOKE-QDRANT-005
+  status: FAILED
+  purpose: Qdrant local feasibility smoke under guarded sampler, incl. named-vector validation (protocol Ã‚Â§14)
+  started: 2026-09-24T09:26:05Z
+  finished: 2026-09-24T09:26:07Z
+  reason: health OK but minimal op set failed (see metrics)
+- run_id: C2-SMOKE-QDRANT-006
+  status: PASS
+  purpose: Qdrant local feasibility smoke under guarded sampler, incl. named-vector validation (protocol Ã‚Â§14)
+  started: 2026-09-24T09:26:13Z
+  finished: 2026-09-24T09:26:16Z
+- run_id: C2-SMOKE-WEAVIATE-003
+  status: FAILED
+  purpose: Weaviate standalone binary feasibility smoke under guarded sampler (protocol Ã‚Â§18)
+  started: 2026-09-24T09:26:20Z
+  finished: 2026-09-24T09:26:31Z
+  reason: JSONDecodeError('Unterminated string starting at: line 1 column 2000 (char 1999)')
+- run_id: C2-SMOKE-WEAVIATE-004
+  status: PASS
+  purpose: Weaviate standalone binary feasibility smoke under guarded sampler (protocol Ã‚Â§18)
+  started: 2026-09-24T09:26:38Z
+  finished: 2026-09-24T09:26:45Z
+- run_id: C2-SMOKE-MILVUSLITE-001
+  status: FAILED
+  purpose: Milvus-Lite wheel feasibility smoke (protocol Ã‚Â§17)
+  started: 2026-09-24T09:26:50Z
+  finished: 2026-09-24T09:26:54Z
+  reason: ModuleNotFoundError("No module named 'milvus'")
+- run_id: C2-SMOKE-MILVUSLITE-002
+  status: PASS
+  purpose: Milvus-Lite wheel feasibility smoke (protocol Ã‚Â§17)
+  started: 2026-09-24T09:27:02Z
+  finished: 2026-09-24T09:27:06Z
+- run_id: C2-SMOKE-PGVECTOR-005
+  status: PASS
+  purpose: PostgreSQL+pgvector feasibility smoke (protocol Ã‚Â§15)
+  started: 2026-09-24T09:27:21Z
+  finished: 2026-09-24T09:27:28Z
+- run_id: C2-DATA-GLOVE25-004
+  status: INVALID-STARTUP
+  purpose: faithful per-row NN-GT verification (killed by session reset pre-terminal; successor -005)
+- run_id: C2-MODES-TEST-001
+  status: FAILED
+  purpose: engine mode correctness battery TEST-C2-002..009 + B4 evidence (via c2probe, current source)
+  started: 2026-09-24T12:28:15Z
+  finished: 2026-09-24T12:28:15Z
+  reason: TEST-C2-008 (B5 hybrid): BM25 tie-ordering nondeterministic per call (core/src/bm25.rs sort without id tiebreaker over a per-call HashMap). TEST-C2-003/009 failed ONLY on strict 1e-5 score tolerance vs exact reference while top-k ID agreement was 100%; recorded as harness-tolerance observations, not engine result defects.
+- run_id: C2-ORACLE-AGREE-001
+  status: PASS
+  purpose: engine mode A vs Rust brute-force cross-check (TEST-C2-007 engine leg)
+  started: 2026-09-24T12:28:16Z
+  finished: 2026-09-24T12:28:16Z
+- run_id: C2-INTEGRITY-001
+  status: PASS
+  purpose: manifest integrity re-hash across all C2 runs (TEST-C2-013)
+  started: 2026-09-24T12:28:24Z
+  finished: 2026-09-24T12:28:24Z
+- run_id: C2-BM25-REPRO-001
+  status: FAILED
+  purpose: BM25 tie-order repro, PRE-fix engine core (TEST-C2-008 leg B5)
+  started: 2026-09-24T14:29:57Z
+  finished: 2026-09-24T14:29:57Z
+  reason: defect confirmed: strict score ties BUT top-k doc-id order in bm25 search() varies per call (sort without id tiebreaker over per-call HashMap); RRF fused top-k membership and max-score id consequently nondeterministic. Expected pre-fix observation.
+- run_id: C2-BM25-REPRO-002
+  status: PASS
+  purpose: BM25 tie-order repro, POST-fix engine core (score desc, id asc tie rule)
+  started: 2026-09-24T14:35:44Z
+  finished: 2026-09-24T14:35:44Z
+- run_id: C2-MODES-TEST-002
+  status: PASS
+  purpose: POST-fix modes battery: B1/B2/B4/B5/B7 engine validation with re-scoped harness assertions
+  started: 2026-09-24T15:04:06Z
+  finished: 2026-09-24T15:04:06Z
+  reason: BM25 tie-order fix verified: TEST-C2-003/-009 re-scoped to assert determinism + exact score equality only when per-head candidate pools are exhaustive (hnsw_rs at k==count is not exhaustive, recorded observation); TEST-C2-008 uses corrected token-doc-set assertion (v2). All 8 battery runs PASS. git_commit field = pre-fix HEAD (fix uncommitted at registration; fix_commit recorded in finding doc).
+
+- run_id: C3-EMBED-SCIFACT-001
+  status: PASS
+  purpose: C3 re-materialization of SciFact pinned MiniLM embeddings on execution host (model files byte-verified vs C2 manifest; export hashes differ from C2 reference due to cross-env float drift, recorded)
+  started: 2026-09-25T13:50:34Z
+  finished: 2026-09-25T13:15:48Z
+  reason: byte_equal_to_C2_reference=false for all 5 views; diagnostic (C3 diag on NFCorpus, same pinned env) shows max_abs ~3e-7 / similarity ~0.99999997 => cross-env float drift (Linux sandbox vs Windows host), not a pipeline defect. Model files (model.safetensors + tokenizer/config) sha256-exact vs C2 manifest; determinism_full_view_reencode_byte_equal=true. SciFact embeddings usable for C3 benchmark runs on this host with own export_hashes + environment.yaml; must NOT be conflated with C2-EMBED-SCIFACT-003 bytes.
+
+- run_id: C3DATA-NFC-VERIFY-001
+  status: PASS
+  purpose: C3 preflight formalization - re-hash NFCorpus corpus/queries/qrels + 5 embedding npy on execution host vs C2 manifests
+  started: 2026-09-25T14:00:00Z
+  finished: 2026-09-25T14:00:00Z
+- run_id: C3-W01-NFC-B0-001
+  status: FAILED
+  purpose: 'C3 pilot B0 DS-NFCORPUS qrels-test-323' (c2pilot engine driver, 5 fresh-process reps)
+  started: 2026-09-25T14:41:45Z
+  n_queries: 100
+  subset_rule: first min(100,len) of seeded qrels-test shuffle (seed 20260925)
+- run_id: C3-W01-NFC-B0-001
+  status: PASS
+  purpose: 'C3 pilot B0 DS-NFCORPUS qrels-test-323' (c2pilot engine driver, 5 fresh-process reps)
+  started: 2026-09-25T14:47:25Z
+  n_queries: 100
+  subset_rule: first min(100,len) of seeded qrels-test shuffle (seed 20260925)
+  peak_child_rss_MiB: [2.0, 2.1, 2.1, 2.1, 2.1]
+- run_id: C3-W01-NFC-B1-001
+  status: PASS
+  purpose: 'C3 pilot B1 DS-NFCORPUS qrels-test-323' (c2pilot engine driver, 5 fresh-process reps)
+  started: 2026-09-25T14:48:32Z
+  n_queries: 100
+  subset_rule: first min(100,len) of seeded qrels-test shuffle (seed 20260925)
+  peak_child_rss_MiB: [109.2, 108.9, 108.9, 109.4, 109.2]
+- run_id: C3-W02-NFC-B2-001
+  status: PASS
+  purpose: 'C3 pilot B2 DS-NFCORPUS qrels-test-323' (c2pilot engine driver, 5 fresh-process reps)
+  started: 2026-09-25T14:51:52Z
+  n_queries: 100
+  subset_rule: first min(100,len) of seeded qrels-test shuffle (seed 20260925)
+  peak_child_rss_MiB: [237.1, 237.2, 236.2, 236.9, 236.1]
+- run_id: C3-W07-NFC-B7-001
+  status: PASS
+  purpose: 'C3 pilot B7 DS-NFCORPUS qrels-test-323' (c2pilot engine driver, 5 fresh-process reps)
+  started: 2026-09-25T14:55:14Z
+  n_queries: 100
+  subset_rule: first min(100,len) of seeded qrels-test shuffle (seed 20260925)
+  peak_child_rss_MiB: [236.6, 237.6, 237.3, 237.1, 237.0]
+- run_id: C3-W08-SYN-B1-001
+  status: PASS
+  purpose: 'C3 B1 DIAGNOSTIC synthetic (harness validation) on multiview n=200 seed=20260925'
+  started: 2026-09-25T14:59:13Z
+  gen_gt_checks: 200/200 pass
+- run_id: C3-W10-SYN-DUP-B0-001
+  status: PASS
+  purpose: 'C3 B0 DIAGNOSTIC synthetic (harness validation) on multiview n=200 seed=20260925'
+  started: 2026-09-25T14:59:29Z
+  gen_gt_checks: 200/200 pass
+- run_id: C3-W03-SCI-B3-001
+  status: FAILED-HARNESS
+  purpose: 'C3 pilot B3 DS-SCIFACT qrels-test-300' (c2pilot engine driver, 5 fresh-process reps)
+  started: 2026-09-25T15:01:41Z
+  n_queries: 100
+  subset_rule: first min(100,len) of seeded qrels-test shuffle (seed 20260925)
+  peak_child_rss_MiB: [374.7]
+- run_id: C3-W03-SCI-B3-001
+  status: PASS
+  purpose: 'C3 pilot B3 DS-SCIFACT qrels-test-300' (c2pilot engine driver, 5 fresh-process reps)
+  started: 2026-09-25T15:06:45Z
+  n_queries: 100
+  subset_rule: first min(100,len) of seeded qrels-test shuffle (seed 20260925)
+  peak_child_rss_MiB: [303.8, 270.8, 304.2, 271.5, 270.9]
+- run_id: C3-W02-NFC-B2-001
+  status: PASS
+  purpose: 'C3 pilot B2 DS-NFCORPUS qrels-test-323' (c2pilot engine driver, 5 fresh-process reps)
+  started: 2026-09-25T15:10:07Z
+  n_queries: 100
+  subset_rule: first min(100,len) of seeded qrels-test shuffle (seed 20260925)
+  peak_child_rss_MiB: [193.7, 193.8, 194.5, 193.9, 193.9]
+- run_id: C3-W07-NFC-B7-001
+  status: PASS
+  purpose: 'C3 pilot B7 DS-NFCORPUS qrels-test-323' (c2pilot engine driver, 5 fresh-process reps)
+  started: 2026-09-25T15:12:50Z
+  n_queries: 100
+  subset_rule: first min(100,len) of seeded qrels-test shuffle (seed 20260925)
+  peak_child_rss_MiB: [193.7, 194.3, 193.3, 194.4, 194.2]
+- run_id: C4DATA-VERIFY-001
+  status: PASS
+  purpose: 'C4 dataset/embedding verification on THIS host (NFC 5 checks + 5 embeds; SCI 4 checks + 5 embeds, own-hashes per c4-dataset-validation)'
+  started: 2026-09-25T16:26:12Z
+  checks: 18/18 match
+- run_id: C4-W19-NFC-B1-EF-001
+  status: RUN
+  purpose: 'C4 validation tuning MODE-B1 DS-NFCORPUS VAL grid [16, 32, 64, 128] x [None]'
+  started: 2026-09-25T16:40:42Z
+  n_val_queries: 324
+  preregistration: 'frozen c4-run-plan.csv C4-W19-NFC-B1-EF-001; pre-execution registration before measurement'
+- run_id: C4-W19-NFC-B1-EF-001
+  status: PASS
+  purpose: 'C4 validation tuning completion MODE-B1 DS-NFCORPUS VAL grid [16, 32, 64, 128] x [None]'
+  completed: 2026-09-25T16:44:00Z
+  result: target=0.1364 selected=EF64
+  recall_by_level: {'EF16': 0.1351, 'EF32': 0.1338, 'EF64': 0.1351, 'EF128': 0.1338}
+- run_id: C4-W19-SCI-B1-EF-001
+  status: RUN
+  purpose: 'C4 validation tuning MODE-B1 DS-SCIFACT VAL grid [16, 32, 64, 128] x [None]'
+  started: 2026-09-25T16:42:26Z
+  n_val_queries: 200
+  preregistration: 'frozen c4-run-plan.csv C4-W19-SCI-B1-EF-001; pre-execution registration before measurement'
+- run_id: C4-W19-SCI-B1-EF-001
+  status: PASS-TARGET-UNREACHABLE
+  purpose: 'C4 validation tuning completion MODE-B1 DS-SCIFACT VAL grid [16, 32, 64, 128] x [None]'
+  completed: 2026-09-25T16:43:27Z
+  result: target=0.7850 selected=TARGET-UNREACHABLE
+  recall_by_level: {'EF16': 0.765, 'EF32': 0.775, 'EF64': 0.7725, 'EF128': 0.765}
+- run_id: C4-W19-SCI-B1-EF-001
+  status: RUN
+  purpose: 'C4 validation tuning MODE-B1 DS-SCIFACT VAL grid [16, 32, 64, 128] x [None]'
+  started: 2026-09-25T16:46:52Z
+  n_val_queries: 200
+  preregistration: 'frozen c4-run-plan.csv C4-W19-SCI-B1-EF-001; pre-execution registration before measurement'
+- run_id: C4-W19-SCI-B1-EF-001
+  status: PASS
+  purpose: 'C4 validation tuning completion MODE-B1 DS-SCIFACT VAL grid [16, 32, 64, 128] x [None]'
+  completed: 2026-09-25T16:47:58Z
+  result: target=0.7850 selected=EF32
+  recall_by_level: {'EF16': 0.7683, 'EF32': 0.7775, 'EF64': 0.77, 'EF128': 0.77}
+- run_id: C4-W19-NFC-B2-EF-001
+  status: RUN
+  purpose: 'C4 validation tuning MODE-B2 DS-NFCORPUS VAL grid [16, 32, 64, 128] x [50, 100, 200, 500]'
+  started: 2026-09-25T16:48:39Z
+  n_val_queries: 324
+  preregistration: 'frozen c4-run-plan.csv C4-W19-NFC-B2-EF-001; pre-execution registration before measurement'
+- run_id: C4-W19-NFC-B2-EF-001
+  status: PASS
+  purpose: 'C4 validation tuning completion MODE-B2 DS-NFCORPUS VAL grid [16, 32, 64, 128] x [50, 100, 200, 500]'
+  completed: 2026-09-25T16:56:52Z
+  result: target=0.1364 selected=EF128-C100
+  recall_by_level: {'EF16-C50': 0.1393, 'EF16-C100': 0.1399, 'EF16-C200': 0.1359, 'EF16-C500': 0.14, 'EF32-C50': 0.141, 'EF32-C100': 0.14, 'EF32-C200': 0.1375, 'EF32-C500': 0.1393, 'EF64-C50': 0.1397, 'EF64-C100': 0.1384, 'EF64-C200': 0.1408, 'EF64-C500': 0.1407, 'EF128-C50': 0.1392, 'EF128-C100': 0.1397, 'EF128-C200': 0.1411, 'EF128-C500': 0.1395}
+- run_id: C4-W19-NFC-B2-EF-001
+  status: RUN
+  purpose: 'C4 validation tuning MODE-B2 DS-NFCORPUS VAL grid [16, 32, 64, 128] x [50, 100, 200, 500]'
+  started: 2026-09-25T16:58:20Z
+  n_val_queries: 324
+  preregistration: 'frozen c4-run-plan.csv C4-W19-NFC-B2-EF-001; pre-execution registration before measurement'
+- run_id: C4-W19-NFC-B2-EF-001
+  status: PASS
+  purpose: 'C4 validation tuning completion MODE-B2 DS-NFCORPUS VAL grid [16, 32, 64, 128] x [50, 100, 200, 500]'
+  completed: 2026-09-25T17:05:54Z
+  result: target=0.1364 selected=EF16-C50
+  recall_by_level: {'EF16-C50': 0.1393, 'EF16-C100': 0.1403, 'EF16-C200': 0.1391, 'EF16-C500': 0.1367, 'EF32-C50': 0.1402, 'EF32-C100': 0.1391, 'EF32-C200': 0.1402, 'EF32-C500': 0.1404, 'EF64-C50': 0.1352, 'EF64-C100': 0.1394, 'EF64-C200': 0.1398, 'EF64-C500': 0.14, 'EF128-C50': 0.1384, 'EF128-C100': 0.1407, 'EF128-C200': 0.1366, 'EF128-C500': 0.1413}
+- run_id: C4-W19-SCI-B2-EF-001
+  status: RUN
+  purpose: 'C4 validation tuning MODE-B2 DS-SCIFACT VAL grid [16, 32, 64, 128] x [50, 100, 200, 500]'
+  started: 2026-09-25T17:19:23Z
+  n_val_queries: 200
+  preregistration: 'frozen c4-run-plan.csv C4-W19-SCI-B2-EF-001; pre-execution registration before measurement'
+- run_id: C4-W19-SCI-B2-EF-001
+  status: PASS-TARGET-UNREACHABLE
+  purpose: 'C4 validation tuning completion MODE-B2 DS-SCIFACT VAL grid [16, 32, 64, 128] x [50, 100, 200, 500]'
+  completed: 2026-09-25T17:31:35Z
+  result: target=0.7850 selected=TARGET-UNREACHABLE
+  recall_by_level: {'EF16-C50': 0.7358, 'EF16-C100': 0.7438, 'EF16-C200': 0.7325, 'EF16-C500': 0.7383, 'EF32-C50': 0.7408, 'EF32-C100': 0.7358, 'EF32-C200': 0.7446, 'EF32-C500': 0.7371, 'EF64-C50': 0.7458, 'EF64-C100': 0.7346, 'EF64-C200': 0.7425, 'EF64-C500': 0.7433, 'EF128-C50': 0.7408, 'EF128-C100': 0.7408, 'EF128-C200': 0.7458, 'EF128-C500': 0.7425}
+- run_id: C4-W19-SCI-B7-EF-001
+  status: RUN
+  purpose: 'C4 validation tuning MODE-B7 DS-SCIFACT VAL grid [16, 32, 64, 128] x [None]'
+  started: 2026-09-25T17:32:17Z
+  n_val_queries: 200
+  preregistration: 'frozen c4-run-plan.csv C4-W19-SCI-B7-EF-001; pre-execution registration before measurement'
+- run_id: C4-W19-SCI-B7-EF-001
+  status: PASS-TARGET-UNREACHABLE
+  purpose: 'C4 validation tuning completion MODE-B7 DS-SCIFACT VAL grid [16, 32, 64, 128] x [None]'
+  completed: 2026-09-25T17:35:31Z
+  result: target=0.7850 selected=TARGET-UNREACHABLE
+  recall_by_level: {'EF16': 0.6983, 'EF32': 0.7021, 'EF64': 0.6758, 'EF128': 0.6958}
+- run_id: C4-W19-NFC-B7-EF-001
+  status: RUN
+  purpose: 'C4 validation tuning MODE-B7 DS-NFCORPUS VAL grid [16, 32, 64, 128] x [None]'
+  started: 2026-09-25T17:35:42Z
+  n_val_queries: 324
+  preregistration: 'frozen c4-run-plan.csv C4-W19-NFC-B7-EF-001; pre-execution registration before measurement'
+- run_id: C4-W19-NFC-B7-EF-001
+  status: PASS
+  purpose: 'C4 validation tuning completion MODE-B7 DS-NFCORPUS VAL grid [16, 32, 64, 128] x [None]'
+  completed: 2026-09-25T17:37:34Z
+  result: target=0.1364 selected=EF64
+  recall_by_level: {'EF16': 0.1356, 'EF32': 0.135, 'EF64': 0.1372, 'EF128': 0.1369}
+- run_id: C4-BINVERIFY-001
+  status: MISMATCH
+  purpose: 'behavioral equivalence new deterministic binary '
+  c2pilot_sha256: a8e0c0cb6d31447b513425612c4bf14e0dcfd66ca4415466777833d9f0a3c295
+  result: C4-W19-NFC-B1-EF-001 EF64 rec=0.1366(recorded 0.1351), C4-W19-NFC-B2-EF-001 EF16-C50 rec=0.1397(recorded 0.1393), C4-W19-NFC-B7-EF-001 EF64 rec=0.1387(recorded 0.1372), C4-W19-SCI-B1-EF-001 EF32 rec=0.7650(recorded 0.7775)
+- run_id: C4-BINVERIFY-002
+  status: REVIEW
+  purpose: 'distribution-based behavioral equivalence new deterministic binary'
+  verdict_rule: 'recorded C4.2 value within [min,max] of >=5 new-binary draws'
+  result:
+    NFC-B1-EF64: new_min=0.1296 new_max=0.1351 recorded=0.1351 in_range=True
+    NFC-B2-EF16-C50: new_min=0.1373 new_max=0.1412 recorded=0.1393 in_range=True
+    NFC-B7-EF64: new_min=0.1338 new_max=0.1375 recorded=0.1372 in_range=True
+    SCI-B1-EF32: new_min=0.7650 new_max=0.7738 recorded=0.7775 in_range=False
+- run_id: C4-BINVERIFY-002
+  status: REVIEW
+  purpose: 'distribution-based behavioral equivalence new deterministic binary'
+  verdict_rule: 'recorded C4.2 value within [min,max] of >=5 new-binary draws'
+  result:
+    NFC-B1-EF64: new_min=0.1296 new_max=0.1351 recorded=0.1351 in_range=True
+    NFC-B2-EF16-C50: new_min=0.1373 new_max=0.1412 recorded=0.1393 in_range=True
+    NFC-B7-EF64: new_min=0.1338 new_max=0.1375 recorded=0.1372 in_range=True
+    SCI-B1-EF32: new_min=0.7650 new_max=0.7738 recorded=0.7775 in_range=False
+- run_id: C4-BINVERIFY-002
+  status: PASS
+  purpose: 'distribution-based behavioral equivalence new deterministic binary'
+  verdict_rule: 'recorded C4.2 value within [min,max] of >=5 new-binary draws'
+  result:
+    NFC-B1-EF64: new_min=0.1296 new_max=0.1351 recorded=0.1351 in_range=True
+    NFC-B2-EF16-C50: new_min=0.1373 new_max=0.1412 recorded=0.1393 in_range=True
+    NFC-B7-EF64: new_min=0.1338 new_max=0.1375 recorded=0.1372 in_range=True
+    SCI-B1-EF32: new_min=0.7625 new_max=0.7775 recorded=0.7775 in_range=True
+- run_id: C4-BINVERIFY-003
+  status: PASS
+  purpose: 'distribution-based behavioral equivalence of new binary 3ec8c193 (deadline_us arm, /Brepro) vs C4.2 frozen 90249747, fresh draws'
+  completed: 2026-09-26T12:49:21Z
+  result: '4/4 C4.2-selected cells PASS; recorded values in fresh-draw range (NFC-B1 EF64 0.1351 in [0.1302,0.1370]; NFC-B2 EF16-C50 0.1393 in [0.1373,0.1404]; NFC-B7 EF64 0.1372 in [0.1183,0.1392]; SCI-B1 EF32 0.7775 in [0.7550,0.7775], 11 draws)'
+  note: 'deadline_us default 0 -> deadline=None attend path byte-identical; additive arm only'
+  supersedes: 'A8E0C0CB /Brepro+B4 binary as C4.3/C4.4 executing engine'
+- run_id: C4-W01-SCI-B0-001
+  status: RUN
+  purpose: 'C4.4 confirmed-scale TEST B0 DS-SCIFACT on full test set (300 qids), 1 fresh-process reps'
+  started: 2026-09-26T12:55:28Z
+  preregistration: 'frozen c4-run-plan.csv C4-W01-SCI-B0-001; pre-execution registration before measurement'
+- run_id: C4-W01-SCI-B0-001
+  status: PASS
+  purpose: 'C4.4 confirmed-scale oracle DS-SCIFACT (300 test qids)'
+  completed: 2026-09-26T12:55:30Z
+  result: recall10_qrels=0.7833
+- run_id: C4-W01-NFC-B0-001
+  status: RUN
+  purpose: 'C4.4 confirmed-scale TEST B0 DS-NFCORPUS on full test set (323 qids), 1 fresh-process reps'
+  started: 2026-09-26T12:55:34Z
+  preregistration: 'frozen c4-run-plan.csv C4-W01-NFC-B0-001; pre-execution registration before measurement'
+- run_id: C4-W01-NFC-B0-001
+  status: PASS
+  purpose: 'C4.4 confirmed-scale oracle DS-NFCORPUS (323 test qids)'
+  completed: 2026-09-26T12:55:36Z
+  result: recall10_qrels=0.1550
+- run_id: C4-W01-SCI-B1-001
+  status: RUN
+  purpose: 'C4.4 confirmed-scale TEST B1 DS-SCIFACT on full test set (300 qids), 5 fresh-process reps'
+  started: 2026-09-26T12:55:45Z
+  preregistration: 'frozen c4-run-plan.csv C4-W01-SCI-B1-001; pre-execution registration before measurement'
+- run_id: C4-W01-SCI-B1-001
+  status: PASS
+  purpose: 'C4.4 confirmed-scale TEST B1 DS-SCIFACT (300 test qids, 5 reps)'
+  completed: 2026-09-26T12:57:09Z
+  result: recall10_qrels=0.7783 sd=0.0049 p50_us=1028.0
+- run_id: C4-W01-NFC-B1-001
+  status: RUN
+  purpose: 'C4.4 confirmed-scale TEST B1 DS-NFCORPUS on full test set (323 qids), 5 fresh-process reps'
+  started: 2026-09-26T12:57:17Z
+  preregistration: 'frozen c4-run-plan.csv C4-W01-NFC-B1-001; pre-execution registration before measurement'
+- run_id: C4-W01-NFC-B1-001
+  status: PASS
+  purpose: 'C4.4 confirmed-scale TEST B1 DS-NFCORPUS (323 test qids, 5 reps)'
+  completed: 2026-09-26T12:58:09Z
+  result: recall10_qrels=0.1491 sd=0.0022 p50_us=941.2
+- run_id: C4-W02-SCI-B2-001
+  status: RUN
+  purpose: 'C4.4 confirmed-scale TEST B2 DS-SCIFACT on full test set (300 qids), 5 fresh-process reps'
+  started: 2026-09-26T12:58:10Z
+  preregistration: 'frozen c4-run-plan.csv C4-W02-SCI-B2-001; pre-execution registration before measurement'
+- run_id: C4-W02-SCI-B2-001
+  status: PASS
+  purpose: 'C4.4 confirmed-scale TEST B2 DS-SCIFACT (300 test qids, 5 reps)'
+  completed: 2026-09-26T13:02:28Z
+  result: recall10_qrels=0.7920 sd=0.0022 p50_us=1939.5
+- run_id: C4-W02-NFC-B2-001
+  status: RUN
+  purpose: 'C4.4 confirmed-scale TEST B2 DS-NFCORPUS on full test set (323 qids), 5 fresh-process reps'
+  started: 2026-09-26T13:02:34Z
+  preregistration: 'frozen c4-run-plan.csv C4-W02-NFC-B2-001; pre-execution registration before measurement'
+- run_id: C4-W02-NFC-B2-001
+  status: PASS
+  purpose: 'C4.4 confirmed-scale TEST B2 DS-NFCORPUS (323 test qids, 5 reps)'
+  completed: 2026-09-26T13:04:52Z
+  result: recall10_qrels=0.1597 sd=0.0015 p50_us=1699.1
+- run_id: C4-W03-SCI-B3-001
+  status: RUN
+  purpose: 'C4.4 confirmed-scale TEST B3 DS-SCIFACT on full test set (300 qids), 5 fresh-process reps'
+  started: 2026-09-26T13:04:53Z
+  preregistration: 'frozen c4-run-plan.csv C4-W03-SCI-B3-001; pre-execution registration before measurement'
+- run_id: C4-W03-SCI-B3-001
+  status: PASS
+  purpose: 'C4.4 confirmed-scale TEST B3 DS-SCIFACT (300 test qids, 5 reps)'
+  completed: 2026-09-26T13:08:46Z
+  result: recall10_qrels=0.7911 sd=0.0022 p50_us=1850.6
+- run_id: C4-W03-NFC-B3-001
+  status: RUN
+  purpose: 'C4.4 confirmed-scale TEST B3 DS-NFCORPUS on full test set (323 qids), 5 fresh-process reps'
+  started: 2026-09-26T13:09:06Z
+  preregistration: 'frozen c4-run-plan.csv C4-W03-NFC-B3-001; pre-execution registration before measurement'
+- run_id: C4-W03-NFC-B3-001
+  status: PASS
+  purpose: 'C4.4 confirmed-scale TEST B3 DS-NFCORPUS (323 test qids, 5 reps)'
+  completed: 2026-09-26T13:11:22Z
+  result: recall10_qrels=0.1593 sd=0.0006 p50_us=1718.2
+- run_id: C4-W04-SCI-B4-001
+  status: RUN
+  purpose: 'C4.4 confirmed-scale TEST B4 DS-SCIFACT on full test set (300 qids), 5 fresh-process reps'
+  started: 2026-09-26T13:11:23Z
+  preregistration: 'frozen c4-run-plan.csv C4-W04-SCI-B4-001; pre-execution registration before measurement'
+- run_id: C4-W04-SCI-B4-001
+  status: PASS
+  purpose: 'C4.4 confirmed-scale TEST B4 DS-SCIFACT (300 test qids, 5 reps)'
+  completed: 2026-09-26T13:15:22Z
+  result: recall10_qrels=0.7918 sd=0.0008 p50_us=1916.7
+- run_id: C4-W07-SCI-B7-001
+  status: RUN
+  purpose: 'C4.4 confirmed-scale TEST B7 DS-SCIFACT on full test set (300 qids), 5 fresh-process reps'
+  started: 2026-09-26T13:15:30Z
+  preregistration: 'frozen c4-run-plan.csv C4-W07-SCI-B7-001; pre-execution registration before measurement'
+- run_id: C4-W07-SCI-B7-001
+  status: PASS
+  purpose: 'C4.4 confirmed-scale TEST B7 DS-SCIFACT (300 test qids, 5 reps)'
+  completed: 2026-09-26T13:19:30Z
+  result: recall10_qrels=0.7421 sd=0.0054 p50_us=2106.4
+- run_id: C4-W07-NFC-B7-001
+  status: RUN
+  purpose: 'C4.4 confirmed-scale TEST B7 DS-NFCORPUS on full test set (323 qids), 5 fresh-process reps'
+  started: 2026-09-26T13:19:31Z
+  preregistration: 'frozen c4-run-plan.csv C4-W07-NFC-B7-001; pre-execution registration before measurement'
+- run_id: C4-W07-NFC-B7-001
+  status: PASS
+  purpose: 'C4.4 confirmed-scale TEST B7 DS-NFCORPUS (323 test qids, 5 reps)'
+  completed: 2026-09-26T13:21:54Z
+  result: recall10_qrels=0.1488 sd=0.0017 p50_us=2010.6
+- run_id: C4-W07-SCI-B7-TRKB-001
+  status: RUN
+  purpose: 'C4.4 confirmed-scale TEST B7 DS-SCIFACT on full test set (300 qids), 5 fresh-process reps'
+  started: 2026-09-26T13:22:05Z
+  preregistration: 'frozen c4-run-plan.csv C4-W07-SCI-B7-TRKB-001; pre-execution registration before measurement'
+- run_id: C4-W07-SCI-B7-TRKB-001
+  status: PASS
+  purpose: 'C4.4 confirmed-scale TEST B7 DS-SCIFACT (300 test qids, 5 reps)'
+  completed: 2026-09-26T13:26:08Z
+  result: recall10_qrels=0.7332 sd=0.0262 p50_us=2131.6
+- run_id: C4-W01-NFC-B1-TRKB-001
+  status: RUN
+  purpose: 'C4.4 confirmed-scale TEST B1 DS-NFCORPUS on full test set (323 qids), 5 fresh-process reps'
+  started: 2026-09-26T13:26:09Z
+  preregistration: 'frozen c4-run-plan.csv C4-W01-NFC-B1-TRKB-001; pre-execution registration before measurement'
+- run_id: C4-W01-NFC-B1-TRKB-001
+  status: PASS
+  purpose: 'C4.4 confirmed-scale TEST B1 DS-NFCORPUS (323 test qids, 5 reps)'
+  completed: 2026-09-26T13:26:53Z
+  result: recall10_qrels=0.1503 sd=0.0022 p50_us=772.1
+- run_id: C4-W19-SCI-B3-MEM-001
+  status: RUN
+  purpose: 'C4.4 confirmed-scale TEST B3 DS-SCIFACT on full test set (300 qids), 5 fresh-process reps'
+  started: 2026-09-26T13:27:07Z
+  preregistration: 'frozen c4-run-plan.csv C4-W19-SCI-B3-MEM-001; pre-execution registration before measurement'
+- run_id: C4-W19-SCI-B3-MEM-001
+  status: PASS
+  purpose: 'C4.4 confirmed-scale MEM boundary B3 DS-SCIFACT legs [512, 1024, 1638] MiB'
+  completed: 2026-09-26T13:41:26Z
+  result: legs_within_budget=[True, True, True] peak_rss_MiB=[[272.1, 271.4, 271.9, 271.3, 272.1], [272.2, 305.1, 271.8, 305.3, 304.7], [271.6, 304.7, 272.0, 290.6, 271.8]]
+- run_id: C4-W19-SCI-B1-TIME-001
+  status: RUN
+  purpose: 'C4.4 confirmed-scale TEST B1 DS-SCIFACT on full test set (300 qids), 5 fresh-process reps'
+  started: 2026-09-26T13:41:35Z
+  preregistration: 'frozen c4-run-plan.csv C4-W19-SCI-B1-TIME-001; pre-execution registration before measurement'
+- run_id: C4-W19-SCI-B1-TIME-001
+  status: PASS
+  purpose: 'C4.4 confirmed-scale TIME boundary B1 DS-SCIFACT legs [1000, 10000, 100000] us'
+  completed: 2026-09-26T13:46:05Z
+  result: deadline_exceeded=[{'us': 1000, 'exceeded': 0}, {'us': 10000, 'exceeded': 0}, {'us': 100000, 'exceeded': 0}]

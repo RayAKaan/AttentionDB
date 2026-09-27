@@ -1,0 +1,14 @@
+{
+  "selected": {
+    "best_val_loss": 1.0985422134399414,
+    "lr": 0.004999999888241291,
+    "hidden": 32,
+    "card": "/home/user/AttentionDB/research/comparative-study/raw/../c2/b3/modelcards/b3-lodo-nf-v2-s20260925-h32-lr0.005.json"
+  },
+  "seeds_trained": [
+    20260925,
+    1,
+    2
+  ],
+  "wall_s": 14.7
+}

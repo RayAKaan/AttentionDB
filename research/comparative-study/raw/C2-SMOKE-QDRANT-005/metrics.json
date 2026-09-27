@@ -1,0 +1,20 @@
+{
+  "binary_version": "qdrant 1.12.4",
+  "startup_healthy": true,
+  "startup_s": 0.51,
+  "create_collection": 200,
+  "upsert_100": 200,
+  "search_5": 200,
+  "search_returns_exact_self_top1": true,
+  "create_named_collection": 200,
+  "upsert_named_100": 200,
+  "named_search_body": "{\"status\":{\"error\":\"Format error in JSON body: data did not match any variant of untagged enum NamedVectorStruct at line 1 column 7808\"},\"time\":0.0}",
+  "named_search_5": 400,
+  "named_search_self_top1": false,
+  "server_peak_rss_kb": 60140,
+  "server_n_samples": 4,
+  "server_abort_reason": null,
+  "server_timed_out": false,
+  "server_exit_code": -9,
+  "server_log_tail": "6-09-24T09:26:05.940947Z  INFO actix_server::server: Actix runtime found; starting in Actix runtime\n2026-09-24T09:26:05.949077Z  INFO qdrant::tonic: Qdrant gRPC listening on 6334    \n2026-09-24T09:26:05.949103Z  INFO qdrant::tonic: TLS disabled for gRPC API    \n2026-09-24T09:26:06.442526Z  INFO storage::content_manager::toc::collection_meta_ops: Creating collection c2smoke    \n2026-09-24T09:26:06.472130Z  INFO actix_web::middleware::logger: 127.0.0.1 \"PUT /collections/c2smoke HTTP/1.1\" 200 48 \"-\" \"Python-urllib/3.13\" 0.029747    \n2026-09-24T09:26:06.504474Z  INFO actix_web::middleware::logger: 127.0.0.1 \"PUT /collections/c2smoke/points?wait=true HTTP/1.1\" 200 83 \"-\" \"Python-urllib/3.13\" 0.007239    \n2026-09-24T09:26:06.506251Z  INFO actix_web::middleware::logger: 127.0.0.1 \"POST /collections/c2smoke/points/search HTTP/1.1\" 200 240 \"-\" \"Python-urllib/3.13\" 0.000665    \n2026-09-24T09:26:06.506801Z  INFO storage::content_manager::toc::collection_meta_ops: Creating collection c2named    \n2026-09-24T09:26:06.560306Z  INFO actix_web::middleware::logger: 127.0.0.1 \"PUT /collections/c2named HTTP/1.1\" 200 48 \"-\" \"Python-urllib/3.13\" 0.053575    \n2026-09-24T09:26:06.622537Z  INFO actix_web::middleware::logger: 127.0.0.1 \"PUT /collections/c2named/points?wait=true HTTP/1.1\" 200 83 \"-\" \"Python-urllib/3.13\" 0.011996    \n2026-09-24T09:26:06.623592Z  INFO actix_web::middleware::logger: 127.0.0.1 \"POST /collections/c2named/points/search HTTP/1.1\" 400 148 \"-\" \"Python-urllib/3.13\" 0.000084    \n"
+}

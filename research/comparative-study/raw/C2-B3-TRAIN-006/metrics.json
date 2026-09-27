@@ -1,0 +1,14 @@
+{
+  "selected": {
+    "best_val_loss": 1.1043211221694946,
+    "lr": 0.004999999888241291,
+    "hidden": 16,
+    "card": "/home/user/AttentionDB/research/comparative-study/raw/../c2/b3/modelcards/b3-synth-concat-s20260925-h16-lr0.005.json"
+  },
+  "seeds_trained": [
+    20260925,
+    1,
+    2
+  ],
+  "wall_s": 4.0
+}

@@ -1,0 +1,20 @@
+run_id: C2-SMOKE-WEAVIATE-003
+purpose: "Weaviate standalone binary feasibility smoke under guarded sampler (protocol\
+  \ \xA718)"
+started_utc: '2026-09-24T09:26:20Z'
+artifacts: {}
+finished_utc: '2026-09-24T09:26:31Z'
+status: FAILED
+study_id: comparative-study-001
+protocol_version: 1.0.0
+git_commit: 7788067c1437ae8c75ced4dc1ffc2f49b2c22a88
+host:
+  logical_cpus: 2
+  mem_total_kb: 2032608
+guardrails:
+  mem_budget_kb_85pct_available: 1075620
+  disk_floor_mb: 500
+  phase3e_crash_env_asserted_unset: true
+seed: null
+reason: 'JSONDecodeError(''Unterminated string starting at: line 1 column 2000 (char
+  1999)'')'

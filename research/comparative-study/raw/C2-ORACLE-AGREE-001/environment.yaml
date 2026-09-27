@@ -1,0 +1,11 @@
+timestamp_utc: '2026-09-24T12:28:15Z'
+os: Windows 11
+kernel: '11'
+cpu_model: AMD64 Family 23 Model 113 Stepping 0, AuthenticAMD
+logical_cpus: 8
+mem_total_kb: 16700964
+mem_available_kb: 2716756
+disk_free_mb: 471153
+filesystem: NTFS
+python: 3.14.4
+git_commit: 7788067c1437ae8c75ced4dc1ffc2f49b2c22a88

@@ -1,0 +1,580 @@
+{
+  "collection_config": {
+    "candidate_budget": 500,
+    "candidate_multiplier": 5,
+    "mode": "Full"
+  },
+  "results": [
+    {
+      "avg_latency_us": 12,
+      "exact_top5_match_10q": false,
+      "mismatches": [
+        {
+          "exp": [
+            21,
+            1,
+            2,
+            3,
+            6
+          ],
+          "got": [
+            1,
+            5,
+            7,
+            22,
+            28
+          ],
+          "q": 0
+        },
+        {
+          "exp": [
+            3,
+            4,
+            5,
+            7,
+            8
+          ],
+          "got": [
+            13,
+            15,
+            19,
+            23,
+            24
+          ],
+          "q": 1
+        },
+        {
+          "exp": [
+            3,
+            7,
+            14,
+            19,
+            20
+          ],
+          "got": [
+            1,
+            18,
+            23,
+            24,
+            25
+          ],
+          "q": 2
+        },
+        {
+          "exp": [
+            3,
+            14,
+            20,
+            2,
+            4
+          ],
+          "got": [
+            5,
+            6,
+            11,
+            19,
+            26
+          ],
+          "q": 3
+        },
+        {
+          "exp": [
+            3,
+            8,
+            14,
+            26,
+            1
+          ],
+          "got": [
+            5,
+            8,
+            13,
+            14,
+            25
+          ],
+          "q": 4
+        },
+        {
+          "exp": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "got": [
+            7,
+            12,
+            26,
+            28,
+            30
+          ],
+          "q": 5
+        },
+        {
+          "exp": [
+            4,
+            5,
+            10,
+            14,
+            16
+          ],
+          "got": [
+            15,
+            17,
+            19,
+            21,
+            24
+          ],
+          "q": 6
+        },
+        {
+          "exp": [
+            14,
+            21,
+            26,
+            1,
+            2
+          ],
+          "got": [
+            8,
+            16,
+            21,
+            24,
+            30
+          ],
+          "q": 7
+        },
+        {
+          "exp": [
+            6,
+            8,
+            1,
+            3,
+            5
+          ],
+          "got": [
+            1,
+            17,
+            23,
+            24,
+            29
+          ],
+          "q": 8
+        },
+        {
+          "exp": [
+            7,
+            14,
+            1,
+            2,
+            3
+          ],
+          "got": [
+            1,
+            11,
+            15,
+            16,
+            19
+          ],
+          "q": 9
+        }
+      ],
+      "name": "single-head ANN retrieval + failure handling",
+      "status": "FAILED",
+      "test": "TEST-C2-002",
+      "unknown_head_is_err": false
+    },
+    {
+      "mismatches": [
+        {
+          "got": [
+            1,
+            2,
+            4,
+            5,
+            7
+          ],
+          "q": 0,
+          "ref": [
+            14,
+            1,
+            7,
+            8,
+            21
+          ]
+        },
+        {
+          "got": [
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "q": 1,
+          "ref": [
+            1,
+            4,
+            10,
+            11,
+            16
+          ]
+        },
+        {
+          "got": [
+            2,
+            3,
+            4,
+            5,
+            7
+          ],
+          "q": 2,
+          "ref": [
+            8,
+            3,
+            4,
+            6,
+            14
+          ]
+        },
+        {
+          "got": [
+            1,
+            2,
+            3,
+            4,
+            8
+          ],
+          "q": 3,
+          "ref": [
+            4,
+            8,
+            22,
+            6,
+            13
+          ]
+        },
+        {
+          "got": [
+            1,
+            3,
+            4,
+            7,
+            8
+          ],
+          "q": 4,
+          "ref": [
+            20,
+            4,
+            16,
+            18,
+            24
+          ]
+        },
+        {
+          "got": [
+            4,
+            5,
+            7,
+            8,
+            11
+          ],
+          "q": 5,
+          "ref": [
+            18,
+            4,
+            6,
+            7,
+            8
+          ]
+        },
+        {
+          "got": [
+            4,
+            5,
+            6,
+            8,
+            9
+          ],
+          "q": 6,
+          "ref": [
+            14,
+            13,
+            26,
+            17,
+            2
+          ]
+        },
+        {
+          "got": [
+            2,
+            4,
+            5,
+            7,
+            8
+          ],
+          "q": 7,
+          "ref": [
+            6,
+            8,
+            5,
+            14,
+            24
+          ]
+        },
+        {
+          "got": [
+            2,
+            3,
+            7,
+            8,
+            9
+          ],
+          "q": 8,
+          "ref": [
+            14,
+            2,
+            3,
+            4,
+            15
+          ]
+        },
+        {
+          "got": [
+            3,
+            6,
+            7,
+            8,
+            9
+          ],
+          "q": 9,
+          "ref": [
+            6,
+            14,
+            21,
+            30,
+            1
+          ]
+        }
+      ],
+      "name": "multi-head equal fusion matches reference pipeline",
+      "status": "FAILED",
+      "test": "TEST-C2-003",
+      "variant": "none"
+    },
+    {
+      "budget": 16,
+      "explain": "QUERY\n  collection: c2t\n  top_k: 5\nVECTOR SEARCH\n  heads: a, b\n  ef_search: 64\n  candidates_per_head: 25\n  parallel: true\nCANDIDATE UNION\n  budget: 16\nRERANK\n  mode: FixedFusion\n  normalization: MinMax\n  exact_similarity: off\nFILTER\n  strategy: scan-only (no vector ranking)\nFINAL TOP K\n  5\n",
+      "name": "candidate-budget hard bound",
+      "status": "FAILED",
+      "test": "TEST-C2-005"
+    },
+    {
+      "dup_block_id_ascending": true,
+      "name": "deterministic tie ordering (score desc, id asc)",
+      "repeat_identical": true,
+      "status": "PASS",
+      "test": "TEST-C2-006"
+    },
+    {
+      "empty_heads_is_err": false,
+      "name": "head cardinality/membership mismatch",
+      "status": "FAILED",
+      "test": "TEST-C2-004",
+      "unknown_head_is_err": false
+    },
+    {
+      "deterministic": false,
+      "name": "hybrid fusion correctness (B5)",
+      "results": 5,
+      "status": "FAILED",
+      "test": "TEST-C2-008",
+      "unique_token_doc_top1": false
+    },
+    {
+      "mismatches": [
+        {
+          "got": [
+            26,
+            7,
+            21,
+            19,
+            12
+          ],
+          "q": 0,
+          "ref_exact_fused": [
+            1,
+            4,
+            8,
+            9,
+            10
+          ]
+        },
+        {
+          "got": [
+            4,
+            3,
+            21,
+            19,
+            18
+          ],
+          "q": 1,
+          "ref_exact_fused": [
+            1,
+            2,
+            3,
+            4,
+            6
+          ]
+        },
+        {
+          "got": [
+            12,
+            18,
+            20,
+            24,
+            11
+          ],
+          "q": 2,
+          "ref_exact_fused": [
+            21,
+            27,
+            1,
+            2,
+            3
+          ]
+        },
+        {
+          "got": [
+            16,
+            28,
+            24,
+            9,
+            7
+          ],
+          "q": 3,
+          "ref_exact_fused": [
+            4,
+            8,
+            16,
+            17,
+            20
+          ]
+        },
+        {
+          "got": [
+            20,
+            14,
+            19,
+            9,
+            21
+          ],
+          "q": 4,
+          "ref_exact_fused": [
+            14,
+            1,
+            2,
+            3,
+            8
+          ]
+        },
+        {
+          "got": [
+            17,
+            3,
+            21,
+            26,
+            18
+          ],
+          "q": 5,
+          "ref_exact_fused": [
+            3,
+            10,
+            13,
+            18,
+            1
+          ]
+        },
+        {
+          "got": [
+            20,
+            24,
+            6,
+            21,
+            15
+          ],
+          "q": 6,
+          "ref_exact_fused": [
+            8,
+            18,
+            25,
+            1,
+            2
+          ]
+        },
+        {
+          "got": [
+            17,
+            21,
+            25,
+            13,
+            11
+          ],
+          "q": 7,
+          "ref_exact_fused": [
+            1,
+            2,
+            3,
+            20,
+            21
+          ]
+        },
+        {
+          "got": [
+            15,
+            23,
+            20,
+            13,
+            29
+          ],
+          "q": 8,
+          "ref_exact_fused": [
+            21,
+            1,
+            2,
+            3,
+            8
+          ]
+        },
+        {
+          "got": [
+            11,
+            17,
+            21,
+            13,
+            2
+          ],
+          "q": 9,
+          "ref_exact_fused": [
+            4,
+            8,
+            20,
+            1,
+            3
+          ]
+        }
+      ],
+      "name": "Full-mode exact rerank path (B7, evaluated as-is)",
+      "status": "FAILED",
+      "test": "TEST-C2-009"
+    },
+    {
+      "name": "B4 identity-QK no-op vs uniform-fusion mode C",
+      "outputs_identical_10q": false,
+      "status": "FAILED",
+      "test": "TEST-C2-B4-NOOP"
+    }
+  ],
+  "subcommand": "modes-test"
+}

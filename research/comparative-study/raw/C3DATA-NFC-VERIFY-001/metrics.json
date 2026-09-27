@@ -1,0 +1,44 @@
+{
+  "run_id": "C3DATA-NFC-VERIFY-001",
+  "all_match": true,
+  "checks": {
+    "_data_manifest": "H:\\Attention-DB\\AttentionDB\\research\\comparative-study\\raw\\C2-DATA-NFCORPUS-003\\artifacts\\DS-NFCORPUS-manifest.yaml",
+    "corpus.jsonl": {
+      "expected": "10cc83ef1826b1425e6a87090b5140b39b27755d5a27e48215a88611c899991f",
+      "observed": "10cc83ef1826b1425e6a87090b5140b39b27755d5a27e48215a88611c899991f",
+      "match": true
+    },
+    "queries.jsonl": {
+      "expected": "d024e6621b84925d485ae473d316a0c3af31c62c8068a59fb29d22f7613aef2a",
+      "observed": "d024e6621b84925d485ae473d316a0c3af31c62c8068a59fb29d22f7613aef2a",
+      "match": true
+    },
+    "embed:HEAD-TITLE.npy": {
+      "expected": "1f10d4eb98383d39520c1a18fbaf78f0d06524484fd9402fa0f4d7b1fb1a59eb",
+      "observed": "1f10d4eb98383d39520c1a18fbaf78f0d06524484fd9402fa0f4d7b1fb1a59eb",
+      "match": true
+    },
+    "embed:HEAD-BODY.npy": {
+      "expected": "0fcaaf147e094a74e41654410210784d21ba26e9cbc7ef08c65a34f43fada501",
+      "observed": "0fcaaf147e094a74e41654410210784d21ba26e9cbc7ef08c65a34f43fada501",
+      "match": true
+    },
+    "embed:HEAD-CITE.npy": {
+      "expected": "0fdadcb4c0e255b832b43e6d600566b63c63dd3b3b4172c4f92d02b3aec500a0",
+      "observed": "0fdadcb4c0e255b832b43e6d600566b63c63dd3b3b4172c4f92d02b3aec500a0",
+      "match": true
+    },
+    "embed:CANONICAL.npy": {
+      "expected": "75bf5f3f02e860574d88a68d07bb20214a37559e85c6b9fe1b1fa3f5ecd8b1a6",
+      "observed": "75bf5f3f02e860574d88a68d07bb20214a37559e85c6b9fe1b1fa3f5ecd8b1a6",
+      "match": true
+    },
+    "embed:QUERIES.npy": {
+      "expected": "82be7079ccf8c2b2df5f61f34fc40aff56242902db3f8c128ecf619e0ea49e93",
+      "observed": "82be7079ccf8c2b2df5f61f34fc40aff56242902db3f8c128ecf619e0ea49e93",
+      "match": true
+    }
+  },
+  "timestamp_utc": "2026-09-25T14:24:34Z",
+  "git_commit": "7cbd16ddd62b671eaefccf4db44bf464164d79ca"
+}

@@ -1,0 +1,15 @@
+manifest,file,result,bytes/hash
+DS-SCIFACT-manifest.yaml,corpus.jsonl,MATCH,8106566
+DS-SCIFACT-manifest.yaml,queries.jsonl,MATCH,209731
+DS-SCIFACT-manifest.yaml,qrels/test.tsv,MATCH,5389
+DS-SCIFACT-manifest.yaml,qrels/train.tsv,MATCH,14502
+DS-SCIFACT-manifest.yaml,hf-qrels/test.tsv,MATCH,5389
+DS-SCIFACT-manifest.yaml,hf-qrels/train.tsv,MATCH,14502
+DS-NFCORPUS-manifest.yaml,corpus.jsonl,MATCH,6219364
+DS-NFCORPUS-manifest.yaml,queries.jsonl,MATCH,441466
+DS-NFCORPUS-manifest.yaml,qrels/dev.tsv,MATCH,258218
+DS-NFCORPUS-manifest.yaml,qrels/test.tsv,MATCH,279572
+DS-NFCORPUS-manifest.yaml,qrels/train.tsv,MATCH,2504643
+DS-NFCORPUS-manifest.yaml,hf-qrels/dev.tsv,MATCH,258218
+DS-NFCORPUS-manifest.yaml,hf-qrels/test.tsv,MATCH,279572
+DS-NFCORPUS-manifest.yaml,hf-qrels/train.tsv,MATCH,2504643

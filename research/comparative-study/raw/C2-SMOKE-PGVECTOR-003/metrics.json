@@ -1,0 +1,24 @@
+{
+  "apt_pgvector_packages": [
+    "postgresql-17-pgvector - Open-source vector similarity search for Postgres"
+  ],
+  "postgresql_packages": [
+    "postgresql-17 - The World's Most Advanced Open Source Relational Database"
+  ],
+  "pgvector_pkg": "postgresql-17-pgvector",
+  "install_rc": 0,
+  "pg_versions_present": [
+    "17"
+  ],
+  "cluster_start_rc": 0,
+  "sql_errors": [
+    "CREATE EXTENSION IF NOT EXISTS vector => Password: su: Authentication failure\n",
+    "CREATE TABLE t (id int primary key, v ve => Password: su: Authentication failure\n",
+    "INSERT INTO t (id, v) VALUES (0, '[0.329 => Password: su: Authentication failure\n",
+    "CREATE INDEX ON t USING hnsw (v vector_c => Password: su: Authentication failure\n",
+    "CREATE INDEX ON t USING ivfflat (v vecto => Password: su: Authentication failure\n"
+  ],
+  "ann_query_rc": 1,
+  "ann_top1_is_self": false,
+  "pgvector_version": "?"
+}

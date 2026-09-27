@@ -1,0 +1,20 @@
+﻿run_id: C2-INTEGRITY-001
+purpose: manifest integrity re-hash across all C2 runs (TEST-C2-013)
+started_utc: '2026-09-24T12:28:24Z'
+artifacts: {}
+finished_utc: '2026-09-24T12:28:24Z'
+status: PASS
+study_id: comparative-study-001
+protocol_version: 1.0.0
+git_commit: 7788067c1437ae8c75ced4dc1ffc2f49b2c22a88
+host:
+  logical_cpus: 8
+  mem_total_kb: 16700964
+guardrails:
+  mem_budget_kb_85pct_available: 2309293
+  disk_floor_mb: 500
+  phase3e_crash_env_asserted_unset: true
+seed: null
+note: first registration of TEST-C2-013 (manifest re-hash); cited in draft
+  register_runs.py but never executed there; ran on the current host (Windows)
+  with Python 3.14 over all 64 C2 run dirs

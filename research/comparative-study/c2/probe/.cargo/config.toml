@@ -1,0 +1,3 @@
+﻿# Reproducible builds: deterministic PE timestamp + PDB GUID for c2pilot.exe
+[build]
+rustflags = ["-C", "link-arg=/Brepro"]

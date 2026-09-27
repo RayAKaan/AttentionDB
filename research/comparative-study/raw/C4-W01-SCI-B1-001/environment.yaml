@@ -1,0 +1,26 @@
+{
+  "host": "Originator",
+  "os": "Windows-11-10.0.26200-SP0",
+  "python": "3.14.4",
+  "created_utc": "2026-09-26T12:57:09Z",
+  "c2pilot_sha256": "3ec8c193354975fa26a3961d8835289a0cad54cc686141f75573baeaebb31c98",
+  "input_hashes": {
+    "CANONICAL.f32": "3e350dcbb6fad01909dc707576420e034d2fd232ed0a8661e57e33202f840be3",
+    "HEAD-BODY.f32": "c7436e493ddbf41dfeedb77c3007067dc60333e15c5622f167b283ee09eb4a2c",
+    "HEAD-CITE.f32": "c927fb7372e784805f37b884336c57af4cddb2bda461714ba4d8267b94a94664",
+    "HEAD-TITLE.f32": "46b483be668257b97d9caebaff5a98d646be193fb42e42914c18bcd1eab567dd",
+    "QUERIES.f32": "bf6fe475ddee390d7672ebf15c1d66d270f3199c098b03272e45a97f1ddc93b2",
+    "RUN-cfg.json": "8e310deba10e8d7c88304e62435de8ca20a7e0c9bb7c355b4172030baa5c403f",
+    "RUN-rep1.json": "a1f89ca30b70a6eb0c7a2779138f3043f56d19a28e391c172cf7c00fe5b22f31",
+    "RUN-rep2.json": "3e99f9cc42fa1a16af851a82ac1e156bdbc98fa1935234e37740821627066e98",
+    "RUN-rep3.json": "b7331715170fb145bdb60ebbf688bda1d8f1437d674202a76e9d7ffde6a8f8bb",
+    "RUN-rep4.json": "413397f53e88678fe4c931e500a758548acd7bdbc183bf904f094418fd897451",
+    "RUN-rep5.json": "497c86d458c520cc2f6c12c037ac976e939dc36ef09ab05369ef3f7535867b9d"
+  },
+  "guardrail": {
+    "policy": "sampler(500ms) aborts when child process-tree RSS >= 85% of MemAvailable at preflight",
+    "mem_avail_at_preflight_bytes": 836964352,
+    "mem_load_pct_at_preflight": 95,
+    "ram_abort_threshold_bytes": 711419699
+  }
+}

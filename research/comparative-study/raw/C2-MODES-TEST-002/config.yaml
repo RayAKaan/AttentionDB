@@ -1,0 +1,9 @@
+run_id: C2-MODES-TEST-002
+study_id: comparative-study-001
+protocol_version: 1.0.0
+git_commit: 7788067c1437ae8c75ced4dc1ffc2f49b2c22a88
+purpose: 'POST-fix modes battery: B1/B2/B4/B5/B7 engine validation with re-scoped
+  harness assertions'
+component: attentiondb-adapter-validation
+tool: c2probe modes-test
+note: 8-run stability; TEST-C2-003/-009 v2 (coverage-recorded); TEST-C2-008 v2

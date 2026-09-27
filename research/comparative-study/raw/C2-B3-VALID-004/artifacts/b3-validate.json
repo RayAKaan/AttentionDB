@@ -1,0 +1,45 @@
+{
+  "results": [
+    {
+      "inspect": "model_id=b3-synth-view0-v2 arch=mlp_relu_softmax input_dim=64 hidden=16 num_heads=3 loss=soft_target trained(seed=20260925, dataset_hash=0x99ffb978eb9a2465, commit=7788067c1437ae8c75ced4dc1ffc2f49b2c22a88)",
+      "model_id": "b3-synth-view0-v2",
+      "name": "B3 ModelCard activation (install + inspect)",
+      "status": "PASS",
+      "test": "TEST-C2-010"
+    },
+    {
+      "head_name_mapping_reversed": true,
+      "name": "mode C results == attend_weighted(card softmax)",
+      "queries_differing_from_uniform": 10,
+      "status": "PASS",
+      "test": "TEST-C2-010a",
+      "weights_match_engine": true
+    },
+    {
+      "err": "Some(InvalidArgument(\"model trained for 4 heads, collection has 3 — refusing (§15)\"))",
+      "name": "card num_heads mismatch refused",
+      "status": "PASS",
+      "test": "TEST-C2-011a"
+    },
+    {
+      "err": "Some(InvalidArgument(\"model does not cover collection head 'metadata' — refusing (§15)\"))",
+      "name": "card head-name coverage refusal (missing collection head)",
+      "status": "PASS",
+      "test": "TEST-C2-011b"
+    },
+    {
+      "err": "Some(InvalidArgument(\"model invalid: not a gating model (bad format tag)\"))",
+      "name": "tampered card format rejected by validate()",
+      "status": "PASS",
+      "test": "TEST-C2-011c"
+    },
+    {
+      "fallback_equals_mode_b": true,
+      "inspect_after_deactivate": null,
+      "name": "deactivate -> documented uniform fallback",
+      "status": "PASS",
+      "test": "TEST-C2-010b"
+    }
+  ],
+  "subcommand": "b3-validate"
+}

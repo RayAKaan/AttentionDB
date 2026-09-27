@@ -1,0 +1,19 @@
+{
+  "binary_version": "qdrant 1.12.4",
+  "startup_healthy": true,
+  "startup_s": 0.03,
+  "create_collection": 200,
+  "upsert_100": 200,
+  "search_5": 200,
+  "search_returns_exact_self_top1": true,
+  "create_named_collection": 200,
+  "upsert_named_100": 200,
+  "named_search_5": 400,
+  "named_search_self_top1": false,
+  "server_peak_rss_kb": 59180,
+  "server_n_samples": 3,
+  "server_abort_reason": null,
+  "server_timed_out": false,
+  "server_exit_code": -9,
+  "server_log_tail": "6-09-24T09:25:55.160913Z  INFO actix_server::server: Actix runtime found; starting in Actix runtime\n2026-09-24T09:25:55.166441Z  INFO qdrant::tonic: Qdrant gRPC listening on 6334    \n2026-09-24T09:25:55.166464Z  INFO qdrant::tonic: TLS disabled for gRPC API    \n2026-09-24T09:25:55.174252Z  INFO storage::content_manager::toc::collection_meta_ops: Creating collection c2smoke    \n2026-09-24T09:25:55.207644Z  INFO actix_web::middleware::logger: 127.0.0.1 \"PUT /collections/c2smoke HTTP/1.1\" 200 47 \"-\" \"Python-urllib/3.13\" 0.033546    \n2026-09-24T09:25:55.243992Z  INFO actix_web::middleware::logger: 127.0.0.1 \"PUT /collections/c2smoke/points?wait=true HTTP/1.1\" 200 83 \"-\" \"Python-urllib/3.13\" 0.008618    \n2026-09-24T09:25:55.246110Z  INFO actix_web::middleware::logger: 127.0.0.1 \"POST /collections/c2smoke/points/search HTTP/1.1\" 200 240 \"-\" \"Python-urllib/3.13\" 0.000943    \n2026-09-24T09:25:55.246768Z  INFO storage::content_manager::toc::collection_meta_ops: Creating collection c2named    \n2026-09-24T09:25:55.307984Z  INFO actix_web::middleware::logger: 127.0.0.1 \"PUT /collections/c2named HTTP/1.1\" 200 48 \"-\" \"Python-urllib/3.13\" 0.061280    \n2026-09-24T09:25:55.375158Z  INFO actix_web::middleware::logger: 127.0.0.1 \"PUT /collections/c2named/points?wait=true HTTP/1.1\" 200 83 \"-\" \"Python-urllib/3.13\" 0.012368    \n2026-09-24T09:25:55.378220Z  INFO actix_web::middleware::logger: 127.0.0.1 \"POST /collections/c2named/points/search HTTP/1.1\" 400 148 \"-\" \"Python-urllib/3.13\" 0.000117    \n"
+}

@@ -1,0 +1,11 @@
+{
+  "vm_max_map_count": 65530,
+  "startup_healthy_default_jvm": false,
+  "startup_s": 240.19,
+  "server_peak_rss_kb": 1149344,
+  "server_n_samples": 20,
+  "server_abort_reason": "OBSERVED-LIMIT: tree RSS 1149344KB >= 85% MemAvailable budget 1089169KB",
+  "server_timed_out": false,
+  "server_exit_code": -9,
+  "server_log_tail": "warning: ignoring JAVA_HOME=/var/tmp/c2-es-ucc7l9rt/elasticsearch-8.15.2/jdk; using ES_JAVA_HOME\n"
+}

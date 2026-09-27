@@ -1,0 +1,22 @@
+{
+  "host": "Originator",
+  "os": "Windows-11-10.0.26200-SP0",
+  "python": "3.14.4",
+  "created_utc": "2026-09-25T14:59:11Z",
+  "c2pilot_sha256": "56bf2bd8014bedd1f9761964cadc30a7b393cf33f70009bff9083423da1a97f4",
+  "input_hashes": {
+    "corpora-multiview.json": "7fa978a462055d6afd1a817abe850ce53a4082f43ef2749563ba61459043e930",
+    "cfg.json": "58ad563a5c658548e475cdc2fc833b1175b586a205221f7eb16b8165a42c6ad1",
+    "semantic.f32": "49666601b7c417b9ab2c1498aeeceff66b865d00a6c7d9c87803ba590b970696",
+    "lexical.f32": "8e6893815b227c01d2d433b6541610db8fbab3d84e0b8d1e2a5988c53f48ea2d",
+    "metadata.f32": "ef3a537f81bcc319cfd9f781b4d76479c9079cc94d7fe37d4957d196230ff81f",
+    "q_view0.f32": "338a538af870b932c4b24ec45f488144979456eab58fb11946ff3e0849f85606"
+  },
+  "env_vars": {},
+  "guardrail": {
+    "policy": "sampler(500ms) aborts when child process-tree RSS >= 85% of MemAvailable at preflight",
+    "mem_avail_at_preflight_bytes": 2464071680,
+    "mem_load_pct_at_preflight": 85,
+    "ram_abort_threshold_bytes": 2094460928
+  }
+}

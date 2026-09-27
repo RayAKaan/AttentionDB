@@ -1,0 +1,11 @@
+{
+  "binary_version": "qdrant 1.12.4",
+  "startup_healthy": true,
+  "startup_s": 0.52,
+  "create_collection": 200,
+  "upsert_100": 200,
+  "search_5": 200,
+  "search_returns_exact_self_top1": true,
+  "create_named_collection": 200,
+  "upsert_named_100": 200
+}

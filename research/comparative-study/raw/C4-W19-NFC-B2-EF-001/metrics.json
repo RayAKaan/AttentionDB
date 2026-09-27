@@ -1,0 +1,271 @@
+{
+  "run_id": "C4-W19-NFC-B2-EF-001",
+  "mode": "B2",
+  "dataset": "DS-NFCORPUS",
+  "split": "VAL",
+  "phase": "C4.2 validation tuning",
+  "matching_metric": "qrels Relevance-Recall@10 (>=1 judged docs, top-10)",
+  "target_recall10_qrels_B0_VAL": 0.13642410370866181,
+  "tolerance": 0.01,
+  "rep_count": 1,
+  "grid": {
+    "ef_search": [
+      16,
+      32,
+      64,
+      128
+    ],
+    "candidate_budget": [
+      50,
+      100,
+      200,
+      500
+    ]
+  },
+  "levels": [
+    {
+      "n_queries": 324,
+      "recall10_qrels_mean": 0.13934659599585253,
+      "recall10_exact_mean": 0.0,
+      "p50_us": 1639.5,
+      "p95_us": 2586.8,
+      "level": "EF16-C50",
+      "ef_search": 16,
+      "candidate_budget": 50,
+      "peak_child_rss_MiB": [
+        179.1
+      ],
+      "within_tolerance": true
+    },
+    {
+      "n_queries": 324,
+      "recall10_qrels_mean": 0.13986937551799425,
+      "recall10_exact_mean": 0.0,
+      "p50_us": 1860.2,
+      "p95_us": 3558.8999999999996,
+      "level": "EF16-C100",
+      "ef_search": 16,
+      "candidate_budget": 100,
+      "peak_child_rss_MiB": [
+        181.3
+      ],
+      "within_tolerance": true
+    },
+    {
+      "n_queries": 324,
+      "recall10_qrels_mean": 0.1358722411369169,
+      "recall10_exact_mean": 0.0,
+      "p50_us": 1737.6,
+      "p95_us": 2243.1,
+      "level": "EF16-C200",
+      "ef_search": 16,
+      "candidate_budget": 200,
+      "peak_child_rss_MiB": [
+        183.8
+      ],
+      "within_tolerance": true
+    },
+    {
+      "n_queries": 324,
+      "recall10_qrels_mean": 0.13996995636693169,
+      "recall10_exact_mean": 0.0,
+      "p50_us": 1724.2,
+      "p95_us": 2372.2000000000003,
+      "level": "EF16-C500",
+      "ef_search": 16,
+      "candidate_budget": 500,
+      "peak_child_rss_MiB": [
+        180.1
+      ],
+      "within_tolerance": true
+    },
+    {
+      "n_queries": 324,
+      "recall10_qrels_mean": 0.1410042321493412,
+      "recall10_exact_mean": 0.0,
+      "p50_us": 1686.6,
+      "p95_us": 2138.4,
+      "level": "EF32-C50",
+      "ef_search": 32,
+      "candidate_budget": 50,
+      "peak_child_rss_MiB": [
+        180.3
+      ],
+      "within_tolerance": true
+    },
+    {
+      "n_queries": 324,
+      "recall10_qrels_mean": 0.14003826316624282,
+      "recall10_exact_mean": 0.0,
+      "p50_us": 1722.5,
+      "p95_us": 3330.3,
+      "level": "EF32-C100",
+      "ef_search": 32,
+      "candidate_budget": 100,
+      "peak_child_rss_MiB": [
+        179.7
+      ],
+      "within_tolerance": true
+    },
+    {
+      "n_queries": 324,
+      "recall10_qrels_mean": 0.13745961799918685,
+      "recall10_exact_mean": 0.0,
+      "p50_us": 1695.2,
+      "p95_us": 2987.8,
+      "level": "EF32-C200",
+      "ef_search": 32,
+      "candidate_budget": 200,
+      "peak_child_rss_MiB": [
+        181.6
+      ],
+      "within_tolerance": true
+    },
+    {
+      "n_queries": 324,
+      "recall10_qrels_mean": 0.13927266567249863,
+      "recall10_exact_mean": 0.0,
+      "p50_us": 1747.2,
+      "p95_us": 2222.2000000000003,
+      "level": "EF32-C500",
+      "ef_search": 32,
+      "candidate_budget": 500,
+      "peak_child_rss_MiB": [
+        180.0
+      ],
+      "within_tolerance": true
+    },
+    {
+      "n_queries": 324,
+      "recall10_qrels_mean": 0.13974420496199372,
+      "recall10_exact_mean": 0.0,
+      "p50_us": 1952.9,
+      "p95_us": 3536.2000000000003,
+      "level": "EF64-C50",
+      "ef_search": 64,
+      "candidate_budget": 50,
+      "peak_child_rss_MiB": [
+        180.9
+      ],
+      "within_tolerance": true
+    },
+    {
+      "n_queries": 324,
+      "recall10_qrels_mean": 0.13836512996751907,
+      "recall10_exact_mean": 0.0,
+      "p50_us": 1767.3000000000002,
+      "p95_us": 2495.7,
+      "level": "EF64-C100",
+      "ef_search": 64,
+      "candidate_budget": 100,
+      "peak_child_rss_MiB": [
+        181.9
+      ],
+      "within_tolerance": true
+    },
+    {
+      "n_queries": 324,
+      "recall10_qrels_mean": 0.14078649922624736,
+      "recall10_exact_mean": 0.0,
+      "p50_us": 1776.6,
+      "p95_us": 2527.7,
+      "level": "EF64-C200",
+      "ef_search": 64,
+      "candidate_budget": 200,
+      "peak_child_rss_MiB": [
+        180.7
+      ],
+      "within_tolerance": true
+    },
+    {
+      "n_queries": 324,
+      "recall10_qrels_mean": 0.14066346492589576,
+      "recall10_exact_mean": 0.0,
+      "p50_us": 1828.6000000000001,
+      "p95_us": 3532.7000000000003,
+      "level": "EF64-C500",
+      "ef_search": 64,
+      "candidate_budget": 500,
+      "peak_child_rss_MiB": [
+        179.5
+      ],
+      "within_tolerance": true
+    },
+    {
+      "n_queries": 324,
+      "recall10_qrels_mean": 0.1391904539770711,
+      "recall10_exact_mean": 0.0,
+      "p50_us": 1674.7,
+      "p95_us": 2327.1,
+      "level": "EF128-C50",
+      "ef_search": 128,
+      "candidate_budget": 50,
+      "peak_child_rss_MiB": [
+        181.1
+      ],
+      "within_tolerance": true
+    },
+    {
+      "n_queries": 324,
+      "recall10_qrels_mean": 0.13966230168524715,
+      "recall10_exact_mean": 0.0,
+      "p50_us": 1610.3,
+      "p95_us": 1947.1,
+      "level": "EF128-C100",
+      "ef_search": 128,
+      "candidate_budget": 100,
+      "peak_child_rss_MiB": [
+        181.7
+      ],
+      "within_tolerance": true
+    },
+    {
+      "n_queries": 324,
+      "recall10_qrels_mean": 0.14113203522226095,
+      "recall10_exact_mean": 0.0,
+      "p50_us": 1696.0,
+      "p95_us": 2265.0,
+      "level": "EF128-C200",
+      "ef_search": 128,
+      "candidate_budget": 200,
+      "peak_child_rss_MiB": [
+        181.9
+      ],
+      "within_tolerance": true
+    },
+    {
+      "n_queries": 324,
+      "recall10_qrels_mean": 0.13946355764759866,
+      "recall10_exact_mean": 0.0,
+      "p50_us": 1731.0,
+      "p95_us": 2324.3,
+      "level": "EF128-C500",
+      "ef_search": 128,
+      "candidate_budget": 500,
+      "peak_child_rss_MiB": [
+        180.1
+      ],
+      "within_tolerance": true
+    }
+  ],
+  "selection": {
+    "n_queries": 324,
+    "recall10_qrels_mean": 0.13966230168524715,
+    "recall10_exact_mean": 0.0,
+    "p50_us": 1610.3,
+    "p95_us": 1947.1,
+    "level": "EF128-C100",
+    "ef_search": 128,
+    "candidate_budget": 100,
+    "peak_child_rss_MiB": [
+      181.7
+    ],
+    "within_tolerance": true
+  },
+  "selection_rule": "fastest p50 post-warmup within +-0.01 of B0 VAL target (TARGET-UNREACHABLE never interpolated)",
+  "val_split": {
+    "dataset": "DS-NFCORPUS",
+    "rule": "NFCorpus official qrel-dev (324 qids)",
+    "n_queries": 324
+  }
+}

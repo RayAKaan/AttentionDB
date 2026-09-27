@@ -1,0 +1,58 @@
+{
+  "name": "C4-BINVERIFY-001",
+  "purpose": "behavioral equivalence new deterministic binary vs C4.2",
+  "c2pilot_sha256_new": "a8e0c0cb6d31447b513425612c4bf14e0dcfd66ca4415466777833d9f0a3c295",
+  "c2pilot_sha256_c4_2": "9024974731d8d5c0b182348eae2601037768819ebae5eff459c82c6931f543ce",
+  "tolerance_rule": "abs(new - recorded) <= 0.01 + 1e-9 (C4 matching rule)",
+  "cells": [
+    {
+      "run_id": "C4-W19-NFC-B1-EF-001",
+      "mode": "B1",
+      "dataset": "DS-NFCORPUS",
+      "level": "EF64",
+      "recorded_c4_2_recall10_qrels": 0.1351,
+      "new_recall10_qrels": 0.13656526558492102,
+      "new_b0_recall10_qrels": 0.13642410370866181,
+      "p50_us": 1071.3000000000002,
+      "within_tolerance": true,
+      "tolerance": 0.01
+    },
+    {
+      "run_id": "C4-W19-NFC-B2-EF-001",
+      "mode": "B2",
+      "dataset": "DS-NFCORPUS",
+      "level": "EF16-C50",
+      "recorded_c4_2_recall10_qrels": 0.1393,
+      "new_recall10_qrels": 0.13974215034941603,
+      "new_b0_recall10_qrels": 0.13642410370866181,
+      "p50_us": 2183.3999999999996,
+      "within_tolerance": true,
+      "tolerance": 0.01
+    },
+    {
+      "run_id": "C4-W19-NFC-B7-EF-001",
+      "mode": "B7",
+      "dataset": "DS-NFCORPUS",
+      "level": "EF64",
+      "recorded_c4_2_recall10_qrels": 0.1372,
+      "new_recall10_qrels": 0.13870492030400783,
+      "new_b0_recall10_qrels": 0.13642410370866181,
+      "p50_us": 2421.2000000000003,
+      "within_tolerance": true,
+      "tolerance": 0.01
+    },
+    {
+      "run_id": "C4-W19-SCI-B1-EF-001",
+      "mode": "B1",
+      "dataset": "DS-SCIFACT",
+      "level": "EF32",
+      "recorded_c4_2_recall10_qrels": 0.7775,
+      "new_recall10_qrels": 0.765,
+      "new_b0_recall10_qrels": 0.785,
+      "p50_us": 1085.3,
+      "within_tolerance": false,
+      "tolerance": 0.01
+    }
+  ],
+  "verdict": "MISMATCH"
+}
