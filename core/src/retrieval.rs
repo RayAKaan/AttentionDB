@@ -17,6 +17,7 @@
 //! scoring. Exact rerank = precise final ordering. These are NOT blurred:
 //! approximate graph scores never reach the output when exact reranking runs.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // ---------------------------------------------------------------------------
@@ -148,8 +149,54 @@ pub fn candidate_union(set: &CandidateSet, budget: usize) -> Vec<UnionCandidate>
 // ef - ef/2, so the total HNSW ef work of C5-C equals C5-B's single-search ef.
 // λ = 0.0 is the glue arm and MUST reproduce the control candidate set.
 
+// ---------------------------------------------------------------------------
+// Adaptive retrieval allocation (C6)
+// ---------------------------------------------------------------------------
+
+/// Adaptive retrieval policy type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AdaptivePolicyType {
+    /// C6-C: Static equal split across heads.
+    StaticEqual,
+    /// C6-D: Query-adaptive via head centroids.
+    QueryAdaptive,
+    /// C6-E: Interaction-guided (two-stage with redistribution).
+    InteractionGuided,
+    /// Negative control: randomized allocation.
+    RandomizedControl,
+}
+
+impl Default for AdaptivePolicyType {
+    fn default() -> Self { Self::StaticEqual }
+}
+
+/// Adaptive retrieval configuration (C6).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdaptiveRetrievalConfig {
+    pub policy_type: AdaptivePolicyType,
+    /// Fraction of budget for stage 1 (C6-E).
+    pub stage1_fraction: f32,
+    /// Redistribution trigger (C6-E).
+    pub overlap_threshold: f32,
+    pub entropy_threshold: f32,
+    /// Randomized control seed.
+    pub randomized_seed: u64,
+}
+
+impl Default for AdaptiveRetrievalConfig {
+    fn default() -> Self {
+        Self {
+            policy_type: AdaptivePolicyType::StaticEqual,
+            stage1_fraction: 0.3,
+            overlap_threshold: 0.3,
+            entropy_threshold: 1.0,
+            randomized_seed: 20260925,
+        }
+    }
+}
+
 /// Interaction parameters (validation-gated). Off by default (`None`).
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct CrossRefineConfig {
     /// Blend of the query with the cross-head centroid (0.0 = pure query).
     pub lambda: f32,

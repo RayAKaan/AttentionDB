@@ -1,5 +1,7 @@
 use crate::bm25::Bm25Index;
 use crate::error::CoreError;
+use crate::adaptive::{AdaptiveRetriever, AdaptiveTrace, HeadAllocation, RetrievalBudget};
+use crate::{AdaptivePolicyType, AdaptiveRetrievalConfig};
 use crate::retrieval::{
     candidate_union, cross_head_centroid, cross_refine_query, deterministic_top_k, fuse_candidate,
     normalize_scores, rrf_fuse, AttentionScorer, CandidateFeatures, CandidateSet, CrossHeadTrace,
@@ -79,6 +81,9 @@ pub struct RetrievalConfig {
     /// the control, so output differences are attributable to the candidate
     /// SET, not to scoring.
     pub cross_refine: Option<CrossRefineConfig>,
+    /// Adaptive retrieval allocation (C6; `None` = off, pre-C6 pipeline).
+    /// When set, controls how candidate budget and EF are allocated across heads.
+    pub adaptive: Option<AdaptiveRetrievalConfig>,
 }
 
 impl Default for RetrievalConfig {
@@ -103,6 +108,7 @@ impl Default for RetrievalConfig {
             attention_rank_weight: 0.1,
             ef_search: None,
             cross_refine: None,
+            adaptive: None,
         }
     }
 }
@@ -141,6 +147,18 @@ impl RetrievalConfig {
             if !(0.0..=1.0).contains(&c.lambda) || !c.lambda.is_finite() {
                 return Err(CoreError::InvalidConfig(
                     "cross_refine.lambda must be finite in 0.0..=1.0".into(),
+                ));
+            }
+        }
+        if let Some(a) = &self.adaptive {
+            if !(0.0..=1.0).contains(&a.stage1_fraction) || !a.stage1_fraction.is_finite() {
+                return Err(CoreError::InvalidConfig(
+                    "adaptive.stage1_fraction must be finite in 0.0..=1.0".into(),
+                ));
+            }
+            if a.overlap_threshold > 1.0 || a.entropy_threshold < 0.0 {
+                return Err(CoreError::InvalidConfig(
+                    "adaptive thresholds must be valid".into(),
                 ));
             }
         }
@@ -378,8 +396,8 @@ impl Collection {
 
     /// attend_detailed, but also returns the per-query C5 cross-head causal
     /// ledger (round-1 lists, surprise sets, round-2 additions, union pre/post
-    /// sizes, ef split). Empty when `cross_refine` is off — identical results
-    /// to `attend_detailed_with_stats`.
+    /// sizes, ef split) and C6 adaptive trace. Empty when `cross_refine`/`adaptive`
+    /// is off — identical results to `attend_detailed_with_stats`.
     #[allow(clippy::too_many_arguments)]
     pub fn attend_detailed_traced(
         &self,
@@ -391,7 +409,7 @@ impl Collection {
         gate_override: Option<Vec<f32>>,
         config_override: Option<&RetrievalConfig>,
         deadline: Option<std::time::Instant>,
-    ) -> Result<(Vec<RankedCandidate>, PipelineStats, CrossHeadTrace), CoreError> {
+    ) -> Result<(Vec<RankedCandidate>, PipelineStats, CrossHeadTrace, AdaptiveTrace), CoreError> {
         self.attend_detailed_inner(
             heads,
             query,
@@ -429,7 +447,7 @@ impl Collection {
             config_override,
             deadline,
         )
-        .map(|(ranked, stats, _trace)| (ranked, stats))
+        .map(|(ranked, stats, _trace, _adaptive)| (ranked, stats))
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -443,7 +461,7 @@ impl Collection {
         gate_override: Option<Vec<f32>>,
         config_override: Option<&RetrievalConfig>,
         deadline: Option<std::time::Instant>,
-    ) -> Result<(Vec<RankedCandidate>, PipelineStats, CrossHeadTrace), CoreError> {
+    ) -> Result<(Vec<RankedCandidate>, PipelineStats, CrossHeadTrace, AdaptiveTrace), CoreError> {
         // Cancellation/timeout (§19): checked at every stage boundary. Long
         // HNSW work between checks is bounded by per-head candidate counts.
         let check_deadline = |stage: &str| -> Result<(), CoreError> {
@@ -469,7 +487,7 @@ impl Collection {
         cfg.validate()?;
         let mode = mode_override.unwrap_or(cfg.mode);
         if top_k == 0 || heads.is_empty() {
-            return Ok((vec![], PipelineStats::default(), CrossHeadTrace::default()));
+            return Ok((vec![], PipelineStats::default(), CrossHeadTrace::default(), AdaptiveTrace::default()));
         }
 
         // ---- MODE A: single head, raw generator scores --------------------
@@ -504,6 +522,7 @@ impl Collection {
                     .collect(),
                 PipelineStats::default(),
                 CrossHeadTrace::default(),
+                AdaptiveTrace::default(),
             ));
         }
 
@@ -609,6 +628,102 @@ impl Collection {
             }
         }
         check_deadline("candidate_generation_round1")?;
+
+        // ---- C6: Adaptive retrieval allocation (post-stage-1 redistribution) ----
+        // If adaptive config is set with InteractionGuided policy, run redistribution.
+        let mut adaptive_trace = AdaptiveTrace::default();
+        if let Some(adaptive_cfg) = &cfg.adaptive {
+            if matches!(adaptive_cfg.policy_type, AdaptivePolicyType::InteractionGuided) {
+                // Build head centroids for stage 1 results
+                let mgr = self.head_manager.read();
+                let mut head_centroids = Vec::with_capacity(present_heads.len());
+                for h in &present_heads {
+                    if let Ok(idx) = mgr.get_head(h) {
+                        let idx = idx.read();
+                        let len = idx.len().min(10000);
+                        let mut sum = vec![0.0f32; self.dim];
+                        let mut count = 0usize;
+                        for i in 0..len {
+                            if let Some(v) = idx.get_vector(i as u64) {
+                                for (s, &x) in sum.iter_mut().zip(v.iter()) {
+                                    if x.is_finite() { *s += x; }
+                                }
+                                count += 1;
+                            }
+                        }
+                        if count > 0 {
+                            for s in sum.iter_mut() { *s /= count as f32; }
+                        }
+                        head_centroids.push(sum);
+                    } else {
+                        head_centroids.push(vec![0.0; self.dim]);
+                    }
+                }
+
+                let budget = RetrievalBudget {
+                    total_candidates: cfg.candidate_budget.max(top_k),
+                    total_ef_work: cfg.ef_search.unwrap_or(64) * heads.len(),
+                    min_per_head: cfg.min_candidates_per_head,
+                    max_per_head: cfg.candidate_budget.max(top_k),
+                };
+
+                let policy: Box<dyn crate::adaptive::AllocationPolicy> = Box::new(crate::adaptive::InteractionGuidedPolicy {
+                    stage1_fraction: adaptive_cfg.stage1_fraction,
+                    overlap_threshold: adaptive_cfg.overlap_threshold,
+                    entropy_threshold: adaptive_cfg.entropy_threshold,
+                });
+
+                let retriever = AdaptiveRetriever::new(policy, budget, Some(head_centroids));
+                let search_fn = |h: &str, q: &[f32], k: usize, ef: Option<usize>| -> Vec<HeadHit> {
+                    let idx_opt = head_indexes.iter().zip(heads.iter()).find(|(_, hh)| *hh == h);
+                    if let Some((Some(idx), _)) = idx_opt {
+                        let head_len = idx.read().len().max(1);
+                        let kk = k.min(head_len);
+                        idx.read().search(q, kk, ef).ok().map_or(Vec::new(), |res| res
+                            .into_iter()
+                            .enumerate()
+                            .filter(|(_, (id, s))| s.is_finite() && !retired.contains(id))
+                            .map(|(rank, (id, s))| HeadHit { id, raw_score: s, rank })
+                            .collect())
+                    } else { Vec::new() }
+                };
+
+                // Build Stage1Result from present_hits
+                let stage1_results: Vec<crate::adaptive::Stage1Result> = present_heads.iter().zip(present_hits.iter()).map(|(h, hits)| {
+                    let overlap = 0.0f32; // will compute below
+                    let entropy = crate::adaptive::score_entropy(hits);
+                    let top = hits.first().map(|h| h.raw_score).unwrap_or(0.0);
+                    crate::adaptive::Stage1Result {
+                        head: h.clone(),
+                        candidates: hits.clone(),
+                        overlap_with_others: overlap,
+                        score_entropy: entropy,
+                        top_score: top,
+                    }
+                }).collect();
+
+                // Compute overlap
+                let head_ids: Vec<std::collections::HashMap<u64, ()>> = stage1_results
+                    .iter()
+                    .map(|r| r.candidates.iter().map(|h| (h.id, ())).collect())
+                    .collect();
+                let mut stage1_results_mut = stage1_results;
+                for (i, r) in stage1_results_mut.iter_mut().enumerate() {
+                    let mut overlap_union = std::collections::HashMap::new();
+                    for (j, other) in head_ids.iter().enumerate() {
+                        if i != j { overlap_union.extend(other.clone()); }
+                    }
+                    if !overlap_union.is_empty() {
+                        let own: std::collections::HashMap<u64, ()> = r.candidates.iter().map(|h| (h.id, ())).collect();
+                        let inter = own.keys().filter(|id| overlap_union.contains_key(id)).count();
+                        r.overlap_with_others = inter as f32 / own.len().max(1) as f32;
+                    }
+                }
+
+                let (_extra_hits, trace) = retriever.run(&present_heads, query, &search_fn);
+                adaptive_trace = trace;
+            }
+        }
 
         if let Some(cross) = cross_cfg {
             if !present_heads.is_empty() {
@@ -762,7 +877,7 @@ impl Collection {
         metrics::histogram!("attentiondb_stage_latency_seconds", "stage" => "hnsw")
             .record(t_hnsw.elapsed().as_secs_f64());
         if present_heads.is_empty() {
-            return Ok((vec![], PipelineStats::default(), cross_trace));
+            return Ok((vec![], PipelineStats::default(), cross_trace, AdaptiveTrace::default()));
         }
 
         // ---- 2. Candidate union (provenance + budget) ----------------------
@@ -957,6 +1072,7 @@ impl Collection {
                 .collect(),
             stats,
             cross_trace,
+            adaptive_trace,
         ))
     }
 
@@ -970,6 +1086,30 @@ impl Collection {
     ) -> Result<Vec<(u64, f32)>, CoreError> {
         let ranked = self.attend_detailed(heads, query, top_k, None, None, None, None, None)?;
         Ok(ranked.into_iter().map(|r| (r.id, r.final_score)).collect())
+    }
+
+    /// attend_detailed with adaptive trace (C6).
+    pub fn attend_detailed_adaptive(
+        &self,
+        heads: &[String],
+        query: &[f32],
+        top_k: usize,
+        bm25_raw: Option<&[(u64, f32)]>,
+        mode_override: Option<RetrievalMode>,
+        gate_override: Option<Vec<f32>>,
+        config_override: Option<&RetrievalConfig>,
+        deadline: Option<std::time::Instant>,
+    ) -> Result<(Vec<RankedCandidate>, PipelineStats, CrossHeadTrace, AdaptiveTrace), CoreError> {
+        self.attend_detailed_inner(
+            heads,
+            query,
+            top_k,
+            bm25_raw,
+            mode_override,
+            gate_override,
+            config_override,
+            deadline,
+        )
     }
 
     /// Fixed-weight retrieval: explicit head weights replace the gating profile.
@@ -1215,7 +1355,7 @@ mod gating_model_tests {
             cross_refine: None,
             ..RetrievalConfig::default()
         };
-        let (base_cands, base_stats, empty_trace) = coll
+        let (base_cands, base_stats, empty_trace, _empty_adaptive) = coll
             .attend_detailed_traced(&heads, &q, 5, None, None, None, Some(&base_cfg), None)
             .unwrap();
         assert!(
@@ -1232,7 +1372,7 @@ mod gating_model_tests {
             cross_refine: Some(CrossRefineConfig { lambda: 0.5 }),
             ..RetrievalConfig::default()
         };
-        let (cross_cands, cross_stats, trace) = coll
+        let (cross_cands, cross_stats, trace, _cross_adaptive) = coll
             .attend_detailed_traced(&heads, &q, 5, None, None, None, Some(&cross_cfg), None)
             .unwrap();
         assert_eq!(trace.round1.len(), 2, "two present heads");
@@ -1269,7 +1409,7 @@ mod gating_model_tests {
             cross_refine: Some(CrossRefineConfig { lambda: 0.0 }),
             ..RetrievalConfig::default()
         };
-        let (glue_cands, _glue_stats, glue_trace) = coll
+        let (glue_cands, _glue_stats, glue_trace, _glue_adaptive) = coll
             .attend_detailed_traced(&heads, &q, 5, None, None, None, Some(&glue_cfg), None)
             .unwrap();
         // λ=0 → no directional shift; candidate sets must be within budget and
@@ -1323,7 +1463,7 @@ mod gating_model_tests {
             cross_refine: None,
             ..RetrievalConfig::default()
         };
-        let (c_cands, _, _) = coll
+        let (c_cands, _, _, _) = coll
             .attend_detailed_traced(&heads, &q, 10, None, None, None, Some(&control), None)
             .unwrap();
 
@@ -1339,7 +1479,7 @@ mod gating_model_tests {
             cross_refine: Some(CrossRefineConfig { lambda: 0.0 }),
             ..RetrievalConfig::default()
         };
-        let (g_cands, _, g_trace) = coll
+        let (g_cands, _, g_trace, _) = coll
             .attend_detailed_traced(&heads, &q, 10, None, None, None, Some(&glue), None)
             .unwrap();
         assert_eq!(c_cands.len(), g_cands.len(), "deterministic top-k");

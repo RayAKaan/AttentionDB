@@ -1,3 +1,4 @@
+pub mod adaptive;
 pub mod backup;
 pub mod bm25;
 pub mod checker;
@@ -14,5 +15,6 @@ pub use checker::{CheckIssue, Severity};
 pub use collection::Collection;
 pub use engine::{AttentionEngine, CheckpointInfo, EngineState, EngineStats, IdMapper};
 pub use error::CoreError;
-pub use retrieval::{CandidateSet, FusionWeights, RankedCandidate, ScoreNormalization};
+pub use adaptive::{AdaptiveTrace, HeadAllocation, RetrievalBudget};
+pub use retrieval::{AdaptivePolicyType, AdaptiveRetrievalConfig, CandidateSet, FusionWeights, RankedCandidate, ScoreNormalization};
 pub use transaction::{TransactionManager, TxnOp};

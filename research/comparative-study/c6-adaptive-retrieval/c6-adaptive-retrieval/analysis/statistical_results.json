@@ -1,0 +1,236 @@
+{
+  "primary_contrasts": {
+    "SCI_BC": {
+      "dataset": "SCI",
+      "contrast": "BvsC",
+      "mean_diff": 0.005933333347241085,
+      "ci95": [
+        0.0003333333333333327,
+        0.012266666680574417
+      ],
+      "wilcoxon_stat": 40.0,
+      "wilcoxon_p": 0.04595713333446315,
+      "cohens_dz": 0.11289812675744573,
+      "negligible": true,
+      "holm_alpha": 0.005,
+      "holm_reject": false
+    },
+    "SCI_BD": {
+      "dataset": "SCI",
+      "contrast": "BvsD",
+      "mean_diff": 0.002855555554231008,
+      "ci95": [
+        -0.0023672222112615907,
+        0.008099999985098838
+      ],
+      "wilcoxon_stat": 47.0,
+      "wilcoxon_p": 0.27307682982892156,
+      "cohens_dz": 0.06142949532123396,
+      "negligible": true,
+      "holm_alpha": 0.01,
+      "holm_reject": false
+    },
+    "SCI_BE": {
+      "dataset": "SCI",
+      "contrast": "BvsE",
+      "mean_diff": 0.00448888889948527,
+      "ci95": [
+        -0.0018666666557391495,
+        0.011133888900776696
+      ],
+      "wilcoxon_stat": 93.0,
+      "wilcoxon_p": 0.1666710936321204,
+      "cohens_dz": 0.07834428242314043,
+      "negligible": true,
+      "holm_alpha": 0.0071428571428571435,
+      "holm_reject": false
+    },
+    "SCI_BF": {
+      "dataset": "SCI",
+      "contrast": "BvsF",
+      "mean_diff": 0.004355555554231007,
+      "ci95": [
+        -0.004922500013311704,
+        0.013888888875643414
+      ],
+      "wilcoxon_stat": 59.5,
+      "wilcoxon_p": 0.151369912770944,
+      "cohens_dz": 0.0521542064490066,
+      "negligible": true,
+      "holm_alpha": 0.00625,
+      "holm_reject": false
+    },
+    "SCI_BRE": {
+      "dataset": "SCI",
+      "contrast": "BvsRE",
+      "mean_diff": 0.004433333347241083,
+      "ci95": [
+        -0.000833333333333334,
+        0.009766666680574417
+      ],
+      "wilcoxon_stat": 30.0,
+      "wilcoxon_p": 0.0467751953063001,
+      "cohens_dz": 0.09486547194496409,
+      "negligible": true,
+      "holm_alpha": 0.005555555555555556,
+      "holm_reject": false
+    },
+    "NFC_BC": {
+      "dataset": "NFC",
+      "contrast": "BvsC",
+      "mean_diff": -6.475633373570475e-05,
+      "ci95": [
+        -0.0030520075316982044,
+        0.003535511856725664
+      ],
+      "wilcoxon_stat": 1080.5,
+      "wilcoxon_p": 0.2577798484991488,
+      "cohens_dz": -0.0021429092167600684,
+      "negligible": true,
+      "holm_alpha": 0.008333333333333333,
+      "holm_reject": false
+    },
+    "NFC_BD": {
+      "dataset": "NFC",
+      "contrast": "BvsD",
+      "mean_diff": -0.0004681670928702633,
+      "ci95": [
+        -0.0037207348886502457,
+        0.003214129404490668
+      ],
+      "wilcoxon_stat": 887.5,
+      "wilcoxon_p": 0.4093899700521749,
+      "cohens_dz": -0.014792820057472388,
+      "negligible": true,
+      "holm_alpha": 0.0125,
+      "holm_reject": false
+    },
+    "NFC_BE": {
+      "dataset": "NFC",
+      "contrast": "BvsE",
+      "mean_diff": -0.0006772299017468842,
+      "ci95": [
+        -0.002898742149860797,
+        0.0012534722843389069
+      ],
+      "wilcoxon_stat": 964.0,
+      "wilcoxon_p": 0.6112708060654266,
+      "cohens_dz": -0.03532961247960461,
+      "negligible": true,
+      "holm_alpha": 0.016666666666666666,
+      "holm_reject": false
+    },
+    "NFC_BF": {
+      "dataset": "NFC",
+      "contrast": "BvsF",
+      "mean_diff": 7.172475450732671e-05,
+      "ci95": [
+        -0.00267138987140955,
+        0.0029738994564532345
+      ],
+      "wilcoxon_stat": 1438.0,
+      "wilcoxon_p": 0.7471304537790739,
+      "cohens_dz": 0.0027634721186721245,
+      "negligible": true,
+      "holm_alpha": 0.025,
+      "holm_reject": false
+    },
+    "NFC_BRE": {
+      "dataset": "NFC",
+      "contrast": "BvsRE",
+      "mean_diff": -0.0011612982584319246,
+      "ci95": [
+        -0.003910781131039485,
+        0.0013983869741183497
+      ],
+      "wilcoxon_stat": 1154.0,
+      "wilcoxon_p": 0.7490597950669506,
+      "cohens_dz": -0.04776942187267575,
+      "negligible": true,
+      "holm_alpha": 0.05,
+      "holm_reject": false
+    }
+  },
+  "candidate_analysis": {
+    "SCI_C": {
+      "n_queries": 300,
+      "changed_count": 0,
+      "pct_changed": 0.0,
+      "redistributed_count": 0,
+      "pct_redistributed": 0.0
+    },
+    "SCI_D": {
+      "n_queries": 300,
+      "changed_count": 0,
+      "pct_changed": 0.0,
+      "redistributed_count": 0,
+      "pct_redistributed": 0.0
+    },
+    "SCI_E": {
+      "n_queries": 300,
+      "changed_count": 300,
+      "pct_changed": 1.0,
+      "redistributed_count": 300,
+      "pct_redistributed": 1.0
+    },
+    "SCI_F": {
+      "n_queries": 300,
+      "changed_count": 300,
+      "pct_changed": 1.0,
+      "redistributed_count": 300,
+      "pct_redistributed": 1.0
+    },
+    "SCI_RE": {
+      "n_queries": 300,
+      "changed_count": 0,
+      "pct_changed": 0.0,
+      "redistributed_count": 0,
+      "pct_redistributed": 0.0
+    },
+    "NFC_C": {
+      "n_queries": 323,
+      "changed_count": 0,
+      "pct_changed": 0.0,
+      "redistributed_count": 0,
+      "pct_redistributed": 0.0
+    },
+    "NFC_D": {
+      "n_queries": 323,
+      "changed_count": 0,
+      "pct_changed": 0.0,
+      "redistributed_count": 0,
+      "pct_redistributed": 0.0
+    },
+    "NFC_E": {
+      "n_queries": 323,
+      "changed_count": 323,
+      "pct_changed": 1.0,
+      "redistributed_count": 323,
+      "pct_redistributed": 1.0
+    },
+    "NFC_F": {
+      "n_queries": 323,
+      "changed_count": 323,
+      "pct_changed": 1.0,
+      "redistributed_count": 323,
+      "pct_redistributed": 1.0
+    },
+    "NFC_RE": {
+      "n_queries": 323,
+      "changed_count": 0,
+      "pct_changed": 0.0,
+      "redistributed_count": 0,
+      "pct_redistributed": 0.0
+    }
+  },
+  "metadata": {
+    "seed": 20260925,
+    "n_boot": 10000,
+    "n_reps": 5,
+    "test_queries": {
+      "SCI": 300,
+      "NFC": 323
+    },
+    "protocol": "C6 adaptive retrieval allocation"
+  }
+}
