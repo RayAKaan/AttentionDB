@@ -1,0 +1,3626 @@
+{
+  "adaptive_changed_queries": 20,
+  "adaptive_redistributed_queries": 20,
+  "candidate_change_count": 0,
+  "deadline_exceeded_count": 0,
+  "engine": {
+    "adaptive_policy": "E",
+    "attend_heads": [
+      "HEAD-TITLE",
+      "HEAD-BODY",
+      "HEAD-CITE"
+    ],
+    "candidate_budget": 500,
+    "collection": "c6p",
+    "configuration_id": "C6-SMOKE-NFC-EE-001__E",
+    "cross_refine": false,
+    "deadline_us": 0,
+    "ef_search": 64,
+    "entropy_threshold": 1.0,
+    "heads": [
+      "HEAD-TITLE",
+      "HEAD-BODY",
+      "HEAD-CITE"
+    ],
+    "lambda": 0.0,
+    "max_candidates_per_head": 300,
+    "min_candidates_per_head": 20,
+    "overlap_threshold": 0.30000001192092896,
+    "randomized_seed": 0,
+    "retrieval_mode": "E",
+    "stage1_fraction": 0.30000001192092896,
+    "total_ef_work": 192
+  },
+  "exact_top10": [
+    [
+      2955,
+      1753,
+      2738,
+      1757,
+      3379,
+      1746,
+      2074,
+      1804,
+      3624,
+      2586
+    ],
+    [
+      2410,
+      2409,
+      3022,
+      266,
+      2966,
+      811,
+      2408,
+      3211,
+      3352,
+      1497
+    ],
+    [
+      2062,
+      1253,
+      1996,
+      1260,
+      1250,
+      1254,
+      1629,
+      3321,
+      1624,
+      1460
+    ],
+    [
+      2653,
+      1596,
+      2665,
+      1479,
+      131,
+      2644,
+      3442,
+      3435,
+      1677,
+      1338
+    ],
+    [
+      2635,
+      2700,
+      2150,
+      2703,
+      1289,
+      2636,
+      3074,
+      2356,
+      1888,
+      1770
+    ],
+    [
+      427,
+      88,
+      3202,
+      3416,
+      1074,
+      984,
+      1774,
+      422,
+      1784,
+      1077
+    ],
+    [
+      132,
+      760,
+      1871,
+      1536,
+      1968,
+      380,
+      461,
+      228,
+      2003,
+      379
+    ],
+    [
+      3460,
+      3467,
+      3456,
+      1305,
+      3470,
+      102,
+      3468,
+      3224,
+      1828,
+      1073
+    ],
+    [
+      2588,
+      2288,
+      11,
+      2661,
+      2289,
+      210,
+      2293,
+      3211,
+      626,
+      975
+    ],
+    [
+      1522,
+      3217,
+      3360,
+      2704,
+      3073,
+      38,
+      2477,
+      2463,
+      2705,
+      3082
+    ],
+    [
+      2913,
+      3264,
+      381,
+      1018,
+      2665,
+      2817,
+      1479,
+      2653,
+      1477,
+      1336
+    ],
+    [
+      1264,
+      1266,
+      2879,
+      381,
+      2368,
+      2637,
+      1447,
+      379,
+      136,
+      1792
+    ],
+    [
+      1070,
+      3316,
+      429,
+      2742,
+      2671,
+      1076,
+      553,
+      973,
+      57,
+      1719
+    ],
+    [
+      2893,
+      2329,
+      1296,
+      2523,
+      1818,
+      1365,
+      28,
+      1248,
+      2278,
+      27
+    ],
+    [
+      400,
+      1472,
+      1469,
+      3570,
+      395,
+      2694,
+      284,
+      1262,
+      1879,
+      399
+    ],
+    [
+      3307,
+      716,
+      3137,
+      105,
+      2525,
+      1936,
+      3138,
+      3309,
+      2062,
+      2302
+    ],
+    [
+      2313,
+      2309,
+      2307,
+      1719,
+      2553,
+      2028,
+      2941,
+      3467,
+      3023,
+      576
+    ],
+    [
+      860,
+      757,
+      3163,
+      1115,
+      2780,
+      758,
+      25,
+      2441,
+      2437,
+      752
+    ],
+    [
+      3001,
+      2302,
+      1802,
+      2118,
+      2549,
+      1801,
+      1800,
+      697,
+      2143,
+      3179
+    ],
+    [
+      163,
+      162,
+      200,
+      1344,
+      2105,
+      2861,
+      3176,
+      2410,
+      2898,
+      843
+    ]
+  ],
+  "k": 10,
+  "latency_us_post_warmup": {
+    "count": 0,
+    "mean": 0.0,
+    "p50": 0.0,
+    "p90": 0.0,
+    "p95": 0.0
+  },
+  "mode": "E",
+  "n_docs": 3633,
+  "n_queries": 20,
+  "ok": true,
+  "per_query": [
+    {
+      "adaptive_ledger": {
+        "budget_conserved": true,
+        "final_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 117,
+            "ef": 14,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 112,
+            "ef": 13,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 121,
+            "ef": 15,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "initial_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          }
+        ],
+        "redistributions": [
+          {
+            "candidates": 117,
+            "ef": 14,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 112,
+            "ef": 13,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 121,
+            "ef": 15,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "total_candidates_used": 500,
+        "total_ef_work_used": 100
+      },
+      "candidate_count": 107,
+      "configuration_id": "C6-SMOKE-NFC-EE-001__E",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        2956,
+        2739,
+        2075,
+        1754,
+        1805,
+        3380,
+        1758,
+        1747,
+        2587,
+        1113
+      ],
+      "heads_present": 3,
+      "hits": [
+        2955,
+        2738,
+        2074,
+        1753,
+        1804,
+        3379,
+        1757,
+        1746,
+        2586,
+        1112
+      ],
+      "latency_us": 18444.100000000002,
+      "n_rel": 4,
+      "ndcg10_qrels": 0.39038002490997314,
+      "pos": 0,
+      "query_row": 2679,
+      "recall10_exact": 0.8999999761581421,
+      "recall10_qrels": 0.25,
+      "relevant_ids": [
+        2952,
+        2955,
+        2953,
+        2954
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": true,
+        "final_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 140,
+            "ef": 17,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 115,
+            "ef": 14,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 95,
+            "ef": 11,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "initial_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          }
+        ],
+        "redistributions": [
+          {
+            "candidates": 140,
+            "ef": 17,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 115,
+            "ef": 14,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 95,
+            "ef": 11,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "total_candidates_used": 500,
+        "total_ef_work_used": 100
+      },
+      "candidate_count": 97,
+      "configuration_id": "C6-SMOKE-NFC-EE-001__E",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        3023,
+        2410,
+        2967,
+        267,
+        2579,
+        2409,
+        2411,
+        812,
+        3212,
+        1498
+      ],
+      "heads_present": 3,
+      "hits": [
+        3022,
+        2409,
+        2966,
+        266,
+        2578,
+        2408,
+        2410,
+        811,
+        3211,
+        1497
+      ],
+      "latency_us": 16375.6,
+      "n_rel": 35,
+      "ndcg10_qrels": 0.5659840106964111,
+      "pos": 1,
+      "query_row": 2848,
+      "recall10_exact": 0.8999999761581421,
+      "recall10_qrels": 0.17142857611179352,
+      "relevant_ids": [
+        2964,
+        2410,
+        2602,
+        2601,
+        2581,
+        2507,
+        2582,
+        2580,
+        2906,
+        3022,
+        2604,
+        2600,
+        3031,
+        2508,
+        2270,
+        2506,
+        2271,
+        2408,
+        2407,
+        3033,
+        2965,
+        2267,
+        3211,
+        3581,
+        2409,
+        3030,
+        3212,
+        3032,
+        2411,
+        2603,
+        2966,
+        3354,
+        2272,
+        3355,
+        2963
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": true,
+        "final_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 126,
+            "ef": 15,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 115,
+            "ef": 14,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 109,
+            "ef": 13,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "initial_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          }
+        ],
+        "redistributions": [
+          {
+            "candidates": 126,
+            "ef": 15,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 115,
+            "ef": 14,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 109,
+            "ef": 13,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "total_candidates_used": 500,
+        "total_ef_work_used": 100
+      },
+      "candidate_count": 99,
+      "configuration_id": "C6-SMOKE-NFC-EE-001__E",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        1254,
+        1997,
+        2063,
+        1251,
+        1255,
+        1261,
+        2692,
+        3322,
+        2062,
+        2050
+      ],
+      "heads_present": 3,
+      "hits": [
+        1253,
+        1996,
+        2062,
+        1250,
+        1254,
+        1260,
+        2691,
+        3321,
+        2061,
+        2049
+      ],
+      "latency_us": 16667.899999999998,
+      "n_rel": 66,
+      "ndcg10_qrels": 0.6117146015167236,
+      "pos": 2,
+      "query_row": 2828,
+      "recall10_exact": 0.699999988079071,
+      "recall10_qrels": 0.12121212482452393,
+      "relevant_ids": [
+        2052,
+        1259,
+        1253,
+        1251,
+        1629,
+        2885,
+        1627,
+        2060,
+        1633,
+        1637,
+        1996,
+        1250,
+        2879,
+        1630,
+        2058,
+        2059,
+        1254,
+        1258,
+        1992,
+        1620,
+        1625,
+        2051,
+        2054,
+        1614,
+        1617,
+        1616,
+        1261,
+        1638,
+        1618,
+        1634,
+        2049,
+        1257,
+        2047,
+        1631,
+        1994,
+        1255,
+        1628,
+        2062,
+        2048,
+        2057,
+        1256,
+        1623,
+        1995,
+        2050,
+        1626,
+        2046,
+        1612,
+        1252,
+        1615,
+        2055,
+        1636,
+        2053,
+        2061,
+        1632,
+        1624,
+        2056,
+        1993,
+        1622,
+        1619,
+        1635,
+        1998,
+        1613,
+        2066,
+        1621,
+        1997,
+        1260
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": true,
+        "final_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 117,
+            "ef": 14,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 117,
+            "ef": 14,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 116,
+            "ef": 14,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "initial_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          }
+        ],
+        "redistributions": [
+          {
+            "candidates": 117,
+            "ef": 14,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 117,
+            "ef": 14,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 116,
+            "ef": 14,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "total_candidates_used": 500,
+        "total_ef_work_used": 100
+      },
+      "candidate_count": 95,
+      "configuration_id": "C6-SMOKE-NFC-EE-001__E",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        132,
+        2654,
+        3443,
+        1678,
+        3436,
+        1480,
+        844,
+        1339,
+        2659,
+        2666
+      ],
+      "heads_present": 3,
+      "hits": [
+        131,
+        2653,
+        3442,
+        1677,
+        3435,
+        1479,
+        843,
+        1338,
+        2658,
+        2665
+      ],
+      "latency_us": 13621.8,
+      "n_rel": 5,
+      "ndcg10_qrels": 0.0,
+      "pos": 3,
+      "query_row": 2624,
+      "recall10_exact": 0.800000011920929,
+      "recall10_qrels": 0.0,
+      "relevant_ids": [
+        3613,
+        2571,
+        3615,
+        2570,
+        3614
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": true,
+        "final_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 152,
+            "ef": 18,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 84,
+            "ef": 10,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 114,
+            "ef": 14,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "initial_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          }
+        ],
+        "redistributions": [
+          {
+            "candidates": 152,
+            "ef": 18,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 84,
+            "ef": 10,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 114,
+            "ef": 14,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "total_candidates_used": 500,
+        "total_ef_work_used": 100
+      },
+      "candidate_count": 89,
+      "configuration_id": "C6-SMOKE-NFC-EE-001__E",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        2701,
+        2637,
+        2636,
+        3075,
+        1290,
+        3359,
+        2151,
+        2355,
+        2704,
+        2356
+      ],
+      "heads_present": 3,
+      "hits": [
+        2700,
+        2636,
+        2635,
+        3074,
+        1289,
+        3358,
+        2150,
+        2354,
+        2703,
+        2355
+      ],
+      "latency_us": 17207.7,
+      "n_rel": 20,
+      "ndcg10_qrels": 0.338881254196167,
+      "pos": 4,
+      "query_row": 2859,
+      "recall10_exact": 0.699999988079071,
+      "recall10_qrels": 0.10000000149011612,
+      "relevant_ids": [
+        2636,
+        3129,
+        2635,
+        3564,
+        3037,
+        3038,
+        2986,
+        2637,
+        3574,
+        2640,
+        2984,
+        2985,
+        2858,
+        2664,
+        2641,
+        3043,
+        3039,
+        3563,
+        2885,
+        3036
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": true,
+        "final_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 121,
+            "ef": 15,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 126,
+            "ef": 15,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 103,
+            "ef": 12,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "initial_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          }
+        ],
+        "redistributions": [
+          {
+            "candidates": 121,
+            "ef": 15,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 126,
+            "ef": 15,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 103,
+            "ef": 12,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "total_candidates_used": 500,
+        "total_ef_work_used": 100
+      },
+      "candidate_count": 108,
+      "configuration_id": "C6-SMOKE-NFC-EE-001__E",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        985,
+        428,
+        1775,
+        429,
+        3356,
+        3417,
+        3140,
+        3203,
+        3018,
+        825
+      ],
+      "heads_present": 3,
+      "hits": [
+        984,
+        427,
+        1774,
+        428,
+        3355,
+        3416,
+        3139,
+        3202,
+        3017,
+        824
+      ],
+      "latency_us": 17984.5,
+      "n_rel": 1,
+      "ndcg10_qrels": 0.0,
+      "pos": 5,
+      "query_row": 2743,
+      "recall10_exact": 0.5,
+      "recall10_qrels": 0.0,
+      "relevant_ids": [
+        3181
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": true,
+        "final_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 150,
+            "ef": 18,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 87,
+            "ef": 10,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 113,
+            "ef": 14,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "initial_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          }
+        ],
+        "redistributions": [
+          {
+            "candidates": 150,
+            "ef": 18,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 87,
+            "ef": 10,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 113,
+            "ef": 14,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "total_candidates_used": 500,
+        "total_ef_work_used": 100
+      },
+      "candidate_count": 97,
+      "configuration_id": "C6-SMOKE-NFC-EE-001__E",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        133,
+        761,
+        381,
+        1537,
+        380,
+        1872,
+        229,
+        1969,
+        2392,
+        2004
+      ],
+      "heads_present": 3,
+      "hits": [
+        132,
+        760,
+        380,
+        1536,
+        379,
+        1871,
+        228,
+        1968,
+        2391,
+        2003
+      ],
+      "latency_us": 16002.4,
+      "n_rel": 300,
+      "ndcg10_qrels": 0.5618918538093567,
+      "pos": 6,
+      "query_row": 2788,
+      "recall10_exact": 0.8999999761581421,
+      "recall10_qrels": 0.019999999552965164,
+      "relevant_ids": [
+        506,
+        1587,
+        497,
+        2019,
+        775,
+        928,
+        773,
+        2013,
+        525,
+        2369,
+        763,
+        504,
+        1535,
+        1954,
+        2011,
+        1270,
+        511,
+        1971,
+        2571,
+        1877,
+        1686,
+        457,
+        1376,
+        1966,
+        939,
+        2865,
+        922,
+        2559,
+        1080,
+        362,
+        2010,
+        491,
+        1860,
+        1086,
+        1690,
+        3050,
+        1878,
+        508,
+        1584,
+        2556,
+        1585,
+        451,
+        459,
+        784,
+        936,
+        1685,
+        2017,
+        783,
+        919,
+        1447,
+        1538,
+        1478,
+        2016,
+        2939,
+        509,
+        2276,
+        703,
+        378,
+        864,
+        1693,
+        1589,
+        2558,
+        2371,
+        1583,
+        1539,
+        1962,
+        2281,
+        3160,
+        1586,
+        810,
+        2557,
+        452,
+        458,
+        2716,
+        1541,
+        813,
+        1579,
+        596,
+        3284,
+        941,
+        1849,
+        3054,
+        942,
+        2275,
+        761,
+        2283,
+        1964,
+        770,
+        1972,
+        807,
+        3003,
+        1961,
+        1848,
+        1576,
+        2372,
+        925,
+        1084,
+        1967,
+        1446,
+        1083,
+        1479,
+        1082,
+        2370,
+        1275,
+        764,
+        927,
+        2961,
+        769,
+        1445,
+        2022,
+        1856,
+        767,
+        2993,
+        502,
+        455,
+        2278,
+        1862,
+        731,
+        937,
+        359,
+        498,
+        521,
+        809,
+        1542,
+        2004,
+        1476,
+        803,
+        526,
+        3249,
+        2231,
+        598,
+        1537,
+        3515,
+        1534,
+        782,
+        924,
+        595,
+        771,
+        2279,
+        1833,
+        1274,
+        522,
+        1850,
+        2277,
+        2006,
+        585,
+        599,
+        1852,
+        523,
+        2282,
+        739,
+        1953,
+        1540,
+        464,
+        1475,
+        760,
+        921,
+        1853,
+        926,
+        3545,
+        524,
+        1655,
+        766,
+        1855,
+        2018,
+        2014,
+        3052,
+        2012,
+        2560,
+        2285,
+        1851,
+        1694,
+        1688,
+        2623,
+        780,
+        1970,
+        520,
+        1443,
+        1278,
+        527,
+        2020,
+        943,
+        2940,
+        493,
+        3547,
+        3250,
+        923,
+        1531,
+        454,
+        768,
+        776,
+        1578,
+        1442,
+        518,
+        453,
+        1444,
+        806,
+        1785,
+        2002,
+        2009,
+        466,
+        467,
+        1973,
+        1277,
+        460,
+        1079,
+        597,
+        1692,
+        2555,
+        1276,
+        517,
+        774,
+        1271,
+        507,
+        380,
+        3537,
+        938,
+        2938,
+        772,
+        2021,
+        930,
+        3053,
+        1474,
+        462,
+        2280,
+        463,
+        2570,
+        2998,
+        940,
+        1577,
+        920,
+        2505,
+        1876,
+        2007,
+        1273,
+        1863,
+        3161,
+        2864,
+        461,
+        361,
+        2604,
+        264,
+        1689,
+        1955,
+        360,
+        765,
+        1952,
+        1951,
+        1687,
+        519,
+        495,
+        1272,
+        804,
+        3051,
+        1477,
+        2511,
+        456,
+        2003,
+        2005,
+        2698,
+        929,
+        808,
+        1581,
+        1854,
+        1968,
+        805,
+        496,
+        918,
+        584,
+        465,
+        1959,
+        1588,
+        2957,
+        762,
+        1532,
+        2498,
+        2499,
+        379,
+        1858,
+        1536,
+        492,
+        586,
+        2284,
+        363,
+        503,
+        1533,
+        494,
+        777,
+        1958,
+        2008,
+        510,
+        364,
+        381,
+        1580,
+        505,
+        1582,
+        1857,
+        1085,
+        1081,
+        1448
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": true,
+        "final_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 150,
+            "ef": 18,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 108,
+            "ef": 13,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 92,
+            "ef": 11,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "initial_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          }
+        ],
+        "redistributions": [
+          {
+            "candidates": 150,
+            "ef": 18,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 108,
+            "ef": 13,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 92,
+            "ef": 11,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "total_candidates_used": 500,
+        "total_ef_work_used": 100
+      },
+      "candidate_count": 86,
+      "configuration_id": "C6-SMOKE-NFC-EE-001__E",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        3461,
+        3468,
+        1306,
+        3225,
+        3471,
+        3020,
+        3460,
+        3469,
+        3457,
+        3467
+      ],
+      "heads_present": 3,
+      "hits": [
+        3460,
+        3467,
+        1305,
+        3224,
+        3470,
+        3019,
+        3459,
+        3468,
+        3456,
+        3466
+      ],
+      "latency_us": 14409.099999999999,
+      "n_rel": 23,
+      "ndcg10_qrels": 0.09478836506605148,
+      "pos": 7,
+      "query_row": 2695,
+      "recall10_exact": 0.699999988079071,
+      "recall10_qrels": 0.043478261679410934,
+      "relevant_ids": [
+        1819,
+        1829,
+        1832,
+        2701,
+        1826,
+        1831,
+        3226,
+        3224,
+        1820,
+        3225,
+        1822,
+        3227,
+        1827,
+        1825,
+        3229,
+        1828,
+        3228,
+        1823,
+        1821,
+        1824,
+        2702,
+        1830,
+        3223
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": true,
+        "final_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 130,
+            "ef": 16,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 82,
+            "ef": 10,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 137,
+            "ef": 16,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "initial_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          }
+        ],
+        "redistributions": [
+          {
+            "candidates": 130,
+            "ef": 16,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 82,
+            "ef": 10,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 137,
+            "ef": 16,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "total_candidates_used": 499,
+        "total_ef_work_used": 100
+      },
+      "candidate_count": 90,
+      "configuration_id": "C6-SMOKE-NFC-EE-001__E",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        2589,
+        2289,
+        2662,
+        2290,
+        12,
+        2294,
+        211,
+        71,
+        2588,
+        975
+      ],
+      "heads_present": 3,
+      "hits": [
+        2588,
+        2288,
+        2661,
+        2289,
+        11,
+        2293,
+        210,
+        70,
+        2587,
+        974
+      ],
+      "latency_us": 13614.9,
+      "n_rel": 19,
+      "ndcg10_qrels": 0.7935839891433716,
+      "pos": 8,
+      "query_row": 2766,
+      "recall10_exact": 0.699999988079071,
+      "recall10_qrels": 0.3684210479259491,
+      "relevant_ids": [
+        2288,
+        2295,
+        2296,
+        2290,
+        2033,
+        2294,
+        2273,
+        12,
+        2287,
+        2587,
+        2292,
+        2661,
+        2289,
+        2291,
+        11,
+        2293,
+        2588,
+        2032,
+        2286
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": true,
+        "final_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 125,
+            "ef": 15,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 119,
+            "ef": 14,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 106,
+            "ef": 13,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "initial_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          }
+        ],
+        "redistributions": [
+          {
+            "candidates": 125,
+            "ef": 15,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 119,
+            "ef": 14,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 106,
+            "ef": 13,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "total_candidates_used": 500,
+        "total_ef_work_used": 100
+      },
+      "candidate_count": 100,
+      "configuration_id": "C6-SMOKE-NFC-EE-001__E",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        1523,
+        3218,
+        1524,
+        1539,
+        400,
+        2464,
+        2599,
+        2486,
+        2705,
+        3361
+      ],
+      "heads_present": 3,
+      "hits": [
+        1522,
+        3217,
+        1523,
+        1538,
+        399,
+        2463,
+        2598,
+        2485,
+        2704,
+        3360
+      ],
+      "latency_us": 16990.3,
+      "n_rel": 13,
+      "ndcg10_qrels": 0.13886244595050812,
+      "pos": 9,
+      "query_row": 2725,
+      "recall10_exact": 0.5,
+      "recall10_qrels": 0.07692307978868484,
+      "relevant_ids": [
+        3231,
+        3232,
+        3233,
+        2742,
+        3217,
+        2580,
+        3354,
+        3234,
+        3216,
+        3353,
+        2581,
+        2741,
+        2744
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": true,
+        "final_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 138,
+            "ef": 17,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 99,
+            "ef": 12,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 113,
+            "ef": 13,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "initial_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          }
+        ],
+        "redistributions": [
+          {
+            "candidates": 138,
+            "ef": 17,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 99,
+            "ef": 12,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 113,
+            "ef": 13,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "total_candidates_used": 500,
+        "total_ef_work_used": 100
+      },
+      "candidate_count": 108,
+      "configuration_id": "C6-SMOKE-NFC-EE-001__E",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        2914,
+        3265,
+        2818,
+        382,
+        2913,
+        3133,
+        1448,
+        1101,
+        3104,
+        2666
+      ],
+      "heads_present": 3,
+      "hits": [
+        2913,
+        3264,
+        2817,
+        381,
+        2912,
+        3132,
+        1447,
+        1100,
+        3103,
+        2665
+      ],
+      "latency_us": 15090.599999999999,
+      "n_rel": 13,
+      "ndcg10_qrels": 0.2501736581325531,
+      "pos": 10,
+      "query_row": 2879,
+      "recall10_exact": 0.5,
+      "recall10_qrels": 0.1538461595773697,
+      "relevant_ids": [
+        2444,
+        2449,
+        2445,
+        2446,
+        3270,
+        2912,
+        2914,
+        2448,
+        2450,
+        2913,
+        2911,
+        2447,
+        100
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": true,
+        "final_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 127,
+            "ef": 15,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 101,
+            "ef": 12,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 122,
+            "ef": 15,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "initial_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          }
+        ],
+        "redistributions": [
+          {
+            "candidates": 127,
+            "ef": 15,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 101,
+            "ef": 12,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 122,
+            "ef": 15,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "total_candidates_used": 500,
+        "total_ef_work_used": 100
+      },
+      "candidate_count": 103,
+      "configuration_id": "C6-SMOKE-NFC-EE-001__E",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        1265,
+        1448,
+        382,
+        1267,
+        2880,
+        1269,
+        380,
+        679,
+        2928,
+        2638
+      ],
+      "heads_present": 3,
+      "hits": [
+        1264,
+        1447,
+        381,
+        1266,
+        2879,
+        1268,
+        379,
+        678,
+        2927,
+        2637
+      ],
+      "latency_us": 14966.0,
+      "n_rel": 27,
+      "ndcg10_qrels": 0.0,
+      "pos": 11,
+      "query_row": 2822,
+      "recall10_exact": 0.699999988079071,
+      "recall10_qrels": 0.0,
+      "relevant_ids": [
+        1518,
+        1517,
+        858,
+        1519,
+        2653,
+        1515,
+        861,
+        1590,
+        1521,
+        1724,
+        2664,
+        860,
+        2500,
+        1725,
+        862,
+        859,
+        1726,
+        2337,
+        863,
+        2338,
+        3129,
+        1520,
+        2654,
+        864,
+        2336,
+        1516,
+        1723
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": true,
+        "final_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 127,
+            "ef": 15,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 93,
+            "ef": 11,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 130,
+            "ef": 16,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "initial_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          }
+        ],
+        "redistributions": [
+          {
+            "candidates": 127,
+            "ef": 15,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 93,
+            "ef": 11,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 130,
+            "ef": 16,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "total_candidates_used": 500,
+        "total_ef_work_used": 100
+      },
+      "candidate_count": 112,
+      "configuration_id": "C6-SMOKE-NFC-EE-001__E",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        1918,
+        1071,
+        1720,
+        2672,
+        1077,
+        2005,
+        3317,
+        1927,
+        3550,
+        430
+      ],
+      "heads_present": 3,
+      "hits": [
+        1917,
+        1070,
+        1719,
+        2671,
+        1076,
+        2004,
+        3316,
+        1926,
+        3549,
+        429
+      ],
+      "latency_us": 14785.0,
+      "n_rel": 11,
+      "ndcg10_qrels": 0.0,
+      "pos": 12,
+      "query_row": 2772,
+      "recall10_exact": 0.6000000238418579,
+      "recall10_qrels": 0.0,
+      "relevant_ids": [
+        1775,
+        2475,
+        2471,
+        2476,
+        1224,
+        3366,
+        1225,
+        1226,
+        1223,
+        2474,
+        2472
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": true,
+        "final_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 131,
+            "ef": 16,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 100,
+            "ef": 12,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 119,
+            "ef": 14,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "initial_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          }
+        ],
+        "redistributions": [
+          {
+            "candidates": 131,
+            "ef": 16,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 100,
+            "ef": 12,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 119,
+            "ef": 14,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "total_candidates_used": 500,
+        "total_ef_work_used": 100
+      },
+      "candidate_count": 120,
+      "configuration_id": "C6-SMOKE-NFC-EE-001__E",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        2894,
+        1819,
+        1494,
+        3453,
+        1297,
+        1328,
+        1089,
+        1525,
+        1366,
+        2330
+      ],
+      "heads_present": 3,
+      "hits": [
+        2893,
+        1818,
+        1493,
+        3452,
+        1296,
+        1327,
+        1088,
+        1524,
+        1365,
+        2329
+      ],
+      "latency_us": 17858.6,
+      "n_rel": 16,
+      "ndcg10_qrels": 0.22009176015853882,
+      "pos": 13,
+      "query_row": 2810,
+      "recall10_exact": 0.5,
+      "recall10_qrels": 0.0625,
+      "relevant_ids": [
+        27,
+        25,
+        2526,
+        2893,
+        3306,
+        3308,
+        2524,
+        32,
+        30,
+        29,
+        3307,
+        31,
+        28,
+        26,
+        2523,
+        2525
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": true,
+        "final_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 149,
+            "ef": 18,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 101,
+            "ef": 12,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 100,
+            "ef": 12,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "initial_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          }
+        ],
+        "redistributions": [
+          {
+            "candidates": 149,
+            "ef": 18,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 101,
+            "ef": 12,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 100,
+            "ef": 12,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "total_candidates_used": 500,
+        "total_ef_work_used": 100
+      },
+      "candidate_count": 105,
+      "configuration_id": "C6-SMOKE-NFC-EE-001__E",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        401,
+        1473,
+        1470,
+        3571,
+        927,
+        396,
+        3269,
+        1691,
+        559,
+        2667
+      ],
+      "heads_present": 3,
+      "hits": [
+        400,
+        1472,
+        1469,
+        3570,
+        926,
+        395,
+        3268,
+        1690,
+        558,
+        2666
+      ],
+      "latency_us": 16556.8,
+      "n_rel": 5,
+      "ndcg10_qrels": 0.09803928434848785,
+      "pos": 14,
+      "query_row": 2854,
+      "recall10_exact": 0.5,
+      "recall10_qrels": 0.20000000298023224,
+      "relevant_ids": [
+        2665,
+        2740,
+        2897,
+        2666,
+        2675
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": true,
+        "final_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 136,
+            "ef": 16,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 110,
+            "ef": 13,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 104,
+            "ef": 12,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "initial_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          }
+        ],
+        "redistributions": [
+          {
+            "candidates": 136,
+            "ef": 16,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 110,
+            "ef": 13,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 104,
+            "ef": 12,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "total_candidates_used": 500,
+        "total_ef_work_used": 99
+      },
+      "candidate_count": 96,
+      "configuration_id": "C6-SMOKE-NFC-EE-001__E",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        3308,
+        3138,
+        717,
+        3307,
+        275,
+        2522,
+        106,
+        715,
+        3139,
+        716
+      ],
+      "heads_present": 3,
+      "hits": [
+        3307,
+        3137,
+        716,
+        3306,
+        274,
+        2521,
+        105,
+        714,
+        3138,
+        715
+      ],
+      "latency_us": 14652.1,
+      "n_rel": 15,
+      "ndcg10_qrels": 0.48206835985183716,
+      "pos": 15,
+      "query_row": 2903,
+      "recall10_exact": 0.5,
+      "recall10_qrels": 0.20000000298023224,
+      "relevant_ids": [
+        902,
+        17,
+        2523,
+        22,
+        21,
+        16,
+        3306,
+        3307,
+        19,
+        20,
+        3308,
+        18,
+        924,
+        2522,
+        2521
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": true,
+        "final_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 128,
+            "ef": 15,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 119,
+            "ef": 14,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 103,
+            "ef": 12,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "initial_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          }
+        ],
+        "redistributions": [
+          {
+            "candidates": 128,
+            "ef": 15,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 119,
+            "ef": 14,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 103,
+            "ef": 12,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "total_candidates_used": 500,
+        "total_ef_work_used": 99
+      },
+      "candidate_count": 113,
+      "configuration_id": "C6-SMOKE-NFC-EE-001__E",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        2314,
+        2310,
+        2308,
+        2554,
+        3468,
+        3551,
+        450,
+        1122,
+        2988,
+        2233
+      ],
+      "heads_present": 3,
+      "hits": [
+        2313,
+        2309,
+        2307,
+        2553,
+        3467,
+        3550,
+        449,
+        1121,
+        2987,
+        2232
+      ],
+      "latency_us": 17230.7,
+      "n_rel": 8,
+      "ndcg10_qrels": 0.5390031337738037,
+      "pos": 16,
+      "query_row": 2668,
+      "recall10_exact": 0.5,
+      "recall10_qrels": 0.375,
+      "relevant_ids": [
+        2312,
+        2313,
+        2310,
+        2306,
+        2307,
+        2309,
+        2308,
+        2311
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": true,
+        "final_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 128,
+            "ef": 15,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 111,
+            "ef": 13,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 111,
+            "ef": 13,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "initial_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          }
+        ],
+        "redistributions": [
+          {
+            "candidates": 128,
+            "ef": 15,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 111,
+            "ef": 13,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 111,
+            "ef": 13,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "total_candidates_used": 500,
+        "total_ef_work_used": 99
+      },
+      "candidate_count": 113,
+      "configuration_id": "C6-SMOKE-NFC-EE-001__E",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        861,
+        759,
+        758,
+        26,
+        753,
+        3311,
+        139,
+        2442,
+        1624,
+        1627
+      ],
+      "heads_present": 3,
+      "hits": [
+        860,
+        758,
+        757,
+        25,
+        752,
+        3310,
+        138,
+        2441,
+        1623,
+        1626
+      ],
+      "latency_us": 16422.6,
+      "n_rel": 19,
+      "ndcg10_qrels": 0.0,
+      "pos": 17,
+      "query_row": 2702,
+      "recall10_exact": 0.6000000238418579,
+      "recall10_qrels": 0.0,
+      "relevant_ids": [
+        1034,
+        1042,
+        1028,
+        1043,
+        1025,
+        1035,
+        1044,
+        1026,
+        1040,
+        1029,
+        1033,
+        1038,
+        1045,
+        1024,
+        1039,
+        1032,
+        1036,
+        1027,
+        1030
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": true,
+        "final_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 138,
+            "ef": 17,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 94,
+            "ef": 11,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 118,
+            "ef": 14,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "initial_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          }
+        ],
+        "redistributions": [
+          {
+            "candidates": 138,
+            "ef": 17,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 94,
+            "ef": 11,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 118,
+            "ef": 14,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "total_candidates_used": 500,
+        "total_ef_work_used": 100
+      },
+      "candidate_count": 109,
+      "configuration_id": "C6-SMOKE-NFC-EE-001__E",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        2550,
+        2582,
+        1802,
+        1801,
+        1803,
+        2379,
+        2303,
+        3002,
+        2119,
+        2721
+      ],
+      "heads_present": 3,
+      "hits": [
+        2549,
+        2581,
+        1801,
+        1800,
+        1802,
+        2378,
+        2302,
+        3001,
+        2118,
+        2720
+      ],
+      "latency_us": 17538.5,
+      "n_rel": 5,
+      "ndcg10_qrels": 0.0,
+      "pos": 18,
+      "query_row": 2697,
+      "recall10_exact": 0.699999988079071,
+      "recall10_qrels": 0.0,
+      "relevant_ids": [
+        2297,
+        2301,
+        2300,
+        2299,
+        3133
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": true,
+        "final_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 117,
+            "ef": 14,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 123,
+            "ef": 15,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 110,
+            "ef": 13,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "initial_allocation": [
+          {
+            "candidates": 50,
+            "ef": 20,
+            "head": "HEAD-TITLE",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-BODY",
+            "reason": "InitialEqual",
+            "round": 1
+          },
+          {
+            "candidates": 50,
+            "ef": 19,
+            "head": "HEAD-CITE",
+            "reason": "InitialEqual",
+            "round": 1
+          }
+        ],
+        "redistributions": [
+          {
+            "candidates": 117,
+            "ef": 14,
+            "head": "HEAD-TITLE",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 123,
+            "ef": 15,
+            "head": "HEAD-BODY",
+            "reason": "InteractionSignal",
+            "round": 2
+          },
+          {
+            "candidates": 110,
+            "ef": 13,
+            "head": "HEAD-CITE",
+            "reason": "InteractionSignal",
+            "round": 2
+          }
+        ],
+        "total_candidates_used": 500,
+        "total_ef_work_used": 100
+      },
+      "candidate_count": 95,
+      "configuration_id": "C6-SMOKE-NFC-EE-001__E",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        164,
+        163,
+        1345,
+        1356,
+        844,
+        321,
+        201,
+        2106,
+        2574,
+        1421
+      ],
+      "heads_present": 3,
+      "hits": [
+        163,
+        162,
+        1344,
+        1355,
+        843,
+        320,
+        200,
+        2105,
+        2573,
+        1420
+      ],
+      "latency_us": 17657.0,
+      "n_rel": 45,
+      "ndcg10_qrels": 0.14782948791980743,
+      "pos": 19,
+      "query_row": 2718,
+      "recall10_exact": 0.6000000238418579,
+      "recall10_qrels": 0.04444444552063942,
+      "relevant_ids": [
+        307,
+        337,
+        408,
+        306,
+        265,
+        268,
+        335,
+        412,
+        324,
+        2107,
+        321,
+        410,
+        423,
+        1418,
+        419,
+        2100,
+        406,
+        407,
+        409,
+        318,
+        316,
+        314,
+        411,
+        304,
+        319,
+        312,
+        320,
+        415,
+        305,
+        302,
+        267,
+        2105,
+        413,
+        303,
+        310,
+        313,
+        322,
+        405,
+        315,
+        308,
+        2101,
+        311,
+        309,
+        266,
+        317
+      ]
+    }
+  ],
+  "recall10_exact_mean": 0.6500000357627869,
+  "recall10_qrels_mean": 0.10936269909143448,
+  "seed": 20260925,
+  "subcommand": "pilot",
+  "surprise_empty_queries": 0,
+  "warmup": 20
+}

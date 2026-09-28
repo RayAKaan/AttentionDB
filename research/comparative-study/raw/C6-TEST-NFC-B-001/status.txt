@@ -1,0 +1,2 @@
+PASS
+recall10_qrels mean=0.1597 sd=0.0012 p50_us=1624.0

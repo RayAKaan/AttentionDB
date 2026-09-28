@@ -1,0 +1,59 @@
+{
+  "run_id": "C6-SMOKE-NFC-FE-001",
+  "mode": "F",
+  "dataset": "DS-NFCORPUS",
+  "split": "SMOKE",
+  "phase": "C6 execution",
+  "test_queries": 20,
+  "rep_count": 1,
+  "warmup": 20,
+  "ef_search": 64,
+  "lambda": 0.1,
+  "stage1_fraction": 0.3,
+  "overlap_threshold": 0.3,
+  "entropy_threshold": 1.0,
+  "randomized_seed": 0,
+  "total_ef_work": 192,
+  "candidate_budget": 500,
+  "per_rep": [
+    {
+      "n_queries": 20,
+      "recall10_qrels_mean": 0.10372578054666519,
+      "recall10_exact_mean": 0.6650000035762786,
+      "p50_us": 18068.1,
+      "p95_us": 19294.0,
+      "deadline_exceeded": 0,
+      "candidate_change_count": 20,
+      "surprise_empty_queries": 0,
+      "adaptive_changed_queries": 20,
+      "adaptive_redistributed_queries": 20
+    }
+  ],
+  "rep_recall10_qrels_mean": [
+    0.10372578054666519
+  ],
+  "recall10_qrels_mean_5rep": 0.1037,
+  "recall10_qrels_sd_5rep": 0.0,
+  "rep_recall10_exact_mean": [
+    0.6650000035762786
+  ],
+  "recall10_exact_mean_5rep": 0.665,
+  "p50_us_per_rep": [
+    18068.1
+  ],
+  "peak_child_rss_MiB": [
+    193.8
+  ],
+  "candidate_change_count": [
+    20
+  ],
+  "surprise_empty_queries": [
+    0
+  ],
+  "adaptive_changed_queries": [
+    20
+  ],
+  "adaptive_redistributed_queries": [
+    20
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "run_id": "C6-TEST-NFC-A-001",
+  "mode": "A",
+  "dataset": "DS-NFCORPUS",
+  "split": "TEST",
+  "phase": "C6 execution",
+  "test_queries": 323,
+  "rep_count": 5,
+  "warmup": 20,
+  "ef_search": 64,
+  "lambda": 0.0,
+  "stage1_fraction": 0.0,
+  "overlap_threshold": 0.0,
+  "entropy_threshold": 0.0,
+  "randomized_seed": 0,
+  "total_ef_work": 192,
+  "candidate_budget": 500,
+  "per_rep": [
+    {
+      "n_queries": 323,
+      "recall10_qrels_mean": 0.14897224856627062,
+      "recall10_exact_mean": 0.9696594382587232,
+      "p50_us": 796.4,
+      "p95_us": 1149.3,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 323,
+      "recall10_qrels_mean": 0.1469151158543194,
+      "recall10_exact_mean": 0.9619195005472969,
+      "p50_us": 763.9,
+      "p95_us": 1096.6000000000001,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 323,
+      "recall10_qrels_mean": 0.1532759858012753,
+      "recall10_exact_mean": 0.9625386951877606,
+      "p50_us": 782.8000000000001,
+      "p95_us": 1171.6999999999998,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 323,
+      "recall10_qrels_mean": 0.14935467628641025,
+      "recall10_exact_mean": 0.965015475041357,
+      "p50_us": 793.7,
+      "p95_us": 1148.8,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 323,
+      "recall10_qrels_mean": 0.1491929710072814,
+      "recall10_exact_mean": 0.9684210487932613,
+      "p50_us": 774.5,
+      "p95_us": 1132.1000000000001,
+      "deadline_exceeded": 0
+    }
+  ],
+  "rep_recall10_qrels_mean": [
+    0.14897224856627062,
+    0.1469151158543194,
+    0.1532759858012753,
+    0.14935467628641025,
+    0.1491929710072814
+  ],
+  "recall10_qrels_mean_5rep": 0.1495,
+  "recall10_qrels_sd_5rep": 0.0021,
+  "rep_recall10_exact_mean": [
+    0.9696594382587232,
+    0.9619195005472969,
+    0.9625386951877606,
+    0.965015475041357,
+    0.9684210487932613
+  ],
+  "recall10_exact_mean_5rep": 0.9655,
+  "p50_us_per_rep": [
+    796.4,
+    763.9,
+    782.8000000000001,
+    793.7,
+    774.5
+  ],
+  "peak_child_rss_MiB": [
+    95.1,
+    95.4,
+    95.5,
+    95.6,
+    95.1
+  ]
+}

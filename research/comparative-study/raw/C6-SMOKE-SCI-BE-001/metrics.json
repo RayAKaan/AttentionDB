@@ -1,0 +1,43 @@
+{
+  "run_id": "C6-SMOKE-SCI-BE-001",
+  "mode": "B",
+  "dataset": "DS-SCIFACT",
+  "split": "SMOKE",
+  "phase": "C6 execution",
+  "test_queries": 20,
+  "rep_count": 1,
+  "warmup": 20,
+  "ef_search": 64,
+  "lambda": 0.0,
+  "stage1_fraction": 0.0,
+  "overlap_threshold": 0.0,
+  "entropy_threshold": 0.0,
+  "randomized_seed": 0,
+  "total_ef_work": 192,
+  "candidate_budget": 500,
+  "per_rep": [
+    {
+      "n_queries": 20,
+      "recall10_qrels_mean": 0.775,
+      "recall10_exact_mean": 0.6999999970197678,
+      "p50_us": 3433.6000000000004,
+      "p95_us": 6827.9,
+      "deadline_exceeded": 0
+    }
+  ],
+  "rep_recall10_qrels_mean": [
+    0.775
+  ],
+  "recall10_qrels_mean_5rep": 0.775,
+  "recall10_qrels_sd_5rep": 0.0,
+  "rep_recall10_exact_mean": [
+    0.6999999970197678
+  ],
+  "recall10_exact_mean_5rep": 0.7,
+  "p50_us_per_rep": [
+    3433.6000000000004
+  ],
+  "peak_child_rss_MiB": [
+    270.2
+  ]
+}
