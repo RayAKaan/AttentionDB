@@ -1,0 +1,1261 @@
+{
+  "adaptive_changed_queries": 0,
+  "adaptive_redistributed_queries": 0,
+  "candidate_change_count": 0,
+  "deadline_exceeded_count": 0,
+  "engine": {
+    "adaptive_policy": "D",
+    "attend_heads": [
+      "HEAD-TITLE",
+      "HEAD-BODY",
+      "HEAD-CITE"
+    ],
+    "candidate_budget": 500,
+    "collection": "c6p",
+    "configuration_id": "C6-SMOKE-SCI-DE-001__D",
+    "cross_refine": false,
+    "deadline_us": 0,
+    "ef_search": 64,
+    "entropy_threshold": 0.0,
+    "heads": [
+      "HEAD-TITLE",
+      "HEAD-BODY",
+      "HEAD-CITE"
+    ],
+    "lambda": 0.0,
+    "max_candidates_per_head": 300,
+    "min_candidates_per_head": 20,
+    "overlap_threshold": 0.0,
+    "randomized_seed": 0,
+    "retrieval_mode": "D",
+    "stage1_fraction": 0.0,
+    "total_ef_work": 192
+  },
+  "exact_top10": [
+    [
+      112,
+      3780,
+      2360,
+      1517,
+      1949,
+      1385,
+      4320,
+      2609,
+      304,
+      2805
+    ],
+    [
+      3141,
+      1272,
+      4903,
+      1598,
+      3865,
+      133,
+      4006,
+      3093,
+      2633,
+      3288
+    ],
+    [
+      5021,
+      3796,
+      2046,
+      1527,
+      660,
+      2535,
+      3292,
+      2284,
+      4708,
+      3309
+    ],
+    [
+      1335,
+      481,
+      478,
+      3364,
+      36,
+      4137,
+      2111,
+      3837,
+      4779,
+      2110
+    ],
+    [
+      1848,
+      2532,
+      2053,
+      2926,
+      254,
+      3051,
+      938,
+      1471,
+      4575,
+      811
+    ],
+    [
+      2435,
+      1248,
+      4987,
+      4099,
+      5002,
+      4269,
+      3817,
+      2697,
+      4134,
+      4872
+    ],
+    [
+      1217,
+      4019,
+      3986,
+      1699,
+      4065,
+      5001,
+      3408,
+      2908,
+      1388,
+      1022
+    ],
+    [
+      2606,
+      1661,
+      3722,
+      546,
+      1568,
+      4189,
+      3206,
+      3899,
+      2175,
+      4536
+    ],
+    [
+      4401,
+      849,
+      1256,
+      1144,
+      2786,
+      915,
+      4904,
+      1916,
+      4147,
+      488
+    ],
+    [
+      4417,
+      3338,
+      858,
+      3691,
+      539,
+      2382,
+      1352,
+      4873,
+      1588,
+      3608
+    ],
+    [
+      2984,
+      1560,
+      902,
+      4565,
+      3049,
+      755,
+      2070,
+      1733,
+      3739,
+      2897
+    ],
+    [
+      3855,
+      5150,
+      4560,
+      1137,
+      906,
+      3856,
+      4127,
+      681,
+      1482,
+      4790
+    ],
+    [
+      2898,
+      3458,
+      3858,
+      3185,
+      685,
+      2008,
+      415,
+      4730,
+      3867,
+      3093
+    ],
+    [
+      1529,
+      4850,
+      4563,
+      2181,
+      2100,
+      978,
+      2823,
+      2605,
+      389,
+      4985
+    ],
+    [
+      3217,
+      203,
+      93,
+      1820,
+      4399,
+      4988,
+      3766,
+      198,
+      1227,
+      527
+    ],
+    [
+      2671,
+      2369,
+      113,
+      4070,
+      2337,
+      1934,
+      4605,
+      2627,
+      2117,
+      1647
+    ],
+    [
+      1369,
+      4269,
+      1257,
+      1909,
+      4791,
+      4450,
+      3378,
+      1083,
+      271,
+      2082
+    ],
+    [
+      3634,
+      4113,
+      3354,
+      391,
+      4685,
+      3905,
+      380,
+      1538,
+      1351,
+      2429
+    ],
+    [
+      3764,
+      977,
+      5045,
+      4960,
+      1482,
+      3359,
+      4930,
+      2329,
+      4184,
+      4909
+    ],
+    [
+      68,
+      2603,
+      513,
+      4513,
+      4816,
+      75,
+      4533,
+      1687,
+      4141,
+      5108
+    ]
+  ],
+  "k": 10,
+  "latency_us_post_warmup": {
+    "count": 0,
+    "mean": 0.0,
+    "p50": 0.0,
+    "p90": 0.0,
+    "p95": 0.0
+  },
+  "mode": "D",
+  "n_docs": 5183,
+  "n_queries": 20,
+  "ok": true,
+  "per_query": [
+    {
+      "adaptive_ledger": {
+        "budget_conserved": false,
+        "final_allocation": [],
+        "initial_allocation": [],
+        "redistributions": [],
+        "total_candidates_used": 0,
+        "total_ef_work_used": 0
+      },
+      "candidate_count": 95,
+      "configuration_id": "C6-SMOKE-SCI-DE-001__D",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        113,
+        3781,
+        3804,
+        2329,
+        317,
+        1518,
+        1950,
+        2361,
+        844,
+        3874
+      ],
+      "heads_present": 3,
+      "hits": [
+        112,
+        3780,
+        3803,
+        2328,
+        316,
+        1517,
+        1949,
+        2360,
+        843,
+        3873
+      ],
+      "latency_us": 1912.8000000000002,
+      "n_rel": 1,
+      "ndcg10_qrels": 1.0,
+      "pos": 0,
+      "query_row": 212,
+      "recall10_exact": 0.5,
+      "recall10_qrels": 1.0,
+      "relevant_ids": [
+        112
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": false,
+        "final_allocation": [],
+        "initial_allocation": [],
+        "redistributions": [],
+        "total_candidates_used": 0,
+        "total_ef_work_used": 0
+      },
+      "candidate_count": 108,
+      "configuration_id": "C6-SMOKE-SCI-DE-001__D",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        3142,
+        4904,
+        1599,
+        2336,
+        1273,
+        3289,
+        1269,
+        1724,
+        3572,
+        134
+      ],
+      "heads_present": 3,
+      "hits": [
+        3141,
+        4903,
+        1598,
+        2335,
+        1272,
+        3288,
+        1268,
+        1723,
+        3571,
+        133
+      ],
+      "latency_us": 2039.0,
+      "n_rel": 1,
+      "ndcg10_qrels": 0.28906482458114624,
+      "pos": 1,
+      "query_row": 182,
+      "recall10_exact": 0.6000000238418579,
+      "recall10_qrels": 1.0,
+      "relevant_ids": [
+        133
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": false,
+        "final_allocation": [],
+        "initial_allocation": [],
+        "redistributions": [],
+        "total_candidates_used": 0,
+        "total_ef_work_used": 0
+      },
+      "candidate_count": 89,
+      "configuration_id": "C6-SMOKE-SCI-DE-001__D",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        3797,
+        5022,
+        661,
+        1528,
+        2047,
+        214,
+        2241,
+        2536,
+        3310,
+        3992
+      ],
+      "heads_present": 3,
+      "hits": [
+        3796,
+        5021,
+        660,
+        1527,
+        2046,
+        213,
+        2240,
+        2535,
+        3309,
+        3991
+      ],
+      "latency_us": 1621.7,
+      "n_rel": 1,
+      "ndcg10_qrels": 0.3333333432674408,
+      "pos": 2,
+      "query_row": 227,
+      "recall10_exact": 0.699999988079071,
+      "recall10_qrels": 1.0,
+      "relevant_ids": [
+        2240
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": false,
+        "final_allocation": [],
+        "initial_allocation": [],
+        "redistributions": [],
+        "total_candidates_used": 0,
+        "total_ef_work_used": 0
+      },
+      "candidate_count": 114,
+      "configuration_id": "C6-SMOKE-SCI-DE-001__D",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        1336,
+        4138,
+        37,
+        570,
+        2246,
+        2720,
+        3838,
+        2112,
+        4209,
+        1315
+      ],
+      "heads_present": 3,
+      "hits": [
+        1335,
+        4137,
+        36,
+        569,
+        2245,
+        2719,
+        3837,
+        2111,
+        4208,
+        1314
+      ],
+      "latency_us": 2154.5,
+      "n_rel": 1,
+      "ndcg10_qrels": 1.0,
+      "pos": 3,
+      "query_row": 676,
+      "recall10_exact": 0.5,
+      "recall10_qrels": 1.0,
+      "relevant_ids": [
+        1335
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": false,
+        "final_allocation": [],
+        "initial_allocation": [],
+        "redistributions": [],
+        "total_candidates_used": 0,
+        "total_ef_work_used": 0
+      },
+      "candidate_count": 111,
+      "configuration_id": "C6-SMOKE-SCI-DE-001__D",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        1849,
+        2766,
+        2533,
+        1935,
+        351,
+        4196,
+        3052,
+        2054,
+        812,
+        2866
+      ],
+      "heads_present": 3,
+      "hits": [
+        1848,
+        2765,
+        2532,
+        1934,
+        350,
+        4195,
+        3051,
+        2053,
+        811,
+        2865
+      ],
+      "latency_us": 2114.6,
+      "n_rel": 1,
+      "ndcg10_qrels": 0.0,
+      "pos": 4,
+      "query_row": 619,
+      "recall10_exact": 0.5,
+      "recall10_qrels": 0.0,
+      "relevant_ids": [
+        844
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": false,
+        "final_allocation": [],
+        "initial_allocation": [],
+        "redistributions": [],
+        "total_candidates_used": 0,
+        "total_ef_work_used": 0
+      },
+      "candidate_count": 93,
+      "configuration_id": "C6-SMOKE-SCI-DE-001__D",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        1249,
+        4988,
+        4100,
+        3818,
+        4270,
+        5003,
+        2436,
+        1829,
+        4873,
+        2698
+      ],
+      "heads_present": 3,
+      "hits": [
+        1248,
+        4987,
+        4099,
+        3817,
+        4269,
+        5002,
+        2435,
+        1828,
+        4872,
+        2697
+      ],
+      "latency_us": 1896.8,
+      "n_rel": 1,
+      "ndcg10_qrels": 0.3333333432674408,
+      "pos": 5,
+      "query_row": 303,
+      "recall10_exact": 0.8999999761581421,
+      "recall10_qrels": 1.0,
+      "relevant_ids": [
+        2435
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": false,
+        "final_allocation": [],
+        "initial_allocation": [],
+        "redistributions": [],
+        "total_candidates_used": 0,
+        "total_ef_work_used": 0
+      },
+      "candidate_count": 72,
+      "configuration_id": "C6-SMOKE-SCI-DE-001__D",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        1218,
+        3987,
+        1700,
+        4020,
+        5002,
+        2909,
+        1023,
+        4066,
+        3409,
+        153
+      ],
+      "heads_present": 3,
+      "hits": [
+        1217,
+        3986,
+        1699,
+        4019,
+        5001,
+        2908,
+        1022,
+        4065,
+        3408,
+        152
+      ],
+      "latency_us": 1668.0,
+      "n_rel": 4,
+      "ndcg10_qrels": 0.6374883651733398,
+      "pos": 6,
+      "query_row": 558,
+      "recall10_exact": 0.8999999761581421,
+      "recall10_qrels": 1.0,
+      "relevant_ids": [
+        1699,
+        4019,
+        4065,
+        5001
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": false,
+        "final_allocation": [],
+        "initial_allocation": [],
+        "redistributions": [],
+        "total_candidates_used": 0,
+        "total_ef_work_used": 0
+      },
+      "candidate_count": 82,
+      "configuration_id": "C6-SMOKE-SCI-DE-001__D",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        2607,
+        1662,
+        547,
+        1569,
+        2176,
+        4190,
+        3207,
+        3426,
+        867,
+        3723
+      ],
+      "heads_present": 3,
+      "hits": [
+        2606,
+        1661,
+        546,
+        1568,
+        2175,
+        4189,
+        3206,
+        3425,
+        866,
+        3722
+      ],
+      "latency_us": 1948.2,
+      "n_rel": 1,
+      "ndcg10_qrels": 1.0,
+      "pos": 7,
+      "query_row": 782,
+      "recall10_exact": 0.800000011920929,
+      "recall10_qrels": 1.0,
+      "relevant_ids": [
+        2606
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": false,
+        "final_allocation": [],
+        "initial_allocation": [],
+        "redistributions": [],
+        "total_candidates_used": 0,
+        "total_ef_work_used": 0
+      },
+      "candidate_count": 100,
+      "configuration_id": "C6-SMOKE-SCI-DE-001__D",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        3874,
+        4402,
+        850,
+        1257,
+        1145,
+        916,
+        3892,
+        4905,
+        489,
+        1386
+      ],
+      "heads_present": 3,
+      "hits": [
+        3873,
+        4401,
+        849,
+        1256,
+        1144,
+        915,
+        3891,
+        4904,
+        488,
+        1385
+      ],
+      "latency_us": 5181.0,
+      "n_rel": 1,
+      "ndcg10_qrels": 0.43067657947540283,
+      "pos": 8,
+      "query_row": 596,
+      "recall10_exact": 0.699999988079071,
+      "recall10_qrels": 1.0,
+      "relevant_ids": [
+        1256
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": false,
+        "final_allocation": [],
+        "initial_allocation": [],
+        "redistributions": [],
+        "total_candidates_used": 0,
+        "total_ef_work_used": 0
+      },
+      "candidate_count": 112,
+      "configuration_id": "C6-SMOKE-SCI-DE-001__D",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        4418,
+        3692,
+        540,
+        859,
+        2383,
+        3339,
+        4148,
+        2329,
+        1229,
+        1358
+      ],
+      "heads_present": 3,
+      "hits": [
+        4417,
+        3691,
+        539,
+        858,
+        2382,
+        3338,
+        4147,
+        2328,
+        1228,
+        1357
+      ],
+      "latency_us": 2209.2000000000003,
+      "n_rel": 1,
+      "ndcg10_qrels": 0.43067657947540283,
+      "pos": 9,
+      "query_row": 405,
+      "recall10_exact": 0.6000000238418579,
+      "recall10_qrels": 1.0,
+      "relevant_ids": [
+        858
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": false,
+        "final_allocation": [],
+        "initial_allocation": [],
+        "redistributions": [],
+        "total_candidates_used": 0,
+        "total_ef_work_used": 0
+      },
+      "candidate_count": 89,
+      "configuration_id": "C6-SMOKE-SCI-DE-001__D",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        2985,
+        4566,
+        903,
+        1561,
+        3050,
+        3819,
+        1734,
+        3740,
+        2071,
+        4658
+      ],
+      "heads_present": 3,
+      "hits": [
+        2984,
+        4565,
+        902,
+        1560,
+        3049,
+        3818,
+        1733,
+        3739,
+        2070,
+        4657
+      ],
+      "latency_us": 2467.0,
+      "n_rel": 1,
+      "ndcg10_qrels": 1.0,
+      "pos": 10,
+      "query_row": 756,
+      "recall10_exact": 0.800000011920929,
+      "recall10_qrels": 1.0,
+      "relevant_ids": [
+        2984
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": false,
+        "final_allocation": [],
+        "initial_allocation": [],
+        "redistributions": [],
+        "total_candidates_used": 0,
+        "total_ef_work_used": 0
+      },
+      "candidate_count": 94,
+      "configuration_id": "C6-SMOKE-SCI-DE-001__D",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        3856,
+        5151,
+        907,
+        4561,
+        1138,
+        42,
+        3815,
+        1567,
+        3857,
+        4910
+      ],
+      "heads_present": 3,
+      "hits": [
+        3855,
+        5150,
+        906,
+        4560,
+        1137,
+        41,
+        3814,
+        1566,
+        3856,
+        4909
+      ],
+      "latency_us": 1912.7,
+      "n_rel": 1,
+      "ndcg10_qrels": 0.5,
+      "pos": 11,
+      "query_row": 480,
+      "recall10_exact": 0.6000000238418579,
+      "recall10_qrels": 1.0,
+      "relevant_ids": [
+        906
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": false,
+        "final_allocation": [],
+        "initial_allocation": [],
+        "redistributions": [],
+        "total_candidates_used": 0,
+        "total_ef_work_used": 0
+      },
+      "candidate_count": 92,
+      "configuration_id": "C6-SMOKE-SCI-DE-001__D",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        3459,
+        3859,
+        416,
+        686,
+        3868,
+        4498,
+        3186,
+        3798,
+        39,
+        2042
+      ],
+      "heads_present": 3,
+      "hits": [
+        3458,
+        3858,
+        415,
+        685,
+        3867,
+        4497,
+        3185,
+        3797,
+        38,
+        2041
+      ],
+      "latency_us": 1867.5,
+      "n_rel": 1,
+      "ndcg10_qrels": 0.0,
+      "pos": 12,
+      "query_row": 224,
+      "recall10_exact": 0.6000000238418579,
+      "recall10_qrels": 0.0,
+      "relevant_ids": [
+        2898
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": false,
+        "final_allocation": [],
+        "initial_allocation": [],
+        "redistributions": [],
+        "total_candidates_used": 0,
+        "total_ef_work_used": 0
+      },
+      "candidate_count": 92,
+      "configuration_id": "C6-SMOKE-SCI-DE-001__D",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        1530,
+        4851,
+        4564,
+        2182,
+        2824,
+        979,
+        2101,
+        3223,
+        3983,
+        1708
+      ],
+      "heads_present": 3,
+      "hits": [
+        1529,
+        4850,
+        4563,
+        2181,
+        2823,
+        978,
+        2100,
+        3222,
+        3982,
+        1707
+      ],
+      "latency_us": 1858.7,
+      "n_rel": 1,
+      "ndcg10_qrels": 0.5,
+      "pos": 13,
+      "query_row": 147,
+      "recall10_exact": 0.699999988079071,
+      "recall10_qrels": 1.0,
+      "relevant_ids": [
+        4563
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": false,
+        "final_allocation": [],
+        "initial_allocation": [],
+        "redistributions": [],
+        "total_candidates_used": 0,
+        "total_ef_work_used": 0
+      },
+      "candidate_count": 101,
+      "configuration_id": "C6-SMOKE-SCI-DE-001__D",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        3218,
+        204,
+        94,
+        2111,
+        2728,
+        4989,
+        4226,
+        4400,
+        1228,
+        3767
+      ],
+      "heads_present": 3,
+      "hits": [
+        3217,
+        203,
+        93,
+        2110,
+        2727,
+        4988,
+        4225,
+        4399,
+        1227,
+        3766
+      ],
+      "latency_us": 1809.7,
+      "n_rel": 1,
+      "ndcg10_qrels": 0.6309297680854797,
+      "pos": 14,
+      "query_row": 232,
+      "recall10_exact": 0.699999988079071,
+      "recall10_qrels": 1.0,
+      "relevant_ids": [
+        203
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": false,
+        "final_allocation": [],
+        "initial_allocation": [],
+        "redistributions": [],
+        "total_candidates_used": 0,
+        "total_ef_work_used": 0
+      },
+      "candidate_count": 107,
+      "configuration_id": "C6-SMOKE-SCI-DE-001__D",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        1935,
+        4606,
+        1648,
+        2118,
+        3572,
+        5013,
+        114,
+        2768,
+        2672,
+        2370
+      ],
+      "heads_present": 3,
+      "hits": [
+        1934,
+        4605,
+        1647,
+        2117,
+        3571,
+        5012,
+        113,
+        2767,
+        2671,
+        2369
+      ],
+      "latency_us": 2068.8,
+      "n_rel": 1,
+      "ndcg10_qrels": 0.0,
+      "pos": 15,
+      "query_row": 571,
+      "recall10_exact": 0.699999988079071,
+      "recall10_qrels": 0.0,
+      "relevant_ids": [
+        2627
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": false,
+        "final_allocation": [],
+        "initial_allocation": [],
+        "redistributions": [],
+        "total_candidates_used": 0,
+        "total_ef_work_used": 0
+      },
+      "candidate_count": 96,
+      "configuration_id": "C6-SMOKE-SCI-DE-001__D",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        1370,
+        3379,
+        1084,
+        683,
+        4270,
+        873,
+        1258,
+        4451,
+        1874,
+        771
+      ],
+      "heads_present": 3,
+      "hits": [
+        1369,
+        3378,
+        1083,
+        682,
+        4269,
+        872,
+        1257,
+        4450,
+        1873,
+        770
+      ],
+      "latency_us": 1694.0,
+      "n_rel": 1,
+      "ndcg10_qrels": 0.0,
+      "pos": 16,
+      "query_row": 666,
+      "recall10_exact": 0.6000000238418579,
+      "recall10_qrels": 0.0,
+      "relevant_ids": [
+        2066
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": false,
+        "final_allocation": [],
+        "initial_allocation": [],
+        "redistributions": [],
+        "total_candidates_used": 0,
+        "total_ef_work_used": 0
+      },
+      "candidate_count": 79,
+      "configuration_id": "C6-SMOKE-SCI-DE-001__D",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        3635,
+        3355,
+        381,
+        4114,
+        4686,
+        2739,
+        1352,
+        392,
+        1539,
+        3906
+      ],
+      "heads_present": 3,
+      "hits": [
+        3634,
+        3354,
+        380,
+        4113,
+        4685,
+        2738,
+        1351,
+        391,
+        1538,
+        3905
+      ],
+      "latency_us": 1935.6,
+      "n_rel": 1,
+      "ndcg10_qrels": 0.6309297680854797,
+      "pos": 17,
+      "query_row": 282,
+      "recall10_exact": 0.8999999761581421,
+      "recall10_qrels": 1.0,
+      "relevant_ids": [
+        3354
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": false,
+        "final_allocation": [],
+        "initial_allocation": [],
+        "redistributions": [],
+        "total_candidates_used": 0,
+        "total_ef_work_used": 0
+      },
+      "candidate_count": 78,
+      "configuration_id": "C6-SMOKE-SCI-DE-001__D",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        3765,
+        978,
+        5046,
+        1483,
+        2330,
+        3360,
+        4931,
+        4961,
+        888,
+        1872
+      ],
+      "heads_present": 3,
+      "hits": [
+        3764,
+        977,
+        5045,
+        1482,
+        2329,
+        3359,
+        4930,
+        4960,
+        887,
+        1871
+      ],
+      "latency_us": 1604.9,
+      "n_rel": 2,
+      "ndcg10_qrels": 1.0,
+      "pos": 18,
+      "query_row": 69,
+      "recall10_exact": 0.800000011920929,
+      "recall10_qrels": 1.0,
+      "relevant_ids": [
+        3764,
+        977
+      ]
+    },
+    {
+      "adaptive_ledger": {
+        "budget_conserved": false,
+        "final_allocation": [],
+        "initial_allocation": [],
+        "redistributions": [],
+        "total_candidates_used": 0,
+        "total_ef_work_used": 0
+      },
+      "candidate_count": 94,
+      "configuration_id": "C6-SMOKE-SCI-DE-001__D",
+      "cross_refine_ledger": null,
+      "engine_hits": [
+        69,
+        2604,
+        222,
+        76,
+        5109,
+        4817,
+        4534,
+        4292,
+        601,
+        4877
+      ],
+      "heads_present": 3,
+      "hits": [
+        68,
+        2603,
+        221,
+        75,
+        5108,
+        4816,
+        4533,
+        4291,
+        600,
+        4876
+      ],
+      "latency_us": 1660.1999999999998,
+      "n_rel": 2,
+      "ndcg10_qrels": 0.38685283064842224,
+      "pos": 19,
+      "query_row": 753,
+      "recall10_exact": 0.6000000238418579,
+      "recall10_qrels": 0.5,
+      "relevant_ids": [
+        2142,
+        2603
+      ]
+    }
+  ],
+  "recall10_exact_mean": 0.6850000619888306,
+  "recall10_qrels_mean": 0.7749999761581421,
+  "seed": 20260925,
+  "subcommand": "pilot",
+  "surprise_empty_queries": 0,
+  "warmup": 20
+}

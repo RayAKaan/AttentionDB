@@ -28,3 +28,16 @@ benchmarks/phase2b/*/qk_content.json
 data/__pycache__/
 __pycache__/
 *.pyc
+
+# C7: superseded pre-determinism evidence (quarantined; see analysis/reports/8_failure_report.md)
+research/comparative-study/raw/.C7-OSSEED-EVIDENCE/
+
+# C7: shared multi-rep TEST intermediates are bit-reproducible from the per-cell
+# ARM artifacts + deterministic build; too large (>100MB/file) for git.
+research/comparative-study/raw/C7-SHARED-SCI/multi-test-rep*.json
+research/comparative-study/raw/C7-SHARED-NFC/multi-test-rep*.json
+
+# C7: tuning sweep raw dumps are >100MB/file (GitHub hard limit); reproduced by
+# rerunning c7_test_run.py --kind tune for cell C from the committed gate_choice.json.
+research/comparative-study/raw/C7-TUNE-SCI-C-001/artifacts/gatescan*.json
+research/comparative-study/raw/C7-TUNE-NFC-C-001/artifacts/gatescan*.json

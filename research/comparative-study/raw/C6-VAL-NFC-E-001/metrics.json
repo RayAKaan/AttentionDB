@@ -1,0 +1,51 @@
+{
+  "run_id": "C6-VAL-NFC-E-001",
+  "mode": "E",
+  "dataset": "DS-NFCORPUS",
+  "split": "VALID",
+  "phase": "C6 execution",
+  "test_queries": 324,
+  "rep_count": 1,
+  "warmup": 20,
+  "ef_search": 64,
+  "lambda": 0.0,
+  "stage1_fraction": 0.3,
+  "overlap_threshold": 0.3,
+  "entropy_threshold": 1.0,
+  "randomized_seed": 0,
+  "total_ef_work": 192,
+  "candidate_budget": 500,
+  "per_rep": [
+    {
+      "n_queries": 324,
+      "recall10_qrels_mean": 0.13837858795814997,
+      "recall10_exact_mean": 0.6787037057457147,
+      "p50_us": 14551.400000000001,
+      "p95_us": 19919.0,
+      "deadline_exceeded": 0,
+      "adaptive_changed_queries": 324,
+      "adaptive_redistributed_queries": 324
+    }
+  ],
+  "rep_recall10_qrels_mean": [
+    0.13837858795814997
+  ],
+  "recall10_qrels_mean_5rep": 0.1384,
+  "recall10_qrels_sd_5rep": 0.0,
+  "rep_recall10_exact_mean": [
+    0.6787037057457147
+  ],
+  "recall10_exact_mean_5rep": 0.6787,
+  "p50_us_per_rep": [
+    14551.400000000001
+  ],
+  "peak_child_rss_MiB": [
+    201.4
+  ],
+  "adaptive_changed_queries": [
+    324
+  ],
+  "adaptive_redistributed_queries": [
+    324
+  ]
+}

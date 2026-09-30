@@ -17,6 +17,7 @@
 //! scoring. Exact rerank = precise final ordering. These are NOT blurred:
 //! approximate graph scores never reach the output when exact reranking runs.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // ---------------------------------------------------------------------------
@@ -148,8 +149,51 @@ pub fn candidate_union(set: &CandidateSet, budget: usize) -> Vec<UnionCandidate>
 // ef - ef/2, so the total HNSW ef work of C5-C equals C5-B's single-search ef.
 // λ = 0.0 is the glue arm and MUST reproduce the control candidate set.
 
+// ---------------------------------------------------------------------------
+// Adaptive retrieval allocation (C6)
+// ---------------------------------------------------------------------------
+
+/// Adaptive retrieval policy type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum AdaptivePolicyType {
+    /// C6-C: Static equal split across heads.
+    #[default]
+    StaticEqual,
+    /// C6-D: Query-adaptive via head centroids.
+    QueryAdaptive,
+    /// C6-E: Interaction-guided (two-stage with redistribution).
+    InteractionGuided,
+    /// Negative control: randomized allocation.
+    RandomizedControl,
+}
+
+/// Adaptive retrieval configuration (C6).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdaptiveRetrievalConfig {
+    pub policy_type: AdaptivePolicyType,
+    /// Fraction of budget for stage 1 (C6-E).
+    pub stage1_fraction: f32,
+    /// Redistribution trigger (C6-E).
+    pub overlap_threshold: f32,
+    pub entropy_threshold: f32,
+    /// Randomized control seed.
+    pub randomized_seed: u64,
+}
+
+impl Default for AdaptiveRetrievalConfig {
+    fn default() -> Self {
+        Self {
+            policy_type: AdaptivePolicyType::StaticEqual,
+            stage1_fraction: 0.3,
+            overlap_threshold: 0.3,
+            entropy_threshold: 1.0,
+            randomized_seed: 20260925,
+        }
+    }
+}
+
 /// Interaction parameters (validation-gated). Off by default (`None`).
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct CrossRefineConfig {
     /// Blend of the query with the cross-head centroid (0.0 = pure query).
     pub lambda: f32,
@@ -182,6 +226,41 @@ pub struct CrossHeadTrace {
     /// ef used for round-1 and round-2 (sum == control ef).
     pub ef_r1: usize,
     pub ef_r2: usize,
+}
+
+/// Per-candidate C7 genuine-attention trace entry (aligned with the union list).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct C7CandidateTrace {
+    /// Document id (engine numeric id).
+    pub id: u64,
+    /// s_d = attention-channel score from the subsystem (pre-fusion).
+    pub attention_score: f32,
+    /// A_d per-head attention weights (length H).
+    pub weights: Vec<f32>,
+    /// O_d = A_d V_d attended output (length d_v).
+    pub output: Vec<f32>,
+    /// Raw attention logits (length H, pre-softmax).
+    pub logits: Vec<f32>,
+    /// Shannon entropy of A_d.
+    pub entropy: f32,
+}
+
+/// C7 genuine-attention trace for a whole query. Present ONLY when the C7
+/// attention channel is enabled (arms C/D/E/F); `None` otherwise, mirroring
+/// `RankedCandidate.features.attention`. End-to-end observability so the
+/// attention claim can be falsified (§C7-6).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct C7Trace {
+    /// Source heads at query time, in alignment order.
+    pub head_names: Vec<String>,
+    /// Per-candidate trace, same order as the (bounded) union list.
+    pub candidates: Vec<C7CandidateTrace>,
+    /// Per-head mean attention weights I_h over candidates.
+    pub per_head_mean: Vec<f32>,
+    /// Mean entropy across candidates.
+    pub mean_entropy: f32,
+    /// Total attention computation time (microseconds).
+    pub compute_time_us: u64,
 }
 
 /// L2-normalize in place; a zero/empty/non-finite vector is left as-is so the

@@ -1,0 +1,43 @@
+{
+  "host": "Originator",
+  "os": "Windows-11-10.0.26200-SP0",
+  "python": "3.14.4",
+  "created_utc": "2026-09-29T23:59:53Z",
+  "c7pilot_sha256": "c14f94183a1dbef2878f867a3fef0aedef48a758b6e8ca9b31328eb6319d0452",
+  "input_hashes": {
+    "CANONICAL.f32": "3e350dcbb6fad01909dc707576420e034d2fd232ed0a8661e57e33202f840be3",
+    "HEAD-BODY.f32": "c7436e493ddbf41dfeedb77c3007067dc60333e15c5622f167b283ee09eb4a2c",
+    "HEAD-CITE.f32": "c927fb7372e784805f37b884336c57af4cddb2bda461714ba4d8267b94a94664",
+    "HEAD-TITLE.f32": "46b483be668257b97d9caebaff5a98d646be193fb42e42914c18bcd1eab567dd",
+    "QUERIES.f32": "bf6fe475ddee390d7672ebf15c1d66d270f3199c098b03272e45a97f1ddc93b2",
+    "multi-probe-rep1-cfg.json": "7313f0123a6f8dafaa26169f33983760fc713e7dd2eeb5e45e814d94e7c50e26",
+    "multi-probe-rep1.json": "a4bb482cd61ec5daaeab8a599890a7d441c6c400c948ba22565437bf8d9c2b6e",
+    "multi-smoke-rep1-cfg.json": "76f20cf945d454072f8ec967e235221c9dd9890c4febc3dc6476c1f857d45a42",
+    "multi-smoke-rep1.json": "191b53215fbcddac4ca67eadb29192cdc7d8efbd517126ddfb93ec93ed2cc16d",
+    "multi-smoke-rerun-cfg.json": "8d6515027b66229d7d0a236cadbb34934a01bf485c85545ce160338087177aa0",
+    "multi-smoke-rerun.json": "7763cf8d0dbdb57a7e9b772939235e9b1ed91e8f096cd2be675be763e508c3c4",
+    "multi-test-rep1-cfg.json": "d925b7ce1bda475b77202a5144fc45600f4779a315ae30ddafe17f3954fbdc5e",
+    "multi-test-rep1.json": "e623c6d79b7a667b782dbf60bec598e342fb8861541a5438a2b12862c7311c22",
+    "multi-test-rep2-cfg.json": "e154fcc87d692250113b0473ebb4ecc3c93d02f00fb9ffa7577171252d7c4608",
+    "multi-test-rep2.json": "214b6f23df221a1f6a32161c71455ed62be252e6a47e2bcace478511a756193d",
+    "multi-test-rep3-cfg.json": "dfc40bb2da87829c49f0a97294d06419471027c1b0d2f1f098e0a3dccbd841d4",
+    "multi-test-rep3.json": "bb21b726279022f85da64178209a95ab13eda954493f7efe04d68f4738d7235e",
+    "multi-test-rep4-cfg.json": "e94b931ecf3f6689e1b8e5459b3938a76477e035e51331f2a06300743e04414a",
+    "multi-test-rep4.json": "eb80d2e333394307c33c942006c84b02a8bc1ad383c45226e1d8b9899cdb2d27",
+    "multi-test-rep5-cfg.json": "ef69ac38ea83f4bdb99a9f88de9266ecc599df2198200463433b813884264ceb",
+    "multi-test-rep5.json": "a358a59f67988a2c2bdcea772733b47e8a581a4ed0ae72c3d43505e65716ea9e",
+    "ARM-D-rep1.json": "2d85ea0f1edae9d9833ca572d830381b57036b698a6df3a8fa33e0bed3684b85",
+    "ARM-D-rep2.json": "05884a88a48da4eeb1090aeef8a38452a0b33d78dae89eb2b9f8b661209787d1",
+    "ARM-D-rep3.json": "f6562cb18ecfcd6df9d96978e391061a35d766d70a9b12fbbb995e82de745e6c",
+    "ARM-D-rep4.json": "4d59a88fbd67b271fe462ca8f9c244d4a613ee22dffaab8b210d6d0a7f5664f3",
+    "ARM-D-rep5.json": "48e962ad3d7ebaf7b7ebe6bb244fcae6b6fb92f430e84fb694efbca39c082485",
+    "cfg.json": "d925b7ce1bda475b77202a5144fc45600f4779a315ae30ddafe17f3954fbdc5e"
+  },
+  "guardrail": {
+    "policy": "sampler(500ms) aborts when child process-tree RSS >= 85% of MemAvailable at preflight; 2400s timeout",
+    "mem_avail_at_preflight_bytes": 1803976704,
+    "mem_load_pct_at_preflight": 89,
+    "ram_abort_threshold_bytes": 1533380198
+  },
+  "method": "one shared engine per process; arms A-F evaluated in-process (B/C/D/E/F union identical by construction, re-verified per rep)"
+}

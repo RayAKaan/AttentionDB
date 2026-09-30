@@ -1,0 +1,10 @@
+[build]
+rustflags = ["-C", "target-cpu=native", "-C", "codegen-units=1", "-C", "link-args=/Brepro"]
+incremental = false
+
+[target.x86_64-pc-windows-msvc]
+linker = "link.exe"
+
+[env]
+CARGO_INCREMENTAL = "0"
+RUSTFLAGS = "-Ctarget-cpu=native -Ccodegen-units=1"

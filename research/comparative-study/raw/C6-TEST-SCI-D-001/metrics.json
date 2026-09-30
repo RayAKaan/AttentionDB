@@ -1,0 +1,115 @@
+{
+  "run_id": "C6-TEST-SCI-D-001",
+  "mode": "D",
+  "dataset": "DS-SCIFACT",
+  "split": "TEST",
+  "phase": "C6 execution",
+  "test_queries": 300,
+  "rep_count": 5,
+  "warmup": 20,
+  "ef_search": 64,
+  "lambda": 0.0,
+  "stage1_fraction": 0.0,
+  "overlap_threshold": 0.0,
+  "entropy_threshold": 0.0,
+  "randomized_seed": 0,
+  "total_ef_work": 192,
+  "candidate_budget": 500,
+  "per_rep": [
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7872222223877907,
+      "recall10_exact_mean": 0.6983333363135655,
+      "p50_us": 1786.1000000000001,
+      "p95_us": 2586.7,
+      "deadline_exceeded": 0,
+      "adaptive_changed_queries": 0,
+      "adaptive_redistributed_queries": 0
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7908333334326744,
+      "recall10_exact_mean": 0.6920000033577284,
+      "p50_us": 1723.6000000000001,
+      "p95_us": 2093.9,
+      "deadline_exceeded": 0,
+      "adaptive_changed_queries": 0,
+      "adaptive_redistributed_queries": 0
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7883333334326744,
+      "recall10_exact_mean": 0.6970000019669533,
+      "p50_us": 1707.5,
+      "p95_us": 2085.3999999999996,
+      "deadline_exceeded": 0,
+      "adaptive_changed_queries": 0,
+      "adaptive_redistributed_queries": 0
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7875000000993411,
+      "recall10_exact_mean": 0.6976666688919068,
+      "p50_us": 1769.8,
+      "p95_us": 2194.3,
+      "deadline_exceeded": 0,
+      "adaptive_changed_queries": 0,
+      "adaptive_redistributed_queries": 0
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.795000000099341,
+      "recall10_exact_mean": 0.6940000030398369,
+      "p50_us": 1702.6999999999998,
+      "p95_us": 2059.6,
+      "deadline_exceeded": 0,
+      "adaptive_changed_queries": 0,
+      "adaptive_redistributed_queries": 0
+    }
+  ],
+  "rep_recall10_qrels_mean": [
+    0.7872222223877907,
+    0.7908333334326744,
+    0.7883333334326744,
+    0.7875000000993411,
+    0.795000000099341
+  ],
+  "recall10_qrels_mean_5rep": 0.7898,
+  "recall10_qrels_sd_5rep": 0.0029,
+  "rep_recall10_exact_mean": [
+    0.6983333363135655,
+    0.6920000033577284,
+    0.6970000019669533,
+    0.6976666688919068,
+    0.6940000030398369
+  ],
+  "recall10_exact_mean_5rep": 0.6958,
+  "p50_us_per_rep": [
+    1786.1000000000001,
+    1723.6000000000001,
+    1707.5,
+    1769.8,
+    1702.6999999999998
+  ],
+  "peak_child_rss_MiB": [
+    305.3,
+    271.2,
+    270.9,
+    300.2,
+    303.6
+  ],
+  "adaptive_changed_queries": [
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "adaptive_redistributed_queries": [
+    0,
+    0,
+    0,
+    0,
+    0
+  ]
+}

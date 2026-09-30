@@ -1,0 +1,51 @@
+{
+  "run_id": "C6-VAL-SCI-E-001",
+  "mode": "E",
+  "dataset": "DS-SCIFACT",
+  "split": "VALID",
+  "phase": "C6 execution",
+  "test_queries": 200,
+  "rep_count": 1,
+  "warmup": 20,
+  "ef_search": 64,
+  "lambda": 0.0,
+  "stage1_fraction": 0.3,
+  "overlap_threshold": 0.3,
+  "entropy_threshold": 1.0,
+  "randomized_seed": 0,
+  "total_ef_work": 192,
+  "candidate_budget": 500,
+  "per_rep": [
+    {
+      "n_queries": 200,
+      "recall10_qrels_mean": 0.7270833334326744,
+      "recall10_exact_mean": 0.6975000004470349,
+      "p50_us": 21121.399999999998,
+      "p95_us": 52960.8,
+      "deadline_exceeded": 0,
+      "adaptive_changed_queries": 200,
+      "adaptive_redistributed_queries": 200
+    }
+  ],
+  "rep_recall10_qrels_mean": [
+    0.7270833334326744
+  ],
+  "recall10_qrels_mean_5rep": 0.7271,
+  "recall10_qrels_sd_5rep": 0.0,
+  "rep_recall10_exact_mean": [
+    0.6975000004470349
+  ],
+  "recall10_exact_mean_5rep": 0.6975,
+  "p50_us_per_rep": [
+    21121.399999999998
+  ],
+  "peak_child_rss_MiB": [
+    304.8
+  ],
+  "adaptive_changed_queries": [
+    200
+  ],
+  "adaptive_redistributed_queries": [
+    200
+  ]
+}

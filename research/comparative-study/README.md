@@ -46,9 +46,19 @@ research/comparative-study/
 │   │   ├── statistical_results.json
 │   │   └── reports/ (10 reports)
 │   └── c5-test_run.py
+├── c6-adaptive-retrieval/     ← STAGE C6 (adaptive allocation; COMPLETE)
+│   ├── c6-protocol.md
+│   ├── c6-architecture.md
+│   ├── c6-run-plan.csv
+│   ├── probe/
+│   ├── harness/
+│   ├── analysis/
+│   │   ├── statistical_results.json
+│   │   └── reports/ (9 reports)
+│   └── c6_test_run.py
 ├── methodology/               ← STAGE C1 docs
 ├── baselines/ datasets/ workloads/ experiments/
-├── raw/                       ← Immutable run registry (C0–C5)
+├── raw/                       ← Immutable run registry (C0–C6)
 ├── results/ tables/ figures/ findings/ limitations/ reports/ scripts/
 ```
 
@@ -70,4 +80,10 @@ results preserved.
   - Probe: `c5-cross-head/probe/c5pilot.rs` (reproducible `/Brepro` build)
   - Primary result: interaction changes candidate set on >99% queries, but recall@10 Δ negligible (|Δ|<0.01, p>0.5 both datasets)
   - Reports: 10 reports in `c5-cross-head/analysis/reports/`
-- [ ] C6–C9 — future workload/scale/statistics/final report
+- [x] **C6 — Adaptive retrieval allocation** (COMPLETE: mechanism implemented, TEST executed, negative result)
+  - Protocol: `c6-adaptive-retrieval/c6-protocol.md`
+  - Engine: `core/src/adaptive.rs` + `collection.rs` (61 tests pass)
+  - Probe: `c6-adaptive-retrieval/probe/c6pilot.rs` (reproducible `/Brepro` build)
+  - Primary result: interaction-guided allocation changes candidate set on 100% queries, but recall@10 Δ negligible (|Δ|<0.01, p>0.05 both datasets); 8× latency overhead not justified
+  - Reports: 9 reports in `c6-adaptive-retrieval/analysis/reports/`
+- [ ] C7–C9 — future workload/scale/statistics/final report

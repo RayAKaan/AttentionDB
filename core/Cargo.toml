@@ -12,6 +12,7 @@ attentiondb-multihead = { path = "../multihead" }
 attentiondb-storage = { path = "../storage" }
 attentiondb-distributed = { path = "../distributed" }
 attentiondb-learned = { path = "../learned" }
+attentiondb-attention = { path = "../attention" }
 thiserror = { workspace = true }
 serde = { workspace = true }
 parking_lot = { workspace = true }
