@@ -8,6 +8,7 @@ members = [
     "learned",
     "distributed",
     "core",
+    "attention",
     "benchmarks/phase2",
     "benchmarks/phase2b",
     "benchmarks/phase3",

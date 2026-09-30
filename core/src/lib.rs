@@ -16,5 +16,5 @@ pub use collection::Collection;
 pub use engine::{AttentionEngine, CheckpointInfo, EngineState, EngineStats, IdMapper};
 pub use error::CoreError;
 pub use adaptive::{AdaptiveTrace, HeadAllocation, RetrievalBudget};
-pub use retrieval::{AdaptivePolicyType, AdaptiveRetrievalConfig, CandidateSet, FusionWeights, RankedCandidate, ScoreNormalization};
+pub use retrieval::{AdaptivePolicyType, AdaptiveRetrievalConfig, C7CandidateTrace, C7Trace, CandidateSet, FusionWeights, RankedCandidate, ScoreNormalization};
 pub use transaction::{TransactionManager, TxnOp};

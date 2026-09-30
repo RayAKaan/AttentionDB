@@ -231,6 +231,41 @@ pub struct CrossHeadTrace {
     pub ef_r2: usize,
 }
 
+/// Per-candidate C7 genuine-attention trace entry (aligned with the union list).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct C7CandidateTrace {
+    /// Document id (engine numeric id).
+    pub id: u64,
+    /// s_d = attention-channel score from the subsystem (pre-fusion).
+    pub attention_score: f32,
+    /// A_d per-head attention weights (length H).
+    pub weights: Vec<f32>,
+    /// O_d = A_d V_d attended output (length d_v).
+    pub output: Vec<f32>,
+    /// Raw attention logits (length H, pre-softmax).
+    pub logits: Vec<f32>,
+    /// Shannon entropy of A_d.
+    pub entropy: f32,
+}
+
+/// C7 genuine-attention trace for a whole query. Present ONLY when the C7
+/// attention channel is enabled (arms C/D/E/F); `None` otherwise, mirroring
+/// `RankedCandidate.features.attention`. End-to-end observability so the
+/// attention claim can be falsified (§C7-6).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct C7Trace {
+    /// Source heads at query time, in alignment order.
+    pub head_names: Vec<String>,
+    /// Per-candidate trace, same order as the (bounded) union list.
+    pub candidates: Vec<C7CandidateTrace>,
+    /// Per-head mean attention weights I_h over candidates.
+    pub per_head_mean: Vec<f32>,
+    /// Mean entropy across candidates.
+    pub mean_entropy: f32,
+    /// Total attention computation time (microseconds).
+    pub compute_time_us: u64,
+}
+
 /// L2-normalize in place; a zero/empty/non-finite vector is left as-is so the
 /// caller can fall back to the original query (deterministic, NaN-safe).
 pub fn l2_normalize(v: &mut [f32]) {

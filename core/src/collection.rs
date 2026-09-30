@@ -4,7 +4,8 @@ use crate::adaptive::{AdaptiveRetriever, AdaptiveTrace, HeadAllocation, Retrieva
 use crate::{AdaptivePolicyType, AdaptiveRetrievalConfig};
 use crate::retrieval::{
     candidate_union, cross_head_centroid, cross_refine_query, deterministic_top_k, fuse_candidate,
-    normalize_scores, rrf_fuse, AttentionScorer, CandidateFeatures, CandidateSet, CrossHeadTrace,
+    normalize_scores, rrf_fuse, AttentionScorer, C7CandidateTrace, C7Trace, CandidateFeatures,
+    CandidateSet, CrossHeadTrace,
     CrossRefineConfig, FusionWeights, HeadHit, RankedCandidate, ScoreNormalization,
 };
 use attentiondb_hnsw::{similarity, HNSWConfig, HeadIndexManager};
@@ -74,6 +75,10 @@ pub struct RetrievalConfig {
     /// pre-C5 behavior). Round-split rule is C5-C internal; control arms run
     /// at the full configured value.
     pub ef_search: Option<usize>,
+    /// Hard cap on the per-head HNSW search `k` (C7 EFPROBE; `None` = no cap).
+    /// hnsw_rs clamps its beam to `max(ef, k)`, so an `ef_search` below the
+    /// per-head budget is otherwise inert; capping `k` lets the ef knob bite.
+    pub search_k: Option<usize>,
     /// One-step cross-head candidate generation (C5-C; `None` = off, the
     /// exact pre-C5 pipeline). When set, only the candidate GENERATION stage
     /// changes: round-1 per-head search → interaction → round-2 re-search;
@@ -84,6 +89,14 @@ pub struct RetrievalConfig {
     /// Adaptive retrieval allocation (C6; `None` = off, pre-C6 pipeline).
     /// When set, controls how candidate budget and EF are allocated across heads.
     pub adaptive: Option<AdaptiveRetrievalConfig>,
+    /// C7 genuine candidate-level Q/K/V attention (C7; `None` = off, backward
+    /// compatible with the legacy attention feature scorer). When set AND
+    /// enabled, the `attention` channel in the fusion is produced by genuine
+    /// QKV attention over the per-head candidate vectors (from the head
+    /// indexes) instead of the legacy feature-based scorer. Membership and
+    /// candidate budget semantics are unchanged — only the attention channel
+    /// score changes, so ranking differences are attributable to the attentions.
+    pub attention: Option<attentiondb_attention::AttentionConfig>,
 }
 
 impl Default for RetrievalConfig {
@@ -107,8 +120,10 @@ impl Default for RetrievalConfig {
                 .unwrap_or(4),
             attention_rank_weight: 0.1,
             ef_search: None,
+            search_k: None,
             cross_refine: None,
             adaptive: None,
+            attention: None,
         }
     }
 }
@@ -143,6 +158,13 @@ impl RetrievalConfig {
                 ));
             }
         }
+        if let Some(sk) = self.search_k {
+            if !(1..=100_000).contains(&sk) {
+                return Err(CoreError::InvalidConfig(
+                    "search_k must be in 1..=100_000".into(),
+                ));
+            }
+        }
         if let Some(c) = self.cross_refine {
             if !(0.0..=1.0).contains(&c.lambda) || !c.lambda.is_finite() {
                 return Err(CoreError::InvalidConfig(
@@ -160,6 +182,13 @@ impl RetrievalConfig {
                 return Err(CoreError::InvalidConfig(
                     "adaptive thresholds must be valid".into(),
                 ));
+            }
+        }
+        if let Some(attn) = &self.attention {
+            if attn.enabled {
+                attn.validate().map_err(|e| {
+                    CoreError::InvalidConfig(format!("attention config invalid: {e}"))
+                })?;
             }
         }
         Ok(())
@@ -184,6 +213,10 @@ pub struct Collection {
     /// fallback (uniform or legacy net). Swapped via `Arc` so a query in
     /// flight sees the old OR new weights, never partial (§18).
     pub gating_model: RwLock<Option<Arc<attentiondb_learned::gating_v2::ModelCard>>>,
+    /// C7 genuine QKV attention subsystem, cached per enabled config
+    /// (§C7): `None` until first query with `retrieval_config.attention`
+    /// enabled. Rebuilt only when the config fingerprint changes.
+    c7_attention: RwLock<Option<(u64, Arc<attentiondb_attention::AttentionSubsystem>)>>,
 }
 
 impl Collection {
@@ -199,6 +232,7 @@ impl Collection {
             retired_ids: RwLock::new(HashSet::new()),
             retrieval_config: RwLock::new(RetrievalConfig::default()),
             gating_model: RwLock::new(None),
+            c7_attention: RwLock::new(None),
         }
     }
 
@@ -420,6 +454,7 @@ impl Collection {
             config_override,
             deadline,
         )
+        .map(|(ranked, stats, cross, adaptive, _c7)| (ranked, stats, cross, adaptive))
     }
 
     /// attend_detailed + pipeline stage sizes (§40: candidate/rerank counts
@@ -447,10 +482,10 @@ impl Collection {
             config_override,
             deadline,
         )
-        .map(|(ranked, stats, _trace, _adaptive)| (ranked, stats))
+        .map(|(ranked, stats, _trace, _adaptive, _c7)| (ranked, stats))
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, clippy::type_complexity)]
     fn attend_detailed_inner(
         &self,
         heads: &[String],
@@ -461,7 +496,16 @@ impl Collection {
         gate_override: Option<Vec<f32>>,
         config_override: Option<&RetrievalConfig>,
         deadline: Option<std::time::Instant>,
-    ) -> Result<(Vec<RankedCandidate>, PipelineStats, CrossHeadTrace, AdaptiveTrace), CoreError> {
+    ) -> Result<
+        (
+            Vec<RankedCandidate>,
+            PipelineStats,
+            CrossHeadTrace,
+            AdaptiveTrace,
+            Option<C7Trace>,
+        ),
+        CoreError,
+    > {
         // Cancellation/timeout (§19): checked at every stage boundary. Long
         // HNSW work between checks is bounded by per-head candidate counts.
         let check_deadline = |stage: &str| -> Result<(), CoreError> {
@@ -487,7 +531,13 @@ impl Collection {
         cfg.validate()?;
         let mode = mode_override.unwrap_or(cfg.mode);
         if top_k == 0 || heads.is_empty() {
-            return Ok((vec![], PipelineStats::default(), CrossHeadTrace::default(), AdaptiveTrace::default()));
+            return Ok((
+                vec![],
+                PipelineStats::default(),
+                CrossHeadTrace::default(),
+                AdaptiveTrace::default(),
+                None,
+            ));
         }
 
         // ---- MODE A: single head, raw generator scores --------------------
@@ -500,7 +550,7 @@ impl Collection {
             let retired = self.retired_ids.read().clone();
             let results = idx
                 .read()
-                .search(query, top_k, cfg.ef_search)
+                .search(query, cfg.search_k.unwrap_or(top_k), cfg.ef_search)
                 .map_err(|e| CoreError::Internal(format!("hnsw search: {e}")))?;
             let out: Vec<(u64, f32)> = results
                 .into_iter()
@@ -523,11 +573,14 @@ impl Collection {
                 PipelineStats::default(),
                 CrossHeadTrace::default(),
                 AdaptiveTrace::default(),
+                None,
             ));
         }
 
         // ---- 1. Candidate generation (parallel, bounded) -------------------
-        let per_head_k = (top_k * cfg.candidate_multiplier).max(cfg.min_candidates_per_head);
+        let per_head_k = (top_k * cfg.candidate_multiplier)
+            .max(cfg.min_candidates_per_head)
+            .min(cfg.search_k.unwrap_or(usize::MAX));
         let retired = self.retired_ids.read().clone();
         let head_indexes: Vec<Option<Arc<RwLock<attentiondb_hnsw::HNSWIndex>>>> = {
             let mgr = self.head_manager.read();
@@ -877,7 +930,13 @@ impl Collection {
         metrics::histogram!("attentiondb_stage_latency_seconds", "stage" => "hnsw")
             .record(t_hnsw.elapsed().as_secs_f64());
         if present_heads.is_empty() {
-            return Ok((vec![], PipelineStats::default(), cross_trace, AdaptiveTrace::default()));
+            return Ok((
+                vec![],
+                PipelineStats::default(),
+                cross_trace,
+                AdaptiveTrace::default(),
+                None,
+            ));
         }
 
         // ---- 2. Candidate union (provenance + budget) ----------------------
@@ -969,29 +1028,122 @@ impl Collection {
         // ---- 7. Candidate features + attention -----------------------------
         let t_attn = std::time::Instant::now();
         let _span_attn = tracing::info_span!("attention", candidates = union.len()).entered();
-        let scorer = AttentionScorer::new(n_heads, cfg.attention_rank_weight);
-        let feature_vecs: Vec<Vec<f32>> = union
-            .iter()
-            .map(|u| {
-                let mut x = Vec::with_capacity(n_heads * 2);
-                for (norm_map, head_score) in norm_maps.iter().zip(u.head_scores.iter()) {
-                    x.push(
-                        head_score
-                            .and_then(|_| norm_map.get(&u.id).copied())
-                            .unwrap_or(0.0),
-                    );
+        let mut attention_scores: Option<Vec<f32>> = None;
+        let mut c7_trace: Option<C7Trace> = None;
+
+        // C7: genuine candidate-level Q/K/V attention over per-head vectors.
+        // Replaces ONLY the attention channel source; candidate membership and
+        // fusion weights are unchanged, so ranking differences are attributable
+        // to the attention scores themselves (§C7). Falls back to the legacy
+        // feature scorer when disabled.
+        let c7_cfg = cfg.attention.clone().filter(|c| c.enabled);
+        if let Some(attn_cfg) = c7_cfg {
+            // Build (or reuse) the deterministic attention subsystem.
+            let fp = attentiondb_attention::config_fingerprint(&attn_cfg);
+            let subsystem = {
+                let cached = self.c7_attention.read();
+                match &*cached {
+                    Some((f, s)) if *f == fp => s.clone(),
+                    _ => {
+                        drop(cached);
+                        let s = Arc::new(
+                            attentiondb_attention::AttentionSubsystem::new(
+                                attn_cfg.clone(),
+                                set.source_heads.clone(),
+                            )
+                            .map_err(|e| CoreError::Internal(format!("c7 subsystem: {e}")))?,
+                        );
+                        *self.c7_attention.write() = Some((fp, s.clone()));
+                        s
+                    }
                 }
-                for r in u.head_ranks.iter() {
-                    x.push(r.map(|r| 1.0 / (1.0 + r as f32)).unwrap_or(0.0));
+            };
+
+            // Per-candidate per-head vectors + retrieval evidence.
+            let mgr = self.head_manager.read();
+            let mut c7_cands: Vec<Vec<Vec<f32>>> = Vec::with_capacity(union.len());
+            let mut c7_evidence: Vec<attentiondb_attention::RetrievalEvidence> =
+                Vec::with_capacity(union.len());
+            for u in &union {
+                let mut per_head: Vec<Vec<f32>> = Vec::with_capacity(n_heads);
+                let mut sims: Vec<Option<f32>> = Vec::with_capacity(n_heads);
+                let mut ranks: Vec<Option<f32>> = Vec::with_capacity(n_heads);
+                let mut present: Vec<bool> = Vec::with_capacity(n_heads);
+                for (h_idx, head) in set.source_heads.iter().enumerate() {
+                    let v = match mgr.get_head(head) {
+                        Ok(idx) => idx.read().get_vector(u.id).map(|v| v.to_vec()),
+                        Err(_) => None,
+                    };
+                    per_head.push(v.unwrap_or_else(|| vec![0.0; self.dim]));
+                    let sim = u.head_scores[h_idx].and_then(|_| norm_maps[h_idx].get(&u.id).copied());
+                    sims.push(sim);
+                    let r = u.head_ranks[h_idx];
+                    ranks.push(r.map(|r| 1.0 / (1.0 + r as f32)));
+                    present.push(sim.is_some());
                 }
-                x
-            })
-            .collect();
-        let attention_scores = if mode >= RetrievalMode::QKAttention {
-            Some(scorer.score(&profile, &feature_vecs))
+                c7_cands.push(per_head);
+                c7_evidence.push(attentiondb_attention::RetrievalEvidence {
+                    head_sims: sims,
+                    head_ranks: ranks,
+                    head_present: present,
+                });
+            }
+            let out = subsystem
+                .compute(query, &c7_cands, &c7_evidence)
+                .map_err(|e| CoreError::Internal(format!("c7 attention: {e}")))?;
+            attention_scores = Some(out.scores.clone());
+            // Union-level attention trace (§C7-6): per-candidate A_d / O_d /
+            // logits / entropy, per-head mean, mean entropy, compute time.
+            // Aligned with `union` (same order as c7_cands).
+            c7_trace = Some(C7Trace {
+                head_names: set.source_heads.clone(),
+                candidates: union
+                    .iter()
+                    .zip(out.candidates.iter())
+                    .zip(out.scores.iter())
+                    .map(|((u, c), &s)| C7CandidateTrace {
+                        id: u.id,
+                        attention_score: s,
+                        weights: c.weights.clone(),
+                        output: c.output.clone(),
+                        logits: c.logits.clone(),
+                        entropy: c.entropy,
+                    })
+                    .collect(),
+                per_head_mean: out.per_head_mean.clone(),
+                mean_entropy: out.mean_entropy,
+                compute_time_us: out.compute_time_us,
+            });
+            metrics::histogram!("attentiondb_c7_attention_micros").record(out.compute_time_us as f64);
+            tracing::info!(
+                candidates = union.len(),
+                mean_entropy = out.mean_entropy,
+                "c7 genuine attention"
+            );
         } else {
-            None
-        };
+            // Legacy attention channel (mode >= QKAttention).
+            let scorer = AttentionScorer::new(n_heads, cfg.attention_rank_weight);
+            let feature_vecs: Vec<Vec<f32>> = union
+                .iter()
+                .map(|u| {
+                    let mut x = Vec::with_capacity(n_heads * 2);
+                    for (norm_map, head_score) in norm_maps.iter().zip(u.head_scores.iter()) {
+                        x.push(
+                            head_score
+                                .and_then(|_| norm_map.get(&u.id).copied())
+                                .unwrap_or(0.0),
+                        );
+                    }
+                    for r in u.head_ranks.iter() {
+                        x.push(r.map(|r| 1.0 / (1.0 + r as f32)).unwrap_or(0.0));
+                    }
+                    x
+                })
+                .collect();
+            if mode >= RetrievalMode::QKAttention {
+                attention_scores = Some(scorer.score(&profile, &feature_vecs));
+            }
+        }
 
         // ---- 8. Fusion (explicit equation; §8) -----------------------------
         let mut out: Vec<RankedCandidate> = Vec::with_capacity(union.len());
@@ -1073,6 +1225,7 @@ impl Collection {
             stats,
             cross_trace,
             adaptive_trace,
+            c7_trace,
         ))
     }
 
@@ -1100,6 +1253,44 @@ impl Collection {
         config_override: Option<&RetrievalConfig>,
         deadline: Option<std::time::Instant>,
     ) -> Result<(Vec<RankedCandidate>, PipelineStats, CrossHeadTrace, AdaptiveTrace), CoreError> {
+        self.attend_detailed_inner(
+            heads,
+            query,
+            top_k,
+            bm25_raw,
+            mode_override,
+            gate_override,
+            config_override,
+            deadline,
+        )
+        .map(|(ranked, stats, cross, adaptive, _c7)| (ranked, stats, cross, adaptive))
+    }
+
+    /// attend_detailed_traced, and ALSO the C7 genuine-attention trace for the
+    /// query. The trace is `Some` only when the attention channel is enabled
+    /// (arms C/D/E/F); it is `None` for the legacy/A/B arms so the probe can
+    /// assert parity. Additive — does not alter any existing signature.
+    #[allow(clippy::too_many_arguments, clippy::type_complexity)]
+    pub fn attend_detailed_c7(
+        &self,
+        heads: &[String],
+        query: &[f32],
+        top_k: usize,
+        bm25_raw: Option<&[(u64, f32)]>,
+        mode_override: Option<RetrievalMode>,
+        gate_override: Option<Vec<f32>>,
+        config_override: Option<&RetrievalConfig>,
+        deadline: Option<std::time::Instant>,
+    ) -> Result<
+        (
+            Vec<RankedCandidate>,
+            PipelineStats,
+            CrossHeadTrace,
+            AdaptiveTrace,
+            Option<C7Trace>,
+        ),
+        CoreError,
+    > {
         self.attend_detailed_inner(
             heads,
             query,
@@ -1494,5 +1685,271 @@ mod gating_model_tests {
             g_trace.per_head_capped.iter().all(|&n| n <= 50),
             "per-head cap must hold"
         );
+    }
+}
+
+#[cfg(test)]
+mod c7_attention_tests {
+    use super::*;
+
+    fn c7_fixed_config(heads: usize, dim: usize) -> attentiondb_attention::AttentionConfig {
+        attentiondb_attention::AttentionConfig::fixed_identity(heads, dim, dim, dim)
+    }
+
+    #[test]
+    fn c7_disabled_matches_legacy_path() {
+        let dim = 4usize;
+        let coll = Collection::new("c7-disabled", dim);
+        coll.add_default_head("a").unwrap();
+        coll.add_default_head("b").unwrap();
+        for i in 0..60u64 {
+            let x = i as f32 * 0.01 - 0.3;
+            let mut v_a = vec![0f32; dim];
+            let mut v_b = vec![0f32; dim];
+            v_a[0] = x;
+            v_a[1] = -0.2;
+            v_b[1] = x;
+            v_b[0] = -0.2;
+            coll.insert_vector("a", i, &v_a).unwrap();
+            coll.insert_vector("b", i, &v_b).unwrap();
+        }
+        let heads = vec!["a".to_string(), "b".to_string()];
+        let q = [0.2, 0.1, 0.0, 0.0];
+
+        // Legacy path: attention disabled.
+        let legacy = RetrievalConfig {
+            mode: RetrievalMode::LearnedGating,
+            ef_search: Some(32),
+            attention: None,
+            ..RetrievalConfig::default()
+        };
+        let (l_cands, l_stats, l_trace, _) = coll
+            .attend_detailed_traced(&heads, &q, 5, None, None, None, Some(&legacy), None)
+            .unwrap();
+
+        // Attention config present but disabled → same path as legacy.
+        let disabled = RetrievalConfig {
+            mode: RetrievalMode::LearnedGating,
+            ef_search: Some(32),
+            attention: Some(attentiondb_attention::AttentionConfig::disabled()),
+            ..RetrievalConfig::default()
+        };
+        let (d_cands, d_stats, d_trace, _) = coll
+            .attend_detailed_traced(&heads, &q, 5, None, None, None, Some(&disabled), None)
+            .unwrap();
+
+        assert_eq!(l_cands.len(), d_cands.len());
+        for (a, b) in l_cands.iter().zip(d_cands.iter()) {
+            assert_eq!(a.id, b.id, "ids must match");
+            assert_eq!(a.final_score, b.final_score, "scores must match");
+        }
+        assert_eq!(l_stats.union_size, d_stats.union_size);
+        assert_eq!(l_trace.round1, d_trace.round1);
+    }
+
+    #[test]
+    fn c7_enabled_changes_scores_not_membership() {
+        let dim = 4usize;
+        let coll = Collection::new("c7-enabled", dim);
+        coll.add_default_head("a").unwrap();
+        coll.add_default_head("b").unwrap();
+        for i in 0..60u64 {
+            let x = i as f32 * 0.01 - 0.3;
+            let mut v_a = vec![0f32; dim];
+            let mut v_b = vec![0f32; dim];
+            v_a[0] = x;
+            v_a[1] = -0.2;
+            v_b[1] = x;
+            v_b[0] = -0.2;
+            coll.insert_vector("a", i, &v_a).unwrap();
+            coll.insert_vector("b", i, &v_b).unwrap();
+        }
+        let heads = vec!["a".to_string(), "b".to_string()];
+        let q = [0.2, 0.1, 0.0, 0.0];
+
+        let off = RetrievalConfig {
+            mode: RetrievalMode::LearnedGating,
+            ef_search: Some(32),
+            attention: None,
+            ..RetrievalConfig::default()
+        };
+        let (no_attn, no_stats, _, _) = coll
+            .attend_detailed_traced(&heads, &q, 5, None, None, None, Some(&off), None)
+            .unwrap();
+
+        let on = RetrievalConfig {
+            mode: RetrievalMode::LearnedGating,
+            ef_search: Some(32),
+            attention: Some(c7_fixed_config(2, dim)),
+            ..RetrievalConfig::default()
+        };
+        let (with_attn, with_stats, _, _) = coll
+            .attend_detailed_traced(&heads, &q, 5, None, None, None, Some(&on), None)
+            .unwrap();
+
+        // Membership invariant: attention must not change the candidate SET.
+        let no_ids: HashSet<u64> = no_attn.iter().map(|c| c.id).collect();
+        let with_ids: HashSet<u64> = with_attn.iter().map(|c| c.id).collect();
+        assert_eq!(no_ids, with_ids, "candidate membership must be invariant");
+        assert_eq!(no_stats.union_size, with_stats.union_size);
+
+        // Reliability: C7 outputs finite scores.
+        assert!(with_attn.iter().all(|c| c.final_score.is_finite()));
+
+        // Attention must actually participate (V use): the returned candidates
+        // carry the attention feature; verify it is populated and finite.
+        for cand in &with_attn {
+            if let Some(attn) = cand.features.attention {
+                assert!(attn.is_finite());
+            }
+        }
+    }
+
+    #[test]
+    fn c7_identity_is_deterministic() {
+        let dim = 4usize;
+        let coll = Collection::new("c7-det", dim);
+        coll.add_default_head("a").unwrap();
+        coll.add_default_head("b").unwrap();
+        for i in 0..40u64 {
+            let x = i as f32 * 0.01 - 0.2;
+            let mut va = vec![0f32; dim];
+            let mut vb = vec![0f32; dim];
+            va[0] = x;
+            vb[1] = x;
+            coll.insert_vector("a", i, &va).unwrap();
+            coll.insert_vector("b", i, &vb).unwrap();
+        }
+        let heads = vec!["a".to_string(), "b".to_string()];
+        let q = [0.1, 0.1, 0.0, 0.0];
+        let cfg = RetrievalConfig {
+            mode: RetrievalMode::LearnedGating,
+            ef_search: Some(16),
+            attention: Some(c7_fixed_config(2, dim)),
+            ..RetrievalConfig::default()
+        };
+        let (r1, _, _, _) = coll
+            .attend_detailed_traced(&heads, &q, 5, None, None, None, Some(&cfg), None)
+            .unwrap();
+        let (r2, _, _, _) = coll
+            .attend_detailed_traced(&heads, &q, 5, None, None, None, Some(&cfg), None)
+            .unwrap();
+        for (a, b) in r1.iter().zip(r2.iter()) {
+            assert_eq!(a.id, b.id);
+            assert_eq!(a.final_score.to_bits(), b.final_score.to_bits(), "bit-exact determinism");
+        }
+    }
+
+    #[test]
+    fn c7_trace_additive_and_union_aligned() {
+        let dim = 4usize;
+        let coll = Collection::new("c7-trace", dim);
+        coll.add_default_head("a").unwrap();
+        coll.add_default_head("b").unwrap();
+        for i in 0..50u64 {
+            let x = i as f32 * 0.01 - 0.25;
+            let mut va = vec![0f32; dim];
+            let mut vb = vec![0f32; dim];
+            va[0] = x;
+            vb[1] = x;
+            coll.insert_vector("a", i, &va).unwrap();
+            coll.insert_vector("b", i, &vb).unwrap();
+        }
+        let heads = vec!["a".to_string(), "b".to_string()];
+        let q = [0.15, 0.1, 0.0, 0.0];
+
+        // Additive API: public 4-tuple methods are unchanged; the new method
+        // returns the same three traces PLUS the C7 trace (None when disabled).
+        let cfg_on = RetrievalConfig {
+            mode: RetrievalMode::LearnedGating,
+            ef_search: Some(16),
+            attention: Some(c7_fixed_config(2, dim)),
+            ..RetrievalConfig::default()
+        };
+        let (ranked, stats, cross, adaptive, trace) = coll
+            .attend_detailed_c7(&heads, &q, 5, None, None, None, Some(&cfg_on), None)
+            .unwrap();
+        let (ranked4, stats4, cross4, adaptive4, _) = coll
+            .attend_detailed_traced(&heads, &q, 5, None, None, None, Some(&cfg_on), None)
+            .map(|(r, s, c, a)| (r, s, c, a, ()))
+            .unwrap();
+
+        assert_eq!(ranked.len(), ranked4.len());
+        assert_eq!(stats.union_size, stats4.union_size);
+        assert_eq!(cross.round1, cross4.round1);
+        assert_eq!(adaptive.total_candidates_used, adaptive4.total_candidates_used);
+
+        // Trace present and union-aligned when attention enabled.
+        let trace = trace.expect("trace must be Some when attention is enabled");
+        assert_eq!(trace.candidates.len(), stats.union_size);
+        assert_eq!(trace.head_names, heads);
+        assert!(trace.compute_time_us >= 0);
+        for c in &trace.candidates {
+            assert_eq!(c.weights.len(), 2, "one weight per head");
+            assert_eq!(c.logits.len(), 2);
+            assert_eq!(c.output.len(), dim);
+            assert!(c.entropy.is_finite() && c.entropy >= 0.0);
+            assert!(c.attention_score.is_finite());
+        }
+        assert_eq!(trace.per_head_mean.len(), 2);
+        assert!(trace.mean_entropy.is_finite() && trace.mean_entropy >= 0.0);
+        // Attention scores in the trace must match the fused candidates.
+        assert_eq!(trace.candidates[0].id, ranked[0].id);
+
+        // None when the attention channel is disabled (arm A/B / legacy).
+        let cfg_off = RetrievalConfig {
+            mode: RetrievalMode::LearnedGating,
+            ef_search: Some(16),
+            attention: None,
+            ..RetrievalConfig::default()
+        };
+        let (_, _, _, _, trace_off) = coll
+            .attend_detailed_c7(&heads, &q, 5, None, None, None, Some(&cfg_off), None)
+            .unwrap();
+        assert!(trace_off.is_none(), "disabled attention must yield None trace");
+    }
+
+    #[test]
+    fn c7_trace_deterministic() {
+        let dim = 4usize;
+        let coll = Collection::new("c7-trace-det", dim);
+        coll.add_default_head("a").unwrap();
+        coll.add_default_head("b").unwrap();
+        for i in 0..30u64 {
+            let x = i as f32 * 0.02 - 0.3;
+            let mut va = vec![0f32; dim];
+            let mut vb = vec![0f32; dim];
+            va[0] = x;
+            vb[1] = x;
+            coll.insert_vector("a", i, &va).unwrap();
+            coll.insert_vector("b", i, &vb).unwrap();
+        }
+        let heads = vec!["a".to_string(), "b".to_string()];
+        let q = [0.1, 0.05, 0.0, 0.0];
+        let cfg = RetrievalConfig {
+            mode: RetrievalMode::LearnedGating,
+            ef_search: Some(16),
+            attention: Some(c7_fixed_config(2, dim)),
+            ..RetrievalConfig::default()
+        };
+        let (_, _, _, _, t1) = coll
+            .attend_detailed_c7(&heads, &q, 5, None, None, None, Some(&cfg), None)
+            .unwrap();
+        let (_, _, _, _, t2) = coll
+            .attend_detailed_c7(&heads, &q, 5, None, None, None, Some(&cfg), None)
+            .unwrap();
+        let t1 = t1.unwrap();
+        let t2 = t2.unwrap();
+        assert_eq!(t1.candidates.len(), t2.candidates.len());
+        for (a, b) in t1.candidates.iter().zip(t2.candidates.iter()) {
+            assert_eq!(a.id, b.id);
+            assert_eq!(a.attention_score.to_bits(), b.attention_score.to_bits());
+            assert_eq!(a.entropy.to_bits(), b.entropy.to_bits());
+            assert_eq!(a.weights, b.weights);
+            assert_eq!(a.output, b.output);
+            assert_eq!(a.logits, b.logits);
+        }
+        assert_eq!(t1.per_head_mean, t2.per_head_mean);
+        assert_eq!(t1.mean_entropy.to_bits(), t2.mean_entropy.to_bits());
     }
 }

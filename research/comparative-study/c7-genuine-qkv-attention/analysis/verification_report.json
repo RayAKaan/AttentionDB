@@ -1,0 +1,13 @@
+{
+  "gate": {
+    "efprobe-SCI": "checked",
+    "smoke-SCI": "checked",
+    "test-SCI": "10 reps checked (oracle recomputed)",
+    "efprobe-NFC": "checked",
+    "smoke-NFC": "checked",
+    "test-NFC": "10 reps checked (oracle recomputed)",
+    "run-index": "checked"
+  },
+  "checks": {},
+  "all_pass": true
+}
