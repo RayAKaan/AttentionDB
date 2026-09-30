@@ -1,0 +1,23 @@
+{
+  "host": "Originator",
+  "os": "Windows-11-10.0.26200-SP0",
+  "python": "3.14.4",
+  "created_utc": "2026-09-29T22:15:45Z",
+  "c7pilot_sha256": "c14f94183a1dbef2878f867a3fef0aedef48a758b6e8ca9b31328eb6319d0452",
+  "input_hashes": {
+    "CANONICAL.f32": "4f1f7a3bc26916b14545e7ac0a5dae1d16393db944a54b37441f7c70029f09ef",
+    "HEAD-BODY.f32": "2f76b795e31d0c09bc63988acf15710cd3607e09d60e0ecdf87ebb42c0fb892a",
+    "HEAD-CITE.f32": "181c17fb89cd63299cca102bb18dc401b3171bf1a60dc0b662d36b694742a5d5",
+    "HEAD-TITLE.f32": "87634220e8b730dcdc5711a5033414bf8168ba6d6feac19a08bb0bfe6d7a1d84",
+    "QUERIES.f32": "afb866ae799124ad3fcd5faadca70bbd698d62c3c38f47d63b5f181ef26cfc15",
+    "model.json": "d104ee487816e0a586ab5b860850ff2b0e9556a05dcf87e483aef854e306f0d3",
+    "train-cfg.json": "ca1d883971ca6ff3b4b3e9f0d02e52d8cbc6ad6c7331a3d16a81fa7ff536abbb"
+  },
+  "guardrail": {
+    "policy": "sampler(500ms) aborts when child process-tree RSS >= 85% of MemAvailable at preflight; 2400s timeout",
+    "mem_avail_at_preflight_bytes": 5676314624,
+    "mem_load_pct_at_preflight": 66,
+    "ram_abort_threshold_bytes": 4824867430
+  },
+  "method": "one shared engine per process; arms A-F evaluated in-process (B/C/D/E/F union identical by construction, re-verified per rep)"
+}
