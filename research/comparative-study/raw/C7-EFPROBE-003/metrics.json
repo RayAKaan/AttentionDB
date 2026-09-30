@@ -1,0 +1,38 @@
+{
+  "run_id": "C7-EFPROBE-003",
+  "mode": "EF16",
+  "dataset": "DS-NFCORPUS",
+  "split": "PROBE",
+  "phase": "C7 execution",
+  "test_queries": 20,
+  "rep_count": 1,
+  "warmup": 20,
+  "ef_search": 64,
+  "candidate_budget": 500,
+  "min_candidates_per_head": 20,
+  "max_candidates_per_head": 300,
+  "per_rep": [
+    {
+      "n_queries": 20,
+      "recall10_qrels_mean": 0.10043212939053774,
+      "recall10_exact_mean": 0.605000002682209,
+      "ndcg10_qrels_mean": 0.26576505079865453,
+      "p50_us": 887.0,
+      "p90_us": 1051.6,
+      "p95_us": 1255.8,
+      "deadline_exceeded": 0
+    }
+  ],
+  "rep_recall10_qrels_mean": [
+    0.10043212939053774
+  ],
+  "recall10_qrels_mean_Nrep": 0.1004,
+  "rep_ndcg10_qrels_mean": [
+    0.26576505079865453
+  ],
+  "ndcg10_qrels_mean_Nrep": 0.2658,
+  "union_identity_ok": true,
+  "union_report": {
+    "skipped": "EFPROBE arms are MODE-B (attention OFF); union identity checked on B/C/D/E/F arms"
+  }
+}

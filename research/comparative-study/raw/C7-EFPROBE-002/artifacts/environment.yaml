@@ -1,0 +1,25 @@
+{
+  "host": "Originator",
+  "os": "Windows-11-10.0.26200-SP0",
+  "python": "3.14.4",
+  "created_utc": "2026-09-29T20:43:04Z",
+  "c7pilot_sha256": "c14f94183a1dbef2878f867a3fef0aedef48a758b6e8ca9b31328eb6319d0452",
+  "input_hashes": {
+    "CANONICAL.f32": "3e350dcbb6fad01909dc707576420e034d2fd232ed0a8661e57e33202f840be3",
+    "HEAD-BODY.f32": "c7436e493ddbf41dfeedb77c3007067dc60333e15c5622f167b283ee09eb4a2c",
+    "HEAD-CITE.f32": "c927fb7372e784805f37b884336c57af4cddb2bda461714ba4d8267b94a94664",
+    "HEAD-TITLE.f32": "46b483be668257b97d9caebaff5a98d646be193fb42e42914c18bcd1eab567dd",
+    "QUERIES.f32": "bf6fe475ddee390d7672ebf15c1d66d270f3199c098b03272e45a97f1ddc93b2",
+    "multi-probe-rep1-cfg.json": "7313f0123a6f8dafaa26169f33983760fc713e7dd2eeb5e45e814d94e7c50e26",
+    "multi-probe-rep1.json": "a4bb482cd61ec5daaeab8a599890a7d441c6c400c948ba22565437bf8d9c2b6e",
+    "ARM-EF128-rep1.json": "1cb503f2ee54fc8c0538686969f2b6ad4bbbb55d1fe99faab6e896e28cf66ee6",
+    "cfg.json": "7313f0123a6f8dafaa26169f33983760fc713e7dd2eeb5e45e814d94e7c50e26"
+  },
+  "guardrail": {
+    "policy": "sampler(500ms) aborts when child process-tree RSS >= 85% of MemAvailable at preflight; 2400s timeout",
+    "mem_avail_at_preflight_bytes": 4634398720,
+    "mem_load_pct_at_preflight": 72,
+    "ram_abort_threshold_bytes": 3939238912
+  },
+  "method": "one shared engine per process; arms A-F evaluated in-process (B/C/D/E/F union identical by construction, re-verified per rep)"
+}

@@ -1623,3 +1623,173 @@
   purpose: 'C6 TEST RAND DS-NFCORPUS (323 qids, 5 reps)'
   completed: 2026-09-28T13:03:38Z
   result: recall10_qrels=0.1609 sd=0.0015 p50_us=1419.1
+- run_id: C7-EFPROBE-001
+  status: PASS
+  purpose: 'C7 PROBE EF16 DS-SCIFACT (20 qids, 1 reps)'
+  completed: 2026-09-29T20:43:04Z
+  result: ndcg10=0.4738 recall10=0.675 union_identity_ok=True
+- run_id: C7-EFPROBE-002
+  status: PASS
+  purpose: 'C7 PROBE EF128 DS-SCIFACT (20 qids, 1 reps)'
+  completed: 2026-09-29T20:43:04Z
+  result: ndcg10=0.4842 recall10=0.725 union_identity_ok=True
+- run_id: C7-EFPROBE-003
+  status: PASS
+  purpose: 'C7 PROBE EF16 DS-NFCORPUS (20 qids, 1 reps)'
+  completed: 2026-09-29T20:43:36Z
+  result: ndcg10=0.2658 recall10=0.1004 union_identity_ok=True
+- run_id: C7-EFPROBE-004
+  status: PASS
+  purpose: 'C7 PROBE EF128 DS-NFCORPUS (20 qids, 1 reps)'
+  completed: 2026-09-29T20:43:36Z
+  result: ndcg10=0.2653 recall10=0.1158 union_identity_ok=True
+- run_id: C7-TUNE-SCI-C-001
+  status: PASS
+  purpose: 'C7 TUNE-C gate scan DS-SCIFACT (VALIDATION 200 qids)'
+  completed: 2026-09-29T21:19:36Z
+  result: g*=1.0 ndcg10=0.5861
+- run_id: C7-TUNE-SCI-E-001
+  status: PASS
+  purpose: 'C7 TUNE-E contrastive QKV DS-SCIFACT (VALIDATION 200 qids)'
+  completed: 2026-09-29T21:21:01Z
+  result: examples=192 skipped=8 dataset_hash=15722903221172142166 epochs=5 loss=[4.125298976898193, 0.17216718196868896, 0.06247486546635628, 0.0005361715448088944, 0.0004724842438008636]
+- run_id: C7-TUNE-SCI-F-001
+  status: PASS
+  purpose: 'C7 TUNE-F contrastive QKV DS-SCIFACT (VALIDATION 200 qids)'
+  completed: 2026-09-29T21:22:16Z
+  result: examples=192 skipped=8 dataset_hash=8349611678822513198 epochs=5 loss=[4.539921760559082, 0.30742326378822327, 0.08515453338623047, 0.0007746841874904931, 0.0004468198458198458]
+- run_id: C7-TUNE-NFC-C-001
+  status: PASS
+  purpose: 'C7 TUNE-C gate scan DS-NFCORPUS (VALIDATION 324 qids)'
+  completed: 2026-09-29T22:14:29Z
+  result: g*=0.9 ndcg10=0.3012
+- run_id: C7-TUNE-NFC-E-001
+  status: PASS
+  purpose: 'C7 TUNE-E contrastive QKV DS-NFCORPUS (VALIDATION 324 qids)'
+  completed: 2026-09-29T22:15:45Z
+  result: examples=303 skipped=21 dataset_hash=11189278346050524437 epochs=5 loss=[6.537671089172363, 0.65986168384552, 0.1298334151506424, 0.008114036172628403, 0.007357690017670393]
+- run_id: C7-TUNE-NFC-F-001
+  status: PASS
+  purpose: 'C7 TUNE-F contrastive QKV DS-NFCORPUS (VALIDATION 324 qids)'
+  completed: 2026-09-29T22:16:56Z
+  result: examples=303 skipped=21 dataset_hash=5443175624639632414 epochs=5 loss=[6.452956676483154, 0.7566808462142944, 0.09531395882368088, 0.061683863401412964, 0.0077606309205293655]
+- run_id: C7-SMOKE-SCI-AE-001
+  status: PASS
+  purpose: 'C7 SMOKE A DS-SCIFACT (20 qids, 1 reps)'
+  completed: 2026-09-29T22:21:10Z
+  result: ndcg10=0.564 recall10=0.775 union_identity_ok=True
+- run_id: C7-SMOKE-SCI-BE-001
+  status: PASS
+  purpose: 'C7 SMOKE B DS-SCIFACT (20 qids, 1 reps)'
+  completed: 2026-09-29T22:21:10Z
+  result: ndcg10=0.4911 recall10=0.775 union_identity_ok=True
+- run_id: C7-SMOKE-SCI-CE-001
+  status: PASS
+  purpose: 'C7 SMOKE C DS-SCIFACT (20 qids, 1 reps)'
+  completed: 2026-09-29T22:21:10Z
+  result: ndcg10=0.4774 recall10=0.725 union_identity_ok=True
+- run_id: C7-SMOKE-SCI-DE-001
+  status: PASS
+  purpose: 'C7 SMOKE D DS-SCIFACT (20 qids, 1 reps)'
+  completed: 2026-09-29T22:21:10Z
+  result: ndcg10=0.4924 recall10=0.775 union_identity_ok=True
+- run_id: C7-SMOKE-SCI-EE-001
+  status: PASS
+  purpose: 'C7 SMOKE E DS-SCIFACT (20 qids, 1 reps)'
+  completed: 2026-09-29T22:21:10Z
+  result: ndcg10=0.9223 recall10=0.9125 union_identity_ok=True
+- run_id: C7-SMOKE-SCI-FE-001
+  status: PASS
+  purpose: 'C7 SMOKE F DS-SCIFACT (20 qids, 1 reps)'
+  completed: 2026-09-29T22:21:11Z
+  result: ndcg10=0.9223 recall10=0.9125 union_identity_ok=True
+- run_id: C7-SMOKE-NFC-AE-001
+  status: PASS
+  purpose: 'C7 SMOKE A DS-NFCORPUS (20 qids, 1 reps)'
+  completed: 2026-09-29T22:24:36Z
+  result: ndcg10=0.2636 recall10=0.0968 union_identity_ok=True
+- run_id: C7-SMOKE-NFC-BE-001
+  status: PASS
+  purpose: 'C7 SMOKE B DS-NFCORPUS (20 qids, 1 reps)'
+  completed: 2026-09-29T22:24:36Z
+  result: ndcg10=0.2651 recall10=0.1158 union_identity_ok=True
+- run_id: C7-SMOKE-NFC-CE-001
+  status: PASS
+  purpose: 'C7 SMOKE C DS-NFCORPUS (20 qids, 1 reps)'
+  completed: 2026-09-29T22:24:36Z
+  result: ndcg10=0.2686 recall10=0.1169 union_identity_ok=True
+- run_id: C7-SMOKE-NFC-DE-001
+  status: PASS
+  purpose: 'C7 SMOKE D DS-NFCORPUS (20 qids, 1 reps)'
+  completed: 2026-09-29T22:24:36Z
+  result: ndcg10=0.2683 recall10=0.1169 union_identity_ok=True
+- run_id: C7-SMOKE-NFC-EE-001
+  status: PASS
+  purpose: 'C7 SMOKE E DS-NFCORPUS (20 qids, 1 reps)'
+  completed: 2026-09-29T22:24:37Z
+  result: ndcg10=0.4406 recall10=0.1928 union_identity_ok=True
+- run_id: C7-SMOKE-NFC-FE-001
+  status: PASS
+  purpose: 'C7 SMOKE F DS-NFCORPUS (20 qids, 1 reps)'
+  completed: 2026-09-29T22:24:37Z
+  result: ndcg10=0.4162 recall10=0.1846 union_identity_ok=True
+- run_id: C7-TEST-SCI-A-001
+  status: PASS
+  purpose: 'C7 TEST A DS-SCIFACT (300 qids, 5 reps)'
+  completed: 2026-09-29T23:58:52Z
+  result: ndcg10=0.6359 recall10=0.77 union_identity_ok=True
+- run_id: C7-TEST-SCI-B-001
+  status: PASS
+  purpose: 'C7 TEST B DS-SCIFACT (300 qids, 5 reps)'
+  completed: 2026-09-29T23:59:13Z
+  result: ndcg10=0.6097 recall10=0.7567 union_identity_ok=True
+- run_id: C7-TEST-SCI-C-001
+  status: PASS
+  purpose: 'C7 TEST C DS-SCIFACT (300 qids, 5 reps)'
+  completed: 2026-09-29T23:59:35Z
+  result: ndcg10=0.6168 recall10=0.7672 union_identity_ok=True
+- run_id: C7-TEST-SCI-D-001
+  status: PASS
+  purpose: 'C7 TEST D DS-SCIFACT (300 qids, 5 reps)'
+  completed: 2026-09-29T23:59:58Z
+  result: ndcg10=0.6115 recall10=0.76 union_identity_ok=True
+- run_id: C7-TEST-SCI-E-001
+  status: PASS
+  purpose: 'C7 TEST E DS-SCIFACT (300 qids, 5 reps)'
+  completed: 2026-09-30T00:00:28Z
+  result: ndcg10=0.5469 recall10=0.6948 union_identity_ok=True
+- run_id: C7-TEST-SCI-F-001
+  status: PASS
+  purpose: 'C7 TEST F DS-SCIFACT (300 qids, 5 reps)'
+  completed: 2026-09-30T00:00:51Z
+  result: ndcg10=0.603 recall10=0.7652 union_identity_ok=True
+- run_id: C7-TEST-NFC-A-001
+  status: PASS
+  purpose: 'C7 TEST A DS-NFCORPUS (323 qids, 5 reps)'
+  completed: 2026-09-30T04:39:31Z
+  result: ndcg10=0.3154 recall10=0.154 union_identity_ok=True
+- run_id: C7-TEST-NFC-B-001
+  status: PASS
+  purpose: 'C7 TEST B DS-NFCORPUS (323 qids, 5 reps)'
+  completed: 2026-09-30T04:39:38Z
+  result: ndcg10=0.3201 recall10=0.1569 union_identity_ok=True
+- run_id: C7-TEST-NFC-C-001
+  status: PASS
+  purpose: 'C7 TEST C DS-NFCORPUS (323 qids, 5 reps)'
+  completed: 2026-09-30T04:39:47Z
+  result: ndcg10=0.3209 recall10=0.1559 union_identity_ok=True
+- run_id: C7-TEST-NFC-D-001
+  status: PASS
+  purpose: 'C7 TEST D DS-NFCORPUS (323 qids, 5 reps)'
+  completed: 2026-09-30T04:39:56Z
+  result: ndcg10=0.3201 recall10=0.1567 union_identity_ok=True
+- run_id: C7-TEST-NFC-E-001
+  status: PASS
+  purpose: 'C7 TEST E DS-NFCORPUS (323 qids, 5 reps)'
+  completed: 2026-09-30T04:40:05Z
+  result: ndcg10=0.2272 recall10=0.1118 union_identity_ok=True
+- run_id: C7-TEST-NFC-F-001
+  status: PASS
+  purpose: 'C7 TEST F DS-NFCORPUS (323 qids, 5 reps)'
+  completed: 2026-09-30T04:40:15Z
+  result: ndcg10=0.2709 recall10=0.13 union_identity_ok=True
