@@ -1,0 +1,165 @@
+{
+  "run_id": "C7-TEST-SCI-A-001",
+  "mode": "A",
+  "dataset": "DS-SCIFACT",
+  "split": "TEST",
+  "phase": "C7 execution",
+  "test_queries": 300,
+  "rep_count": 5,
+  "warmup": 20,
+  "ef_search": 64,
+  "candidate_budget": 500,
+  "min_candidates_per_head": 20,
+  "max_candidates_per_head": 300,
+  "per_rep": [
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7700000000993411,
+      "recall10_exact_mean": 0.9886666645606359,
+      "ndcg10_qrels_mean": 0.635865471214056,
+      "p50_us": 3452.9,
+      "p90_us": 4804.9,
+      "p95_us": 5366.0,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7700000000993411,
+      "recall10_exact_mean": 0.9886666645606359,
+      "ndcg10_qrels_mean": 0.635865471214056,
+      "p50_us": 3446.9,
+      "p90_us": 4500.8,
+      "p95_us": 4994.3,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7700000000993411,
+      "recall10_exact_mean": 0.9886666645606359,
+      "ndcg10_qrels_mean": 0.635865471214056,
+      "p50_us": 3457.3,
+      "p90_us": 4568.5,
+      "p95_us": 4972.0,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7700000000993411,
+      "recall10_exact_mean": 0.9886666645606359,
+      "ndcg10_qrels_mean": 0.635865471214056,
+      "p50_us": 3297.7000000000003,
+      "p90_us": 4364.4,
+      "p95_us": 4669.8,
+      "deadline_exceeded": 0
+    },
+    {
+      "n_queries": 300,
+      "recall10_qrels_mean": 0.7700000000993411,
+      "recall10_exact_mean": 0.9886666645606359,
+      "ndcg10_qrels_mean": 0.635865471214056,
+      "p50_us": 3557.6000000000004,
+      "p90_us": 4902.400000000001,
+      "p95_us": 5497.6,
+      "deadline_exceeded": 0
+    }
+  ],
+  "rep_recall10_qrels_mean": [
+    0.7700000000993411,
+    0.7700000000993411,
+    0.7700000000993411,
+    0.7700000000993411,
+    0.7700000000993411
+  ],
+  "recall10_qrels_mean_Nrep": 0.77,
+  "rep_ndcg10_qrels_mean": [
+    0.635865471214056,
+    0.635865471214056,
+    0.635865471214056,
+    0.635865471214056,
+    0.635865471214056
+  ],
+  "ndcg10_qrels_mean_Nrep": 0.6359,
+  "union_identity_ok": true,
+  "union_report": {
+    "rep1:BvsC": {
+      "mismatches": 0,
+      "n_queries": 300
+    },
+    "rep1:BvsD": {
+      "mismatches": 0,
+      "n_queries": 300
+    },
+    "rep1:BvsE": {
+      "mismatches": 0,
+      "n_queries": 300
+    },
+    "rep1:BvsF": {
+      "mismatches": 0,
+      "n_queries": 300
+    },
+    "rep2:BvsC": {
+      "mismatches": 0,
+      "n_queries": 300
+    },
+    "rep2:BvsD": {
+      "mismatches": 0,
+      "n_queries": 300
+    },
+    "rep2:BvsE": {
+      "mismatches": 0,
+      "n_queries": 300
+    },
+    "rep2:BvsF": {
+      "mismatches": 0,
+      "n_queries": 300
+    },
+    "rep3:BvsC": {
+      "mismatches": 0,
+      "n_queries": 300
+    },
+    "rep3:BvsD": {
+      "mismatches": 0,
+      "n_queries": 300
+    },
+    "rep3:BvsE": {
+      "mismatches": 0,
+      "n_queries": 300
+    },
+    "rep3:BvsF": {
+      "mismatches": 0,
+      "n_queries": 300
+    },
+    "rep4:BvsC": {
+      "mismatches": 0,
+      "n_queries": 300
+    },
+    "rep4:BvsD": {
+      "mismatches": 0,
+      "n_queries": 300
+    },
+    "rep4:BvsE": {
+      "mismatches": 0,
+      "n_queries": 300
+    },
+    "rep4:BvsF": {
+      "mismatches": 0,
+      "n_queries": 300
+    },
+    "rep5:BvsC": {
+      "mismatches": 0,
+      "n_queries": 300
+    },
+    "rep5:BvsD": {
+      "mismatches": 0,
+      "n_queries": 300
+    },
+    "rep5:BvsE": {
+      "mismatches": 0,
+      "n_queries": 300
+    },
+    "rep5:BvsF": {
+      "mismatches": 0,
+      "n_queries": 300
+    }
+  }
+}
