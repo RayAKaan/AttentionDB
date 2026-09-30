@@ -1,13 +1,13 @@
+use crate::adaptive::{AdaptiveRetriever, AdaptiveTrace, RetrievalBudget};
 use crate::bm25::Bm25Index;
 use crate::error::CoreError;
-use crate::adaptive::{AdaptiveRetriever, AdaptiveTrace, HeadAllocation, RetrievalBudget};
-use crate::{AdaptivePolicyType, AdaptiveRetrievalConfig};
 use crate::retrieval::{
     candidate_union, cross_head_centroid, cross_refine_query, deterministic_top_k, fuse_candidate,
     normalize_scores, rrf_fuse, AttentionScorer, C7CandidateTrace, C7Trace, CandidateFeatures,
-    CandidateSet, CrossHeadTrace,
-    CrossRefineConfig, FusionWeights, HeadHit, RankedCandidate, ScoreNormalization,
+    CandidateSet, CrossHeadTrace, CrossRefineConfig, FusionWeights, HeadHit, RankedCandidate,
+    ScoreNormalization,
 };
+use crate::{AdaptivePolicyType, AdaptiveRetrievalConfig};
 use attentiondb_hnsw::{similarity, HNSWConfig, HeadIndexManager};
 use attentiondb_multihead::{GatingNetwork, HeadConfig, HeadType, MultiHeadManager};
 use parking_lot::RwLock;
@@ -443,7 +443,15 @@ impl Collection {
         gate_override: Option<Vec<f32>>,
         config_override: Option<&RetrievalConfig>,
         deadline: Option<std::time::Instant>,
-    ) -> Result<(Vec<RankedCandidate>, PipelineStats, CrossHeadTrace, AdaptiveTrace), CoreError> {
+    ) -> Result<
+        (
+            Vec<RankedCandidate>,
+            PipelineStats,
+            CrossHeadTrace,
+            AdaptiveTrace,
+        ),
+        CoreError,
+    > {
         self.attend_detailed_inner(
             heads,
             query,
@@ -686,7 +694,10 @@ impl Collection {
         // If adaptive config is set with InteractionGuided policy, run redistribution.
         let mut adaptive_trace = AdaptiveTrace::default();
         if let Some(adaptive_cfg) = &cfg.adaptive {
-            if matches!(adaptive_cfg.policy_type, AdaptivePolicyType::InteractionGuided) {
+            if matches!(
+                adaptive_cfg.policy_type,
+                AdaptivePolicyType::InteractionGuided
+            ) {
                 // Build head centroids for stage 1 results
                 let mgr = self.head_manager.read();
                 let mut head_centroids = Vec::with_capacity(present_heads.len());
@@ -699,13 +710,17 @@ impl Collection {
                         for i in 0..len {
                             if let Some(v) = idx.get_vector(i as u64) {
                                 for (s, &x) in sum.iter_mut().zip(v.iter()) {
-                                    if x.is_finite() { *s += x; }
+                                    if x.is_finite() {
+                                        *s += x;
+                                    }
                                 }
                                 count += 1;
                             }
                         }
                         if count > 0 {
-                            for s in sum.iter_mut() { *s /= count as f32; }
+                            for s in sum.iter_mut() {
+                                *s /= count as f32;
+                            }
                         }
                         head_centroids.push(sum);
                     } else {
@@ -720,40 +735,55 @@ impl Collection {
                     max_per_head: cfg.candidate_budget.max(top_k),
                 };
 
-                let policy: Box<dyn crate::adaptive::AllocationPolicy> = Box::new(crate::adaptive::InteractionGuidedPolicy {
-                    stage1_fraction: adaptive_cfg.stage1_fraction,
-                    overlap_threshold: adaptive_cfg.overlap_threshold,
-                    entropy_threshold: adaptive_cfg.entropy_threshold,
-                });
+                let policy: Box<dyn crate::adaptive::AllocationPolicy> =
+                    Box::new(crate::adaptive::InteractionGuidedPolicy {
+                        stage1_fraction: adaptive_cfg.stage1_fraction,
+                        overlap_threshold: adaptive_cfg.overlap_threshold,
+                        entropy_threshold: adaptive_cfg.entropy_threshold,
+                    });
 
                 let retriever = AdaptiveRetriever::new(policy, budget, Some(head_centroids));
                 let search_fn = |h: &str, q: &[f32], k: usize, ef: Option<usize>| -> Vec<HeadHit> {
-                    let idx_opt = head_indexes.iter().zip(heads.iter()).find(|(_, hh)| *hh == h);
+                    let idx_opt = head_indexes
+                        .iter()
+                        .zip(heads.iter())
+                        .find(|(_, hh)| *hh == h);
                     if let Some((Some(idx), _)) = idx_opt {
                         let head_len = idx.read().len().max(1);
                         let kk = k.min(head_len);
-                        idx.read().search(q, kk, ef).ok().map_or(Vec::new(), |res| res
-                            .into_iter()
-                            .enumerate()
-                            .filter(|(_, (id, s))| s.is_finite() && !retired.contains(id))
-                            .map(|(rank, (id, s))| HeadHit { id, raw_score: s, rank })
-                            .collect())
-                    } else { Vec::new() }
+                        idx.read().search(q, kk, ef).ok().map_or(Vec::new(), |res| {
+                            res.into_iter()
+                                .enumerate()
+                                .filter(|(_, (id, s))| s.is_finite() && !retired.contains(id))
+                                .map(|(rank, (id, s))| HeadHit {
+                                    id,
+                                    raw_score: s,
+                                    rank,
+                                })
+                                .collect()
+                        })
+                    } else {
+                        Vec::new()
+                    }
                 };
 
                 // Build Stage1Result from present_hits
-                let stage1_results: Vec<crate::adaptive::Stage1Result> = present_heads.iter().zip(present_hits.iter()).map(|(h, hits)| {
-                    let overlap = 0.0f32; // will compute below
-                    let entropy = crate::adaptive::score_entropy(hits);
-                    let top = hits.first().map(|h| h.raw_score).unwrap_or(0.0);
-                    crate::adaptive::Stage1Result {
-                        head: h.clone(),
-                        candidates: hits.clone(),
-                        overlap_with_others: overlap,
-                        score_entropy: entropy,
-                        top_score: top,
-                    }
-                }).collect();
+                let stage1_results: Vec<crate::adaptive::Stage1Result> = present_heads
+                    .iter()
+                    .zip(present_hits.iter())
+                    .map(|(h, hits)| {
+                        let overlap = 0.0f32; // will compute below
+                        let entropy = crate::adaptive::score_entropy(hits);
+                        let top = hits.first().map(|h| h.raw_score).unwrap_or(0.0);
+                        crate::adaptive::Stage1Result {
+                            head: h.clone(),
+                            candidates: hits.clone(),
+                            overlap_with_others: overlap,
+                            score_entropy: entropy,
+                            top_score: top,
+                        }
+                    })
+                    .collect();
 
                 // Compute overlap
                 let head_ids: Vec<std::collections::HashMap<u64, ()>> = stage1_results
@@ -764,11 +794,17 @@ impl Collection {
                 for (i, r) in stage1_results_mut.iter_mut().enumerate() {
                     let mut overlap_union = std::collections::HashMap::new();
                     for (j, other) in head_ids.iter().enumerate() {
-                        if i != j { overlap_union.extend(other.clone()); }
+                        if i != j {
+                            overlap_union.extend(other.clone());
+                        }
                     }
                     if !overlap_union.is_empty() {
-                        let own: std::collections::HashMap<u64, ()> = r.candidates.iter().map(|h| (h.id, ())).collect();
-                        let inter = own.keys().filter(|id| overlap_union.contains_key(id)).count();
+                        let own: std::collections::HashMap<u64, ()> =
+                            r.candidates.iter().map(|h| (h.id, ())).collect();
+                        let inter = own
+                            .keys()
+                            .filter(|id| overlap_union.contains_key(id))
+                            .count();
                         r.overlap_with_others = inter as f32 / own.len().max(1) as f32;
                     }
                 }
@@ -1075,7 +1111,8 @@ impl Collection {
                         Err(_) => None,
                     };
                     per_head.push(v.unwrap_or_else(|| vec![0.0; self.dim]));
-                    let sim = u.head_scores[h_idx].and_then(|_| norm_maps[h_idx].get(&u.id).copied());
+                    let sim =
+                        u.head_scores[h_idx].and_then(|_| norm_maps[h_idx].get(&u.id).copied());
                     sims.push(sim);
                     let r = u.head_ranks[h_idx];
                     ranks.push(r.map(|r| 1.0 / (1.0 + r as f32)));
@@ -1114,7 +1151,8 @@ impl Collection {
                 mean_entropy: out.mean_entropy,
                 compute_time_us: out.compute_time_us,
             });
-            metrics::histogram!("attentiondb_c7_attention_micros").record(out.compute_time_us as f64);
+            metrics::histogram!("attentiondb_c7_attention_micros")
+                .record(out.compute_time_us as f64);
             tracing::info!(
                 candidates = union.len(),
                 mean_entropy = out.mean_entropy,
@@ -1242,6 +1280,7 @@ impl Collection {
     }
 
     /// attend_detailed with adaptive trace (C6).
+    #[allow(clippy::too_many_arguments)]
     pub fn attend_detailed_adaptive(
         &self,
         heads: &[String],
@@ -1252,7 +1291,15 @@ impl Collection {
         gate_override: Option<Vec<f32>>,
         config_override: Option<&RetrievalConfig>,
         deadline: Option<std::time::Instant>,
-    ) -> Result<(Vec<RankedCandidate>, PipelineStats, CrossHeadTrace, AdaptiveTrace), CoreError> {
+    ) -> Result<
+        (
+            Vec<RankedCandidate>,
+            PipelineStats,
+            CrossHeadTrace,
+            AdaptiveTrace,
+        ),
+        CoreError,
+    > {
         self.attend_detailed_inner(
             heads,
             query,
@@ -1836,7 +1883,11 @@ mod c7_attention_tests {
             .unwrap();
         for (a, b) in r1.iter().zip(r2.iter()) {
             assert_eq!(a.id, b.id);
-            assert_eq!(a.final_score.to_bits(), b.final_score.to_bits(), "bit-exact determinism");
+            assert_eq!(
+                a.final_score.to_bits(),
+                b.final_score.to_bits(),
+                "bit-exact determinism"
+            );
         }
     }
 
@@ -1877,13 +1928,15 @@ mod c7_attention_tests {
         assert_eq!(ranked.len(), ranked4.len());
         assert_eq!(stats.union_size, stats4.union_size);
         assert_eq!(cross.round1, cross4.round1);
-        assert_eq!(adaptive.total_candidates_used, adaptive4.total_candidates_used);
+        assert_eq!(
+            adaptive.total_candidates_used,
+            adaptive4.total_candidates_used
+        );
 
         // Trace present and union-aligned when attention enabled.
         let trace = trace.expect("trace must be Some when attention is enabled");
         assert_eq!(trace.candidates.len(), stats.union_size);
         assert_eq!(trace.head_names, heads);
-        assert!(trace.compute_time_us >= 0);
         for c in &trace.candidates {
             assert_eq!(c.weights.len(), 2, "one weight per head");
             assert_eq!(c.logits.len(), 2);
@@ -1906,7 +1959,10 @@ mod c7_attention_tests {
         let (_, _, _, _, trace_off) = coll
             .attend_detailed_c7(&heads, &q, 5, None, None, None, Some(&cfg_off), None)
             .unwrap();
-        assert!(trace_off.is_none(), "disabled attention must yield None trace");
+        assert!(
+            trace_off.is_none(),
+            "disabled attention must yield None trace"
+        );
     }
 
     #[test]

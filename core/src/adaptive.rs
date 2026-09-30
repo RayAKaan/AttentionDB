@@ -27,7 +27,7 @@ impl Default for RetrievalBudget {
     fn default() -> Self {
         Self {
             total_candidates: 500,
-            total_ef_work: 192,   // 64 * 3 heads
+            total_ef_work: 192, // 64 * 3 heads
             min_per_head: 20,
             max_per_head: 300,
         }
@@ -106,8 +106,18 @@ pub struct AdaptiveTrace {
 /// Allocation policy trait with Debug support for trait objects.
 pub trait AllocationPolicy: Send + Sync + std::fmt::Debug {
     fn name(&self) -> &'static str;
-    fn initial_allocation(&self, budget: &RetrievalBudget, heads: &[String], query: &[f32], head_centroids: Option<&[Vec<f32>]>) -> Vec<HeadAllocation>;
-    fn redistribute(&self, budget: &RetrievalBudget, stage1_results: &[Stage1Result]) -> Vec<HeadAllocation>;
+    fn initial_allocation(
+        &self,
+        budget: &RetrievalBudget,
+        heads: &[String],
+        query: &[f32],
+        head_centroids: Option<&[Vec<f32>]>,
+    ) -> Vec<HeadAllocation>;
+    fn redistribute(
+        &self,
+        budget: &RetrievalBudget,
+        stage1_results: &[Stage1Result],
+    ) -> Vec<HeadAllocation>;
 }
 
 /// Trait alias for dyn AllocationPolicy + Debug (workaround for trait object limitations).
@@ -118,9 +128,17 @@ type DynAllocationPolicy = dyn AllocationPolicy;
 pub struct StaticEqualPolicy;
 
 impl AllocationPolicy for StaticEqualPolicy {
-    fn name(&self) -> &'static str { "static_equal" }
+    fn name(&self) -> &'static str {
+        "static_equal"
+    }
 
-    fn initial_allocation(&self, budget: &RetrievalBudget, heads: &[String], _query: &[f32], _centroids: Option<&[Vec<f32>]>) -> Vec<HeadAllocation> {
+    fn initial_allocation(
+        &self,
+        budget: &RetrievalBudget,
+        heads: &[String],
+        _query: &[f32],
+        _centroids: Option<&[Vec<f32>]>,
+    ) -> Vec<HeadAllocation> {
         let n = heads.len().max(1);
         let base_cand = budget.total_candidates / n;
         let base_ef = budget.total_ef_work / n;
@@ -141,7 +159,11 @@ impl AllocationPolicy for StaticEqualPolicy {
         allocs
     }
 
-    fn redistribute(&self, _budget: &RetrievalBudget, _stage1: &[Stage1Result]) -> Vec<HeadAllocation> {
+    fn redistribute(
+        &self,
+        _budget: &RetrievalBudget,
+        _stage1: &[Stage1Result],
+    ) -> Vec<HeadAllocation> {
         Vec::new()
     }
 }
@@ -151,9 +173,17 @@ impl AllocationPolicy for StaticEqualPolicy {
 pub struct QueryAdaptivePolicy;
 
 impl AllocationPolicy for QueryAdaptivePolicy {
-    fn name(&self) -> &'static str { "query_adaptive" }
+    fn name(&self) -> &'static str {
+        "query_adaptive"
+    }
 
-    fn initial_allocation(&self, budget: &RetrievalBudget, heads: &[String], query: &[f32], centroids: Option<&[Vec<f32>]>) -> Vec<HeadAllocation> {
+    fn initial_allocation(
+        &self,
+        budget: &RetrievalBudget,
+        heads: &[String],
+        query: &[f32],
+        centroids: Option<&[Vec<f32>]>,
+    ) -> Vec<HeadAllocation> {
         let n = heads.len().max(1);
         let Some(cents) = centroids else {
             return StaticEqualPolicy.initial_allocation(budget, heads, query, None);
@@ -200,7 +230,11 @@ impl AllocationPolicy for QueryAdaptivePolicy {
         allocs
     }
 
-    fn redistribute(&self, _budget: &RetrievalBudget, _stage1: &[Stage1Result]) -> Vec<HeadAllocation> {
+    fn redistribute(
+        &self,
+        _budget: &RetrievalBudget,
+        _stage1: &[Stage1Result],
+    ) -> Vec<HeadAllocation> {
         Vec::new()
     }
 }
@@ -224,11 +258,20 @@ impl Default for InteractionGuidedPolicy {
 }
 
 impl AllocationPolicy for InteractionGuidedPolicy {
-    fn name(&self) -> &'static str { "interaction_guided" }
+    fn name(&self) -> &'static str {
+        "interaction_guided"
+    }
 
-    fn initial_allocation(&self, budget: &RetrievalBudget, heads: &[String], _query: &[f32], _centroids: Option<&[Vec<f32>]>) -> Vec<HeadAllocation> {
+    fn initial_allocation(
+        &self,
+        budget: &RetrievalBudget,
+        heads: &[String],
+        _query: &[f32],
+        _centroids: Option<&[Vec<f32>]>,
+    ) -> Vec<HeadAllocation> {
         let n = heads.len().max(1);
-        let stage1_cand = ((budget.total_candidates as f32) * self.stage1_fraction).round() as usize;
+        let stage1_cand =
+            ((budget.total_candidates as f32) * self.stage1_fraction).round() as usize;
         let stage1_ef = ((budget.total_ef_work as f32) * self.stage1_fraction).round() as usize;
         let base_cand = stage1_cand / n;
         let base_ef = stage1_ef / n;
@@ -236,7 +279,8 @@ impl AllocationPolicy for InteractionGuidedPolicy {
         let rem_ef = stage1_ef % n;
         let mut allocs = Vec::with_capacity(n);
         for (i, h) in heads.iter().enumerate() {
-            let cand = (base_cand + if i < rem_cand { 1 } else { 0 }).clamp(budget.min_per_head, budget.max_per_head);
+            let cand = (base_cand + if i < rem_cand { 1 } else { 0 })
+                .clamp(budget.min_per_head, budget.max_per_head);
             let ef = (base_ef + if i < rem_ef { 1 } else { 0 }).max(1);
             allocs.push(HeadAllocation {
                 head: h.clone(),
@@ -249,7 +293,11 @@ impl AllocationPolicy for InteractionGuidedPolicy {
         allocs
     }
 
-    fn redistribute(&self, budget: &RetrievalBudget, stage1: &[Stage1Result]) -> Vec<HeadAllocation> {
+    fn redistribute(
+        &self,
+        budget: &RetrievalBudget,
+        stage1: &[Stage1Result],
+    ) -> Vec<HeadAllocation> {
         let n = stage1.len().max(1);
         let stage1_cand: usize = stage1.iter().map(|r| r.candidates.len()).sum();
         let stage1_ef: usize = stage1.iter().map(|r| r.candidates.len()).sum(); // proxy
@@ -277,7 +325,6 @@ impl AllocationPolicy for InteractionGuidedPolicy {
             let mut cand = ((rem_cand as f32) * frac).round() as usize;
             let mut ef = ((rem_ef as f32) * frac).round() as usize;
             cand = cand.clamp(0, budget.max_per_head.saturating_sub(r.candidates.len()));
-            ef = ef.max(0);
             if i == n - 1 {
                 cand = remaining_cand.min(cand);
                 ef = remaining_ef.min(ef);
@@ -305,18 +352,30 @@ pub struct RandomizedPolicy {
 }
 
 impl RandomizedPolicy {
-    pub fn new(seed: u64) -> Self { Self { seed } }
+    pub fn new(seed: u64) -> Self {
+        Self { seed }
+    }
 }
 
 impl AllocationPolicy for RandomizedPolicy {
-    fn name(&self) -> &'static str { "randomized" }
+    fn name(&self) -> &'static str {
+        "randomized"
+    }
 
-    fn initial_allocation(&self, budget: &RetrievalBudget, heads: &[String], _query: &[f32], _centroids: Option<&[Vec<f32>]>) -> Vec<HeadAllocation> {
+    fn initial_allocation(
+        &self,
+        budget: &RetrievalBudget,
+        heads: &[String],
+        _query: &[f32],
+        _centroids: Option<&[Vec<f32>]>,
+    ) -> Vec<HeadAllocation> {
         let n = heads.len().max(1);
         let mut rng = Lcg(self.seed);
         let mut weights: Vec<f32> = (0..n).map(|_| rng.next_f32()).collect();
         let sum: f32 = weights.iter().sum();
-        if sum <= 0.0 { weights = vec![1.0; n]; }
+        if sum <= 0.0 {
+            weights = vec![1.0; n];
+        }
         let mut allocs = Vec::with_capacity(n);
         let mut remaining_cand = budget.total_candidates;
         let mut remaining_ef = budget.total_ef_work;
@@ -326,7 +385,10 @@ impl AllocationPolicy for RandomizedPolicy {
             let mut ef = ((budget.total_ef_work as f32) * frac).round() as usize;
             cand = cand.clamp(budget.min_per_head, budget.max_per_head);
             ef = ef.max(1);
-            if i == n - 1 { cand = remaining_cand; ef = remaining_ef; }
+            if i == n - 1 {
+                cand = remaining_cand;
+                ef = remaining_ef;
+            }
             remaining_cand = remaining_cand.saturating_sub(cand);
             remaining_ef = remaining_ef.saturating_sub(ef);
             allocs.push(HeadAllocation {
@@ -340,12 +402,18 @@ impl AllocationPolicy for RandomizedPolicy {
         allocs
     }
 
-    fn redistribute(&self, budget: &RetrievalBudget, stage1: &[Stage1Result]) -> Vec<HeadAllocation> {
+    fn redistribute(
+        &self,
+        budget: &RetrievalBudget,
+        stage1: &[Stage1Result],
+    ) -> Vec<HeadAllocation> {
         let n = stage1.len().max(1);
         let mut rng = Lcg(self.seed.wrapping_add(0x9E3779B9));
         let mut weights: Vec<f32> = (0..n).map(|_| rng.next_f32()).collect();
         let sum: f32 = weights.iter().sum();
-        if sum <= 0.0 { weights = vec![1.0; n]; }
+        if sum <= 0.0 {
+            weights = vec![1.0; n];
+        }
         let stage1_cand: usize = stage1.iter().map(|r| r.candidates.len()).sum();
         let stage1_ef: usize = stage1.iter().map(|r| r.candidates.len()).sum();
         let rem_cand = budget.total_candidates.saturating_sub(stage1_cand);
@@ -358,8 +426,10 @@ impl AllocationPolicy for RandomizedPolicy {
             let mut cand = ((rem_cand as f32) * frac).round() as usize;
             let mut ef = ((rem_ef as f32) * frac).round() as usize;
             cand = cand.clamp(0, budget.max_per_head.saturating_sub(r.candidates.len()));
-            ef = ef.max(0);
-            if i == n - 1 { cand = remaining_cand; ef = remaining_ef; }
+            if i == n - 1 {
+                cand = remaining_cand;
+                ef = remaining_ef;
+            }
             remaining_cand = remaining_cand.saturating_sub(cand);
             remaining_ef = remaining_ef.saturating_sub(ef);
             if cand > 0 || ef > 0 {
@@ -388,15 +458,21 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
         nb += b[i] * b[i];
     }
     let d = (na * nb).sqrt();
-    if d == 0.0 { 0.0 } else { dot / d }
+    if d == 0.0 {
+        0.0
+    } else {
+        dot / d
+    }
 }
 
 /// Simple LCG for deterministic randomness.
 struct Lcg(u64);
 impl Lcg {
-    fn new(seed: u64) -> Self { Self(seed) }
     fn next_u64(&mut self) -> u64 {
-        self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         self.0
     }
     fn next_f32(&mut self) -> f32 {
@@ -413,10 +489,19 @@ pub struct AdaptiveRetriever {
 }
 
 impl AdaptiveRetriever {
-    pub fn new(policy: Box<dyn AllocationPolicy>, budget: RetrievalBudget, head_centroids: Option<Vec<Vec<f32>>>) -> Self {
-        Self { policy, budget, head_centroids }
+    pub fn new(
+        policy: Box<dyn AllocationPolicy>,
+        budget: RetrievalBudget,
+        head_centroids: Option<Vec<Vec<f32>>>,
+    ) -> Self {
+        Self {
+            policy,
+            budget,
+            head_centroids,
+        }
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn run(
         &self,
         heads: &[String],
@@ -427,7 +512,12 @@ impl AdaptiveRetriever {
         let mut all_hits: Vec<HeadHit> = Vec::new();
 
         // Stage 1: initial allocation
-        let initial = self.policy.initial_allocation(&self.budget, heads, query, self.head_centroids.as_deref());
+        let initial = self.policy.initial_allocation(
+            &self.budget,
+            heads,
+            query,
+            self.head_centroids.as_deref(),
+        );
         trace.initial_allocation = initial.clone();
 
         let mut stage1_results: Vec<Stage1Result> = Vec::new();
@@ -454,11 +544,16 @@ impl AdaptiveRetriever {
         for (i, r) in stage1_results.iter_mut().enumerate() {
             let mut overlap_union = HashMap::new();
             for (j, other) in head_ids.iter().enumerate() {
-                if i != j { overlap_union.extend(other.clone()); }
+                if i != j {
+                    overlap_union.extend(other.clone());
+                }
             }
             if !overlap_union.is_empty() {
                 let own: HashMap<u64, ()> = r.candidates.iter().map(|h| (h.id, ())).collect();
-                let inter = own.keys().filter(|id| overlap_union.contains_key(id)).count();
+                let inter = own
+                    .keys()
+                    .filter(|id| overlap_union.contains_key(id))
+                    .count();
                 r.overlap_with_others = inter as f32 / own.len().max(1) as f32;
             }
         }
@@ -481,7 +576,8 @@ impl AdaptiveRetriever {
         let used_ef: usize = trace.final_allocation.iter().map(|a| a.ef).sum();
         trace.total_candidates_used = used_cand;
         trace.total_ef_work_used = used_ef;
-        trace.budget_conserved = used_cand <= self.budget.total_candidates && used_ef <= self.budget.total_ef_work;
+        trace.budget_conserved =
+            used_cand <= self.budget.total_candidates && used_ef <= self.budget.total_ef_work;
 
         (all_hits, trace)
     }
@@ -489,14 +585,20 @@ impl AdaptiveRetriever {
 
 /// Score entropy of a hit list.
 pub fn score_entropy(hits: &[HeadHit]) -> f32 {
-    if hits.is_empty() { return 0.0; }
+    if hits.is_empty() {
+        return 0.0;
+    }
     let scores: Vec<f32> = hits.iter().map(|h| h.raw_score.max(0.0)).collect();
     let sum: f32 = scores.iter().sum();
-    if sum <= 0.0 { return 0.0; }
+    if sum <= 0.0 {
+        return 0.0;
+    }
     let mut ent = 0.0f32;
     for s in scores {
         let p = s / sum;
-        if p > 0.0 { ent -= p * p.ln(); }
+        if p > 0.0 {
+            ent -= p * p.ln();
+        }
     }
     ent
 }
@@ -506,7 +608,12 @@ mod tests {
     use super::*;
 
     fn dummy_budget() -> RetrievalBudget {
-        RetrievalBudget { total_candidates: 500, total_ef_work: 192, min_per_head: 20, max_per_head: 300 }
+        RetrievalBudget {
+            total_candidates: 500,
+            total_ef_work: 192,
+            min_per_head: 20,
+            max_per_head: 300,
+        }
     }
 
     #[test]
@@ -527,12 +634,20 @@ mod tests {
         let p = StaticEqualPolicy;
         let heads = vec!["a".into(), "b".into()];
         let allocs = p.initial_allocation(&b, &heads, &[0.1; 8], None);
-        assert_eq!(allocs[0].candidates + allocs[1].candidates, b.total_candidates);
+        assert_eq!(
+            allocs[0].candidates + allocs[1].candidates,
+            b.total_candidates
+        );
     }
 
     #[test]
     fn zero_signal_heads_get_min() {
-        let b = RetrievalBudget { total_candidates: 100, total_ef_work: 60, min_per_head: 10, max_per_head: 80 };
+        let b = RetrievalBudget {
+            total_candidates: 100,
+            total_ef_work: 60,
+            min_per_head: 10,
+            max_per_head: 80,
+        };
         let p = QueryAdaptivePolicy;
         let heads = vec!["a".into(), "b".into()];
         let query = vec![0.0; 8];
@@ -543,7 +658,12 @@ mod tests {
 
     #[test]
     fn min_per_head_floor() {
-        let b = RetrievalBudget { total_candidates: 100, total_ef_work: 60, min_per_head: 25, max_per_head: 80 };
+        let b = RetrievalBudget {
+            total_candidates: 100,
+            total_ef_work: 60,
+            min_per_head: 25,
+            max_per_head: 80,
+        };
         let p = StaticEqualPolicy;
         let heads = vec!["a".into(), "b".into(), "c".into()];
         let allocs = p.initial_allocation(&b, &heads, &[0.1; 8], None);
@@ -552,7 +672,12 @@ mod tests {
 
     #[test]
     fn max_per_head_ceiling() {
-        let b = RetrievalBudget { total_candidates: 500, total_ef_work: 192, min_per_head: 20, max_per_head: 100 };
+        let b = RetrievalBudget {
+            total_candidates: 500,
+            total_ef_work: 192,
+            min_per_head: 20,
+            max_per_head: 100,
+        };
         let p = StaticEqualPolicy;
         let heads = vec!["a".into(), "b".into()];
         let allocs = p.initial_allocation(&b, &heads, &[0.1; 8], None);
@@ -575,10 +700,30 @@ mod tests {
     fn redistribution_conservation() {
         let b = dummy_budget();
         let p = InteractionGuidedPolicy::default();
-        let heads: Vec<String> = vec!["a".into(), "b".into()];
+        let _heads: Vec<String> = vec!["a".into(), "b".into()];
         let stage1 = vec![
-            Stage1Result { head: "a".into(), candidates: vec![HeadHit{id:1, raw_score:0.9, rank:0}], overlap_with_others: 0.1, score_entropy: 0.5, top_score: 0.9 },
-            Stage1Result { head: "b".into(), candidates: vec![HeadHit{id:2, raw_score:0.8, rank:0}], overlap_with_others: 0.1, score_entropy: 0.5, top_score: 0.8 },
+            Stage1Result {
+                head: "a".into(),
+                candidates: vec![HeadHit {
+                    id: 1,
+                    raw_score: 0.9,
+                    rank: 0,
+                }],
+                overlap_with_others: 0.1,
+                score_entropy: 0.5,
+                top_score: 0.9,
+            },
+            Stage1Result {
+                head: "b".into(),
+                candidates: vec![HeadHit {
+                    id: 2,
+                    raw_score: 0.8,
+                    rank: 0,
+                }],
+                overlap_with_others: 0.1,
+                score_entropy: 0.5,
+                top_score: 0.8,
+            },
         ];
         let red = p.redistribute(&b, &stage1);
         let total: usize = red.iter().map(|a| a.candidates).sum();
@@ -587,7 +732,12 @@ mod tests {
 
     #[test]
     fn exhausted_budget_no_allocation() {
-        let b = RetrievalBudget { total_candidates: 0, total_ef_work: 0, min_per_head: 0, max_per_head: 0 };
+        let b = RetrievalBudget {
+            total_candidates: 0,
+            total_ef_work: 0,
+            min_per_head: 0,
+            max_per_head: 0,
+        };
         let p = StaticEqualPolicy;
         let heads: Vec<String> = vec!["a".into()];
         let allocs = p.initial_allocation(&b, &heads, &[0.1; 8], None);
@@ -621,7 +771,13 @@ mod tests {
         let retriever = AdaptiveRetriever::new(Box::new(p), b, None);
         let heads: Vec<String> = vec!["a".into(), "b".into()];
         let search_fn = |_h: &str, _q: &[f32], k: usize, _ef: Option<usize>| -> Vec<HeadHit> {
-            (0..k).map(|i| HeadHit { id: i as u64, raw_score: 1.0 - i as f32 * 0.1, rank: i }).collect()
+            (0..k)
+                .map(|i| HeadHit {
+                    id: i as u64,
+                    raw_score: 1.0 - i as f32 * 0.1,
+                    rank: i,
+                })
+                .collect()
         };
         let (_hits, trace) = retriever.run(&heads, &[0.1; 8], &search_fn);
         assert!(!trace.initial_allocation.is_empty());

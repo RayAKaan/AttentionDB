@@ -154,9 +154,10 @@ pub fn candidate_union(set: &CandidateSet, budget: usize) -> Vec<UnionCandidate>
 // ---------------------------------------------------------------------------
 
 /// Adaptive retrieval policy type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum AdaptivePolicyType {
     /// C6-C: Static equal split across heads.
+    #[default]
     StaticEqual,
     /// C6-D: Query-adaptive via head centroids.
     QueryAdaptive,
@@ -164,10 +165,6 @@ pub enum AdaptivePolicyType {
     InteractionGuided,
     /// Negative control: randomized allocation.
     RandomizedControl,
-}
-
-impl Default for AdaptivePolicyType {
-    fn default() -> Self { Self::StaticEqual }
 }
 
 /// Adaptive retrieval configuration (C6).
