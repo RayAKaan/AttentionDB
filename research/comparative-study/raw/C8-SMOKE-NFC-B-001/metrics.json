@@ -1,0 +1,70 @@
+{
+  "run_id": "C8-SMOKE-NFC-B-001",
+  "mode": "B",
+  "dataset": "DS-NFCORPUS",
+  "split": "SMOKE",
+  "phase": "C8 execution",
+  "test_queries": 20,
+  "rep_count": 1,
+  "warmup": 20,
+  "ef_search": 64,
+  "candidate_budget": 500,
+  "min_candidates_per_head": 20,
+  "max_candidates_per_head": 300,
+  "attention_dim": 384,
+  "key_dim": 64,
+  "value_dim": 64,
+  "lambda": 0.1,
+  "per_rep": [
+    {
+      "n_queries": 20,
+      "recall10_qrels_mean": 0.1157904495485127,
+      "recall10_exact_mean": 0.6350000098347663,
+      "ndcg10_qrels_mean": 0.26510616652667524,
+      "mrr10_qrels_mean": 0.51125,
+      "p50_us": 11962.6,
+      "p90_us": 14200.5,
+      "p95_us": 14258.2,
+      "deadline_exceeded": 0
+    }
+  ],
+  "rep_recall10_qrels_mean": [
+    0.1157904495485127
+  ],
+  "recall10_qrels_mean_Nrep": 0.1158,
+  "rep_ndcg10_qrels_mean": [
+    0.26510616652667524
+  ],
+  "ndcg10_qrels_mean_Nrep": 0.2651,
+  "union_identity_ok": true,
+  "union_report": {
+    "rep1:BvsC": {
+      "mismatches": 0,
+      "n_queries": 20
+    },
+    "rep1:BvsD": {
+      "mismatches": 0,
+      "n_queries": 20
+    },
+    "rep1:BvsE": {
+      "mismatches": 0,
+      "n_queries": 20
+    },
+    "rep1:BvsF": {
+      "mismatches": 0,
+      "n_queries": 20
+    },
+    "rep1:BvsG": {
+      "mismatches": 0,
+      "n_queries": 20
+    },
+    "rep1:BvsH": {
+      "mismatches": 0,
+      "n_queries": 20
+    },
+    "rep1:BvsI": {
+      "mismatches": 0,
+      "n_queries": 20
+    }
+  }
+}

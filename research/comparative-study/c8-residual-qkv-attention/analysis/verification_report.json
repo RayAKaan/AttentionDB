@@ -1,0 +1,20 @@
+{
+  "gate": {
+    "efprobe-SCI": "checked",
+    "smoke-SCI": "checked",
+    "efprobe-NFC": "checked",
+    "smoke-NFC": "checked",
+    "run-index": "checked"
+  },
+  "checks": {
+    "ef-knob": [],
+    "nonfinite": [],
+    "determinism": [],
+    "union-identity": [],
+    "lambda-zero": [],
+    "cache-parity": [],
+    "correction-active": [],
+    "fingerprints": []
+  },
+  "all_pass": true
+}

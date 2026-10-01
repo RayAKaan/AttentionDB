@@ -86,4 +86,17 @@ results preserved.
   - Probe: `c6-adaptive-retrieval/probe/c6pilot.rs` (reproducible `/Brepro` build)
   - Primary result: interaction-guided allocation changes candidate set on 100% queries, but recall@10 Δ negligible (|Δ|<0.01, p>0.05 both datasets); 8× latency overhead not justified
   - Reports: 9 reports in `c6-adaptive-retrieval/analysis/reports/`
-- [ ] C7–C9 — future workload/scale/statistics/final report
+- [x] **C7 — Genuine candidate-level Q/K/V attention** (COMPLETE: mechanism implemented, TEST executed, negative result)
+  - Protocol: `c7-genuine-qkv-attention/c7-protocol.md`
+  - Engine: `core/src/retrieval.rs` + `collection.rs` (candidate-level attention); `attention/` crate
+  - Probe: `c7-genuine-qkv-attention/probe/`
+  - Primary result: learned candidate-level QKV (E) significantly degrades nDCG@10 vs fixed fusion (B) on both datasets (SCI Δ +0.063, NFC Δ +0.093); identity arms C/D equivalent to B
+  - Reports: 10 reports in `c7-genuine-qkv-attention/analysis/reports/`
+- [ ] **C8 — Residual candidate-level Q/K/V attention** (IN PROGRESS: mechanism implemented; VALIDATION/SMOKE/EFPROBE verified; TRK-A TEST + SUPPORT pending Ubuntu CI)
+  - Protocol: `c8-residual-qkv-attention/c8-protocol.md` v1.0.0 (9 arms A–I; 14 primary contrasts)
+  - Plan: `c8-residual-qkv-attention/c8-run-plan.csv` (66 cells × 22 cols)
+  - Engine: `attention/` (C8 modules) + `core/src/collection.rs` stage 8b (`S_final = S_base + λ·ΔS_attention`)
+  - Probe/harness: `c8-residual-qkv-attention/probe/` + `harness/c8_{test_run,verify,analyze}.py`
+  - Verified: λ=0 parity C==B bit-exact, cache parity I==E bit-exact, union identity 0 mismatches; `c8_verify.py` → `all_pass: true`
+  - Reports: 10 reports in `c8-residual-qkv-attention/analysis/reports/` (TEST statistics pending CI)
+- [ ] C9 — future workload/scale/final report

@@ -3,9 +3,9 @@ use crate::bm25::Bm25Index;
 use crate::error::CoreError;
 use crate::retrieval::{
     candidate_union, cross_head_centroid, cross_refine_query, deterministic_top_k, fuse_candidate,
-    normalize_scores, rrf_fuse, AttentionScorer, C7CandidateTrace, C7Trace, CandidateFeatures,
-    CandidateSet, CrossHeadTrace, CrossRefineConfig, FusionWeights, HeadHit, RankedCandidate,
-    ScoreNormalization,
+    normalize_scores, rrf_fuse, AttentionScorer, C7CandidateTrace, C7Trace, C8CandidateTrace,
+    C8Trace, CandidateFeatures, CandidateSet, CrossHeadTrace, CrossRefineConfig, FusionWeights,
+    HeadHit, RankedCandidate, ScoreNormalization,
 };
 use crate::{AdaptivePolicyType, AdaptiveRetrievalConfig};
 use attentiondb_hnsw::{similarity, HNSWConfig, HeadIndexManager};
@@ -17,7 +17,7 @@ use std::sync::Arc;
 pub const OVERFETCH_MULTIPLIER: usize = 5;
 pub const MIN_CANDIDATES_PER_HEAD: usize = 20;
 
-/// Ablation modes (Phase 2 §9). Each mode is a strict superset of the previous
+/// Ablation modes (Phase 2 Ãƒâ€šÃ‚Â§9). Each mode is a strict superset of the previous
 /// one, so ablations attribute improvements to the added stage.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RetrievalMode {
@@ -25,8 +25,8 @@ pub enum RetrievalMode {
     SingleHead,
     /// B: multi-head union + fixed (uniform) head weights.
     FixedFusion,
-    /// C: B + learned gating (query → head weights; uniform when no network
-    /// is loaded — documented, never claimed to be learned).
+    /// C: B + learned gating (query ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ head weights; uniform when no network
+    /// is loaded ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â documented, never claimed to be learned).
     LearnedGating,
     /// D: C + candidate-level Q/K attention (docs/retrieval/attention.md).
     QKAttention,
@@ -43,7 +43,7 @@ pub enum HybridStrategy {
     Fusion,
 }
 
-/// Per-query pipeline stage sizes (§40 benchmark observability).
+/// Per-query pipeline stage sizes (Ãƒâ€šÃ‚Â§40 benchmark observability).
 #[derive(Debug, Clone, Copy, Default)]
 pub struct PipelineStats {
     /// Candidates after union + budget clamp.
@@ -54,19 +54,19 @@ pub struct PipelineStats {
     pub heads_present: usize,
 }
 
-/// Retrieval execution configuration (planner-controllable, §16/§38).
+/// Retrieval execution configuration (planner-controllable, Ãƒâ€šÃ‚Â§16/Ãƒâ€šÃ‚Â§38).
 #[derive(Debug, Clone)]
 pub struct RetrievalConfig {
     pub mode: RetrievalMode,
     pub normalization: ScoreNormalization,
     pub candidate_multiplier: usize,
     pub min_candidates_per_head: usize,
-    /// Hard bound on the post-union candidate pool (§6/§27).
+    /// Hard bound on the post-union candidate pool (Ãƒâ€šÃ‚Â§6/Ãƒâ€šÃ‚Â§27).
     pub candidate_budget: usize,
     pub fusion: FusionWeights,
     pub rrf_k: f32,
     pub hybrid_strategy: HybridStrategy,
-    /// Parallel head search (§5); results are parallel≡serial (tested).
+    /// Parallel head search (Ãƒâ€šÃ‚Â§5); results are parallelÃƒÂ¢Ã¢â‚¬Â°Ã‚Â¡serial (tested).
     pub parallel: bool,
     pub max_search_threads: usize,
     /// Weight of rank features inside candidate attention features.
@@ -81,7 +81,7 @@ pub struct RetrievalConfig {
     pub search_k: Option<usize>,
     /// One-step cross-head candidate generation (C5-C; `None` = off, the
     /// exact pre-C5 pipeline). When set, only the candidate GENERATION stage
-    /// changes: round-1 per-head search → interaction → round-2 re-search;
+    /// changes: round-1 per-head search ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ interaction ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ round-2 re-search;
     /// all downstream union/normalize/gate/fuse/top-K stages are shared with
     /// the control, so output differences are attributable to the candidate
     /// SET, not to scoring.
@@ -94,9 +94,21 @@ pub struct RetrievalConfig {
     /// enabled, the `attention` channel in the fusion is produced by genuine
     /// QKV attention over the per-head candidate vectors (from the head
     /// indexes) instead of the legacy feature-based scorer. Membership and
-    /// candidate budget semantics are unchanged — only the attention channel
+    /// candidate budget semantics are unchanged ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â only the attention channel
     /// score changes, so ranking differences are attributable to the attentions.
     pub attention: Option<attentiondb_attention::AttentionConfig>,
+    /// C8 residual candidate-level attention (C8; `None` = off, which is
+    /// exactly the pre-C8 pipeline). When set AND enabled, an ADDITIVE
+    /// correction is applied *after* fusion:
+    /// `S_final = S_base + residual_scale * dS_attention`, where `S_base` is
+    /// the score the untouched pipeline produced.
+    ///
+    /// This is deliberately NOT a fourth fusion channel. Folding it into
+    /// `fusion` would let it interact with the attention/mhs/bm25 mix and
+    /// confound the C8-B vs C8-E/H comparison, and it would make `lambda = 0`
+    /// parity unreachable (a zero-weight channel still perturbs the
+    /// present-weight renormalization in `fuse_candidate`).
+    pub c8_attention: Option<attentiondb_attention::C8AttentionConfig>,
 }
 
 impl Default for RetrievalConfig {
@@ -124,6 +136,7 @@ impl Default for RetrievalConfig {
             cross_refine: None,
             adaptive: None,
             attention: None,
+            c8_attention: None,
         }
     }
 }
@@ -191,8 +204,36 @@ impl RetrievalConfig {
                 })?;
             }
         }
+        if let Some(c8) = &self.c8_attention {
+            if c8.enabled {
+                c8.validate().map_err(|e| {
+                    CoreError::InvalidConfig(format!("c8 attention config invalid: {e}"))
+                })?;
+            }
+        }
         Ok(())
     }
+}
+
+/// Cache key for the C8 attention subsystem: the config fingerprint folded with
+/// the head name list.
+///
+/// The subsystem captures `head_names` when it is built, so a config-only key
+/// would hand back a subsystem whose head labels no longer match the query's
+/// head set. Folding the names in makes that a rebuild instead of a silent
+/// mismatch in the emitted trace.
+fn subsystem_key(cfg: &attentiondb_attention::C8AttentionConfig, head_names: &[String]) -> u64 {
+    let mut hash = cfg.fingerprint();
+    for name in head_names {
+        for b in name.as_bytes() {
+            hash ^= *b as u64;
+            hash = hash.wrapping_mul(0x100000001b3);
+        }
+        // Length separator so ["a", "bc"] and ["ab", "c"] differ.
+        hash ^= 0xff;
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash
 }
 
 pub struct Collection {
@@ -209,14 +250,26 @@ pub struct Collection {
     pub retired_ids: RwLock<HashSet<u64>>,
     /// Phase 2 staged-retrieval configuration (planner-controllable).
     pub retrieval_config: RwLock<RetrievalConfig>,
-    /// Phase 2B trained gating model (§14/§17/§18): `None` ⇒ deterministic
+    /// Phase 2B trained gating model (Ãƒâ€šÃ‚Â§14/Ãƒâ€šÃ‚Â§17/Ãƒâ€šÃ‚Â§18): `None` ÃƒÂ¢Ã¢â‚¬Â¡Ã¢â‚¬â„¢ deterministic
     /// fallback (uniform or legacy net). Swapped via `Arc` so a query in
-    /// flight sees the old OR new weights, never partial (§18).
+    /// flight sees the old OR new weights, never partial (Ãƒâ€šÃ‚Â§18).
     pub gating_model: RwLock<Option<Arc<attentiondb_learned::gating_v2::ModelCard>>>,
     /// C7 genuine QKV attention subsystem, cached per enabled config
-    /// (§C7): `None` until first query with `retrieval_config.attention`
+    /// (Ãƒâ€šÃ‚Â§C7): `None` until first query with `retrieval_config.attention`
     /// enabled. Rebuilt only when the config fingerprint changes.
     c7_attention: RwLock<Option<(u64, Arc<attentiondb_attention::AttentionSubsystem>)>>,
+    /// C8 residual attention subsystem (Ãƒâ€šÃ‚Â§C8), cached the same way. The cache
+    /// key folds in the *head name list*, not just the config fingerprint: the
+    /// subsystem captures `head_names` at build time, so a config-identical
+    /// query against a different head set would otherwise silently reuse a
+    /// subsystem built for the old heads.
+    c8_attention: RwLock<Option<(u64, Arc<attentiondb_attention::C8AttentionSubsystem>)>>,
+    /// C8 document-side K/V cache (arm I). `None` until first cached query;
+    /// replaced wholesale when the cache fingerprint stops matching the
+    /// active subsystem. Purged of retired ids on every cached query, because
+    /// `hnsw_rs` cannot physically remove nodes and a retired document would
+    /// otherwise keep serving K/V.
+    c8_kv_cache: RwLock<Option<attentiondb_attention::AttentionKVCache>>,
 }
 
 impl Collection {
@@ -233,6 +286,8 @@ impl Collection {
             retrieval_config: RwLock::new(RetrievalConfig::default()),
             gating_model: RwLock::new(None),
             c7_attention: RwLock::new(None),
+            c8_attention: RwLock::new(None),
+            c8_kv_cache: RwLock::new(None),
         }
     }
 
@@ -274,7 +329,7 @@ impl Collection {
         Ok(())
     }
 
-    /// Trained-model gating (Phase 2B §14): inference only — weights for the
+    /// Trained-model gating (Phase 2B Ãƒâ€šÃ‚Â§14): inference only ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â weights for the
     /// requested heads, looked up by name from the card's head ordering.
     /// Returns None when no model is active or the card doesn't cover the
     /// requested heads (caller falls back; never silent WRONG weights).
@@ -339,7 +394,7 @@ impl Collection {
 
     /// Deterministically rebuild every head index + BM25 from authoritative
     /// records `[(numeric_id, record)]`. Used at recovery (Phase 1 rebuild
-    /// strategy — see docs/indexes.md) and after mass operations.
+    /// strategy ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â see docs/indexes.md) and after mass operations.
     pub fn rebuild_from_records(
         &self,
         records: &[(u64, attentiondb_storage::Record)],
@@ -400,7 +455,7 @@ impl Collection {
     ///
     /// `bm25_raw` (optional) supplies the text channel's raw scores; they are
     /// normalized (min-max) and fused through the same equation as everything
-    /// else — BM25 similarities are never linearly mixed with vector scores
+    /// else ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â BM25 similarities are never linearly mixed with vector scores
     /// unnormalized.
     #[allow(clippy::too_many_arguments)]
     pub fn attend_detailed(
@@ -431,7 +486,7 @@ impl Collection {
     /// attend_detailed, but also returns the per-query C5 cross-head causal
     /// ledger (round-1 lists, surprise sets, round-2 additions, union pre/post
     /// sizes, ef split) and C6 adaptive trace. Empty when `cross_refine`/`adaptive`
-    /// is off — identical results to `attend_detailed_with_stats`.
+    /// is off ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â identical results to `attend_detailed_with_stats`.
     #[allow(clippy::too_many_arguments)]
     pub fn attend_detailed_traced(
         &self,
@@ -462,10 +517,10 @@ impl Collection {
             config_override,
             deadline,
         )
-        .map(|(ranked, stats, cross, adaptive, _c7)| (ranked, stats, cross, adaptive))
+        .map(|(ranked, stats, cross, adaptive, _c7, _c8)| (ranked, stats, cross, adaptive))
     }
 
-    /// attend_detailed + pipeline stage sizes (§40: candidate/rerank counts
+    /// attend_detailed + pipeline stage sizes (Ãƒâ€šÃ‚Â§40: candidate/rerank counts
     /// for the benchmark harness). Union size = post-budget candidate pool;
     /// rerank size = candidates entering exact rerank (MODE E).
     #[allow(clippy::too_many_arguments)]
@@ -490,7 +545,7 @@ impl Collection {
             config_override,
             deadline,
         )
-        .map(|(ranked, stats, _trace, _adaptive, _c7)| (ranked, stats))
+        .map(|(ranked, stats, _trace, _adaptive, _c7, _c8)| (ranked, stats))
     }
 
     #[allow(clippy::too_many_arguments, clippy::type_complexity)]
@@ -511,10 +566,11 @@ impl Collection {
             CrossHeadTrace,
             AdaptiveTrace,
             Option<C7Trace>,
+            Option<C8Trace>,
         ),
         CoreError,
     > {
-        // Cancellation/timeout (§19): checked at every stage boundary. Long
+        // Cancellation/timeout (Ãƒâ€šÃ‚Â§19): checked at every stage boundary. Long
         // HNSW work between checks is bounded by per-head candidate counts.
         let check_deadline = |stage: &str| -> Result<(), CoreError> {
             match deadline {
@@ -544,6 +600,7 @@ impl Collection {
                 PipelineStats::default(),
                 CrossHeadTrace::default(),
                 AdaptiveTrace::default(),
+                None,
                 None,
             ));
         }
@@ -582,6 +639,7 @@ impl Collection {
                 CrossHeadTrace::default(),
                 AdaptiveTrace::default(),
                 None,
+                None,
             ));
         }
 
@@ -595,11 +653,11 @@ impl Collection {
             heads.iter().map(|h| mgr.get_head(h).ok()).collect()
         };
 
-        // C5: one-step cross-head interaction (retrieve → interact → retrieve).
-        // Effort rule (frozen C5 protocol §4): round-1 at ef/2, round-2 at
+        // C5: one-step cross-head interaction (retrieve ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ interact ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ retrieve).
+        // Effort rule (frozen C5 protocol Ãƒâ€šÃ‚Â§4): round-1 at ef/2, round-2 at
         // ef - ef/2, so total HNSW ef work == the control arm's single search.
         // `cfg.ef_search` (None = index defaults, pre-C5) is the single total;
-        // the interaction never exceeds it. λ=0 is the glue arm: q'_H == q.
+        // the interaction never exceeds it. ÃƒÅ½Ã‚Â»=0 is the glue arm: q'_H == q.
         let cross_cfg = cfg.cross_refine;
         let ef_total = cfg.ef_search.unwrap_or(64);
         let (ef_r1, ef_r2) = if cross_cfg.is_some() {
@@ -612,8 +670,8 @@ impl Collection {
         // Scoped per-head search; `ef` is passed into HNSW explicitly so the
         // round-split is a REAL knob (C4's coll.settings write was inert).
 
-        // Stage instrumentation (§56/§57): per-stage latency histograms with
-        // STATIC labels only (stage name) — never doc ids or query text.
+        // Stage instrumentation (Ãƒâ€šÃ‚Â§56/Ãƒâ€šÃ‚Â§57): per-stage latency histograms with
+        // STATIC labels only (stage name) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â never doc ids or query text.
         let t_hnsw = std::time::Instant::now();
         let _span_head_search = tracing::info_span!("head_search", heads = heads.len()).entered();
         let mut cross_trace = CrossHeadTrace::default();
@@ -816,9 +874,9 @@ impl Collection {
 
         if let Some(cross) = cross_cfg {
             if !present_heads.is_empty() {
-                // ---- 1b. Cross-head interaction (retrieve → interact → repeat)
+                // ---- 1b. Cross-head interaction (retrieve ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ interact ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ repeat)
                 // S_H = ids returned by OTHER heads in round-1 but NOT by this
-                // head; centroid in H's own space; q'_H = normalize(q + λ·mean).
+                // head; centroid in H's own space; q'_H = normalize(q + ÃƒÅ½Ã‚Â»Ãƒâ€šÃ‚Â·mean).
                 cross_trace.heads = present_heads.clone();
                 cross_trace.round1 = present_hits
                     .iter()
@@ -854,13 +912,13 @@ impl Collection {
                     }
                     let own: HashSet<u64> = h1.iter().map(|x| x.id).collect();
                     let mut s_h: Vec<u64> = other_ids.difference(&own).copied().collect();
-                    s_h.sort_unstable(); // id ASC → order-independent centroid
+                    s_h.sort_unstable(); // id ASC ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ order-independent centroid
 
                     let idx = head_pos
                         .get(h.as_str())
                         .and_then(|&i| head_indexes[i].as_ref())
                         .cloned();
-                    // H-space vectors of S_H (missing ids skipped — never crashes)
+                    // H-space vectors of S_H (missing ids skipped ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â never crashes)
                     let mut vecs: Vec<Vec<f32>> = Vec::new();
                     if let Some(a) = &idx {
                         let guard = a.read();
@@ -905,7 +963,7 @@ impl Collection {
                             .collect(),
                     );
 
-                    // Cap round-1 ∪ round-2 back to per_head_k by best raw score
+                    // Cap round-1 ÃƒÂ¢Ã‹â€ Ã‚Âª round-2 back to per_head_k by best raw score
                     // (deterministic: score DESC, id ASC).
                     let mut by_id: HashMap<u64, HeadHit> = HashMap::new();
                     for hit in h1.iter().chain(r2.iter()) {
@@ -972,6 +1030,7 @@ impl Collection {
                 cross_trace,
                 AdaptiveTrace::default(),
                 None,
+                None,
             ));
         }
 
@@ -994,7 +1053,7 @@ impl Collection {
             "candidate_union complete"
         );
 
-        // ---- 3. Per-head normalization (id → normalized score) -------------
+        // ---- 3. Per-head normalization (id ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ normalized score) -------------
         let mut norm_maps: Vec<HashMap<u64, f32>> = Vec::with_capacity(set.source_heads.len());
         for hits in &set.per_head {
             let mut raw: Vec<f32> = hits.iter().map(|x| x.raw_score).collect();
@@ -1011,7 +1070,7 @@ impl Collection {
         let mut profile: Vec<f32> = match (gate_override, mode) {
             (Some(g), _) => g,
             (None, RetrievalMode::FixedFusion) => vec![1.0 / n_heads as f32; n_heads],
-            // Phase 2B: trained model first (§14: loaded model, no training at
+            // Phase 2B: trained model first (Ãƒâ€šÃ‚Â§14: loaded model, no training at
             // query time); legacy built-in net second; uniform last.
             (None, _) => self
                 .get_trained_weights(query, &set.source_heads)
@@ -1070,7 +1129,7 @@ impl Collection {
         // C7: genuine candidate-level Q/K/V attention over per-head vectors.
         // Replaces ONLY the attention channel source; candidate membership and
         // fusion weights are unchanged, so ranking differences are attributable
-        // to the attention scores themselves (§C7). Falls back to the legacy
+        // to the attention scores themselves (Ãƒâ€šÃ‚Â§C7). Falls back to the legacy
         // feature scorer when disabled.
         let c7_cfg = cfg.attention.clone().filter(|c| c.enabled);
         if let Some(attn_cfg) = c7_cfg {
@@ -1129,7 +1188,7 @@ impl Collection {
                 .compute(query, &c7_cands, &c7_evidence)
                 .map_err(|e| CoreError::Internal(format!("c7 attention: {e}")))?;
             attention_scores = Some(out.scores.clone());
-            // Union-level attention trace (§C7-6): per-candidate A_d / O_d /
+            // Union-level attention trace (Ãƒâ€šÃ‚Â§C7-6): per-candidate A_d / O_d /
             // logits / entropy, per-head mean, mean entropy, compute time.
             // Aligned with `union` (same order as c7_cands).
             c7_trace = Some(C7Trace {
@@ -1183,8 +1242,12 @@ impl Collection {
             }
         }
 
-        // ---- 8. Fusion (explicit equation; §8) -----------------------------
+        // ---- 8. Fusion (explicit equation; Ãƒâ€šÃ‚Â§8) -----------------------------
         let mut out: Vec<RankedCandidate> = Vec::with_capacity(union.len());
+        // S_base is retained explicitly: the C8 residual is defined relative to
+        // it, and keeping the pre-correction value in the artifact is what makes
+        // the residual auditable rather than asserted.
+        let mut base_scores: Vec<f32> = Vec::with_capacity(union.len());
         for (i, u) in union.iter().enumerate() {
             let mut head_scores = Vec::with_capacity(n_heads);
             let mut mhs_num = 0.0f32;
@@ -1199,8 +1262,8 @@ impl Collection {
                 }
                 head_scores.push(norm);
             }
-            // Multi-head similarity = Σ_h profile_h · norm_h. A head that did
-            // NOT return the candidate contributes 0 — no renormalization over
+            // Multi-head similarity = ÃƒÅ½Ã‚Â£_h profile_h Ãƒâ€šÃ‚Â· norm_h. A head that did
+            // NOT return the candidate contributes 0 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â no renormalization over
             // present heads (a candidate perfect in one channel while absent
             // from another must not tie with one that is perfect everywhere).
             // Exact rerank (MODE E) replaces normalized scores with exact
@@ -1228,12 +1291,171 @@ impl Collection {
                 attention: attn,
             };
             let final_score = fuse_candidate(&features, &cfg.fusion);
+            base_scores.push(final_score);
             out.push(RankedCandidate {
                 id: u.id,
                 final_score,
                 features,
             });
         }
+
+        // ---- 8b. C8 residual attention (post-fusion, additive) -------------
+        // S_final = S_base + lambda * dS_attention, applied AFTER `fuse_candidate`
+        // so the baseline is the exact score the untouched pipeline produced.
+        // Folding this into `fuse_candidate` would perturb the present-weight
+        // renormalization even at lambda = 0, breaking baseline parity (Ãƒâ€šÃ‚Â§C8).
+        let mut c8_trace: Option<C8Trace> = None;
+        let c8_cfg = cfg.c8_attention.clone().filter(|c| c.enabled);
+        if let Some(c8c) = c8_cfg {
+            // Build (or reuse) the subsystem. The key folds in the head names,
+            // which the subsystem captures at build time.
+            let want_key = subsystem_key(&c8c, &set.source_heads);
+            let subsystem = {
+                let cached = self.c8_attention.read();
+                match &*cached {
+                    Some((f, s)) if *f == want_key => s.clone(),
+                    _ => {
+                        drop(cached);
+                        let s = Arc::new(
+                            attentiondb_attention::C8AttentionSubsystem::new(
+                                c8c.clone(),
+                                set.source_heads.clone(),
+                            )
+                            .map_err(|e| CoreError::Internal(format!("c8 subsystem: {e}")))?,
+                        );
+                        *self.c8_attention.write() = Some((want_key, s.clone()));
+                        s
+                    }
+                }
+            };
+
+            // Per-candidate per-head vectors + retrieval evidence, gathered
+            // exactly as in the C7 stage so both stages see identical inputs.
+            let mgr = self.head_manager.read();
+            let mut c8_cands: Vec<Vec<Vec<f32>>> = Vec::with_capacity(union.len());
+            let mut c8_evidence: Vec<attentiondb_attention::RetrievalEvidence> =
+                Vec::with_capacity(union.len());
+            for u in &union {
+                let mut per_head: Vec<Vec<f32>> = Vec::with_capacity(n_heads);
+                let mut sims: Vec<Option<f32>> = Vec::with_capacity(n_heads);
+                let mut ranks: Vec<Option<f32>> = Vec::with_capacity(n_heads);
+                let mut present: Vec<bool> = Vec::with_capacity(n_heads);
+                for (h_idx, head) in set.source_heads.iter().enumerate() {
+                    let v = match mgr.get_head(head) {
+                        Ok(idx) => idx.read().get_vector(u.id).map(|v| v.to_vec()),
+                        Err(_) => None,
+                    };
+                    per_head.push(v.unwrap_or_else(|| vec![0.0; self.dim]));
+                    let sim =
+                        u.head_scores[h_idx].and_then(|_| norm_maps[h_idx].get(&u.id).copied());
+                    sims.push(sim);
+                    let r = u.head_ranks[h_idx];
+                    ranks.push(r.map(|r| 1.0 / (1.0 + r as f32)));
+                    present.push(sim.is_some());
+                }
+                c8_cands.push(per_head);
+                c8_evidence.push(attentiondb_attention::RetrievalEvidence {
+                    head_sims: sims,
+                    head_ranks: ranks,
+                    head_present: present,
+                });
+            }
+            drop(mgr);
+
+            let doc_ids: Vec<u64> = union.iter().map(|u| u.id).collect();
+            let c8_out = if c8c.cache_enabled {
+                // Cache path (arm I). A fingerprint mismatch replaces the cache
+                // rather than being tolerated: serving stale K/V would silently
+                // rank with a different model than the one in the config.
+                let want = subsystem.cache_fingerprint();
+                let mut guard = self.c8_kv_cache.write();
+                if guard
+                    .as_ref()
+                    .map(|c| !c.is_valid_for(&want))
+                    .unwrap_or(true)
+                {
+                    *guard = Some(attentiondb_attention::AttentionKVCache::new(want));
+                }
+                let cache = guard
+                    .as_mut()
+                    .expect("cache slot just ensured to be present");
+                // Purge retired documents: the vector store cannot remove nodes,
+                // so a deleted id would otherwise keep serving K/V forever.
+                {
+                    let retired = self.retired_ids.read();
+                    if !retired.is_empty() {
+                        cache.retain(|id| !retired.contains(&id));
+                    }
+                }
+                let mut stats = attentiondb_attention::CacheStats::default();
+                let r = subsystem
+                    .compute_cached(
+                        query,
+                        &c8_cands,
+                        &c8_evidence,
+                        &base_scores,
+                        &doc_ids,
+                        cache,
+                        &mut stats,
+                    )
+                    .map_err(|e| CoreError::Internal(format!("c8 cached attention: {e}")))?;
+                cache.seal_stats(&mut stats);
+                r
+            } else {
+                subsystem
+                    .compute(query, &c8_cands, &c8_evidence, &base_scores)
+                    .map_err(|e| CoreError::Internal(format!("c8 attention: {e}")))?
+            };
+
+            // Write the corrected scores back. `verify_fusion` is a cheap
+            // per-candidate identity check on the values actually used, so a
+            // fusion regression fails the query instead of quietly degrading
+            // ranking quality.
+            c8_out
+                .verify_fusion(1e-6)
+                .map_err(|e| CoreError::Internal(format!("c8 fusion identity: {e}")))?;
+            for (i, s) in c8_out.final_scores.iter().enumerate() {
+                if let Some(slot) = out.get_mut(i) {
+                    slot.final_score = *s;
+                }
+            }
+            c8_trace = Some(C8Trace {
+                head_names: set.source_heads.clone(),
+                candidates: union
+                    .iter()
+                    .zip(c8_out.candidates.iter())
+                    .map(|(u, c)| C8CandidateTrace {
+                        id: u.id,
+                        baseline_score: c.baseline_score,
+                        attention_delta: c.attention_delta,
+                        residual_scale: c.residual_scale,
+                        final_score: c.final_score,
+                        applied_correction: c.applied_correction,
+                        weights: c.weights.clone(),
+                        output: c.output.clone(),
+                        logits: c.logits.clone(),
+                        entropy: c.entropy,
+                    })
+                    .collect(),
+                per_head_mean: c8_out.per_head_mean.clone(),
+                mean_entropy: c8_out.mean_entropy,
+                mean_abs_correction: c8_out.mean_abs_correction(),
+                timings: c8_out.timings,
+                cache_stats: c8_out.cache_stats,
+                config_fingerprint: c8_out.config_fingerprint,
+            });
+            metrics::histogram!("attentiondb_c8_residual_micros")
+                .record(c8_out.timings.total_us as f64);
+            metrics::histogram!("attentiondb_c8_kv_projection_micros")
+                .record(c8_out.timings.kv_projection_us as f64);
+            tracing::info!(
+                candidates = union.len(),
+                residual_scale = c8_out.residual_scale,
+                mean_abs_correction = c8_out.mean_abs_correction(),
+                "c8 residual attention"
+            );
+        }
+        check_deadline("c8_residual")?;
 
         // ---- 9. Deterministic top-K ----------------------------------------
         metrics::histogram!("attentiondb_stage_latency_seconds", "stage" => "exact_rerank")
@@ -1264,6 +1486,7 @@ impl Collection {
             cross_trace,
             adaptive_trace,
             c7_trace,
+            c8_trace,
         ))
     }
 
@@ -1310,13 +1533,13 @@ impl Collection {
             config_override,
             deadline,
         )
-        .map(|(ranked, stats, cross, adaptive, _c7)| (ranked, stats, cross, adaptive))
+        .map(|(ranked, stats, cross, adaptive, _c7, _c8)| (ranked, stats, cross, adaptive))
     }
 
     /// attend_detailed_traced, and ALSO the C7 genuine-attention trace for the
     /// query. The trace is `Some` only when the attention channel is enabled
     /// (arms C/D/E/F); it is `None` for the legacy/A/B arms so the probe can
-    /// assert parity. Additive — does not alter any existing signature.
+    /// assert parity. Additive ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â does not alter any existing signature.
     #[allow(clippy::too_many_arguments, clippy::type_complexity)]
     pub fn attend_detailed_c7(
         &self,
@@ -1348,6 +1571,47 @@ impl Collection {
             config_override,
             deadline,
         )
+        .map(|(ranked, stats, cross, adaptive, c7, _c8)| (ranked, stats, cross, adaptive, c7))
+    }
+
+    /// attend_detailed, and ALSO the C8 residual trace for the query.
+    ///
+    /// The trace is `Some` only when `retrieval_config.c8_attention` is enabled;
+    /// it is `None` for the control arms so the probe can assert that a disabled
+    /// C8 reproduces the baseline bit-for-bit. Additive Ã¢â‚¬â€ every pre-existing
+    /// public signature is unchanged.
+    #[allow(clippy::too_many_arguments, clippy::type_complexity)]
+    pub fn attend_detailed_c8(
+        &self,
+        heads: &[String],
+        query: &[f32],
+        top_k: usize,
+        bm25_raw: Option<&[(u64, f32)]>,
+        mode_override: Option<RetrievalMode>,
+        gate_override: Option<Vec<f32>>,
+        config_override: Option<&RetrievalConfig>,
+        deadline: Option<std::time::Instant>,
+    ) -> Result<
+        (
+            Vec<RankedCandidate>,
+            PipelineStats,
+            CrossHeadTrace,
+            AdaptiveTrace,
+            Option<C8Trace>,
+        ),
+        CoreError,
+    > {
+        self.attend_detailed_inner(
+            heads,
+            query,
+            top_k,
+            bm25_raw,
+            mode_override,
+            gate_override,
+            config_override,
+            deadline,
+        )
+        .map(|(ranked, stats, cross, adaptive, _c7, c8)| (ranked, stats, cross, adaptive, c8))
     }
 
     /// Fixed-weight retrieval: explicit head weights replace the gating profile.
@@ -1379,10 +1643,10 @@ impl Collection {
     }
 
     /// Hybrid vector+text retrieval through the staged pipeline.
-    /// Default strategy: RRF (strong deterministic baseline, §15).
+    /// Default strategy: RRF (strong deterministic baseline, Ãƒâ€šÃ‚Â§15).
     /// Raw BM25 channel for a text query (descending score, retired ids
     /// excluded). Used by the engine's filtered-hybrid path to filter the
-    /// sparse channel BEFORE fusion (§13 invariant: post-filter never leaks).
+    /// sparse channel BEFORE fusion (Ãƒâ€šÃ‚Â§13 invariant: post-filter never leaks).
     pub fn bm25_channel(&self, query_text: &str, limit: usize) -> Vec<(u64, f32)> {
         let t_bm25 = std::time::Instant::now();
         let _span_bm25 = tracing::info_span!("bm25", limit = limit).entered();
@@ -1467,7 +1731,7 @@ mod gating_model_tests {
 
     /// The deterministic contract behind "queries use the trained model":
     /// get_trained_weights MUST return the card's own softmax output, mapped
-    /// to the requested head order. No HNSW involved ⇒ exact equality holds.
+    /// to the requested head order. No HNSW involved ÃƒÂ¢Ã¢â‚¬Â¡Ã¢â‚¬â„¢ exact equality holds.
     #[test]
     fn trained_weights_equal_card_prediction_by_head_name() {
         let dim = 8usize;
@@ -1490,7 +1754,7 @@ mod gating_model_tests {
             hardware: "ci".into(),
         };
         let mut card = ModelCard::from_mlp(&m, meta, "w-test", "soft_target");
-        // card order ≠ requested order: mapping must follow names
+        // card order ÃƒÂ¢Ã¢â‚¬Â°Ã‚Â  requested order: mapping must follow names
         card.head_names = Some(vec![
             "head3".into(),
             "head2".into(),
@@ -1503,7 +1767,7 @@ mod gating_model_tests {
         let full = m.predict(&query);
         let card_names = ["head3", "head2", "head1", "head0"];
         for (i, n) in names.iter().enumerate() {
-            // head_names[j] names MODEL ROW j — resolve by name lookup
+            // head_names[j] names MODEL ROW j ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â resolve by name lookup
             let model_idx = card_names.iter().position(|c| c == n).unwrap();
             assert_eq!(got[i], full[model_idx], "head {n} weight mapping wrong");
         }
@@ -1512,7 +1776,7 @@ mod gating_model_tests {
             .get_trained_weights(&query, &["head2".to_string()])
             .unwrap();
         assert_eq!(got2[0], full[1]);
-        // the boosted row (b2[2]=5 → card row 2 = "head1") must dominate
+        // the boosted row (b2[2]=5 ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ card row 2 = "head1") must dominate
         let got3 = coll
             .get_trained_weights(&query, &["head1".to_string()])
             .unwrap();
@@ -1524,7 +1788,7 @@ mod gating_model_tests {
         );
     }
 
-    /// §14: no model → None → caller falls back; wrong coverage → None (never
+    /// Ãƒâ€šÃ‚Â§14: no model ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ None ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ caller falls back; wrong coverage ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ None (never
     /// partial weights).
     #[test]
     fn missing_or_incompatible_model_returns_none() {
@@ -1550,7 +1814,7 @@ mod gating_model_tests {
         let mut card = ModelCard::from_mlp(&m, meta, "small", "soft_target");
         card.head_names = Some(vec!["a".into(), "b".into()]);
         *coll.gating_model.write() = Some(Arc::new(card));
-        // request a head the card doesn't know → None, not garbage
+        // request a head the card doesn't know ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ None, not garbage
         assert!(coll
             .get_trained_weights(&vec![0.1; dim], &["c".to_string()])
             .is_none());
@@ -1603,7 +1867,7 @@ mod gating_model_tests {
         assert_eq!(empty_trace.union_post, 0);
         assert_eq!(base_cands.len(), 5);
 
-        // --- Enabled interaction at λ=0.5 ---
+        // --- Enabled interaction at ÃƒÅ½Ã‚Â»=0.5 ---
         let cross_cfg = RetrievalConfig {
             mode: RetrievalMode::FixedFusion,
             ef_search: Some(32),
@@ -1640,7 +1904,7 @@ mod gating_model_tests {
         assert_eq!(cross_cands.len(), 5);
         assert_eq!(cross_stats.heads_present, 2);
 
-        // --- Glue arm: λ=0.0 must reproduce the control candidate SET ---
+        // --- Glue arm: ÃƒÅ½Ã‚Â»=0.0 must reproduce the control candidate SET ---
         let glue_cfg = RetrievalConfig {
             mode: RetrievalMode::FixedFusion,
             ef_search: Some(32),
@@ -1650,7 +1914,7 @@ mod gating_model_tests {
         let (glue_cands, _glue_stats, glue_trace, _glue_adaptive) = coll
             .attend_detailed_traced(&heads, &q, 5, None, None, None, Some(&glue_cfg), None)
             .unwrap();
-        // λ=0 → no directional shift; candidate sets must be within budget and
+        // ÃƒÅ½Ã‚Â»=0 ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ no directional shift; candidate sets must be within budget and
         // the interaction MUST NOT invent better universe: nothing outside of
         // the potentially-seen universe may appear. (Exact equality with control
         // is not required since ef is now a real knob; the set move is the claim.)
@@ -1658,7 +1922,7 @@ mod gating_model_tests {
         assert_eq!(glue_ids.len(), glue_cands.len(), "ids unique");
         assert!(
             glue_trace.refined.iter().all(|r| !r),
-            "λ=0 must never refine a query"
+            "ÃƒÅ½Ã‚Â»=0 must never refine a query"
         );
         assert_eq!(base_stats.heads_present, 2);
     }
@@ -1705,11 +1969,11 @@ mod gating_model_tests {
             .attend_detailed_traced(&heads, &q, 10, None, None, None, Some(&control), None)
             .unwrap();
 
-        // λ=0.0 re-searches the exact control query (never refines); the
+        // ÃƒÅ½Ã‚Â»=0.0 re-searches the exact control query (never refines); the
         // mechanism must be inert w.r.t. query direction. Candidate SETS may
         // differ slightly from the control because ef is now a real per-round
-        // knob (two ef/2 searches ≠ one ef search) — that is inherent to the
-        // split and documented; the causal claim is measured at λ>0 by the
+        // knob (two ef/2 searches ÃƒÂ¢Ã¢â‚¬Â°Ã‚Â  one ef search) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â that is inherent to the
+        // split and documented; the causal claim is measured at ÃƒÅ½Ã‚Â»>0 by the
         // study harness, not assumed here.
         let glue = RetrievalConfig {
             mode: RetrievalMode::FixedFusion,
@@ -1723,7 +1987,7 @@ mod gating_model_tests {
         assert_eq!(c_cands.len(), g_cands.len(), "deterministic top-k");
         assert!(
             g_trace.refined.iter().all(|r| !r),
-            "λ=0 must never refine any head's query"
+            "ÃƒÅ½Ã‚Â»=0 must never refine any head's query"
         );
         assert_eq!(g_trace.ef_r1, 32);
         assert_eq!(g_trace.ef_r2, 32);
@@ -1774,7 +2038,7 @@ mod c7_attention_tests {
             .attend_detailed_traced(&heads, &q, 5, None, None, None, Some(&legacy), None)
             .unwrap();
 
-        // Attention config present but disabled → same path as legacy.
+        // Attention config present but disabled ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ same path as legacy.
         let disabled = RetrievalConfig {
             mode: RetrievalMode::LearnedGating,
             ef_search: Some(32),
@@ -2007,5 +2271,393 @@ mod c7_attention_tests {
         }
         assert_eq!(t1.per_head_mean, t2.per_head_mean);
         assert_eq!(t1.mean_entropy.to_bits(), t2.mean_entropy.to_bits());
+    }
+}
+
+#[cfg(test)]
+mod c8_residual_attention_tests {
+    use super::*;
+
+    const DIM: usize = 4;
+    const HEADS: usize = 2;
+
+    /// C8-B baseline: FixedFusion with the attention channel off, which is the
+    /// exact control the residual is measured against.
+    fn base_config() -> RetrievalConfig {
+        RetrievalConfig {
+            mode: RetrievalMode::FixedFusion,
+            ef_search: Some(32),
+            attention: None,
+            c8_attention: None,
+            ..RetrievalConfig::default()
+        }
+    }
+
+    fn c8_config(residual_scale: f32) -> RetrievalConfig {
+        RetrievalConfig {
+            c8_attention: Some(
+                attentiondb_attention::C8AttentionConfig::truncated_identity_control(
+                    HEADS, DIM, DIM, DIM,
+                )
+                .with_residual_scale(residual_scale),
+            ),
+            ..base_config()
+        }
+    }
+
+    /// Two heads over 60 docs, with the heads deliberately disagreeing so the
+    /// union is non-trivial and evidence is not uniform.
+    fn fixture(name: &str) -> (Collection, Vec<String>, [f32; DIM]) {
+        let coll = Collection::new(name, DIM);
+        coll.add_default_head("a").unwrap();
+        coll.add_default_head("b").unwrap();
+        for i in 0..60u64 {
+            let x = i as f32 * 0.01 - 0.3;
+            let mut v_a = vec![0f32; DIM];
+            let mut v_b = vec![0f32; DIM];
+            v_a[0] = x;
+            v_a[1] = -0.2;
+            v_b[1] = x;
+            v_b[0] = -0.2;
+            coll.insert_vector("a", i, &v_a).unwrap();
+            coll.insert_vector("b", i, &v_b).unwrap();
+        }
+        (
+            coll,
+            vec!["a".to_string(), "b".to_string()],
+            [0.2, 0.1, 0.0, 0.0],
+        )
+    }
+
+    fn ids(c: &[RankedCandidate]) -> Vec<u64> {
+        c.iter().map(|r| r.id).collect()
+    }
+
+    #[test]
+    fn c8_lambda_zero_reproduces_the_baseline_bit_for_bit() {
+        // The central C8 contract. `residual_scale = 0` must not perturb the
+        // score, the ordering, or the candidate set Ã¢â‚¬â€ not "close enough".
+        let (coll, heads, q) = fixture("c8-lambda0");
+        let base = base_config();
+        let zero = c8_config(0.0);
+
+        let (b_cands, b_stats, _, _, _) = coll
+            .attend_detailed_c8(&heads, &q, 5, None, None, None, Some(&base), None)
+            .unwrap();
+        let (z_cands, z_stats, _, _, z_trace) = coll
+            .attend_detailed_c8(&heads, &q, 5, None, None, None, Some(&zero), None)
+            .unwrap();
+
+        assert_eq!(ids(&b_cands), ids(&z_cands), "ordering must be identical");
+        assert_eq!(b_stats.union_size, z_stats.union_size);
+        for (b, z) in b_cands.iter().zip(z_cands.iter()) {
+            assert_eq!(b.id, z.id);
+            assert_eq!(
+                b.final_score.to_bits(),
+                z.final_score.to_bits(),
+                "id {}: {} vs {}",
+                b.id,
+                b.final_score,
+                z.final_score
+            );
+        }
+        // The stage ran, and provably applied nothing.
+        let t = z_trace.expect("trace present when enabled");
+        assert_eq!(t.mean_abs_correction, 0.0);
+        for c in &t.candidates {
+            assert_eq!(c.applied_correction, 0.0);
+            assert_eq!(c.final_score, c.baseline_score);
+            assert!(
+                c.attention_delta.is_finite(),
+                "delta is computed but unused at lambda=0"
+            );
+        }
+        t.verify_residual(1e-6).unwrap();
+    }
+
+    #[test]
+    fn c8_disabled_matches_the_no_config_path() {
+        // `None` and `Some(disabled)` must both be the pre-C8 pipeline.
+        let (coll, heads, q) = fixture("c8-disabled");
+        let base = base_config();
+        let disabled = RetrievalConfig {
+            c8_attention: Some(attentiondb_attention::C8AttentionConfig::disabled()),
+            ..base.clone()
+        };
+        let (a, a_stats, _, _, at) = coll
+            .attend_detailed_c8(&heads, &q, 5, None, None, None, Some(&base), None)
+            .unwrap();
+        let (b, b_stats, _, _, bt) = coll
+            .attend_detailed_c8(&heads, &q, 5, None, None, None, Some(&disabled), None)
+            .unwrap();
+        assert_eq!(ids(&a), ids(&b));
+        assert_eq!(a_stats.union_size, b_stats.union_size);
+        for (x, y) in a.iter().zip(b.iter()) {
+            assert_eq!(x.final_score.to_bits(), y.final_score.to_bits());
+        }
+        assert!(at.is_none(), "no C8 stage ran");
+        assert!(bt.is_none(), "a disabled C8 must not emit a trace");
+    }
+
+    #[test]
+    fn c8_residual_keeps_membership_and_changes_scores() {
+        // The residual is a re-ranking of the SAME candidate set, which is what
+        // makes the C8-B vs C8-E comparison attributable to scoring alone.
+        let (coll, heads, q) = fixture("c8-membership");
+        let base = base_config();
+        let on = c8_config(0.5);
+        let (b_cands, _, _, _, _) = coll
+            .attend_detailed_c8(&heads, &q, 5, None, None, None, Some(&base), None)
+            .unwrap();
+        let (o_cands, _, _, _, trace) = coll
+            .attend_detailed_c8(&heads, &q, 5, None, None, None, Some(&on), None)
+            .unwrap();
+        assert_eq!(ids(&b_cands), ids(&o_cands));
+        for c in &o_cands {
+            assert!(c.final_score.is_finite());
+        }
+        let t = trace.unwrap();
+        assert!(!t.candidates.is_empty(), "trace must cover the union");
+        assert!(
+            t.candidates.iter().all(|c| c.attention_delta.is_finite()),
+            "every correction must be finite"
+        );
+        t.verify_residual(1e-6).unwrap();
+    }
+
+    #[test]
+    fn c8_baseline_in_trace_matches_an_independent_baseline_run() {
+        // The trace's S_base must be the real baseline, not a recomputation.
+        let (coll, heads, q) = fixture("c8-baseline");
+        let base = base_config();
+        let on = c8_config(0.25);
+        let (b_cands, b_stats, _, _, _) = coll
+            .attend_detailed_c8(&heads, &q, 20, None, None, None, Some(&base), None)
+            .unwrap();
+        let (_, _, _, _, trace) = coll
+            .attend_detailed_c8(&heads, &q, 20, None, None, None, Some(&on), None)
+            .unwrap();
+        let t = trace.unwrap();
+        let base_by_id: HashMap<u64, f32> = b_cands.iter().map(|c| (c.id, c.final_score)).collect();
+        // top_k = 20 may truncate the union, so only check traced ids we have.
+        let mut checked = 0;
+        for c in &t.candidates {
+            if let Some(&expected) = base_by_id.get(&c.id) {
+                assert_eq!(
+                    c.baseline_score.to_bits(),
+                    expected.to_bits(),
+                    "id {} baseline drift",
+                    c.id
+                );
+                checked += 1;
+            }
+        }
+        assert!(
+            checked > 0,
+            "no overlap: {}/{}",
+            checked,
+            t.candidates.len()
+        );
+        assert!(b_stats.union_size >= t.candidates.len());
+    }
+
+    #[test]
+    fn c8_is_bit_deterministic() {
+        let (coll, heads, q) = fixture("c8-determinism");
+        let cfg = c8_config(0.3);
+        let run = || {
+            coll.attend_detailed_c8(&heads, &q, 5, None, None, None, Some(&cfg), None)
+                .unwrap()
+        };
+        let (c1, _, _, _, t1) = run();
+        let (c2, _, _, _, t2) = run();
+        for (a, b) in c1.iter().zip(c2.iter()) {
+            assert_eq!(a.id, b.id);
+            assert_eq!(a.final_score.to_bits(), b.final_score.to_bits());
+        }
+        let t1 = t1.unwrap();
+        let t2 = t2.unwrap();
+        for (a, b) in t1.candidates.iter().zip(t2.candidates.iter()) {
+            assert_eq!(a.id, b.id);
+            assert_eq!(a.baseline_score.to_bits(), b.baseline_score.to_bits());
+            assert_eq!(a.attention_delta.to_bits(), b.attention_delta.to_bits());
+            assert_eq!(
+                a.applied_correction.to_bits(),
+                b.applied_correction.to_bits()
+            );
+            assert_eq!(a.weights, b.weights);
+            assert_eq!(a.output, b.output);
+            assert_eq!(a.logits, b.logits);
+            assert_eq!(a.entropy.to_bits(), b.entropy.to_bits());
+        }
+        assert_eq!(t1.per_head_mean, t2.per_head_mean);
+        assert_eq!(
+            t1.mean_abs_correction.to_bits(),
+            t2.mean_abs_correction.to_bits()
+        );
+    }
+
+    #[test]
+    fn c8_cached_and_uncached_paths_agree() {
+        // Arm I must be a pure speedup: identical scores and deltas, and the
+        // second run must actually hit the cache.
+        let (coll, heads, q) = fixture("c8-cache");
+        let uncached = c8_config(0.3);
+        let cached = RetrievalConfig {
+            c8_attention: Some(
+                attentiondb_attention::C8AttentionConfig::truncated_identity_control(
+                    HEADS, DIM, DIM, DIM,
+                )
+                .with_residual_scale(0.3)
+                .with_cache(true),
+            ),
+            ..base_config()
+        };
+        let (u_cands, _, _, _, u_trace) = coll
+            .attend_detailed_c8(&heads, &q, 5, None, None, None, Some(&uncached), None)
+            .unwrap();
+        let (c_cands, _, _, _, c_trace1) = coll
+            .attend_detailed_c8(&heads, &q, 5, None, None, None, Some(&cached), None)
+            .unwrap();
+        let (_, _, _, _, c_trace2) = coll
+            .attend_detailed_c8(&heads, &q, 5, None, None, None, Some(&cached), None)
+            .unwrap();
+
+        assert_eq!(ids(&u_cands), ids(&c_cands));
+        for (a, b) in u_cands.iter().zip(c_cands.iter()) {
+            assert_eq!(a.final_score.to_bits(), b.final_score.to_bits());
+        }
+        let u = u_trace.unwrap();
+        let c1 = c_trace1.unwrap();
+        for (a, b) in u.candidates.iter().zip(c1.candidates.iter()) {
+            assert_eq!(a.id, b.id);
+            assert_eq!(a.attention_delta.to_bits(), b.attention_delta.to_bits());
+            assert_eq!(
+                a.applied_correction.to_bits(),
+                b.applied_correction.to_bits()
+            );
+        }
+        // Cold run populates the cache; the warm run must hit it.
+        assert!(
+            c1.cache_stats.misses > 0,
+            "first cached query should miss and populate"
+        );
+        let c2 = c_trace2.unwrap();
+        assert!(c2.cache_stats.hits > 0, "second cached query should hit");
+        assert_eq!(
+            c2.timings.kv_projection_us, 0,
+            "a warm cache must skip the K/V projection bucket"
+        );
+    }
+
+    #[test]
+    fn c8_subsystem_cache_key_tracks_the_head_set() {
+        // The subsystem captures head names at build time, so a config-only key
+        // would hand back a subsystem built for a different head set.
+        let a = subsystem_key(
+            &attentiondb_attention::C8AttentionConfig::truncated_identity_control(
+                HEADS, DIM, DIM, DIM,
+            ),
+            &["a".to_string(), "b".to_string()],
+        );
+        let b = subsystem_key(
+            &attentiondb_attention::C8AttentionConfig::truncated_identity_control(
+                HEADS, DIM, DIM, DIM,
+            ),
+            &["a".to_string(), "c".to_string()],
+        );
+        assert_ne!(a, b, "head set must change the key");
+        // Same config, same heads -> same key (so the subsystem is reused).
+        let c = subsystem_key(
+            &attentiondb_attention::C8AttentionConfig::truncated_identity_control(
+                HEADS, DIM, DIM, DIM,
+            ),
+            &["a".to_string(), "b".to_string()],
+        );
+        assert_eq!(a, c);
+        // And the length separator must prevent an ambiguous concatenation.
+        let d = subsystem_key(
+            &attentiondb_attention::C8AttentionConfig::truncated_identity_control(
+                HEADS, DIM, DIM, DIM,
+            ),
+            &["ab".to_string()],
+        );
+        let e = subsystem_key(
+            &attentiondb_attention::C8AttentionConfig::truncated_identity_control(
+                HEADS, DIM, DIM, DIM,
+            ),
+            &["a".to_string(), "b".to_string()],
+        );
+        assert_ne!(d, e);
+    }
+
+    #[test]
+    fn c8_lambda_scales_the_correction_linearly() {
+        // delta(lambda) must be exactly lambda * delta(1), so a single trained
+        // model can be swept across arms without retraining.
+        let (coll, heads, q) = fixture("c8-lambda-scale");
+        let run = |lambda: f32| {
+            coll.attend_detailed_c8(
+                &heads,
+                &q,
+                5,
+                None,
+                None,
+                None,
+                Some(&c8_config(lambda)),
+                None,
+            )
+            .unwrap()
+        };
+        let (_, _, _, _, t_half) = run(0.5);
+        let (_, _, _, _, t_one) = run(1.0);
+        let (h, o) = (t_half.unwrap(), t_one.unwrap());
+        for (a, b) in h.candidates.iter().zip(o.candidates.iter()) {
+            // Same underlying delta regardless of lambda...
+            assert_eq!(a.attention_delta.to_bits(), b.attention_delta.to_bits());
+            // ...and the applied correction is exactly half.
+            assert!((a.applied_correction - 0.5 * b.applied_correction).abs() < 1e-6);
+        }
+    }
+
+    #[test]
+    fn c8_timings_are_reported() {
+        let (coll, heads, q) = fixture("c8-timings");
+        let (_, _, _, _, t) = coll
+            .attend_detailed_c8(&heads, &q, 5, None, None, None, Some(&c8_config(0.3)), None)
+            .unwrap();
+        let t = t.unwrap();
+        assert!(t.timings.total_us > 0, "total time must be measured");
+        assert!(t.config_fingerprint != 0);
+        assert_eq!(t.head_names.len(), HEADS);
+    }
+
+    #[test]
+    fn c8_rejects_an_invalid_config() {
+        let (coll, heads, q) = fixture("c8-invalid");
+        // key_dim > attention_dim is invalid.
+        let bad = RetrievalConfig {
+            c8_attention: Some(attentiondb_attention::C8AttentionConfig {
+                enabled: true,
+                attention_dim: 4,
+                key_dim: 8,
+                value_dim: 4,
+                head_alignments: vec![attentiondb_attention::AlignmentProjection::identity(4)],
+                query_alignment: Some(attentiondb_attention::AlignmentProjection::identity(4)),
+                residual_projection: None,
+                residual_scale: 0.1,
+                use_evidence: false,
+                scorer: attentiondb_attention::ResidualScorer::new(1.0, 0.0, 0.0),
+                cache_enabled: false,
+            }),
+            ..base_config()
+        };
+        let err = coll
+            .attend_detailed_c8(&heads, &q, 5, None, None, None, Some(&bad), None)
+            .unwrap_err();
+        assert!(
+            format!("{err}").contains("c8 attention config invalid"),
+            "got: {err}"
+        );
     }
 }

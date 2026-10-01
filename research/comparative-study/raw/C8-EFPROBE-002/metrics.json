@@ -1,0 +1,43 @@
+{
+  "run_id": "C8-EFPROBE-002",
+  "mode": "EF128",
+  "dataset": "DS-SCIFACT",
+  "split": "PROBE",
+  "phase": "C8 execution",
+  "test_queries": 20,
+  "rep_count": 1,
+  "warmup": 20,
+  "ef_search": 64,
+  "candidate_budget": 500,
+  "min_candidates_per_head": 20,
+  "max_candidates_per_head": 300,
+  "attention_dim": 384,
+  "key_dim": 64,
+  "value_dim": 64,
+  "lambda": 0.1,
+  "per_rep": [
+    {
+      "n_queries": 20,
+      "recall10_qrels_mean": 0.725,
+      "recall10_exact_mean": 0.6900000005960465,
+      "ndcg10_qrels_mean": 0.4842287003993988,
+      "mrr10_qrels_mean": 0.40734126984126984,
+      "p50_us": 2264.4,
+      "p90_us": 2608.5,
+      "p95_us": 2716.9,
+      "deadline_exceeded": 0
+    }
+  ],
+  "rep_recall10_qrels_mean": [
+    0.725
+  ],
+  "recall10_qrels_mean_Nrep": 0.725,
+  "rep_ndcg10_qrels_mean": [
+    0.4842287003993988
+  ],
+  "ndcg10_qrels_mean_Nrep": 0.4842,
+  "union_identity_ok": true,
+  "union_report": {
+    "skipped": "EFPROBE arms are MODE-B (attention OFF); union identity checked on B/C/D/E/F/G/H/I arms"
+  }
+}

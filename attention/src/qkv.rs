@@ -3,7 +3,7 @@ use crate::projection::QkvProjection;
 use serde::{Deserialize, Serialize};
 
 /// Numerically stable softmax: max-shift then exp then normalize.
-fn stable_softmax(logits: &mut [f32]) {
+pub fn stable_softmax(logits: &mut [f32]) {
     if logits.is_empty() {
         return;
     }
@@ -68,23 +68,52 @@ impl AttentionEngine {
                 "z_d cannot be empty".into(),
             ));
         }
-        let h_count = z_d.len();
-        let d_k = self.key_dim;
-
-        // Project query: Q = q_a W_Q  →  1 × d_k
         let q = self.qkv.project_q(q_a)?;
-
-        // Project keys: K_d = Z_d W_K  →  H × d_k
         let k_d = self.qkv.project_k(z_d)?;
-
-        // Project values: V_d = Z_d W_V  →  H × d_v
         let v_d = self.qkv.project_v(z_d)?;
+        self.attend_from_kv(&q, z_d.len(), &k_d, &v_d)
+    }
+
+    /// Project the query once so it can be reused across candidates.
+    /// This is the only query-dependent step; everything after it is
+    /// candidate-local, which is what makes a document-side K/V cache valid.
+    pub fn project_query(&self, q_a: &[f32]) -> Result<Vec<f32>> {
+        self.qkv.project_q(q_a)
+    }
+
+    /// Attention from *already projected* keys and values.
+    ///
+    /// This is the single implementation of the attention math, shared by the
+    /// uncached path (which projects K/V first) and the C8 cached path (which
+    /// reuses vectors cached from a previous query). Because both call this
+    /// function with identical inputs, the two paths are bit-identical by
+    /// construction rather than by agreement between two code paths.
+    pub fn attend_from_kv(
+        &self,
+        q: &[f32],
+        head_count: usize,
+        k_d: &[Vec<f32>],
+        v_d: &[Vec<f32>],
+    ) -> Result<CandidateAttention> {
+        if head_count == 0 {
+            return Err(crate::errors::AttentionError::EmptyInput(
+                "z_d cannot be empty".into(),
+            ));
+        }
+        if k_d.len() != head_count || v_d.len() != head_count {
+            return Err(crate::errors::AttentionError::DimensionMismatch {
+                expected: head_count,
+                found: k_d.len().min(v_d.len()),
+            });
+        }
+        let d_k = self.key_dim;
+        let value_dim = self.qkv.value_dim;
 
         // Compute logits: L_d = Q K_d^T / sqrt(d_k)
         // L_d is 1 × H
         let scale = 1.0 / (d_k as f32).sqrt();
-        let mut logits = vec![0.0; h_count];
-        for h in 0..h_count {
+        let mut logits = vec![0.0; head_count];
+        for h in 0..head_count {
             let mut dot = 0.0;
             let k_h = &k_d[h];
             for d in 0..d_k {
@@ -98,9 +127,8 @@ impl AttentionEngine {
 
         // Attention output: O_d = A_d V_d
         // A_d is 1 × H, V_d is H × d_v → O_d is 1 × d_v
-        let value_dim = self.qkv.value_dim;
         let mut output = vec![0.0; value_dim];
-        for h in 0..h_count {
+        for h in 0..head_count {
             let a_h = logits[h];
             let v_h = &v_d[h];
             for d in 0..value_dim {

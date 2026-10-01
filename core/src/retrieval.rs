@@ -263,6 +263,82 @@ pub struct C7Trace {
     pub compute_time_us: u64,
 }
 
+/// Per-candidate C8 residual-attention trace entry (aligned with the union list).
+///
+/// Unlike `C7CandidateTrace`, the baseline is retained alongside the correction
+/// so the residual contract `S_final = S_base + lambda * dS` is checkable
+/// per candidate from the artifact, rather than being an aggregate assertion.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct C8CandidateTrace {
+    /// Document id (engine numeric id).
+    pub id: u64,
+    /// S_base: the score the baseline pipeline produced, before any correction.
+    pub baseline_score: f32,
+    /// dS_attention: the pre-scale attention correction.
+    pub attention_delta: f32,
+    /// lambda in force for this query.
+    pub residual_scale: f32,
+    /// S_final actually applied.
+    pub final_score: f32,
+    /// S_final - S_base as applied. Exactly `0.0` when lambda is zero.
+    pub applied_correction: f32,
+    /// A_d per-head attention weights (length H).
+    pub weights: Vec<f32>,
+    /// O_d = A_d V_d attended output (length d_v).
+    pub output: Vec<f32>,
+    /// Raw attention logits (length H, pre-softmax).
+    pub logits: Vec<f32>,
+    /// Shannon entropy of the attention distribution.
+    pub entropy: f32,
+}
+
+/// C8 residual-attention trace for a whole query. Present ONLY when the C8
+/// residual stage is enabled; `None` otherwise, so the probe can assert that a
+/// disabled C8 reproduces the baseline exactly.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct C8Trace {
+    /// Source heads at query time, in alignment order.
+    pub head_names: Vec<String>,
+    /// Per-candidate trace, same order as the (bounded) union list.
+    pub candidates: Vec<C8CandidateTrace>,
+    /// Per-head mean attention weights I_h over candidates.
+    pub per_head_mean: Vec<f32>,
+    /// Mean entropy across candidates.
+    pub mean_entropy: f32,
+    /// Mean |applied correction| across candidates. `0.0` means the residual
+    /// stage ran but changed nothing.
+    pub mean_abs_correction: f32,
+    /// Timing breakdown for the residual stage.
+    pub timings: attentiondb_attention::C8AttentionTimings,
+    /// Cache accounting (arm I; all zero when the cache is off).
+    pub cache_stats: attentiondb_attention::CacheStats,
+    /// Config fingerprint of the subsystem that produced this trace.
+    pub config_fingerprint: u64,
+}
+
+impl C8Trace {
+    /// Verify the residual identity for every candidate, within `tolerance`.
+    ///
+    /// A broken fusion must fail loudly here rather than hide behind good
+    /// ranking metrics.
+    pub fn verify_residual(&self, tolerance: f32) -> Result<(), String> {
+        for (i, c) in self.candidates.iter().enumerate() {
+            let expected = if c.residual_scale == 0.0 {
+                c.baseline_score
+            } else {
+                c.baseline_score + c.residual_scale * c.attention_delta
+            };
+            if (c.final_score - expected).abs() > tolerance {
+                return Err(format!(
+                    "candidate {i}: final {} != base {} + {} * delta {}",
+                    c.final_score, c.baseline_score, c.residual_scale, c.attention_delta
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
 /// L2-normalize in place; a zero/empty/non-finite vector is left as-is so the
 /// caller can fall back to the original query (deterministic, NaN-safe).
 pub fn l2_normalize(v: &mut [f32]) {
