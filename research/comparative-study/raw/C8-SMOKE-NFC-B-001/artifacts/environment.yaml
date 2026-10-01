@@ -1,0 +1,27 @@
+{
+  "host": "Originator",
+  "os": "Windows-11-10.0.26200-SP0",
+  "python": "3.14.4",
+  "created_utc": "2026-10-01T00:21:43Z",
+  "c8pilot_sha256": "10159ff8c6183763b4b46823b6d715c5afaf5815885542235946025f1e864617",
+  "input_hashes": {
+    "CANONICAL.f32": "4f1f7a3bc26916b14545e7ac0a5dae1d16393db944a54b37441f7c70029f09ef",
+    "HEAD-BODY.f32": "2f76b795e31d0c09bc63988acf15710cd3607e09d60e0ecdf87ebb42c0fb892a",
+    "HEAD-CITE.f32": "181c17fb89cd63299cca102bb18dc401b3171bf1a60dc0b662d36b694742a5d5",
+    "HEAD-TITLE.f32": "87634220e8b730dcdc5711a5033414bf8168ba6d6feac19a08bb0bfe6d7a1d84",
+    "QUERIES.f32": "afb866ae799124ad3fcd5faadca70bbd698d62c3c38f47d63b5f181ef26cfc15",
+    "multi-smoke-rep1-cfg.json": "ac54915099067e49419e3134430721b6e3519a262bf32ee28cd89af39455db83",
+    "multi-smoke-rep1.json": "a658e39dc3e20f92e80443a8291c1f7edfabf2a2fe80af86710e7824ce7bddbe",
+    "multi-smoke-rerun-cfg.json": "e2d9f3796e747030a15cb1eedb1d122d8533bbc4dd65517f933f9298b4fed0ca",
+    "multi-smoke-rerun.json": "fa33a3ebff8a38a810dfe20759d567e423497a1a8212d6c8911fb94ee157a4c8",
+    "ARM-B-rep1.json": "c29753ae447c4148298ee283d0f0e13767994b8ddd3bf9fb236941bcb12ba3d0",
+    "cfg.json": "ac54915099067e49419e3134430721b6e3519a262bf32ee28cd89af39455db83"
+  },
+  "guardrail": {
+    "policy": "sampler(500ms) aborts when child process-tree RSS >= 85% of MemAvailable at preflight; 7200s timeout",
+    "mem_avail_at_preflight_bytes": 3157647360,
+    "mem_load_pct_at_preflight": 81,
+    "ram_abort_threshold_bytes": 2684000256
+  },
+  "method": "one shared engine per process; arms A-I evaluated in-process (B/C/D/E/F/G/H/I union identical by construction, re-verified per rep)"
+}

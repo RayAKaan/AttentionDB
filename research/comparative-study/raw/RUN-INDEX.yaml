@@ -1793,3 +1793,163 @@
   purpose: 'C7 TEST F DS-NFCORPUS (323 qids, 5 reps)'
   completed: 2026-09-30T04:40:15Z
   result: ndcg10=0.2709 recall10=0.13 union_identity_ok=True
+- run_id: C8-TUNE-SCI-E-001
+  status: PASS
+  purpose: 'C8 TUNE-E residual QKV DS-SCIFACT (VALIDATION 200 qids)'
+  completed: 2026-10-01T00:06:43Z
+  result: examples=192 skipped=8 dataset_hash=8141147154856472173 epochs=5 steps=120 loss=[2.5113208293914795, 2.4889779090881348, 2.4758870601654053, 2.4669294357299805, 2.460775852203369]
+- run_id: C8-TUNE-SCI-D-001
+  status: PASS
+  purpose: 'C8 TUNE-D residual QKV DS-SCIFACT (VALIDATION 200 qids)'
+  completed: 2026-10-01T00:07:45Z
+  result: examples=192 skipped=8 dataset_hash=8141147154856472173 epochs=5 steps=120 loss=[2.4873874187469482, 2.237154483795166, 2.044029951095581, 1.8610399961471558, 1.6844172477722168]
+- run_id: C8-TUNE-SCI-F-001
+  status: PASS
+  purpose: 'C8 TUNE-F residual QKV DS-SCIFACT (VALIDATION 200 qids)'
+  completed: 2026-10-01T00:08:44Z
+  result: examples=192 skipped=8 dataset_hash=14864224517566290257 epochs=5 steps=120 loss=[2.636115550994873, 2.613621473312378, 2.600402593612671, 2.5913331508636475, 2.5850870609283447]
+- run_id: C8-TUNE-SCI-G-001
+  status: PASS
+  purpose: 'C8 TUNE-G residual QKV DS-SCIFACT (VALIDATION 200 qids)'
+  completed: 2026-10-01T00:09:41Z
+  result: examples=192 skipped=8 dataset_hash=14864224517566290257 epochs=5 steps=120 loss=[2.6222498416900635, 2.5997965335845947, 2.586611747741699, 2.577570676803589, 2.571347713470459]
+- run_id: C8-TUNE-SCI-H-001
+  status: PASS
+  purpose: 'C8 TUNE-H residual QKV DS-SCIFACT (VALIDATION 200 qids)'
+  completed: 2026-10-01T00:10:32Z
+  result: examples=192 skipped=8 dataset_hash=8141147154856472173 epochs=5 steps=120 loss=[2.5113306045532227, 2.4889886379241943, 2.4759018421173096, 2.4669477939605713, 2.4607994556427]
+- run_id: C8-SMOKE-SCI-A-001
+  status: PASS
+  purpose: 'C8 SMOKE A DS-SCIFACT (20 qids, 1 reps)'
+  completed: 2026-10-01T00:15:22Z
+  result: ndcg10=0.564 recall10=0.775 union_identity_ok=True
+- run_id: C8-SMOKE-SCI-B-001
+  status: PASS
+  purpose: 'C8 SMOKE B DS-SCIFACT (20 qids, 1 reps)'
+  completed: 2026-10-01T00:15:22Z
+  result: ndcg10=0.4911 recall10=0.775 union_identity_ok=True
+- run_id: C8-SMOKE-SCI-C-001
+  status: PASS
+  purpose: 'C8 SMOKE C DS-SCIFACT (20 qids, 1 reps)'
+  completed: 2026-10-01T00:15:22Z
+  result: ndcg10=0.4911 recall10=0.775 union_identity_ok=True
+- run_id: C8-SMOKE-SCI-D-001
+  status: PASS
+  purpose: 'C8 SMOKE D DS-SCIFACT (20 qids, 1 reps)'
+  completed: 2026-10-01T00:15:23Z
+  result: ndcg10=0.6087 recall10=0.775 union_identity_ok=True
+- run_id: C8-SMOKE-SCI-E-001
+  status: PASS
+  purpose: 'C8 SMOKE E DS-SCIFACT (20 qids, 1 reps)'
+  completed: 2026-10-01T00:15:23Z
+  result: ndcg10=0.5008 recall10=0.775 union_identity_ok=True
+- run_id: C8-SMOKE-SCI-F-001
+  status: PASS
+  purpose: 'C8 SMOKE F DS-SCIFACT (20 qids, 1 reps)'
+  completed: 2026-10-01T00:15:23Z
+  result: ndcg10=0.5008 recall10=0.775 union_identity_ok=True
+- run_id: C8-SMOKE-SCI-G-001
+  status: PASS
+  purpose: 'C8 SMOKE G DS-SCIFACT (20 qids, 1 reps)'
+  completed: 2026-10-01T00:15:23Z
+  result: ndcg10=0.5008 recall10=0.775 union_identity_ok=True
+- run_id: C8-SMOKE-SCI-H-001
+  status: PASS
+  purpose: 'C8 SMOKE H DS-SCIFACT (20 qids, 1 reps)'
+  completed: 2026-10-01T00:15:23Z
+  result: ndcg10=0.5008 recall10=0.775 union_identity_ok=True
+- run_id: C8-SMOKE-SCI-I-001
+  status: PASS
+  purpose: 'C8 SMOKE I DS-SCIFACT (20 qids, 1 reps)'
+  completed: 2026-10-01T00:15:24Z
+  result: ndcg10=0.5008 recall10=0.775 union_identity_ok=True
+- run_id: C8-TUNE-NFC-D-001
+  status: PASS
+  purpose: 'C8 TUNE-D residual QKV DS-NFCORPUS (VALIDATION 324 qids)'
+  completed: 2026-10-01T00:16:14Z
+  result: examples=303 skipped=21 dataset_hash=17744417282313574642 epochs=5 steps=190 loss=[2.5767617225646973, 2.338992118835449, 2.1610023975372314, 2.0019915103912354, 1.8597898483276367]
+- run_id: C8-TUNE-NFC-E-001
+  status: PASS
+  purpose: 'C8 TUNE-E residual QKV DS-NFCORPUS (VALIDATION 324 qids)'
+  completed: 2026-10-01T00:16:52Z
+  result: examples=303 skipped=21 dataset_hash=17744417282313574642 epochs=5 steps=190 loss=[2.6003384590148926, 2.5812408924102783, 2.5722110271453857, 2.5668137073516846, 2.5635509490966797]
+- run_id: C8-TUNE-NFC-F-001
+  status: PASS
+  purpose: 'C8 TUNE-F residual QKV DS-NFCORPUS (VALIDATION 324 qids)'
+  completed: 2026-10-01T00:17:33Z
+  result: examples=303 skipped=21 dataset_hash=3686909789714422379 epochs=5 steps=190 loss=[2.7683467864990234, 2.7490432262420654, 2.739863634109497, 2.73435115814209, 2.731003761291504]
+- run_id: C8-TUNE-NFC-G-001
+  status: PASS
+  purpose: 'C8 TUNE-G residual QKV DS-NFCORPUS (VALIDATION 324 qids)'
+  completed: 2026-10-01T00:18:08Z
+  result: examples=303 skipped=21 dataset_hash=3686909789714422379 epochs=5 steps=190 loss=[2.761575698852539, 2.74229097366333, 2.7331249713897705, 2.7276222705841064, 2.724283218383789]
+- run_id: C8-TUNE-NFC-H-001
+  status: PASS
+  purpose: 'C8 TUNE-H residual QKV DS-NFCORPUS (VALIDATION 324 qids)'
+  completed: 2026-10-01T00:18:43Z
+  result: examples=303 skipped=21 dataset_hash=17744417282313574642 epochs=5 steps=190 loss=[2.600348711013794, 2.581252336502075, 2.5722270011901855, 2.5668327808380127, 2.5635740756988525]
+- run_id: C8-SMOKE-NFC-A-001
+  status: PASS
+  purpose: 'C8 SMOKE A DS-NFCORPUS (20 qids, 1 reps)'
+  completed: 2026-10-01T00:21:43Z
+  result: ndcg10=0.2636 recall10=0.0968 union_identity_ok=True
+- run_id: C8-SMOKE-NFC-B-001
+  status: PASS
+  purpose: 'C8 SMOKE B DS-NFCORPUS (20 qids, 1 reps)'
+  completed: 2026-10-01T00:21:43Z
+  result: ndcg10=0.2651 recall10=0.1158 union_identity_ok=True
+- run_id: C8-SMOKE-NFC-C-001
+  status: PASS
+  purpose: 'C8 SMOKE C DS-NFCORPUS (20 qids, 1 reps)'
+  completed: 2026-10-01T00:21:43Z
+  result: ndcg10=0.2651 recall10=0.1158 union_identity_ok=True
+- run_id: C8-SMOKE-NFC-D-001
+  status: PASS
+  purpose: 'C8 SMOKE D DS-NFCORPUS (20 qids, 1 reps)'
+  completed: 2026-10-01T00:21:43Z
+  result: ndcg10=0.2861 recall10=0.1162 union_identity_ok=True
+- run_id: C8-SMOKE-NFC-E-001
+  status: PASS
+  purpose: 'C8 SMOKE E DS-NFCORPUS (20 qids, 1 reps)'
+  completed: 2026-10-01T00:21:44Z
+  result: ndcg10=0.2654 recall10=0.1158 union_identity_ok=True
+- run_id: C8-SMOKE-NFC-F-001
+  status: PASS
+  purpose: 'C8 SMOKE F DS-NFCORPUS (20 qids, 1 reps)'
+  completed: 2026-10-01T00:21:44Z
+  result: ndcg10=0.2654 recall10=0.1158 union_identity_ok=True
+- run_id: C8-SMOKE-NFC-G-001
+  status: PASS
+  purpose: 'C8 SMOKE G DS-NFCORPUS (20 qids, 1 reps)'
+  completed: 2026-10-01T00:21:44Z
+  result: ndcg10=0.2654 recall10=0.1158 union_identity_ok=True
+- run_id: C8-SMOKE-NFC-H-001
+  status: PASS
+  purpose: 'C8 SMOKE H DS-NFCORPUS (20 qids, 1 reps)'
+  completed: 2026-10-01T00:21:44Z
+  result: ndcg10=0.2654 recall10=0.1158 union_identity_ok=True
+- run_id: C8-SMOKE-NFC-I-001
+  status: PASS
+  purpose: 'C8 SMOKE I DS-NFCORPUS (20 qids, 1 reps)'
+  completed: 2026-10-01T00:21:44Z
+  result: ndcg10=0.2654 recall10=0.1158 union_identity_ok=True
+- run_id: C8-EFPROBE-001
+  status: PASS
+  purpose: 'C8 PROBE EF16 DS-SCIFACT (20 qids, 1 reps)'
+  completed: 2026-10-01T00:22:34Z
+  result: ndcg10=0.4738 recall10=0.675 union_identity_ok=True
+- run_id: C8-EFPROBE-002
+  status: PASS
+  purpose: 'C8 PROBE EF128 DS-SCIFACT (20 qids, 1 reps)'
+  completed: 2026-10-01T00:22:35Z
+  result: ndcg10=0.4842 recall10=0.725 union_identity_ok=True
+- run_id: C8-EFPROBE-003
+  status: PASS
+  purpose: 'C8 PROBE EF16 DS-NFCORPUS (20 qids, 1 reps)'
+  completed: 2026-10-01T00:23:00Z
+  result: ndcg10=0.2658 recall10=0.1004 union_identity_ok=True
+- run_id: C8-EFPROBE-004
+  status: PASS
+  purpose: 'C8 PROBE EF128 DS-NFCORPUS (20 qids, 1 reps)'
+  completed: 2026-10-01T00:23:00Z
+  result: ndcg10=0.2653 recall10=0.1158 union_identity_ok=True

@@ -1,0 +1,95 @@
+name: C8 Residual QKV Study
+
+# Heavy research runner (not part of the default push/PR gate).
+# Produces the C8 TRK-A TEST + SUPPORT evidence on Linux (authoritative platform),
+# then runs the invariant gates and the 14-contrast statistical analysis.
+#
+# Manual trigger: Actions -> "C8 Residual QKV Study" -> Run workflow.
+# The resulting evidence bundle is uploaded as an artifact for review/commit.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tracks:
+        description: "Comma-separated tracks to run (SAFETY,TUNE,SUPPORT,TRK-A) or ALL"
+        required: false
+        default: "ALL"
+
+env:
+  CARGO_TERM_COLOR: always
+  C8_ROOT: research/comparative-study/c8-residual-qkv-attention
+  C8PILOT: research/comparative-study/c8-residual-qkv-attention/probe/target/release/c8pilot
+
+concurrency:
+  group: c8-study-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  c8:
+    name: C8 study (Linux, authoritative)
+    runs-on: ubuntu-latest
+    timeout-minutes: 600
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "25.x"
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-c8-cargo-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
+
+      - name: Install Python dependencies
+        run: python3 -m pip install --upgrade pip numpy scipy psutil
+
+      - name: Build c8pilot (release)
+        run: cargo build --release --manifest-path "$C8_ROOT/probe/Cargo.toml"
+        env:
+          RUSTFLAGS: ""
+
+      - name: Verify frozen datasets/embeddings are present
+        run: |
+          test -f research/comparative-study/raw/datasets/beir/scifact/queries.jsonl
+          test -f research/comparative-study/raw/datasets/beir/nfcorpus/queries.jsonl
+          test -d research/comparative-study/raw/C2-EMBED-NFCORPUS-003/artifacts
+          test -d research/comparative-study/raw/C3-EMBED-SCIFACT-001/artifacts
+
+      - name: Run C8 cells (PROBE, TUNE, SMOKE, SUPPORT, TEST) + gates + analysis
+        run: |
+          python3 "$C8_ROOT/harness/c8_ci.py" \
+            --tracks "${{ github.event.inputs.tracks }}" \
+            --verify --analyze
+        env:
+          C8PILOT: ${{ env.C8PILOT }}
+
+      - name: Stage evidence bundle (exclude bulky shared union dumps)
+        if: always()
+        run: |
+          mkdir -p c8-evidence
+          cp -r research/comparative-study/raw/C8-* c8-evidence/ 2>/dev/null || true
+          rm -rf c8-evidence/C8-SHARED-SCI c8-evidence/C8-SHARED-NFC 2>/dev/null || true
+          mkdir -p c8-evidence/analysis
+          cp "$C8_ROOT/analysis/verification_report.json" c8-evidence/analysis/ 2>/dev/null || true
+          cp "$C8_ROOT/analysis/statistical_results.json" c8-evidence/analysis/ 2>/dev/null || true
+          du -sh c8-evidence || true
+
+      - name: Upload C8 evidence bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: c8-evidence-${{ github.run_id }}
+          path: c8-evidence
+          if-no-files-found: warn
+          retention-days: 30

@@ -41,3 +41,8 @@ research/comparative-study/raw/C7-SHARED-NFC/multi-test-rep*.json
 # rerunning c7_test_run.py --kind tune for cell C from the committed gate_choice.json.
 research/comparative-study/raw/C7-TUNE-SCI-C-001/artifacts/gatescan*.json
 research/comparative-study/raw/C7-TUNE-NFC-C-001/artifacts/gatescan*.json
+
+# C8: shared multi-rep union dumps (all arms in one file) are bit-reproducible
+# from the per-cell ARM artifacts; well over the 100MB/file GitHub limit for TEST.
+research/comparative-study/raw/C8-SHARED-SCI/multi-*.json
+research/comparative-study/raw/C8-SHARED-NFC/multi-*.json

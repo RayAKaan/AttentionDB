@@ -1,0 +1,70 @@
+{
+  "run_id": "C8-SMOKE-SCI-E-001",
+  "mode": "E",
+  "dataset": "DS-SCIFACT",
+  "split": "SMOKE",
+  "phase": "C8 execution",
+  "test_queries": 20,
+  "rep_count": 1,
+  "warmup": 20,
+  "ef_search": 64,
+  "candidate_budget": 500,
+  "min_candidates_per_head": 20,
+  "max_candidates_per_head": 300,
+  "attention_dim": 384,
+  "key_dim": 64,
+  "value_dim": 64,
+  "lambda": 0.1,
+  "per_rep": [
+    {
+      "n_queries": 20,
+      "recall10_qrels_mean": 0.775,
+      "recall10_exact_mean": 0.6749999985098839,
+      "ndcg10_qrels_mean": 0.5008198842406273,
+      "mrr10_qrels_mean": 0.4141666666666667,
+      "p50_us": 356281.8,
+      "p90_us": 389160.2,
+      "p95_us": 412410.1,
+      "deadline_exceeded": 0
+    }
+  ],
+  "rep_recall10_qrels_mean": [
+    0.775
+  ],
+  "recall10_qrels_mean_Nrep": 0.775,
+  "rep_ndcg10_qrels_mean": [
+    0.5008198842406273
+  ],
+  "ndcg10_qrels_mean_Nrep": 0.5008,
+  "union_identity_ok": true,
+  "union_report": {
+    "rep1:BvsC": {
+      "mismatches": 0,
+      "n_queries": 20
+    },
+    "rep1:BvsD": {
+      "mismatches": 0,
+      "n_queries": 20
+    },
+    "rep1:BvsE": {
+      "mismatches": 0,
+      "n_queries": 20
+    },
+    "rep1:BvsF": {
+      "mismatches": 0,
+      "n_queries": 20
+    },
+    "rep1:BvsG": {
+      "mismatches": 0,
+      "n_queries": 20
+    },
+    "rep1:BvsH": {
+      "mismatches": 0,
+      "n_queries": 20
+    },
+    "rep1:BvsI": {
+      "mismatches": 0,
+      "n_queries": 20
+    }
+  }
+}

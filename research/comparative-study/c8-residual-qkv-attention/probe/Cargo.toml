@@ -1,0 +1,31 @@
+[package]
+name = "c8pilot"
+version = "0.1.0"
+edition = "2021"
+description = "C8 residual Q/K/V attention pilot — drives the C8 engine via config JSON"
+
+[workspace]
+
+[dependencies]
+attentiondb-core = { path = "../../../../core" }
+attentiondb-storage = { path = "../../../../storage" }
+attentiondb-attention = { path = "../../../../attention" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+
+[[bin]]
+name = "c8pilot"
+path = "src/main.rs"
+
+# C8 §8 gate #6: redirect hnsw_rs to the vendored copy with a fixed
+# layer-RNG seed so index builds are bit-identical across processes.
+[patch.crates-io]
+hnsw_rs = { path = "../../../../vendor/hnsw_rs" }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+opt-level = 3
+panic = "abort"
+debug = false
