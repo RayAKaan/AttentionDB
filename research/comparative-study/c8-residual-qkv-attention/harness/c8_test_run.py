@@ -37,8 +37,9 @@ import numpy as np
 
 RAW = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "raw"))
 PLAN = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "c8-run-plan.csv"))
+_PILOT_NAME = "c8pilot.exe" if platform.system() == "Windows" else "c8pilot"
 C8PILOT = os.environ.get("C8PILOT", os.path.abspath(os.path.join(
-    os.path.dirname(__file__), "..", "probe", "target", "release", "c8pilot.exe")))
+    os.path.dirname(__file__), "..", "probe", "target", "release", _PILOT_NAME)))
 SEED = 20260925
 WARMUP = 20
 K = 10
@@ -62,8 +63,21 @@ RESID_REG = 1e-3
 DISTILL_TEMP = 0.5
 
 
-# ---- Windows memory sampler -------------------------------------------------
-try:
+# ---- cross-platform memory sampler ------------------------------------------
+import psutil
+
+
+class _MemStatus:
+    """Portable stand-in for Win32 MEMORYSTATUSEX (same attribute names)."""
+
+    def __init__(self, total, avail):
+        self.ullTotalPhys = int(total)
+        self.ullAvailPhys = int(avail)
+        self.dwMemoryLoad = (int(round((total - avail) * 100 / total))
+                             if total else 0)
+
+
+if platform.system() == "Windows":
     import ctypes
 
     class MEMORYSTATUSEX(ctypes.Structure):
@@ -81,24 +95,17 @@ try:
         m.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
         ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m))
         return m
-
-    def proc_rss_bytes(pid):
-        import psutil
-        try:
-            return psutil.Process(pid).memory_info().rss
-        except Exception:
-            return 0
-except ImportError:
-    import psutil
-
+else:
     def mem_status():
-        return (None, psutil.virtual_memory().available)
+        vm = psutil.virtual_memory()
+        return _MemStatus(vm.total, vm.available)
 
-    def proc_rss_bytes(pid):
-        try:
-            return psutil.Process(pid).memory_info().rss
-        except Exception:
-            return 0
+
+def proc_rss_bytes(pid):
+    try:
+        return psutil.Process(pid).memory_info().rss
+    except Exception:
+        return 0
 
 
 def sha256_file(p):
