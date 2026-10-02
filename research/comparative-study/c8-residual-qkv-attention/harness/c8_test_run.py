@@ -478,7 +478,8 @@ def tune_train_block(mode, model_id, rows, d_k=KEY_DIM, d_v=VALUE_DIM):
 
 
 def run_train(run_id, row, dsinfo, art, query_ids, doc_ids, qrels, keep,
-              doc_vectors, qvec_out, mem_snapshot, model_id):
+              doc_vectors, qvec_out, mem_snapshot, model_id,
+              d_k=KEY_DIM, d_v=VALUE_DIM):
     mode = row["mode"].replace("MODE-", "")
     cfg = {
         "subcommand": "train", "k": K, "seed": SEED, "warmup": WARMUP,
@@ -490,7 +491,7 @@ def run_train(run_id, row, dsinfo, art, query_ids, doc_ids, qrels, keep,
         "candidate_budget": 500, "min_candidates_per_head": 20,
         "max_candidates_per_head": 300, "ef_search": 64,
         "configuration_id": run_id,
-        "train": tune_train_block(mode, model_id, keep),
+        "train": tune_train_block(mode, model_id, keep, d_k=d_k, d_v=d_v),
     }
     out = os.path.join(art, "train_report.json")
     cfg_path = os.path.join(art, "train-cfg.json")
@@ -581,7 +582,8 @@ def main():
             train_row["mode"] = "MODE-E"
             card = run_train(run_id, train_row, dsinfo, art, query_ids, doc_ids,
                              qrels, keep, doc_vectors, qvec_out, mem_snapshot,
-                             model_id=f"{ds_short.lower()}-c8-support-{variant.lower()}")
+                             model_id=f"{ds_short.lower()}-c8-support-{variant.lower()}",
+                             d_k=d_kv, d_v=d_kv)
             # single-arm run at the sweep point
             arm = arm_learned(variant, os.path.join(art, "model.json"),
                               use_evidence=False, arch="residual",
