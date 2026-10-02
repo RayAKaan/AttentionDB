@@ -320,6 +320,7 @@ def main():
                     for i, pq in enumerate(multi["arms"][name]["per_query"]):
                         check_nonfinite(checks.setdefault("nonfinite", []),
                                         f"C8-TEST-{ds_short}", name, pq, i)
+                del multi
             summary[f"test-{ds_short}"] = f"{rep_count} reps checked"
 
     # ---- RUN-INDEX consistency ----

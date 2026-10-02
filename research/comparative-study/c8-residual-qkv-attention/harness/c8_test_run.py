@@ -239,6 +239,26 @@ def arm_slice(multi_out, name):
     return multi_out["arms"].get(name)
 
 
+def mean_abs_correction(arm):
+    """Mean |applied_correction| over every traced candidate of the arm.
+
+    The probe reports this per query inside c8_trace; c8_aggregate only
+    carries entropy/spearman summaries.
+    """
+    vals = []
+    for pq in arm.get("per_query") or []:
+        tr = pq.get("c8_trace") or {}
+        for c in tr.get("candidates") or []:
+            v = c.get("applied_correction")
+            if v is not None:
+                vals.append(abs(float(v)))
+    return float(sum(vals) / len(vals)) if vals else None
+
+
+def round4(v):
+    return round(float(v), 4) if isinstance(v, (int, float)) else None
+
+
 def arm_name_for_row(r):
     if r["track"] == "SAFETY" and r["split"] == "PROBE":
         return f"EF{int(r['ef_search'])}"
@@ -575,15 +595,17 @@ def main():
                                  int(getattr(mem_snapshot, "ullAvailPhys", 0) * 0.85))
             a = arm_slice(multi, variant)
             st = derive_rows_stats(a)
+            agg = a.get("c8_aggregate") or {}
             metrics = {
                 "run_id": run_id, "track": "SUPPORT", "variant": variant,
                 "dataset": ds, "split": "VALID", "d_k": d_kv, "d_v": d_kv,
                 "candidate_budget": depth, "n_queries": len(keep),
-                "ndcg10_qrels_mean": round(st["ndcg10_qrels_mean"], 4),
-                "recall10_qrels_mean": round(st["recall10_qrels_mean"], 4),
-                "mrr10_qrels_mean": round(st["mrr10_qrels_mean"], 4),
-                "mean_abs_correction": a["c8_aggregate"]["mean_abs_correction"]
-                if a.get("c8_aggregate") else None,
+                "ndcg10_qrels_mean": round4(st.get("ndcg10_qrels_mean")),
+                "recall10_qrels_mean": round4(st.get("recall10_qrels_mean")),
+                "mrr10_qrels_mean": round4(st.get("mrr10_qrels_mean")),
+                "mean_abs_correction": mean_abs_correction(a),
+                "mean_entropy_over_queries": agg.get("mean_entropy_over_queries"),
+                "mean_spearman_delta_final": agg.get("mean_spearman_delta_final"),
                 "train_dataset_hash": card["dataset_hash"],
             }
             with open(os.path.join(run_dir, "metrics.json"), "w", encoding="utf8") as f:
