@@ -37,8 +37,9 @@ import numpy as np
 
 RAW = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "raw"))
 PLAN = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "c8-run-plan.csv"))
+_PILOT_NAME = "c8pilot.exe" if platform.system() == "Windows" else "c8pilot"
 C8PILOT = os.environ.get("C8PILOT", os.path.abspath(os.path.join(
-    os.path.dirname(__file__), "..", "probe", "target", "release", "c8pilot.exe")))
+    os.path.dirname(__file__), "..", "probe", "target", "release", _PILOT_NAME)))
 SEED = 20260925
 WARMUP = 20
 K = 10
@@ -62,8 +63,21 @@ RESID_REG = 1e-3
 DISTILL_TEMP = 0.5
 
 
-# ---- Windows memory sampler -------------------------------------------------
-try:
+# ---- cross-platform memory sampler ------------------------------------------
+import psutil
+
+
+class _MemStatus:
+    """Portable stand-in for Win32 MEMORYSTATUSEX (same attribute names)."""
+
+    def __init__(self, total, avail):
+        self.ullTotalPhys = int(total)
+        self.ullAvailPhys = int(avail)
+        self.dwMemoryLoad = (int(round((total - avail) * 100 / total))
+                             if total else 0)
+
+
+if platform.system() == "Windows":
     import ctypes
 
     class MEMORYSTATUSEX(ctypes.Structure):
@@ -81,24 +95,17 @@ try:
         m.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
         ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m))
         return m
-
-    def proc_rss_bytes(pid):
-        import psutil
-        try:
-            return psutil.Process(pid).memory_info().rss
-        except Exception:
-            return 0
-except ImportError:
-    import psutil
-
+else:
     def mem_status():
-        return (None, psutil.virtual_memory().available)
+        vm = psutil.virtual_memory()
+        return _MemStatus(vm.total, vm.available)
 
-    def proc_rss_bytes(pid):
-        try:
-            return psutil.Process(pid).memory_info().rss
-        except Exception:
-            return 0
+
+def proc_rss_bytes(pid):
+    try:
+        return psutil.Process(pid).memory_info().rss
+    except Exception:
+        return 0
 
 
 def sha256_file(p):
@@ -230,6 +237,26 @@ def materialize(art_root, dsinfo):
 
 def arm_slice(multi_out, name):
     return multi_out["arms"].get(name)
+
+
+def mean_abs_correction(arm):
+    """Mean |applied_correction| over every traced candidate of the arm.
+
+    The probe reports this per query inside c8_trace; c8_aggregate only
+    carries entropy/spearman summaries.
+    """
+    vals = []
+    for pq in arm.get("per_query") or []:
+        tr = pq.get("c8_trace") or {}
+        for c in tr.get("candidates") or []:
+            v = c.get("applied_correction")
+            if v is not None:
+                vals.append(abs(float(v)))
+    return float(sum(vals) / len(vals)) if vals else None
+
+
+def round4(v):
+    return round(float(v), 4) if isinstance(v, (int, float)) else None
 
 
 def arm_name_for_row(r):
@@ -451,7 +478,8 @@ def tune_train_block(mode, model_id, rows, d_k=KEY_DIM, d_v=VALUE_DIM):
 
 
 def run_train(run_id, row, dsinfo, art, query_ids, doc_ids, qrels, keep,
-              doc_vectors, qvec_out, mem_snapshot, model_id):
+              doc_vectors, qvec_out, mem_snapshot, model_id,
+              d_k=KEY_DIM, d_v=VALUE_DIM):
     mode = row["mode"].replace("MODE-", "")
     cfg = {
         "subcommand": "train", "k": K, "seed": SEED, "warmup": WARMUP,
@@ -463,7 +491,7 @@ def run_train(run_id, row, dsinfo, art, query_ids, doc_ids, qrels, keep,
         "candidate_budget": 500, "min_candidates_per_head": 20,
         "max_candidates_per_head": 300, "ef_search": 64,
         "configuration_id": run_id,
-        "train": tune_train_block(mode, model_id, keep),
+        "train": tune_train_block(mode, model_id, keep, d_k=d_k, d_v=d_v),
     }
     out = os.path.join(art, "train_report.json")
     cfg_path = os.path.join(art, "train-cfg.json")
@@ -554,7 +582,8 @@ def main():
             train_row["mode"] = "MODE-E"
             card = run_train(run_id, train_row, dsinfo, art, query_ids, doc_ids,
                              qrels, keep, doc_vectors, qvec_out, mem_snapshot,
-                             model_id=f"{ds_short.lower()}-c8-support-{variant.lower()}")
+                             model_id=f"{ds_short.lower()}-c8-support-{variant.lower()}",
+                             d_k=d_kv, d_v=d_kv)
             # single-arm run at the sweep point
             arm = arm_learned(variant, os.path.join(art, "model.json"),
                               use_evidence=False, arch="residual",
@@ -568,15 +597,17 @@ def main():
                                  int(getattr(mem_snapshot, "ullAvailPhys", 0) * 0.85))
             a = arm_slice(multi, variant)
             st = derive_rows_stats(a)
+            agg = a.get("c8_aggregate") or {}
             metrics = {
                 "run_id": run_id, "track": "SUPPORT", "variant": variant,
                 "dataset": ds, "split": "VALID", "d_k": d_kv, "d_v": d_kv,
                 "candidate_budget": depth, "n_queries": len(keep),
-                "ndcg10_qrels_mean": round(st["ndcg10_qrels_mean"], 4),
-                "recall10_qrels_mean": round(st["recall10_qrels_mean"], 4),
-                "mrr10_qrels_mean": round(st["mrr10_qrels_mean"], 4),
-                "mean_abs_correction": a["c8_aggregate"]["mean_abs_correction"]
-                if a.get("c8_aggregate") else None,
+                "ndcg10_qrels_mean": round4(st.get("ndcg10_qrels_mean")),
+                "recall10_qrels_mean": round4(st.get("recall10_qrels_mean")),
+                "mrr10_qrels_mean": round4(st.get("mrr10_qrels_mean")),
+                "mean_abs_correction": mean_abs_correction(a),
+                "mean_entropy_over_queries": agg.get("mean_entropy_over_queries"),
+                "mean_spearman_delta_final": agg.get("mean_spearman_delta_final"),
                 "train_dataset_hash": card["dataset_hash"],
             }
             with open(os.path.join(run_dir, "metrics.json"), "w", encoding="utf8") as f:
