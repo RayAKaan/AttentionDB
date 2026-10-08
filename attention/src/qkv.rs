@@ -153,17 +153,79 @@ impl AttentionEngine {
     }
 
     /// Batch attend for multiple candidates with the same query.
-    /// Returns a vector of CandidateAttention, one per candidate.
+    ///
+    /// C9 optimization: project the query once per batch, not once per candidate.
+    /// Candidate K/V projection and the per-candidate softmax remain independent,
+    /// preserving scalar semantics and deterministic accumulation order. This is
+    /// the reference CPU batch path; it intentionally does not reorder candidates.
     pub fn attend_batch(
         &self,
         q_a: &[f32],
         candidates: &[Vec<Vec<f32>>],
     ) -> Result<Vec<CandidateAttention>> {
-        candidates.iter().map(|z_d| self.attend(q_a, z_d)).collect()
+        if candidates.is_empty() {
+            return Ok(Vec::new());
+        }
+        let q = self.project_query(q_a)?;
+        candidates
+            .iter()
+            .map(|z_d| {
+                if z_d.is_empty() {
+                    return Err(crate::errors::AttentionError::EmptyInput(
+                        "z_d cannot be empty".into(),
+                    ));
+                }
+                let k_d = self.qkv.project_k(z_d)?;
+                let v_d = self.qkv.project_v(z_d)?;
+                self.attend_from_kv(&q, z_d.len(), &k_d, &v_d)
+            })
+            .collect()
     }
 
     /// Get the key dimension.
     pub fn key_dim(&self) -> usize {
         self.key_dim
+    }
+}
+
+#[cfg(test)]
+mod c9_batch_tests {
+    use super::*;
+    use crate::projection::QkvProjection;
+
+    #[test]
+    fn c9_batch_matches_scalar_attention_exactly() {
+        let engine = AttentionEngine::new(QkvProjection::identity(4));
+        let query = vec![0.2, -0.1, 0.7, 0.4];
+        let candidates = vec![
+            vec![vec![1.0, 0.0, 0.0, 0.0], vec![0.0, 1.0, 0.0, 0.0]],
+            vec![vec![0.1, 0.2, 0.3, 0.4], vec![-0.4, 0.3, 0.2, 0.1]],
+            vec![vec![0.9, -0.2, 0.1, 0.0]],
+        ];
+        let scalar: Vec<_> = candidates
+            .iter()
+            .map(|candidate| engine.attend(&query, candidate).unwrap())
+            .collect();
+        let batch = engine.attend_batch(&query, &candidates).unwrap();
+        assert_eq!(batch.len(), scalar.len());
+        for (actual, expected) in batch.iter().zip(scalar.iter()) {
+            assert_eq!(actual.weights, expected.weights);
+            assert_eq!(actual.logits, expected.logits);
+            assert_eq!(actual.output, expected.output);
+            assert_eq!(actual.entropy, expected.entropy);
+        }
+    }
+
+    #[test]
+    fn c9_batch_empty_input_returns_empty_output() {
+        let engine = AttentionEngine::new(QkvProjection::identity(4));
+        assert!(engine.attend_batch(&[0.0; 4], &[]).unwrap().is_empty());
+    }
+
+    #[test]
+    fn c9_batch_propagates_invalid_candidate_error() {
+        let engine = AttentionEngine::new(QkvProjection::identity(4));
+        let candidates = vec![vec![vec![1.0, 0.0, 0.0, 0.0]], vec![]];
+        assert!(engine.attend_batch(&[0.0; 4], &candidates).is_err());
     }
 }

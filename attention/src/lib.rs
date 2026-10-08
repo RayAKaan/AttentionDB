@@ -10,6 +10,7 @@
 pub mod alignment;
 pub mod attention;
 pub mod c8_training;
+pub mod c9_benchmark;
 pub mod cache;
 pub mod config;
 pub mod diagnostics;
@@ -31,6 +32,7 @@ pub use c8_training::{
     C8LossReport, C8QkvDataset, C8QkvDatasetBuilder, C8QkvExample, C8TrainedModel,
     C8TrainingConfig, ResidualQkvTrainer,
 };
+pub use c9_benchmark::{benchmark_scalar_vs_batch, C9BenchmarkReport};
 pub use cache::{AttentionKVCache, CacheFingerprint, CacheStats, CachedCandidateKV};
 pub use config::{config_fingerprint, AttentionConfig, C8AttentionConfig};
 pub use diagnostics::AttentionDiagnostics;
