@@ -1,7 +1,9 @@
 # C8 Closure Report
 
-Phase: **C8 — Residual candidate-level Q/K/V attention** · Branch: `comparative-study/c8-residual-qkv-attention`
-Date: 2026-10-01 · HEAD: `4ca4f05ce4a7d4c684287cc1bf436554acfd4c16`
+Phase: **C8 — Residual candidate-level Q/K/V attention**
+Study branch: `comparative-study/c8-residual-qkv-attention`
+Repository integration: C8 implementation merged to `main` at `ff5d6ec811dc11a31b926494e423866418c172ec`
+Closure-gate update: 2026-10-09
 
 ## 1. What is complete
 
@@ -38,7 +40,8 @@ Date: 2026-10-01 · HEAD: `4ca4f05ce4a7d4c684287cc1bf436554acfd4c16`
    in dependency order, is idempotent (skips complete cells), and invokes the
    gates + analysis; the resulting bundle is uploaded as a workflow artifact.
 2. **SUPPORT** (16 cells) dimension/depth sweep.
-3. Final REPORT.md at the study root once TEST statistics exist.
+3. Final study-level REPORT.md once TEST statistics exist.
+4. The repository now includes `harness/c8_finalize.py`, a strict closure gate that refuses to declare C8 complete until all 18 TEST cells, all 16 SUPPORT cells, five TEST repetitions per dataset, a passing verification report, and statistical results are present.
 
 ## 4. Stop-condition status
 
@@ -48,6 +51,6 @@ report-level). No condition has **failed**; TEST is pending, not negative.
 
 ## 5. Recommendation
 
-Proceed to CI: run `C8-TEST-*` (5 reps) and `C8-SUPPORT-*`, then
-`c8_analyze.py`, then write the study-level REPORT.md. Do not merge PR #7 or modify
-`main`. Do not commit until explicitly requested.
+Run the authoritative Ubuntu C8 workflow. It executes PROBE → TUNE → SMOKE → SUPPORT → TEST, then verification and statistical analysis, and finally the strict `c8_finalize.py` closure gate. C8 is not scientifically closed until that gate reports `READY`.
+
+The C8 implementation itself is already integrated into `main`; this closure PR is deliberately limited to research reproducibility, validation gating, and documentation. No validation result is promoted to a paper claim before TEST-scale inference is available.

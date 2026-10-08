@@ -62,43 +62,22 @@ RESID_REG = 1e-3
 DISTILL_TEMP = 0.5
 
 
-# ---- Windows memory sampler -------------------------------------------------
-try:
-    import ctypes
+# ---- Cross-platform memory sampler -----------------------------------------
+# psutil exposes the required memory metrics on both Windows and Linux.
+# Keeping the sampler platform-neutral is required because authoritative C8
+# execution runs on Linux while local development may run on Windows.
+import psutil
 
-    class MEMORYSTATUSEX(ctypes.Structure):
-        _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
-                    ("ullTotalPhys", ctypes.c_ulonglong),
-                    ("ullAvailPhys", ctypes.c_ulonglong),
-                    ("ullTotalPageFile", ctypes.c_ulonglong),
-                    ("ullAvailPageFile", ctypes.c_ulonglong),
-                    ("ullTotalVirtual", ctypes.c_ulonglong),
-                    ("ullAvailVirtual", ctypes.c_ulonglong),
-                    ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
 
-    def mem_status():
-        m = MEMORYSTATUSEX()
-        m.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
-        ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m))
-        return m
+def mem_status():
+    return psutil.virtual_memory()
 
-    def proc_rss_bytes(pid):
-        import psutil
-        try:
-            return psutil.Process(pid).memory_info().rss
-        except Exception:
-            return 0
-except ImportError:
-    import psutil
 
-    def mem_status():
-        return (None, psutil.virtual_memory().available)
-
-    def proc_rss_bytes(pid):
-        try:
-            return psutil.Process(pid).memory_info().rss
-        except Exception:
-            return 0
+def proc_rss_bytes(pid):
+    try:
+        return psutil.Process(pid).memory_info().rss
+    except Exception:
+        return 0
 
 
 def sha256_file(p):
@@ -451,7 +430,8 @@ def tune_train_block(mode, model_id, rows, d_k=KEY_DIM, d_v=VALUE_DIM):
 
 
 def run_train(run_id, row, dsinfo, art, query_ids, doc_ids, qrels, keep,
-              doc_vectors, qvec_out, mem_snapshot, model_id):
+              doc_vectors, qvec_out, mem_snapshot, model_id,
+              d_k=KEY_DIM, d_v=VALUE_DIM):
     mode = row["mode"].replace("MODE-", "")
     cfg = {
         "subcommand": "train", "k": K, "seed": SEED, "warmup": WARMUP,
@@ -463,7 +443,7 @@ def run_train(run_id, row, dsinfo, art, query_ids, doc_ids, qrels, keep,
         "candidate_budget": 500, "min_candidates_per_head": 20,
         "max_candidates_per_head": 300, "ef_search": 64,
         "configuration_id": run_id,
-        "train": tune_train_block(mode, model_id, keep),
+        "train": tune_train_block(mode, model_id, keep, d_k=d_k, d_v=d_v),
     }
     out = os.path.join(art, "train_report.json")
     cfg_path = os.path.join(art, "train-cfg.json")
@@ -554,7 +534,8 @@ def main():
             train_row["mode"] = "MODE-E"
             card = run_train(run_id, train_row, dsinfo, art, query_ids, doc_ids,
                              qrels, keep, doc_vectors, qvec_out, mem_snapshot,
-                             model_id=f"{ds_short.lower()}-c8-support-{variant.lower()}")
+                             model_id=f"{ds_short.lower()}-c8-support-{variant.lower()}",
+                             d_k=d_kv, d_v=d_kv)
             # single-arm run at the sweep point
             arm = arm_learned(variant, os.path.join(art, "model.json"),
                               use_evidence=False, arch="residual",
@@ -575,8 +556,11 @@ def main():
                 "ndcg10_qrels_mean": round(st["ndcg10_qrels_mean"], 4),
                 "recall10_qrels_mean": round(st["recall10_qrels_mean"], 4),
                 "mrr10_qrels_mean": round(st["mrr10_qrels_mean"], 4),
-                "mean_abs_correction": a["c8_aggregate"]["mean_abs_correction"]
-                if a.get("c8_aggregate") else None,
+                "mean_abs_correction": (
+                    a.get("c8_aggregate", {}).get("mean_abs_correction")
+                    if isinstance(a.get("c8_aggregate"), dict)
+                    else None
+                ),
                 "train_dataset_hash": card["dataset_hash"],
             }
             with open(os.path.join(run_dir, "metrics.json"), "w", encoding="utf8") as f:

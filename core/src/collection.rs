@@ -2412,7 +2412,14 @@ mod c8_residual_attention_tests {
         let (o_cands, _, _, _, trace) = coll
             .attend_detailed_c8(&heads, &q, 5, None, None, None, Some(&on), None)
             .unwrap();
-        assert_eq!(ids(&b_cands), ids(&o_cands));
+        // C8 reranks the shared candidate union, so final top-k ordering may change.
+        // Membership is the invariant; compare IDs as sets rather than requiring
+        // the baseline ordering to survive reranking.
+        let mut baseline_ids = ids(&b_cands);
+        let mut reranked_ids = ids(&o_cands);
+        baseline_ids.sort_unstable();
+        reranked_ids.sort_unstable();
+        assert_eq!(baseline_ids, reranked_ids);
         for c in &o_cands {
             assert!(c.final_score.is_finite());
         }

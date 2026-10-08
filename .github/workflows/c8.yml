@@ -8,6 +8,8 @@ name: C8 Residual QKV Study
 # The resulting evidence bundle is uploaded as an artifact for review/commit.
 
 on:
+  push:
+    branches: [comparative-study/c8-closure-completion]
   workflow_dispatch:
     inputs:
       tracks:
@@ -36,9 +38,10 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install protoc
-        uses: arduino/setup-protoc@v3
-        with:
-          version: "25.x"
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+          protoc --version
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -71,6 +74,7 @@ jobs:
           python3 "$C8_ROOT/harness/c8_ci.py" \
             --tracks "${{ github.event.inputs.tracks }}" \
             --verify --analyze
+          python3 "$C8_ROOT/harness/c8_finalize.py"
         env:
           C8PILOT: ${{ env.C8PILOT }}
 
