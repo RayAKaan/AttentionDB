@@ -60,7 +60,7 @@ def paired_bootstrap(a, b, metric, draws=10000, seed=SEED):
     rng = random.Random(seed)
     samples = []
     for _ in range(draws):
-        samples.append(statistics.fmean(diffs[rng.randrange(len(diffs))] for _ in diffs))
+        samples.append(statistics.fmean(diffs[rng.randrange(len(diffs))] for _ in diffs)) )
     return {'n_paired': len(diffs), 'delta_mean': statistics.fmean(diffs),
             'ci95_low': percentile(samples, .025), 'ci95_high': percentile(samples, .975),
             'method': 'paired query-repetition bootstrap; percentile interval; no multiplicity correction',
@@ -85,12 +85,12 @@ def main():
             issues.append(f'{metrics_path}: invalid JSON: {exc}'); continue
         dataset = str(m.get('dataset', '')).upper()
         if dataset in ('SCIFACT', 'SCI-FACT'): dataset = 'SCI'
-        if dataset in ('NFCORPUS', 'NFCORPUS'): dataset = 'NFC'
+        if dataset == 'NFCORPUS': dataset = 'NFC'
         arm = str(m.get('mode', '')).replace('MODE-', '').upper()
         split = str(m.get('split', '')).upper()
         if dataset not in DATASETS or arm not in ARMS: continue
         if split != 'TEST':
-            issues.append(f'{metrics_path}: ignored non-TEST record split={split}'); continue
+            continue
         if m.get('union_identity_ok') is False: issues.append(f'{metrics_path}: union_identity_ok=false')
         if m.get('union_identity_ok') is None: issues.append(f'{metrics_path}: union_identity_ok missing')
         reps = m.get('per_rep', [])
