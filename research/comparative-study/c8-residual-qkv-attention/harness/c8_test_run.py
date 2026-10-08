@@ -443,7 +443,7 @@ def run_train(run_id, row, dsinfo, art, query_ids, doc_ids, qrels, keep,
         "candidate_budget": 500, "min_candidates_per_head": 20,
         "max_candidates_per_head": 300, "ef_search": 64,
         "configuration_id": run_id,
-        "train": tune_train_block(mode, model_id, keep),
+        "train": tune_train_block(mode, model_id, keep, d_k=d_k, d_v=d_v),
     }
     out = os.path.join(art, "train_report.json")
     cfg_path = os.path.join(art, "train-cfg.json")
