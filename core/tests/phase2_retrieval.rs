@@ -484,7 +484,15 @@ fn partial_head_coverage_is_represented() {
         e.insert_document("p", r).unwrap();
     }
     for i in 40..50i64 {
-        let mut r = doc(i, &one_hot(i as usize % DIM, DIM), "only-default");
+        // Give the asserted target a unique vector. A one-hot vector repeats
+        // every DIM documents, so an HNSW tie could omit idx=41 despite
+        // correct partial-head handling.
+        let vector = if i == 41 {
+            two_hot(1, 2, DIM)
+        } else {
+            one_hot(i as usize % DIM, DIM)
+        };
+        let mut r = doc(i, &vector, "only-default");
         r.k_vecs.remove("semantic");
         e.insert_document("p", r).unwrap();
     }
@@ -492,7 +500,7 @@ fn partial_head_coverage_is_represented() {
     let ranked = coll
         .attend_detailed(
             &["default".into(), "semantic".into()],
-            &one_hot(41 % DIM, DIM),
+            &two_hot(1, 2, DIM),
             50,
             None,
             None,

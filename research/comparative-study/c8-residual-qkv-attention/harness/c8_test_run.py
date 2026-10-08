@@ -314,9 +314,34 @@ def run_probe(cfg, out_path, art_dir, cfg_name, run_dir, ram_abort_bytes):
 def write_env(art_dir, run_id, hash_files, mem_snapshot):
     avail = getattr(mem_snapshot, "ullAvailPhys", None)
     load = getattr(mem_snapshot, "dwMemoryLoad", None)
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
+    try:
+        commit_sha = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=repo_root, capture_output=True,
+            text=True, check=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        commit_sha = None
+    try:
+        rustc_version = subprocess.run(
+            ["rustc", "--version"], cwd=repo_root, capture_output=True,
+            text=True, check=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        rustc_version = None
     env = {
-        "host": platform.node(), "os": platform.platform(), "python": platform.python_version(),
+        "run_id": run_id,
+        "commit_sha": commit_sha,
+        "host": platform.node(),
+        "os": platform.platform(),
+        "python": platform.python_version(),
+        "rustc_version": rustc_version,
+        "cpu_model": platform.processor() or platform.machine(),
+        "logical_cpu_count": os.cpu_count(),
+        "memory_total_bytes": getattr(mem_snapshot, "total", None),
+        "build_profile": "release" if "release" in C8PILOT.lower() else "unknown",
         "created_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "c8pilot_path": os.path.abspath(C8PILOT),
         "c8pilot_sha256": sha256_file(C8PILOT),
         "input_hashes": hash_files,
         "guardrail": {"policy": "sampler(500ms) aborts when child process-tree RSS "
