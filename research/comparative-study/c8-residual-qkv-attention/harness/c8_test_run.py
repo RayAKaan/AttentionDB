@@ -533,7 +533,8 @@ def main():
             train_row["mode"] = "MODE-E"
             card = run_train(run_id, train_row, dsinfo, art, query_ids, doc_ids,
                              qrels, keep, doc_vectors, qvec_out, mem_snapshot,
-                             model_id=f"{ds_short.lower()}-c8-support-{variant.lower()}")
+                             model_id=f"{ds_short.lower()}-c8-support-{variant.lower()}",
+                             d_k=d_kv, d_v=d_kv)
             # single-arm run at the sweep point
             arm = arm_learned(variant, os.path.join(art, "model.json"),
                               use_evidence=False, arch="residual",
