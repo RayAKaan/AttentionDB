@@ -25,10 +25,6 @@ pub mod scorer;
 pub mod training;
 
 pub use alignment::{AlignmentProjection, DetRng};
-pub use c10_cache_benchmark::{
-    benchmark_cache_lifecycle, run_cache_lifecycle_sweep, C10CacheBenchmarkReport, C10SweepCell,
-    C10SweepConfig,
-};
 pub use attention::{
     AttentionOutput, AttentionSubsystem, C8AttentionOutput, C8AttentionSubsystem,
     C8AttentionTimings, C8CandidateScore,
