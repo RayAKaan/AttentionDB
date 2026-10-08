@@ -73,8 +73,20 @@ pub fn benchmark_cache_lifecycle(
         ));
     }
 
+    let expected_heads = candidates[0].1.len();
+    if expected_heads == 0 {
+        return Err(AttentionError::EmptyInput(
+            "C10 candidate representation cannot be empty".into(),
+        ));
+    }
     let mut ids = HashSet::with_capacity(candidates.len());
     for (id, representation) in candidates {
+        if representation.len() != expected_heads {
+            return Err(AttentionError::HeadCountMismatch {
+                expected: expected_heads,
+                found: representation.len(),
+            });
+        }
         if !ids.insert(*id) {
             return Err(AttentionError::Config(format!(
                 "C10 candidate id {id} is duplicated"
@@ -85,7 +97,7 @@ pub fn benchmark_cache_lifecycle(
     }
 
     let fingerprint =
-        CacheFingerprint::from_projection(model_fingerprint, qkv, candidates[0].1.len());
+        CacheFingerprint::from_projection(model_fingerprint, qkv, expected_heads);
     let reference: Vec<_> = candidates
         .iter()
         .map(|(_, z_d)| project_candidate(z_d, qkv))
@@ -171,7 +183,6 @@ pub fn benchmark_cache_lifecycle(
         exact_kv_parity,
     })
 }
-
 
 /// Configurable dimensions for a reproducible cache-lifecycle sweep.
 /// Use `C10SweepConfig::default()` for the preregistered matrix; callers can
