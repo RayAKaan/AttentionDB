@@ -48,7 +48,7 @@ C10 is deliberately narrower than an end-to-end retrieval benchmark. It isolates
 | Repetitions | at least 5 measured per cell, after warm-up |
 | Correctness | exact K/V parity, 100% expected warm hits, zero warm misses, valid cache geometry |
 
-Only use supported dimension combinations and report skipped cells with reasons. The initial benchmark API measures projection/cache costs; the full sweep driver and end-to-end retrieval evaluation are not claimed complete by this phase.
+Only use supported dimension combinations and report skipped cells with reasons. The configurable `run_cache_lifecycle_sweep(&C10SweepConfig::default())` API executes the Cartesian matrix and returns one seed-keyed report per cell. The caller must persist the returned cells as immutable JSONL raw runs. End-to-end retrieval evaluation remains C11.
 
 ## Acceptance gates
 
