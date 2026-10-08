@@ -9,6 +9,7 @@
 
 pub mod alignment;
 pub mod attention;
+pub mod c10_cache_benchmark;
 pub mod c8_training;
 pub mod c9_benchmark;
 pub mod cache;
@@ -27,6 +28,10 @@ pub use alignment::{AlignmentProjection, DetRng};
 pub use attention::{
     AttentionOutput, AttentionSubsystem, C8AttentionOutput, C8AttentionSubsystem,
     C8AttentionTimings, C8CandidateScore,
+};
+pub use c10_cache_benchmark::{
+    benchmark_cache_lifecycle, run_cache_lifecycle_sweep, C10CacheBenchmarkReport, C10SweepCell,
+    C10SweepConfig,
 };
 pub use c8_training::{
     C8LossReport, C8QkvDataset, C8QkvDatasetBuilder, C8QkvExample, C8TrainedModel,
