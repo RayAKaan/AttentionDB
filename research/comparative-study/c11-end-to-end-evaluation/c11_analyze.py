@@ -60,7 +60,7 @@ def paired_bootstrap(a, b, metric, draws=10000, seed=SEED):
     rng = random.Random(seed)
     samples = []
     for _ in range(draws):
-        samples.append(statistics.fmean(diffs[rng.randrange(len(diffs))] for _ in diffs)) )
+        samples.append(statistics.fmean([diffs[rng.randrange(len(diffs))] for _ in diffs]))
     return {'n_paired': len(diffs), 'delta_mean': statistics.fmean(diffs),
             'ci95_low': percentile(samples, .025), 'ci95_high': percentile(samples, .975),
             'method': 'paired query-repetition bootstrap; percentile interval; no multiplicity correction',
