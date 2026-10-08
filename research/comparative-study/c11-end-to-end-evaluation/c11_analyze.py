@@ -84,8 +84,8 @@ def main():
         except Exception as exc:
             issues.append(f'{metrics_path}: invalid JSON: {exc}'); continue
         dataset = str(m.get('dataset', '')).upper()
-        if dataset in ('SCIFACT', 'SCI-FACT'): dataset = 'SCI'
-        if dataset == 'NFCORPUS': dataset = 'NFC'
+        if dataset in ('SCIFACT', 'DS-SCIFACT', 'SCI-FACT'): dataset = 'SCI'
+        if dataset in ('NFCORPUS', 'DS-NFCORPUS'): dataset = 'NFC'
         arm = str(m.get('mode', '')).replace('MODE-', '').upper()
         split = str(m.get('split', '')).upper()
         if dataset not in DATASETS or arm not in ARMS: continue
