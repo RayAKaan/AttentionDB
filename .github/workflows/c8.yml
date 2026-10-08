@@ -8,6 +8,8 @@ name: C8 Residual QKV Study
 # The resulting evidence bundle is uploaded as an artifact for review/commit.
 
 on:
+  push:
+    branches: [comparative-study/c8-closure-completion]
   workflow_dispatch:
     inputs:
       tracks:
