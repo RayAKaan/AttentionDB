@@ -34,7 +34,10 @@ pub use c8_training::{
     C8TrainingConfig, ResidualQkvTrainer,
 };
 pub use c9_benchmark::{benchmark_scalar_vs_batch, C9BenchmarkReport};
-pub use c10_cache_benchmark::{benchmark_cache_lifecycle, C10CacheBenchmarkReport};
+pub use c10_cache_benchmark::{
+    benchmark_cache_lifecycle, run_cache_lifecycle_sweep, C10CacheBenchmarkReport, C10SweepCell,
+    C10SweepConfig,
+};
 pub use cache::{AttentionKVCache, CacheFingerprint, CacheStats, CachedCandidateKV};
 pub use config::{config_fingerprint, AttentionConfig, C8AttentionConfig};
 pub use diagnostics::AttentionDiagnostics;
