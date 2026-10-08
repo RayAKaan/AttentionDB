@@ -20,7 +20,7 @@ C10 is deliberately narrower than an end-to-end retrieval benchmark. It isolates
 - Two discarded warm-up rounds; minimum three measured repetitions.
 - Nearest-rank p50/p95 timing summaries, cache hit/miss counts, hit rate, resident entries, and estimated K/V payload bytes.
 - Exact K/V equality checks between the reference projections, uncached projections, and cold-filled cache entries.
-- Input gates: non-empty candidates, minimum repetitions, unique candidate IDs, and valid candidate dimensions.
+- Input gates: non-empty candidates, minimum repetitions, unique candidate IDs, uniform candidate head counts, and valid candidate dimensions.
 - Cache geometry validation and fingerprint checks.
 - Unit tests for parity, report metrics, malformed inputs, duplicate IDs, and model/geometry fingerprint invalidation.
 
