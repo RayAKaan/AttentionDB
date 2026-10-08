@@ -121,7 +121,6 @@ pub fn benchmark_cache_lifecycle(
     let mut cold_fill_times = Vec::with_capacity(repetitions);
     let mut warm_lookup_times = Vec::with_capacity(repetitions);
     let mut exact_kv_parity = true;
-    let mut final_cache = AttentionKVCache::new(fingerprint);
     let mut aggregate_warm_stats = CacheStats::default();
 
     for _ in 0..repetitions {
@@ -153,10 +152,9 @@ pub fn benchmark_cache_lifecycle(
         warm_lookup_times.push(start.elapsed().as_micros());
         exact_kv_parity &= stats.hits == candidates.len() as u64 && stats.misses == 0;
         aggregate_warm_stats.merge(&stats);
-        final_cache = cold_cache;
     }
 
-    final_cache.seal_stats(&mut aggregate_warm_stats);
+    aggregate_warm_stats.entries = candidates.len();
     let estimated_kv_payload_bytes = final_cache.len()
         * fingerprint.head_count
         * (fingerprint.key_dim + fingerprint.value_dim)
