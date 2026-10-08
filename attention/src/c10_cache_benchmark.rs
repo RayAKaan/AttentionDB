@@ -124,11 +124,9 @@ pub fn benchmark_cache_lifecycle(
 
         let mut cold_cache = AttentionKVCache::new(fingerprint);
         let start = Instant::now();
-        for (id, z_d) in candidates {
+        for ((id, z_d), expected) in candidates.iter().zip(&reference) {
             let kv = project_candidate(z_d, qkv)?;
-            exact_kv_parity &= reference
-                .get(candidates.iter().position(|(candidate_id, _)| candidate_id == id).unwrap())
-                == Some(&kv);
+            exact_kv_parity &= expected == &kv;
             cold_cache.insert(*id, kv);
         }
         cold_fill_times.push(start.elapsed().as_micros());
