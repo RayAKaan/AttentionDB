@@ -96,8 +96,7 @@ pub fn benchmark_cache_lifecycle(
         project_candidate(representation, qkv)?;
     }
 
-    let fingerprint =
-        CacheFingerprint::from_projection(model_fingerprint, qkv, expected_heads);
+    let fingerprint = CacheFingerprint::from_projection(model_fingerprint, qkv, expected_heads);
     let reference: Vec<_> = candidates
         .iter()
         .map(|(_, z_d)| project_candidate(z_d, qkv))
@@ -284,12 +283,8 @@ pub fn run_cache_lifecycle_sweep(config: &C10SweepConfig) -> Result<Vec<C10Sweep
                 for &key_dim in &config.key_dims {
                     for &value_dim in &config.value_dims {
                         let cell_seed = config.seed.wrapping_add(cell_index as u64);
-                        let qkv = QkvProjection::random(
-                            attention_dim,
-                            key_dim,
-                            value_dim,
-                            cell_seed,
-                        );
+                        let qkv =
+                            QkvProjection::random(attention_dim, key_dim, value_dim, cell_seed);
                         let candidates: Vec<_> = (0..candidate_count)
                             .map(|doc_id| {
                                 (
