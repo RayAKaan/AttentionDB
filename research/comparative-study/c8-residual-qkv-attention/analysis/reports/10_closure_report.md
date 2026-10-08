@@ -42,7 +42,6 @@ Closure-gate update: 2026-10-09
 2. **SUPPORT** (16 cells) dimension/depth sweep.
 3. Final study-level REPORT.md once TEST statistics exist.
 4. The repository now includes `harness/c8_finalize.py`, a strict closure gate that refuses to declare C8 complete until all 18 TEST cells, all 16 SUPPORT cells, five TEST repetitions per dataset, a passing verification report, and statistical results are present.
-4. The repository now includes `harness/c8_finalize.py`, a strict closure gate that refuses to declare C8 complete until all 18 TEST cells, all 16 SUPPORT cells, five TEST repetitions per dataset, a passing verification report, and statistical results are present.
 
 ## 4. Stop-condition status
 
