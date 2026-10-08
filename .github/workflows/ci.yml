@@ -47,6 +47,8 @@ jobs:
 
       - name: Validate C11 evidence tooling
         run: |
+          python3 -m py_compile research/comparative-study/c8-residual-qkv-attention/harness/c8_test_run.py
+          python3 -m py_compile research/comparative-study/c11-end-to-end-evaluation/c11_analyze.py research/comparative-study/c11-end-to-end-evaluation/c11_validate.py
           python3 research/comparative-study/c11-end-to-end-evaluation/c11_validate.py
           python3 -m unittest discover -s research/comparative-study/c11-end-to-end-evaluation -p 'test_*.py'
 
