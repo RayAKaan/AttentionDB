@@ -45,6 +45,11 @@ jobs:
       - name: Run tests
         run: cargo test --workspace
 
+      - name: Validate C11 evidence tooling
+        run: |
+          python3 research/comparative-study/c11-end-to-end-evaluation/c11_validate.py
+          python3 -m unittest discover -s research/comparative-study/c11-end-to-end-evaluation -p 'test_*.py'
+
       - name: Run stress tests
         run: |
           cargo run --release -p attentiondb-query
