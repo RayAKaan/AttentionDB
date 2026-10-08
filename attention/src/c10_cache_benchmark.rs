@@ -3,9 +3,7 @@
 //! Timings cover document-side K/V projection and cache operations only. They
 //! are not end-to-end retrieval latency and must not be reported as such.
 
-use crate::cache::{
-    AttentionKVCache, CacheFingerprint, CacheStats, CachedCandidateKV,
-};
+use crate::cache::{AttentionKVCache, CacheFingerprint, CacheStats, CachedCandidateKV};
 use crate::errors::{AttentionError, Result};
 use crate::projection::QkvProjection;
 use serde::{Deserialize, Serialize};
@@ -394,11 +392,8 @@ mod tests {
         let (qkv, _) = fixture();
         let original = CacheFingerprint::from_projection(123, &qkv, 2);
         let changed_model = CacheFingerprint::from_projection(124, &qkv, 2);
-        let changed_geometry = CacheFingerprint::from_projection(
-            123,
-            &QkvProjection::random(4, 2, 2, 10),
-            2,
-        );
+        let changed_geometry =
+            CacheFingerprint::from_projection(123, &QkvProjection::random(4, 2, 2, 10), 2);
         assert!(!original.accepts(&changed_model));
         assert!(!original.accepts(&changed_geometry));
     }
