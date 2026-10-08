@@ -8,10 +8,10 @@
 // accumulation order).
 
 pub mod alignment;
+pub mod c10_cache_benchmark;
 pub mod attention;
 pub mod c8_training;
 pub mod c9_benchmark;
-pub mod c10_cache_benchmark;
 pub mod cache;
 pub mod config;
 pub mod diagnostics;
@@ -25,6 +25,10 @@ pub mod scorer;
 pub mod training;
 
 pub use alignment::{AlignmentProjection, DetRng};
+pub use c10_cache_benchmark::{
+    benchmark_cache_lifecycle, run_cache_lifecycle_sweep, C10CacheBenchmarkReport, C10SweepCell,
+    C10SweepConfig,
+};
 pub use attention::{
     AttentionOutput, AttentionSubsystem, C8AttentionOutput, C8AttentionSubsystem,
     C8AttentionTimings, C8CandidateScore,
