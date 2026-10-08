@@ -188,7 +188,6 @@ impl AttentionEngine {
     }
 }
 
-
 #[cfg(test)]
 mod c9_batch_tests {
     use super::*;
