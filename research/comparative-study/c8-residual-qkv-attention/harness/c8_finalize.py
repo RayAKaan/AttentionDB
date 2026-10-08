@@ -20,7 +20,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-RAW = ROOT.parent.parent / "raw"
+RAW = ROOT.parent / "raw"
 PLAN = ROOT / "c8-run-plan.csv"
 ANALYSIS = ROOT / "analysis"
 
