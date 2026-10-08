@@ -62,43 +62,22 @@ RESID_REG = 1e-3
 DISTILL_TEMP = 0.5
 
 
-# ---- Windows memory sampler -------------------------------------------------
-try:
-    import ctypes
+# ---- Cross-platform memory sampler -----------------------------------------
+# psutil exposes the required memory metrics on both Windows and Linux.
+# Keeping the sampler platform-neutral is required because authoritative C8
+# execution runs on Linux while local development may run on Windows.
+import psutil
 
-    class MEMORYSTATUSEX(ctypes.Structure):
-        _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
-                    ("ullTotalPhys", ctypes.c_ulonglong),
-                    ("ullAvailPhys", ctypes.c_ulonglong),
-                    ("ullTotalPageFile", ctypes.c_ulonglong),
-                    ("ullAvailPageFile", ctypes.c_ulonglong),
-                    ("ullTotalVirtual", ctypes.c_ulonglong),
-                    ("ullAvailVirtual", ctypes.c_ulonglong),
-                    ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
 
-    def mem_status():
-        m = MEMORYSTATUSEX()
-        m.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
-        ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m))
-        return m
+def mem_status():
+    return psutil.virtual_memory()
 
-    def proc_rss_bytes(pid):
-        import psutil
-        try:
-            return psutil.Process(pid).memory_info().rss
-        except Exception:
-            return 0
-except ImportError:
-    import psutil
 
-    def mem_status():
-        return (None, psutil.virtual_memory().available)
-
-    def proc_rss_bytes(pid):
-        try:
-            return psutil.Process(pid).memory_info().rss
-        except Exception:
-            return 0
+def proc_rss_bytes(pid):
+    try:
+        return psutil.Process(pid).memory_info().rss
+    except Exception:
+        return 0
 
 
 def sha256_file(p):
