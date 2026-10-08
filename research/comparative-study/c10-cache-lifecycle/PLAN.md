@@ -55,7 +55,7 @@ Only use supported dimension combinations and report skipped cells with reasons.
 1. Workspace CI compiles and tests the new API.
 2. All unit tests pass, including malformed-input and fingerprint checks.
 3. Every measured cell reports exact K/V parity.
-4. Warm lookups yield one hit per requested candidate, zero misses, and the expected resident-entry count.
+4. Warm lookups yield one hit per requested candidate per measured repetition, zero misses, and the expected resident-entry count.
 5. The report clearly labels payload memory as an estimate excluding allocator/HashMap overhead.
 6. No performance or end-to-end latency claim is made without authoritative measurements.
 7. Existing C8 and C9 semantics remain unchanged.
