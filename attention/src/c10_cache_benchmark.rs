@@ -1,0 +1,242 @@
+//! C10 cache-aware serving benchmark and lifecycle correctness gates.
+//!
+//! Timings cover document-side K/V projection and cache operations only. They
+//! are not end-to-end retrieval latency and must not be reported as such.
+
+use crate::cache::{
+    AttentionKVCache, CacheFingerprint, CacheStats, CachedCandidateKV,
+};
+use crate::errors::{AttentionError, Result};
+use crate::projection::QkvProjection;
+use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
+use std::mem::size_of;
+use std::time::Instant;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct C10CacheBenchmarkReport {
+    pub candidate_count: usize,
+    pub head_count: usize,
+    pub attention_dim: usize,
+    pub key_dim: usize,
+    pub value_dim: usize,
+    pub repetitions: usize,
+    pub uncached_projection_median_micros: u128,
+    pub uncached_projection_p95_micros: u128,
+    pub cold_fill_median_micros: u128,
+    pub cold_fill_p95_micros: u128,
+    pub warm_lookup_median_micros: u128,
+    pub warm_lookup_p95_micros: u128,
+    pub warm_hits: u64,
+    pub warm_misses: u64,
+    pub warm_hit_rate: f32,
+    pub resident_entries: usize,
+    /// Payload estimate only; excludes HashMap, allocator, and vector overhead.
+    pub estimated_kv_payload_bytes: usize,
+    pub exact_kv_parity: bool,
+}
+
+fn percentile_nearest_rank(samples: &[u128], percentile: usize) -> u128 {
+    let mut sorted = samples.to_vec();
+    sorted.sort_unstable();
+    let index = (percentile * sorted.len()).div_ceil(100).saturating_sub(1);
+    sorted[index.min(sorted.len() - 1)]
+}
+
+fn project_candidate(z_d: &[Vec<f32>], qkv: &QkvProjection) -> Result<CachedCandidateKV> {
+    if z_d.is_empty() {
+        return Err(AttentionError::EmptyInput(
+            "C10 candidate representation cannot be empty".into(),
+        ));
+    }
+    Ok(CachedCandidateKV {
+        keys: qkv.project_k(z_d)?,
+        values: qkv.project_v(z_d)?,
+    })
+}
+
+/// Benchmark uncached projection, cold cache fill, and warm cache lookup on
+/// identical candidates. IDs must be unique; at least three measured rounds
+/// are required. Two warm-up rounds are discarded for each measured path.
+pub fn benchmark_cache_lifecycle(
+    qkv: &QkvProjection,
+    candidates: &[(u64, Vec<Vec<f32>>)],
+    model_fingerprint: u64,
+    repetitions: usize,
+) -> Result<C10CacheBenchmarkReport> {
+    if candidates.is_empty() {
+        return Err(AttentionError::EmptyInput(
+            "C10 benchmark requires at least one candidate".into(),
+        ));
+    }
+    if repetitions < 3 {
+        return Err(AttentionError::EmptyInput(
+            "C10 benchmark requires at least 3 measured repetitions".into(),
+        ));
+    }
+
+    let mut ids = HashSet::with_capacity(candidates.len());
+    for (id, representation) in candidates {
+        if !ids.insert(*id) {
+            return Err(AttentionError::Config(format!(
+                "C10 candidate id {id} is duplicated"
+            )));
+        }
+        // Validate every candidate before starting the timed runs.
+        project_candidate(representation, qkv)?;
+    }
+
+    let fingerprint =
+        CacheFingerprint::from_projection(model_fingerprint, qkv, candidates[0].1.len());
+    let reference: Vec<_> = candidates
+        .iter()
+        .map(|(_, z_d)| project_candidate(z_d, qkv))
+        .collect::<Result<_>>()?;
+
+    for _ in 0..2 {
+        for (_, z_d) in candidates {
+            let _ = project_candidate(z_d, qkv)?;
+        }
+        let mut cache = AttentionKVCache::new(fingerprint);
+        for (id, z_d) in candidates {
+            cache.insert(*id, project_candidate(z_d, qkv)?);
+        }
+        let mut stats = CacheStats::default();
+        for (id, _) in candidates {
+            let _ = cache.lookup(*id, &mut stats);
+        }
+    }
+
+    let mut uncached_times = Vec::with_capacity(repetitions);
+    let mut cold_fill_times = Vec::with_capacity(repetitions);
+    let mut warm_lookup_times = Vec::with_capacity(repetitions);
+    let mut exact_kv_parity = true;
+    let mut final_cache = AttentionKVCache::new(fingerprint);
+
+    for _ in 0..repetitions {
+        let start = Instant::now();
+        let uncached: Vec<_> = candidates
+            .iter()
+            .map(|(_, z_d)| project_candidate(z_d, qkv))
+            .collect::<Result<_>>()?;
+        uncached_times.push(start.elapsed().as_micros());
+        exact_kv_parity &= uncached == reference;
+
+        let mut cold_cache = AttentionKVCache::new(fingerprint);
+        let start = Instant::now();
+        for (id, z_d) in candidates {
+            let kv = project_candidate(z_d, qkv)?;
+            exact_kv_parity &= reference
+                .get(candidates.iter().position(|(candidate_id, _)| candidate_id == id).unwrap())
+                == Some(&kv);
+            cold_cache.insert(*id, kv);
+        }
+        cold_fill_times.push(start.elapsed().as_micros());
+        exact_kv_parity &= cold_cache.validate_geometry().is_ok();
+
+        let mut stats = CacheStats::default();
+        let start = Instant::now();
+        for (id, _) in candidates {
+            if cold_cache.lookup(*id, &mut stats).is_none() {
+                exact_kv_parity = false;
+            }
+        }
+        warm_lookup_times.push(start.elapsed().as_micros());
+        exact_kv_parity &= stats.hits == candidates.len() as u64 && stats.misses == 0;
+        final_cache = cold_cache;
+    }
+
+    let mut warm_stats = CacheStats::default();
+    for (id, _) in candidates {
+        if final_cache.lookup(*id, &mut warm_stats).is_none() {
+            exact_kv_parity = false;
+        }
+    }
+    final_cache.seal_stats(&mut warm_stats);
+    let estimated_kv_payload_bytes = final_cache.len()
+        * fingerprint.head_count
+        * (fingerprint.key_dim + fingerprint.value_dim)
+        * size_of::<f32>();
+
+    Ok(C10CacheBenchmarkReport {
+        candidate_count: candidates.len(),
+        head_count: fingerprint.head_count,
+        attention_dim: fingerprint.attention_dim,
+        key_dim: fingerprint.key_dim,
+        value_dim: fingerprint.value_dim,
+        repetitions,
+        uncached_projection_median_micros: percentile_nearest_rank(&uncached_times, 50),
+        uncached_projection_p95_micros: percentile_nearest_rank(&uncached_times, 95),
+        cold_fill_median_micros: percentile_nearest_rank(&cold_fill_times, 50),
+        cold_fill_p95_micros: percentile_nearest_rank(&cold_fill_times, 95),
+        warm_lookup_median_micros: percentile_nearest_rank(&warm_lookup_times, 50),
+        warm_lookup_p95_micros: percentile_nearest_rank(&warm_lookup_times, 95),
+        warm_hits: warm_stats.hits,
+        warm_misses: warm_stats.misses,
+        warm_hit_rate: warm_stats.hit_rate(),
+        resident_entries: warm_stats.entries,
+        estimated_kv_payload_bytes,
+        exact_kv_parity,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fixture() -> (QkvProjection, Vec<(u64, Vec<Vec<f32>>)>) {
+        let qkv = QkvProjection::random(4, 3, 2, 10);
+        let candidates = vec![
+            (11, vec![vec![1.0, 0.0, 0.0, 1.0], vec![0.0, 1.0, 0.0, 1.0]]),
+            (12, vec![vec![0.0, 0.0, 1.0, 1.0], vec![1.0, 1.0, 0.0, 0.0]]),
+        ];
+        (qkv, candidates)
+    }
+
+    #[test]
+    fn benchmark_reports_exact_parity_and_warm_hits() {
+        let (qkv, candidates) = fixture();
+        let report = benchmark_cache_lifecycle(&qkv, &candidates, 123, 3).unwrap();
+        assert!(report.exact_kv_parity);
+        assert_eq!(report.candidate_count, 2);
+        assert_eq!(report.warm_hits, 2);
+        assert_eq!(report.warm_misses, 0);
+        assert_eq!(report.warm_hit_rate, 1.0);
+        assert_eq!(report.resident_entries, 2);
+        assert!(report.estimated_kv_payload_bytes > 0);
+        assert!(report.uncached_projection_p95_micros >= report.uncached_projection_median_micros);
+        assert!(report.cold_fill_p95_micros >= report.cold_fill_median_micros);
+        assert!(report.warm_lookup_p95_micros >= report.warm_lookup_median_micros);
+    }
+
+    #[test]
+    fn benchmark_rejects_empty_candidates_and_too_few_repetitions() {
+        let (qkv, candidates) = fixture();
+        assert!(benchmark_cache_lifecycle(&qkv, &[], 123, 3).is_err());
+        assert!(benchmark_cache_lifecycle(&qkv, &candidates, 123, 2).is_err());
+    }
+
+    #[test]
+    fn benchmark_rejects_duplicate_ids_and_malformed_dimensions() {
+        let (qkv, candidates) = fixture();
+        let duplicate = vec![candidates[0].clone(), candidates[0].clone()];
+        assert!(benchmark_cache_lifecycle(&qkv, &duplicate, 123, 3).is_err());
+
+        let malformed = vec![(1, vec![vec![1.0, 2.0]])];
+        assert!(benchmark_cache_lifecycle(&qkv, &malformed, 123, 3).is_err());
+    }
+
+    #[test]
+    fn cache_fingerprint_changes_when_model_changes() {
+        let (qkv, _) = fixture();
+        let original = CacheFingerprint::from_projection(123, &qkv, 2);
+        let changed_model = CacheFingerprint::from_projection(124, &qkv, 2);
+        let changed_geometry = CacheFingerprint::from_projection(
+            123,
+            &QkvProjection::random(4, 2, 2, 10),
+            2,
+        );
+        assert!(!original.accepts(&changed_model));
+        assert!(!original.accepts(&changed_geometry));
+    }
+}
