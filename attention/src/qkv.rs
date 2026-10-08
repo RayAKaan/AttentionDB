@@ -187,3 +187,46 @@ impl AttentionEngine {
         self.key_dim
     }
 }
+
+
+#[cfg(test)]
+mod c9_batch_tests {
+    use super::*;
+    use crate::projection::QkvProjection;
+
+    #[test]
+    fn c9_batch_matches_scalar_attention_exactly() {
+        let engine = AttentionEngine::new(QkvProjection::identity(4));
+        let query = vec![0.2, -0.1, 0.7, 0.4];
+        let candidates = vec![
+            vec![vec![1.0, 0.0, 0.0, 0.0], vec![0.0, 1.0, 0.0, 0.0]],
+            vec![vec![0.1, 0.2, 0.3, 0.4], vec![-0.4, 0.3, 0.2, 0.1]],
+            vec![vec![0.9, -0.2, 0.1, 0.0]],
+        ];
+        let scalar: Vec<_> = candidates
+            .iter()
+            .map(|candidate| engine.attend(&query, candidate).unwrap())
+            .collect();
+        let batch = engine.attend_batch(&query, &candidates).unwrap();
+        assert_eq!(batch.len(), scalar.len());
+        for (actual, expected) in batch.iter().zip(scalar.iter()) {
+            assert_eq!(actual.weights, expected.weights);
+            assert_eq!(actual.logits, expected.logits);
+            assert_eq!(actual.output, expected.output);
+            assert_eq!(actual.entropy, expected.entropy);
+        }
+    }
+
+    #[test]
+    fn c9_batch_empty_input_returns_empty_output() {
+        let engine = AttentionEngine::new(QkvProjection::identity(4));
+        assert!(engine.attend_batch(&[0.0; 4], &[]).unwrap().is_empty());
+    }
+
+    #[test]
+    fn c9_batch_propagates_invalid_candidate_error() {
+        let engine = AttentionEngine::new(QkvProjection::identity(4));
+        let candidates = vec![vec![vec![1.0, 0.0, 0.0, 0.0]], vec![]];
+        assert!(engine.attend_batch(&[0.0; 4], &candidates).is_err());
+    }
+}
