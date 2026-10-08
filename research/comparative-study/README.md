@@ -102,7 +102,12 @@ results preserved.
 - [x] **C9 — Efficient attention serving implementation** (merged to main; correctness/benchmark protocol registered, authoritative performance evidence pending)
   - Engine: `attention/src/qkv.rs` query projection reuse; `attention/src/c9_benchmark.rs` scalar-vs-batch microbenchmark
   - Protocol: `c9-efficient-attention/PLAN.md`; no speedup claim until measured on a named runner
-- [ ] **C10 — Cache lifecycle and projection-cost benchmark** (implementation PR in progress; CI and authoritative measurements pending)
+- [x] **C10 — Cache lifecycle and projection-cost benchmark** (implementation merged; authoritative measurements pending)
   - Protocol: `c10-cache-lifecycle/PLAN.md`
   - Engine: `attention/src/c10_cache_benchmark.rs` configurable deterministic Cartesian sweep; uncached projection vs cold fill vs warm lookup; exact K/V parity, cache accounting, p50/p95, payload estimate
-- [ ] **C11 — End-to-end workload evaluation and paper-ready evidence** (planned after C10; must include dataset/config/commit provenance, baseline comparisons, full query latency, retrieval-quality metrics, and immutable raw results)
+- [ ] **C11 — End-to-end workload evaluation and paper-ready evidence** (evidence tooling and CI checks implemented; authoritative TEST runs and paper-ready empirical conclusions still pending)
+  - Protocol/run matrix: `c11-end-to-end-evaluation/PLAN.md` and `c11-run-plan.csv` (2 datasets × 9 arms; 5 repetitions per cell)
+  - Aggregator: `c11-end-to-end-evaluation/c11_analyze.py` produces JSON, CSV, paired query bootstrap intervals where available, provenance hashes, and a Markdown report
+  - Validation/tests: `c11-end-to-end-evaluation/c11_validate.py` and `test_c11_evidence.py`; wired into CI
+  - C11 uses C8 raw per-query artifacts and keeps C10 cache microbenchmarks separate from end-to-end latency
+  - No empirical completion claim until all 18 TEST cells, five repetitions, correctness gates, and provenance checks pass
