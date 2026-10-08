@@ -178,6 +178,150 @@ pub fn benchmark_cache_lifecycle(
     })
 }
 
+
+/// Configurable dimensions for a reproducible cache-lifecycle sweep.
+/// Use `C10SweepConfig::default()` for the preregistered matrix; callers can
+/// pass smaller vectors for smoke runs. The default matrix is intentionally
+/// not executed by unit tests because it is a long-running experiment.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct C10SweepConfig {
+    pub candidate_counts: Vec<usize>,
+    pub head_counts: Vec<usize>,
+    pub attention_dims: Vec<usize>,
+    pub key_dims: Vec<usize>,
+    pub value_dims: Vec<usize>,
+    pub repetitions: usize,
+    pub seed: u64,
+}
+
+impl Default for C10SweepConfig {
+    fn default() -> Self {
+        Self {
+            candidate_counts: vec![32, 64, 128, 256, 500, 1_000, 2_000],
+            head_counts: vec![1, 3, 8],
+            attention_dims: vec![64, 128, 384],
+            key_dims: vec![32, 64, 128],
+            value_dims: vec![32, 64, 128],
+            repetitions: 5,
+            seed: 20261009,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct C10SweepCell {
+    pub cell_index: usize,
+    pub seed: u64,
+    pub report: C10CacheBenchmarkReport,
+}
+
+fn deterministic_candidate(
+    doc_id: usize,
+    head_count: usize,
+    attention_dim: usize,
+    seed: u64,
+) -> Vec<Vec<f32>> {
+    (0..head_count)
+        .map(|head| {
+            (0..attention_dim)
+                .map(|dimension| {
+                    let mixed = seed
+                        .wrapping_add((doc_id as u64).wrapping_mul(1_000_003))
+                        .wrapping_add((head as u64).wrapping_mul(9_176))
+                        .wrapping_add((dimension as u64).wrapping_mul(131))
+                        .wrapping_mul(2_654_435_761);
+                    ((mixed % 2_001) as i32 - 1_000) as f32 / 1_000.0
+                })
+                .collect()
+        })
+        .collect()
+}
+
+/// Run the full requested Cartesian sweep and return one provenance-keyed
+/// report per cell. The function does not write files: callers should serialize
+/// each returned cell as JSONL and preserve it as an immutable raw run.
+pub fn run_cache_lifecycle_sweep(config: &C10SweepConfig) -> Result<Vec<C10SweepCell>> {
+    if config.candidate_counts.is_empty()
+        || config.head_counts.is_empty()
+        || config.attention_dims.is_empty()
+        || config.key_dims.is_empty()
+        || config.value_dims.is_empty()
+    {
+        return Err(AttentionError::Config(
+            "C10 sweep dimensions must all be non-empty".into(),
+        ));
+    }
+    if config.repetitions < 3 {
+        return Err(AttentionError::Config(
+            "C10 sweep requires at least 3 measured repetitions".into(),
+        ));
+    }
+    if config.candidate_counts.contains(&0)
+        || config.head_counts.contains(&0)
+        || config.attention_dims.contains(&0)
+        || config.key_dims.contains(&0)
+        || config.value_dims.contains(&0)
+    {
+        return Err(AttentionError::Config(
+            "C10 sweep dimensions must be positive".into(),
+        ));
+    }
+
+    let cell_count = config.candidate_counts.len()
+        * config.head_counts.len()
+        * config.attention_dims.len()
+        * config.key_dims.len()
+        * config.value_dims.len();
+    let mut cells = Vec::with_capacity(cell_count);
+    let mut cell_index = 0usize;
+
+    for &candidate_count in &config.candidate_counts {
+        for &head_count in &config.head_counts {
+            for &attention_dim in &config.attention_dims {
+                for &key_dim in &config.key_dims {
+                    for &value_dim in &config.value_dims {
+                        let cell_seed = config.seed.wrapping_add(cell_index as u64);
+                        let qkv = QkvProjection::random(
+                            attention_dim,
+                            key_dim,
+                            value_dim,
+                            cell_seed,
+                        );
+                        let candidates: Vec<_> = (0..candidate_count)
+                            .map(|doc_id| {
+                                (
+                                    doc_id as u64,
+                                    deterministic_candidate(
+                                        doc_id,
+                                        head_count,
+                                        attention_dim,
+                                        cell_seed,
+                                    ),
+                                )
+                            })
+                            .collect();
+                        let fingerprint = qkv.fingerprint();
+                        let report = benchmark_cache_lifecycle(
+                            &qkv,
+                            &candidates,
+                            fingerprint,
+                            config.repetitions,
+                        )?;
+                        cells.push(C10SweepCell {
+                            cell_index,
+                            seed: cell_seed,
+                            report,
+                        });
+                        cell_index += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(cells)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
