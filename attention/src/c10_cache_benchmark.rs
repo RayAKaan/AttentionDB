@@ -112,6 +112,7 @@ pub fn benchmark_cache_lifecycle(
     let mut warm_lookup_times = Vec::with_capacity(repetitions);
     let mut exact_kv_parity = true;
     let mut final_cache = AttentionKVCache::new(fingerprint);
+    let mut aggregate_warm_stats = CacheStats::default();
 
     for _ in 0..repetitions {
         let start = Instant::now();
@@ -141,16 +142,11 @@ pub fn benchmark_cache_lifecycle(
         }
         warm_lookup_times.push(start.elapsed().as_micros());
         exact_kv_parity &= stats.hits == candidates.len() as u64 && stats.misses == 0;
+        aggregate_warm_stats.merge(&stats);
         final_cache = cold_cache;
     }
 
-    let mut warm_stats = CacheStats::default();
-    for (id, _) in candidates {
-        if final_cache.lookup(*id, &mut warm_stats).is_none() {
-            exact_kv_parity = false;
-        }
-    }
-    final_cache.seal_stats(&mut warm_stats);
+    final_cache.seal_stats(&mut aggregate_warm_stats);
     let estimated_kv_payload_bytes = final_cache.len()
         * fingerprint.head_count
         * (fingerprint.key_dim + fingerprint.value_dim)
@@ -169,10 +165,10 @@ pub fn benchmark_cache_lifecycle(
         cold_fill_p95_micros: percentile_nearest_rank(&cold_fill_times, 95),
         warm_lookup_median_micros: percentile_nearest_rank(&warm_lookup_times, 50),
         warm_lookup_p95_micros: percentile_nearest_rank(&warm_lookup_times, 95),
-        warm_hits: warm_stats.hits,
-        warm_misses: warm_stats.misses,
-        warm_hit_rate: warm_stats.hit_rate(),
-        resident_entries: warm_stats.entries,
+        warm_hits: aggregate_warm_stats.hits,
+        warm_misses: aggregate_warm_stats.misses,
+        warm_hit_rate: aggregate_warm_stats.hit_rate(),
+        resident_entries: aggregate_warm_stats.entries,
         estimated_kv_payload_bytes,
         exact_kv_parity,
     })
@@ -341,7 +337,7 @@ mod tests {
         let report = benchmark_cache_lifecycle(&qkv, &candidates, 123, 3).unwrap();
         assert!(report.exact_kv_parity);
         assert_eq!(report.candidate_count, 2);
-        assert_eq!(report.warm_hits, 2);
+        assert_eq!(report.warm_hits, 6);
         assert_eq!(report.warm_misses, 0);
         assert_eq!(report.warm_hit_rate, 1.0);
         assert_eq!(report.resident_entries, 2);
@@ -384,7 +380,7 @@ mod tests {
         assert_eq!(cells[0].cell_index, 0);
         assert_eq!(cells[0].seed, 77);
         assert!(cells[0].report.exact_kv_parity);
-        assert_eq!(cells[0].report.warm_hits, 2);
+        assert_eq!(cells[0].report.warm_hits, 6);
 
         let invalid = C10SweepConfig {
             candidate_counts: Vec::new(),
