@@ -554,8 +554,11 @@ def main():
                 "ndcg10_qrels_mean": round(st["ndcg10_qrels_mean"], 4),
                 "recall10_qrels_mean": round(st["recall10_qrels_mean"], 4),
                 "mrr10_qrels_mean": round(st["mrr10_qrels_mean"], 4),
-                "mean_abs_correction": a["c8_aggregate"]["mean_abs_correction"]
-                if a.get("c8_aggregate") else None,
+                "mean_abs_correction": (
+                    a.get("c8_aggregate", {}).get("mean_abs_correction")
+                    if isinstance(a.get("c8_aggregate"), dict)
+                    else None
+                ),
                 "train_dataset_hash": card["dataset_hash"],
             }
             with open(os.path.join(run_dir, "metrics.json"), "w", encoding="utf8") as f:
