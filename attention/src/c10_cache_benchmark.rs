@@ -369,6 +369,31 @@ mod tests {
     }
 
     #[test]
+    fn deterministic_sweep_runs_a_small_cell_and_rejects_invalid_config() {
+        let config = C10SweepConfig {
+            candidate_counts: vec![2],
+            head_counts: vec![2],
+            attention_dims: vec![4],
+            key_dims: vec![3],
+            value_dims: vec![2],
+            repetitions: 3,
+            seed: 77,
+        };
+        let cells = run_cache_lifecycle_sweep(&config).unwrap();
+        assert_eq!(cells.len(), 1);
+        assert_eq!(cells[0].cell_index, 0);
+        assert_eq!(cells[0].seed, 77);
+        assert!(cells[0].report.exact_kv_parity);
+        assert_eq!(cells[0].report.warm_hits, 2);
+
+        let invalid = C10SweepConfig {
+            candidate_counts: Vec::new(),
+            ..config
+        };
+        assert!(run_cache_lifecycle_sweep(&invalid).is_err());
+    }
+
+    #[test]
     fn cache_fingerprint_changes_when_model_changes() {
         let (qkv, _) = fixture();
         let original = CacheFingerprint::from_projection(123, &qkv, 2);
