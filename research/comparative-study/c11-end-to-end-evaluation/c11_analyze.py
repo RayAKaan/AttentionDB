@@ -120,6 +120,11 @@ def main():
         missing_reps = [rep for rep in range(1, rep_count + 1)
                         if not (artifacts_dir / f'ARM-{arm}-rep{rep}.json').exists()]
         if missing_reps: issues.append(f'{metrics_path}: missing per-query artifact repetitions {missing_reps}')
+        artifact_hashes = {
+            f'ARM-{arm}-rep{rep}.json': sha256(artifacts_dir / f'ARM-{arm}-rep{rep}.json')
+            for rep in range(1, rep_count + 1)
+            if (artifacts_dir / f'ARM-{arm}-rep{rep}.json').exists()
+        }
         summary = {}
         for metric in ('recall10_qrels_mean', 'ndcg10_qrels_mean', 'mrr10_qrels_mean', 'p50_us', 'p90_us', 'p95_us', 'deadline_exceeded'):
             vals = [r.get(metric) for r in reps if isinstance(r, dict) and r.get(metric) is not None]
@@ -130,6 +135,7 @@ def main():
                         'candidate_budget': m.get('candidate_budget'), 'ef_search': m.get('ef_search'),
                         'union_identity_ok': m.get('union_identity_ok'), 'summary': summary,
                         'provenance': env, 'environment_sha256': sha256(env_path) if env_path.exists() else None,
+                        'artifact_sha256': artifact_hashes,
                         'metrics_path': str(metrics_path.relative_to(raw_root)), 'metrics_sha256': sha256(metrics_path)})
         query_data[(dataset, arm)] = read_per_query(metrics_path.parent, arm, rep_count)
     cell_counts = {}
@@ -158,7 +164,9 @@ def main():
             except Exception as exc: issues.append(f'C10 JSONL line {line_no} invalid: {exc}')
     provenance = {'generated_utc': datetime.now(timezone.utc).isoformat(), 'python': platform.python_version(),
                   'platform': platform.platform(), 'raw_root': str(raw_root), 'c11_analyzer_sha256': sha256(Path(__file__)),
-                  'raw_metrics': [{'path': r['metrics_path'], 'sha256': r['metrics_sha256']} for r in records],
+                  'raw_metrics': [{'path': r['metrics_path'], 'sha256': r['metrics_sha256'],
+                                  'environment_sha256': r['environment_sha256'],
+                                  'artifacts': r['artifact_sha256']} for r in records],
                   'c10_jsonl': str(args.c10_jsonl.resolve()) if args.c10_jsonl else None,
                   'c10_jsonl_sha256': sha256(args.c10_jsonl) if args.c10_jsonl else None}
     result = {'schema_version': '1.0.0', 'empirical_completion': not missing and not issues,
