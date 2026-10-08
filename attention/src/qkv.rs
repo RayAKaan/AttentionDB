@@ -153,13 +153,33 @@ impl AttentionEngine {
     }
 
     /// Batch attend for multiple candidates with the same query.
-    /// Returns a vector of CandidateAttention, one per candidate.
+    ///
+    /// C9 optimization: project the query once per batch, not once per candidate.
+    /// Candidate K/V projection and the per-candidate softmax remain independent,
+    /// preserving scalar semantics and deterministic accumulation order. This is
+    /// the reference CPU batch path; it intentionally does not reorder candidates.
     pub fn attend_batch(
         &self,
         q_a: &[f32],
         candidates: &[Vec<Vec<f32>>],
     ) -> Result<Vec<CandidateAttention>> {
-        candidates.iter().map(|z_d| self.attend(q_a, z_d)).collect()
+        if candidates.is_empty() {
+            return Ok(Vec::new());
+        }
+        let q = self.project_query(q_a)?;
+        candidates
+            .iter()
+            .map(|z_d| {
+                if z_d.is_empty() {
+                    return Err(crate::errors::AttentionError::EmptyInput(
+                        "z_d cannot be empty".into(),
+                    ));
+                }
+                let k_d = self.qkv.project_k(z_d)?;
+                let v_d = self.qkv.project_v(z_d)?;
+                self.attend_from_kv(&q, z_d.len(), &k_d, &v_d)
+            })
+            .collect()
     }
 
     /// Get the key dimension.
