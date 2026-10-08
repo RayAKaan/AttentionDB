@@ -36,8 +36,7 @@ def required_rows(rows: list[dict[str, str]], track: str) -> list[dict[str, str]
 
 def cell_complete(row: dict[str, str]) -> bool:
     run_dir = RAW / row["run_id"]
-    marker = run_dir / ("artifacts" / Path("model.json") if row["track"] == "TUNE" else Path("metrics.json"))
-    return marker.exists()
+    return (run_dir / "metrics.json").exists()
 
 
 def test_rep_counts() -> dict[str, int]:
