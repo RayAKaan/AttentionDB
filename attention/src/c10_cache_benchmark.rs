@@ -154,7 +154,7 @@ pub fn benchmark_cache_lifecycle(
     }
 
     aggregate_warm_stats.entries = candidates.len();
-    let estimated_kv_payload_bytes = final_cache.len()
+    let estimated_kv_payload_bytes = candidates.len()
         * fingerprint.head_count
         * (fingerprint.key_dim + fingerprint.value_dim)
         * size_of::<f32>();
