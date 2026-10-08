@@ -430,7 +430,8 @@ def tune_train_block(mode, model_id, rows, d_k=KEY_DIM, d_v=VALUE_DIM):
 
 
 def run_train(run_id, row, dsinfo, art, query_ids, doc_ids, qrels, keep,
-              doc_vectors, qvec_out, mem_snapshot, model_id):
+              doc_vectors, qvec_out, mem_snapshot, model_id,
+              d_k=KEY_DIM, d_v=VALUE_DIM):
     mode = row["mode"].replace("MODE-", "")
     cfg = {
         "subcommand": "train", "k": K, "seed": SEED, "warmup": WARMUP,
