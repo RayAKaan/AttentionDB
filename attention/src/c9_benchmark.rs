@@ -24,7 +24,7 @@ pub struct C9BenchmarkReport {
 fn percentile_nearest_rank(samples: &[u128], percentile: usize) -> u128 {
     let mut sorted = samples.to_vec();
     sorted.sort_unstable();
-    let index = ((percentile * sorted.len() + 99) / 100).saturating_sub(1);
+    let index = (percentile * sorted.len()).div_ceil(100).saturating_sub(1);
     sorted[index.min(sorted.len() - 1)]
 }
 
