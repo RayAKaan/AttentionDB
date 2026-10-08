@@ -99,4 +99,10 @@ results preserved.
   - Probe/harness: `c8-residual-qkv-attention/probe/` + `harness/c8_{test_run,verify,analyze}.py`
   - Verified: λ=0 parity C==B bit-exact, cache parity I==E bit-exact, union identity 0 mismatches; `c8_verify.py` → `all_pass: true`
   - Reports: 10 reports in `c8-residual-qkv-attention/analysis/reports/` (TEST statistics pending CI)
-- [ ] C9 — future workload/scale/final report
+- [x] **C9 — Efficient attention serving implementation** (merged to main; correctness/benchmark protocol registered, authoritative performance evidence pending)
+  - Engine: `attention/src/qkv.rs` query projection reuse; `attention/src/c9_benchmark.rs` scalar-vs-batch microbenchmark
+  - Protocol: `c9-efficient-attention/PLAN.md`; no speedup claim until measured on a named runner
+- [ ] **C10 — Cache lifecycle and projection-cost benchmark** (implementation PR in progress; CI and authoritative measurements pending)
+  - Protocol: `c10-cache-lifecycle/PLAN.md`
+  - Engine: `attention/src/c10_cache_benchmark.rs` uncached projection vs cold fill vs warm lookup; exact K/V parity, cache accounting, p50/p95, payload estimate
+- [ ] **C11 — End-to-end workload evaluation and paper-ready evidence** (planned after C10; must include dataset/config/commit provenance, baseline comparisons, full query latency, retrieval-quality metrics, and immutable raw results)
