@@ -371,6 +371,12 @@ mod tests {
 
         let malformed = vec![(1, vec![vec![1.0, 2.0]])];
         assert!(benchmark_cache_lifecycle(&qkv, &malformed, 123, 3).is_err());
+
+        let uneven_heads = vec![
+            (1, vec![vec![0.0; 4], vec![1.0; 4]]),
+            (2, vec![vec![0.5; 4]]),
+        ];
+        assert!(benchmark_cache_lifecycle(&qkv, &uneven_heads, 123, 3).is_err());
     }
 
     #[test]
