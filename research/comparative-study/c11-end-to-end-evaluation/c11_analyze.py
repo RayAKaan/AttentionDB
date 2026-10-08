@@ -98,8 +98,28 @@ def main():
         if rep_count < 5: issues.append(f'{metrics_path}: only {rep_count} repetitions (required 5)')
         for field in ('test_queries', 'candidate_budget', 'ef_search', 'union_identity_ok'):
             if field not in m: issues.append(f'{metrics_path}: missing {field}')
+        expected_queries = 300 if dataset == 'SCI' else 323
+        if m.get('test_queries') != expected_queries:
+            issues.append(f'{metrics_path}: expected {expected_queries} TEST queries, got {m.get("test_queries")}')
+        if m.get('candidate_budget') != 500: issues.append(f'{metrics_path}: candidate_budget must be 500')
+        if m.get('ef_search') != 64: issues.append(f'{metrics_path}: ef_search must be 64')
+        if rep_count != 5: issues.append(f'{metrics_path}: exactly 5 repetitions required, got {rep_count}')
         env_path = metrics_path.parent / 'artifacts' / 'environment.yaml'
-        if not env_path.exists(): issues.append(f'{metrics_path}: missing artifacts/environment.yaml')
+        env = {}
+        if not env_path.exists():
+            issues.append(f'{metrics_path}: missing artifacts/environment.yaml')
+        else:
+            try:
+                env = json.loads(env_path.read_text(encoding='utf-8'))
+            except Exception as exc:
+                issues.append(f'{env_path}: invalid JSON provenance: {exc}')
+            for field in ('commit_sha', 'rustc_version', 'cpu_model', 'logical_cpu_count',
+                          'memory_total_bytes', 'c8pilot_sha256', 'input_hashes'):
+                if not env.get(field): issues.append(f'{env_path}: missing provenance field {field}')
+        artifacts_dir = metrics_path.parent / 'artifacts'
+        missing_reps = [rep for rep in range(1, rep_count + 1)
+                        if not (artifacts_dir / f'ARM-{arm}-rep{rep}.json').exists()]
+        if missing_reps: issues.append(f'{metrics_path}: missing per-query artifact repetitions {missing_reps}')
         summary = {}
         for metric in ('recall10_qrels_mean', 'ndcg10_qrels_mean', 'mrr10_qrels_mean', 'p50_us', 'p90_us', 'p95_us', 'deadline_exceeded'):
             vals = [r.get(metric) for r in reps if isinstance(r, dict) and r.get(metric) is not None]
@@ -109,8 +129,15 @@ def main():
                         'rep_count': rep_count, 'test_queries': m.get('test_queries'),
                         'candidate_budget': m.get('candidate_budget'), 'ef_search': m.get('ef_search'),
                         'union_identity_ok': m.get('union_identity_ok'), 'summary': summary,
+                        'provenance': env, 'environment_sha256': sha256(env_path) if env_path.exists() else None,
                         'metrics_path': str(metrics_path.relative_to(raw_root)), 'metrics_sha256': sha256(metrics_path)})
         query_data[(dataset, arm)] = read_per_query(metrics_path.parent, arm, rep_count)
+    cell_counts = {}
+    for record in records:
+        key = (record['dataset'], record['arm'])
+        cell_counts[key] = cell_counts.get(key, 0) + 1
+    for key, count in cell_counts.items():
+        if count > 1: issues.append(f'duplicate raw TEST records for {key}: {count}')
     by_cell = {(r['dataset'], r['arm']): r for r in records}
     expected = {(d, a) for d in DATASETS for a in ARMS}
     missing = sorted(expected - set(by_cell))
@@ -158,6 +185,18 @@ def main():
         fmt=lambda v: 'NA' if v is None else f'{v:.6g}'
         report.append(f"| {c['dataset']} | {c['contrast']} | {c['metric']} | {c['n_paired']} | {fmt(c['delta_mean'])} | [{fmt(c['ci95_low'])}, {fmt(c['ci95_high'])}] |")
     report += ['', '## Validation issues', ''] + ([f'- {i}' for i in issues] if issues else ['- None detected by the aggregator.'])
+    report += ['', '## C10 cache lifecycle microbenchmarks (separate track)', '',
+               '| Cell | Candidates | Heads | Attention dim | Key dim | Value dim | Uncached p50 µs | Cold-fill p50 µs | Warm-lookup p50 µs | Warm hit rate | Exact parity |',
+               '|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|']
+    for cell in c10:
+        q = cell.get('report', cell)
+        fmt = lambda v: 'NA' if v is None else f'{v:.6g}' if isinstance(v, (int, float)) else str(v)
+        report.append('| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |'.format(
+            cell.get('cell_index', 'NA'), q.get('candidate_count', 'NA'), q.get('head_count', 'NA'),
+            q.get('attention_dim', 'NA'), q.get('key_dim', 'NA'), q.get('value_dim', 'NA'),
+            fmt(q.get('uncached_projection_median_micros')), fmt(q.get('cold_fill_median_micros')),
+            fmt(q.get('warm_lookup_median_micros')), fmt(q.get('warm_hit_rate')), q.get('exact_kv_parity', 'NA')))
+    if not c10: report.append('| — | No C10 JSONL supplied | — | — | — | — | — | — | — | — | — |')
     report += ['', '## Interpretation limits', '', '- C10 cache lifecycle timings are a separate microbenchmark and are not end-to-end query latency.',
                '- These in-repository controls are not claims of superiority over external databases.',
                '- CI validates code and fixtures; only frozen, provenance-complete TEST runs provide empirical evidence.',
